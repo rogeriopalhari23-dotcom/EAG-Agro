@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 
 interface Env {
-  DB: D1Database;
-  KV_CACHE: KVNamespace;
+  DB: any;
+  KV_CACHE: any;
   ENVIRONMENT: string;
 }
 
