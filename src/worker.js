@@ -12,6 +12,8 @@ import { getActor } from "./auth.js";
 import { statement as s, parameters } from "./store.js";
 import * as companies from "./companies.js";
 import * as operations from "./operations.js";
+import * as catalog from "./catalog.js";
+import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
 export const VERSION = "0.3.1-review.2";
 async function route(request, env, rid) {
@@ -109,11 +111,43 @@ async function route(request, env, rid) {
       );
     }
   }
-  const cat = path.match(/^\/api\/catalog(?:\/([^/]+))?$/);
-  if (cat && method === "GET")
-    return response(await operations.catalog(env, actor, cat[1]));
-  if (path === "/api/parameters" && method === "GET")
-    return response({ parameters: await parameters(env, actor.tenant_id) });
+  if (path === "/api/catalog" && method === "POST")
+    return response(await catalog.createProduct(request, env, actor, rid), 201);
+  const cat = path.match(
+    /^\/api\/catalog\/([^/]+)(?:\/(codes|characteristics)(?:\/([^/]+))?)?$/,
+  );
+  if (path === "/api/catalog" && method === "GET")
+    return response(await catalog.catalog(env, actor));
+  if (cat) {
+    const [, id, sub, subId] = cat;
+    if (!sub && method === "GET")
+      return response(await catalog.catalog(env, actor, id));
+    if (!sub && method === "PATCH")
+      return response(await catalog.updateProduct(request, env, actor, rid, id));
+    if (sub === "codes" && !subId && method === "POST")
+      return response(await catalog.addCode(request, env, actor, rid, id), 201);
+    if (sub === "codes" && subId && method === "PATCH")
+      return response(
+        await catalog.updateCode(request, env, actor, rid, id, subId),
+      );
+    if (sub === "codes" && subId && method === "DELETE")
+      return response(
+        await catalog.removeCode(request, env, actor, rid, id, subId),
+      );
+    if (sub === "characteristics" && !subId && method === "POST")
+      return response(
+        await catalog.addCharacteristic(request, env, actor, rid, id),
+        201,
+      );
+    if (sub === "characteristics" && subId && method === "PATCH")
+      return response(
+        await catalog.updateCharacteristic(request, env, actor, rid, id, subId),
+      );
+  }
+  if (path === "/api/parameters" && method === "GET") {
+    const current = await parameters(env, actor.tenant_id);
+    return response({ parameters: current, definitions: definitionsView(current) });
+  }
   const pm = path.match(/^\/api\/parameters\/([a-z_]+)$/);
   if (pm && method === "PUT")
     return response(
@@ -131,10 +165,19 @@ async function route(request, env, rid) {
       );
   }
   const camp = path.match(
-    /^\/api\/campaigns\/([^/]+)(?:\/(activate|declarations))?$/,
+    /^\/api\/campaigns\/([^/]+)(?:\/(activate|declarations|icp)(?:\/([^/]+)\/(revoke))?)?$/,
   );
   if (camp) {
-    const [, id, action] = camp;
+    const [, id, action, declId, sub] = camp;
+    if (action === "declarations" && declId && sub === "revoke" && method === "POST")
+      return response(
+        await operations.revokeDeclaration(request, env, actor, rid, id, declId),
+      );
+    if (declId) fail(404, "route_not_found", "Rota não encontrada.");
+    if (action === "declarations" && method === "GET")
+      return response(await operations.listDeclarations(env, actor, id));
+    if (action === "icp" && method === "PUT")
+      return response(await operations.updateIcp(request, env, actor, rid, id));
     if (!action && method === "GET")
       return response(await operations.getCampaign(env, actor, id));
     if (!action && method === "PATCH")

@@ -994,10 +994,19 @@ async function showCompany(id, offset = 0) {
   $("content").replaceChildren(node);
   $("content").focus({ preventScroll: true });
 }
+const originLabels = {
+  SITE: "Site",
+  SOLICITACAO: "Solicitação",
+  PORTFOLIO: "Portfólio",
+};
+const admin = () => state.actor?.role === "admin";
+async function reloadProducts() {
+  state.products = (await api("/api/catalog")).products;
+}
 async function catalogView() {
   const node = section(
     "Catálogo",
-    "28 itens do portfólio documentado. Identidade pendente bloqueia uso; características da amostra não viram promessa de oferta.",
+    "Portfólio documentado. Identidade pendente bloqueia uso; características só da amostra não viram promessa de oferta.",
   );
   node.append(
     rows(state.products, (p) =>
@@ -1008,33 +1017,283 @@ async function catalogView() {
           "div",
           {},
           text("strong", p.variant_name),
-          text("small", p.group_name + " · " + p.source_ref),
+          text(
+            "small",
+            `${p.group_name} · ${p.source_ref || "sem referência"} · rev. ${p.revision ?? 1}`,
+          ),
         ),
         text(
           "span",
-          p.identity_status === "confirmed" ? "Identificado" : "Pendente",
+          !p.active
+            ? "Inativo"
+            : p.identity_status === "confirmed"
+              ? "Identificado"
+              : "Identidade pendente",
           "tag",
+        ),
+        button("Detalhes", () => showProduct(p.id)),
+      ),
+    ),
+  );
+  if (admin())
+    node.append(
+      details(
+        "Cadastrar produto",
+        makeForm(
+          [
+            input("Commodity (identificador, ex.: soy_meal)", "commodity"),
+            input("Grupo", "groupName"),
+            input("Variante", "variantName"),
+            select(
+              "Origem",
+              "origin",
+              Object.entries(originLabels),
+            ),
+            input("Referência da origem", "sourceRef", "text", "", false),
+            input("Motivo", "reason", "textarea"),
+          ],
+          async (v) => {
+            await api("/api/catalog", "POST", {
+              commodity: v.commodity,
+              groupName: v.groupName,
+              variantName: v.variantName,
+              origins: [v.origin],
+              sourceRef: v.sourceRef || undefined,
+              reason: v.reason,
+            });
+            await reloadProducts();
+            notice("Produto cadastrado com identidade pendente.");
+            await navigate("Catálogo");
+          },
+          "Cadastrar",
+        ),
+      ),
+    );
+  return node;
+}
+async function showProduct(id) {
+  const p = await api(`/api/catalog/${id}`),
+    origins = JSON.parse(p.origins_json || "[]"),
+    node = section(
+      p.variant_name,
+      `${p.group_name} · commodity ${p.commodity} · revisão ${p.revision}`,
+    );
+  node.append(
+    button("Voltar ao catálogo", () => navigate("Catálogo")),
+    panel(
+      "Identidade",
+      kv([
+        ["Situação", p.identity_status === "confirmed" ? "Identificado" : "Identidade pendente"],
+        ["Ativo", p.active ? "Sim" : "Não"],
+        ["Origem", origins.map((o) => originLabels[o] || o).join(", ")],
+        ["Referência", p.source_ref],
+        ["Consulta", p.consulted_at],
+        ["Responsável", p.updated_by],
+      ]),
+    ),
+    panel(
+      "Códigos NCM/HS",
+      text(
+        "p",
+        "Código pendente não comprova correspondência no mercado internacional. Confirmado exige fonte e versão da classificação.",
+        "muted",
+      ),
+      rows(p.codes, (c) =>
+        el(
+          "div",
+          { class: "row" },
+          el(
+            "div",
+            {},
+            text("strong", `${c.code_system} ${c.code}`),
+            text(
+              "small",
+              `${c.classification_version || "versão não informada"} · ${c.source_ref || "sem fonte"}`,
+            ),
+          ),
+          text("span", c.status === "confirmed" ? "Confirmado" : "Pendente", "tag"),
+          admin()
+            ? button("Remover", async () => {
+                const reason = prompt("Motivo da remoção do código:");
+                if (!reason) return;
+                await api(`/api/catalog/${id}/codes/${c.id}`, "DELETE", {
+                  expectedRevision: p.revision,
+                  reason,
+                });
+                notice("Código removido.");
+                await showProduct(id);
+              })
+            : null,
+        ),
+      ),
+    ),
+    panel(
+      "Características",
+      text(
+        "p",
+        "Só característica confirmada e fora do escopo de amostra pode ser citada em texto comercial.",
+        "muted",
+      ),
+      rows(p.characteristics, (c) =>
+        el(
+          "div",
+          { class: "row" },
+          el(
+            "div",
+            {},
+            text("strong", c.char_key),
+            text("small", `${c.char_value} · ${c.source_ref}`),
+          ),
+          text(
+            "span",
+            (c.status === "confirmed" ? "Confirmada" : "Não confirmada") +
+              (c.sample_only ? " · só amostra" : ""),
+            "tag",
+          ),
         ),
       ),
     ),
   );
-  return node;
+  if (admin()) {
+    node.append(
+      details(
+        "Alterar identidade",
+        makeForm(
+          [
+            input("Variante", "variantName", "text", p.variant_name),
+            input("Grupo", "groupName", "text", p.group_name),
+            input("Referência da origem", "sourceRef", "text", p.source_ref || "", false),
+            select(
+              "Identidade",
+              "identityStatus",
+              [
+                ["pending", "Pendente"],
+                ["confirmed", "Confirmada"],
+              ],
+              p.identity_status,
+            ),
+            select(
+              "Ativo",
+              "active",
+              [
+                ["true", "Sim"],
+                ["false", "Não"],
+              ],
+              p.active ? "true" : "false",
+            ),
+            input("Motivo", "reason", "textarea"),
+          ],
+          async (v) => {
+            await api(`/api/catalog/${id}`, "PATCH", {
+              variantName: v.variantName,
+              groupName: v.groupName,
+              sourceRef: v.sourceRef || null,
+              identityStatus: v.identityStatus,
+              active: v.active === "true",
+              expectedRevision: p.revision,
+              reason: v.reason,
+            });
+            await reloadProducts();
+            notice("Produto atualizado.");
+            await showProduct(id);
+          },
+        ),
+      ),
+      details(
+        "Cadastrar código",
+        makeForm(
+          [
+            select("Sistema", "codeSystem", ["NCM", "HS"]),
+            input("Código", "code"),
+            select("Estado", "status", [
+              ["pending", "Pendente"],
+              ["confirmed", "Confirmado"],
+            ]),
+            input("Versão da classificação", "classificationVersion", "text", "", false),
+            input("Fonte", "sourceRef", "text", "", false),
+            input("Motivo", "reason", "textarea"),
+          ],
+          async (v) => {
+            await api(`/api/catalog/${id}/codes`, "POST", {
+              codeSystem: v.codeSystem,
+              code: v.code,
+              status: v.status,
+              classificationVersion: v.classificationVersion || undefined,
+              sourceRef: v.sourceRef || undefined,
+              expectedRevision: p.revision,
+              reason: v.reason,
+            });
+            notice("Código registrado.");
+            await showProduct(id);
+          },
+          "Registrar código",
+        ),
+      ),
+      details(
+        "Cadastrar característica",
+        makeForm(
+          [
+            input("Característica", "key"),
+            input("Valor", "value"),
+            input("Fonte", "sourceRef"),
+            select("Estado", "status", [
+              ["not_confirmed", "Não confirmada"],
+              ["confirmed", "Confirmada"],
+            ]),
+            select("Vale só para a amostra", "sampleOnly", [
+              ["true", "Sim"],
+              ["false", "Não"],
+            ]),
+            input("Motivo", "reason", "textarea"),
+          ],
+          async (v) => {
+            await api(`/api/catalog/${id}/characteristics`, "POST", {
+              key: v.key,
+              value: v.value,
+              sourceRef: v.sourceRef,
+              status: v.status,
+              sampleOnly: v.sampleOnly === "true",
+              expectedRevision: p.revision,
+              reason: v.reason,
+            });
+            notice("Característica registrada.");
+            await showProduct(id);
+          },
+          "Registrar característica",
+        ),
+      ),
+    );
+  }
+  $("content").replaceChildren(node);
+  $("content").focus({ preventScroll: true });
 }
 async function parametersView() {
   const d = await api("/api/parameters"),
     node = section(
       "Parâmetros",
-      "Valores versionados. Mínimos nacionais não definidos continuam desconhecidos.",
+      "Valores versionados. Parâmetro sem valor aprovado fica pendente e bloqueia a função que depende dele.",
     );
   node.append(
-    rows(Object.entries(d.parameters), ([k, v]) =>
-      el(
+    rows(d.definitions, (def) => {
+      const configured = def.configuredScopes.map((scope) => [
+        scope,
+        d.parameters[`${def.key}:${scope}`],
+      ]);
+      return el(
         "div",
         { class: "row" },
-        text("strong", k),
-        text("span", JSON.stringify(v), "tag"),
-      ),
-    ),
+        el(
+          "div",
+          {},
+          text("strong", def.label),
+          text("small", `${def.key} · escopo ${def.scope} · usado em ${def.requiredBy}`),
+          ...configured.map(([scope, value]) =>
+            text("small", `${scope}: ${JSON.stringify(value)}`),
+          ),
+        ),
+        text("span", configured.length ? "Com valor" : "Pendente", "tag"),
+      );
+    }),
   );
   if (state.actor.role === "admin")
     node.append(
@@ -1042,26 +1301,29 @@ async function parametersView() {
         "Alterar parâmetro",
         makeForm(
           [
-            select("Parâmetro", "key", [
-              "volume_min",
-              "confidence_min",
-              "potential_min",
-              "completeness_min",
-              "risk_coverage_min",
-              "sanctions_max_age_hours",
-            ]),
-            input("Escopo — global ou commodity:mercado", "scope"),
+            select(
+              "Parâmetro",
+              "key",
+              d.definitions.map((def) => [def.key, def.label]),
+            ),
+            input("Escopo (ver a linha do parâmetro)", "scope"),
             input(
-              "Valor numérico (volume em MT; sanções em horas)",
+              'Valor em JSON, ex.: 50, [5,10,15,20] ou {"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}',
               "value",
-              "number",
+              "textarea",
             ),
             input("Motivo da decisão", "reason", "textarea"),
           ],
           async (v) => {
+            let value;
+            try {
+              value = JSON.parse(v.value);
+            } catch {
+              throw new Error("Valor precisa ser JSON válido. Texto vai entre aspas.");
+            }
             await api(`/api/parameters/${v.key}`, "PUT", {
               scope: v.scope,
-              value: Number(v.value),
+              value,
               reason: v.reason,
             });
             notice("Nova vigência registrada.");
@@ -1117,6 +1379,7 @@ async function campaignView() {
           ),
         ),
         text("span", statusLabels[c.status], "tag"),
+        button("Detalhes", () => showCampaign(c.id)),
         approver() && c.status !== "active"
           ? button("Ativar", async () => {
               const r = await api(`/api/campaigns/${c.id}/activate`, "POST", {
@@ -1199,6 +1462,158 @@ async function campaignView() {
       ),
     );
   return node;
+}
+async function showCampaign(id) {
+  const [d, hist] = await Promise.all([
+      api(`/api/campaigns/${id}`),
+      api(`/api/campaigns/${id}/declarations`),
+    ]),
+    c = d.campaign,
+    icp = d.icp,
+    sectors = icp ? JSON.parse(icp.user_sectors_json) : [],
+    node = section(
+      c.name,
+      `${statusLabels[c.status]} · versão ${c.version} · ${c.market === "national" ? `${c.origin_city}/${c.origin_uf} · ${c.radius_km} km` : c.country_code}`,
+    );
+  node.append(
+    button("Voltar às campanhas", () => navigate("Campanhas")),
+    panel(
+      "Cliente ideal (ICP)",
+      icp
+        ? kv([
+            ["Setores usuários", sectors.join(", ")],
+            ["Porte alvo", icp.size_target === "medium_plus" ? "Médio ou maior" : "Médio"],
+            ["Região", icp.region],
+            ["Decisor", icp.decision_role],
+            ["Influenciador", icp.influencer_role],
+            ["Dores de suprimento", icp.supply_pains],
+            ["Ciclo de compra (dias)", icp.buying_cycle_days],
+            ["Atualizado por", `${icp.updated_by} em ${icp.updated_at}`],
+          ])
+        : text("p", "ICP ausente: a campanha não pode ser ativada.", "error"),
+    ),
+    panel(
+      "Declarações comerciais",
+      text(
+        "p",
+        "Frase de volume e prova social só entram nos textos com declaração aprovada e vigente.",
+        "muted",
+      ),
+      rows(hist.items, (x) =>
+        el(
+          "div",
+          { class: "row" },
+          el(
+            "div",
+            {},
+            text(
+              "strong",
+              x.kind === "volume_available"
+                ? `Volume disponível: ${x.value_bool ? "sim" : "não"}`
+                : "Prova social",
+            ),
+            x.text ? text("small", x.text) : null,
+            text(
+              "small",
+              `Aprovada por ${x.approved_by} em ${x.approved_at}${x.review_due_at ? ` · válida até ${x.review_due_at}` : ""}`,
+            ),
+          ),
+          text("span", x.status === "approved" ? "Vigente" : "Revogada", "tag"),
+          approver() && x.status === "approved"
+            ? button("Revogar", async () => {
+                const reason = prompt("Motivo da revogação:");
+                if (!reason) return;
+                await api(`/api/campaigns/${id}/declarations/${x.id}/revoke`, "POST", {
+                  expectedVersion: c.version,
+                  reason,
+                });
+                notice("Declaração revogada.");
+                await showCampaign(id);
+              })
+            : null,
+        ),
+      ),
+    ),
+  );
+  if (writable() && c.status !== "ended")
+    node.append(
+      details(
+        "Editar ICP",
+        makeForm(
+          [
+            input("Setores usuários, separados por vírgula", "userSectors", "text", sectors.join(", ")),
+            select(
+              "Porte alvo",
+              "sizeTarget",
+              [
+                ["medium", "Médio"],
+                ["medium_plus", "Médio ou maior"],
+              ],
+              icp?.size_target,
+            ),
+            input("Região do cliente ideal", "region", "text", icp?.region),
+            input("Cargo decisor", "decisionRole", "text", icp?.decision_role),
+            input("Cargo influenciador", "influencerRole", "text", icp?.influencer_role),
+            input("Dores de suprimento", "supplyPains", "textarea", icp?.supply_pains || "", false),
+            input("Ciclo de compra em dias", "buyingCycleDays", "number", icp?.buying_cycle_days ?? "", false),
+          ],
+          async (v) => {
+            await api(`/api/campaigns/${id}/icp`, "PUT", {
+              expectedVersion: c.version,
+              icp: {
+                userSectors: v.userSectors
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+                sizeTarget: v.sizeTarget,
+                region: v.region,
+                decisionRole: v.decisionRole,
+                influencerRole: v.influencerRole,
+                supplyPains: v.supplyPains || null,
+                buyingCycleDays: v.buyingCycleDays ? Number(v.buyingCycleDays) : null,
+              },
+            });
+            notice("ICP salvo em nova versão da campanha.");
+            await showCampaign(id);
+          },
+          "Salvar ICP",
+        ),
+      ),
+    );
+  if (approver() && c.status !== "ended")
+    node.append(
+      details(
+        "Aprovar declaração",
+        makeForm(
+          [
+            select("Tipo", "kind", [
+              ["volume_available", "Volume disponível"],
+              ["social_proof", "Prova social"],
+            ]),
+            select("Volume disponível confirmado", "valueBool", [
+              ["true", "Sim"],
+              ["false", "Não"],
+            ]),
+            input("Texto aprovado da prova social", "text", "textarea", "", false),
+            input("Válida até (AAAA-MM-DD)", "reviewDueAt", "date", "", false),
+          ],
+          async (v) => {
+            await api(`/api/campaigns/${id}/declarations`, "POST", {
+              kind: v.kind,
+              valueBool: v.kind === "volume_available" ? v.valueBool === "true" : undefined,
+              text: v.kind === "social_proof" ? v.text : undefined,
+              reviewDueAt: v.reviewDueAt || undefined,
+              expectedVersion: c.version,
+            });
+            notice("Declaração aprovada.");
+            await showCampaign(id);
+          },
+          "Aprovar",
+        ),
+      ),
+    );
+  $("content").replaceChildren(node);
+  $("content").focus({ preventScroll: true });
 }
 async function suppressionView() {
   const node = section(

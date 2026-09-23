@@ -18,6 +18,8 @@ ctx.env.ASSETS = {
       "/": ["index.html", "text/html"],
       "/app.js": ["app.js", "text/javascript"],
       "/app.css": ["app.css", "text/css"],
+      "/fonts/roboto-latin-400-normal.woff2": ["fonts/roboto-latin-400-normal.woff2", "font/woff2"],
+      "/fonts/barlow-condensed-latin-700-normal.woff2": ["fonts/barlow-condensed-latin-700-normal.woff2", "font/woff2"],
     };
     if (!files[path]) return new Response("Not found", { status: 404 });
     return new Response(
@@ -140,7 +142,68 @@ try {
       0,
     );
   }
+  // P1-T7: ficha do produto e código pendente pelo formulário do admin.
+  const nav = (label) =>
+    page.getByRole("navigation").getByRole("button", { name: label, exact: true }).click();
+  const form = (summary) =>
+    page
+      .locator("details")
+      .filter({ has: page.locator("summary", { hasText: summary }) })
+      .locator("form");
+  await nav("Catálogo");
+  await page
+    .locator(".row")
+    .filter({ hasText: "ICUMSA 45" })
+    .getByRole("button", { name: "Detalhes" })
+    .click();
+  await page.getByRole("heading", { name: "ICUMSA 45", exact: true }).waitFor();
+  await page.locator("summary", { hasText: "Cadastrar código" }).click();
+  const codeForm = form("Cadastrar código");
+  await codeForm.getByLabel("Código", { exact: true }).fill("1701.14.00");
+  await codeForm.getByLabel("Motivo", { exact: true }).fill("Código em apuração no teste de interface");
+  await codeForm.getByRole("button", { name: "Registrar código" }).click();
+  await page.getByText("NCM 17011400", { exact: true }).waitFor();
+  // P1-T8: parâmetros mostram pendências sem valor inventado.
+  await nav("Parâmetros");
+  await page
+    .locator(".row")
+    .filter({ hasText: "Janela de envio no fuso do destinatário" })
+    .getByText("Pendente", { exact: true })
+    .waitFor();
+  // P1-T9: campanha com edição de ICP versionada.
+  await nav("Campanhas");
+  await page.locator("summary", { hasText: "Criar campanha" }).click();
+  const cform = form("Criar campanha");
+  await cform.getByLabel("Nome", { exact: true }).fill("Açúcar interior UI");
+  await cform.getByLabel("Produto", { exact: true }).selectOption("product-06");
+  await cform.getByLabel("Cidade de origem nacional").fill("Sertãozinho");
+  await cform.getByLabel("UF nacional").fill("SP");
+  await cform.getByLabel("Setores usuários, separados por vírgula").fill("balas");
+  await cform.getByLabel("Região do cliente ideal").fill("SP");
+  await cform.getByLabel("Cargo decisor").fill("Compras");
+  await cform.getByLabel("Cargo influenciador").fill("Qualidade");
+  await cform.getByRole("button", { name: "Criar campanha" }).click();
+  await page
+    .locator(".row")
+    .filter({ hasText: "Açúcar interior UI" })
+    .getByRole("button", { name: "Detalhes" })
+    .click();
+  await page.locator("summary", { hasText: "Editar ICP" }).click();
+  const icpForm = form("Editar ICP");
+  await icpForm.getByLabel("Setores usuários, separados por vírgula").fill("balas, chocolates");
+  await icpForm.getByRole("button", { name: "Salvar ICP" }).click();
+  await page.getByText("balas, chocolates", { exact: true }).waitFor();
+  assert.equal(
+    ctx.DB.raw.prepare("SELECT version FROM campaigns WHERE name='Açúcar interior UI'").get().version,
+    2,
+  );
+  await page.screenshot({ path: "review-output/campanha-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  );
   await page
     .getByRole("navigation")
     .getByRole("button", { name: "Hoje", exact: true })
@@ -157,7 +220,7 @@ try {
   });
   assert.deepEqual(errors, []);
   console.log(
-    "UI smoke OK: cadastro, demanda, gate, 7 telas e viewport 390 px, sem erros JS.",
+    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, 7 telas e viewport 390 px, sem erros JS.",
   );
 } finally {
   await browser.close();

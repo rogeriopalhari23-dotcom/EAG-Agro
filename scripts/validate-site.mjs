@@ -7,8 +7,17 @@ assert.deepEqual((await readdir(resolve(root, "dist"))).sort(), [
   "_headers",
   "app.css",
   "app.js",
+  "fonts",
   "index.html",
 ]);
+// Fontes: só woff2 e licenças; toda fonte citada no CSS precisa existir.
+const fonts = await readdir(resolve(root, "dist/fonts"));
+assert.ok(fonts.every((f) => /^[a-z0-9-]+\.woff2$|^LICENSE-[a-z0-9-]+\.txt$/.test(f)));
+const css = await readFile(resolve(root, "dist/app.css"), "utf8");
+for (const [, file] of css.matchAll(/url\("fonts\/([^"]+)"\)/g))
+  assert.ok(fonts.includes(file), `Fonte ausente: ${file}`);
+for (const family of ["roboto", "barlow-condensed", "ibm-plex-mono"])
+  assert.ok(fonts.includes(`LICENSE-${family}.txt`), `Licença ausente: ${family}`);
 const worker = await import(pathToFileURL(resolve(root, "src/worker.js")).href);
 assert.equal(typeof worker.default.fetch, "function");
 const html = await readFile(resolve(root, "dist/index.html"), "utf8");

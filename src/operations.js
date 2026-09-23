@@ -22,29 +22,7 @@ import {
   now,
 } from "./store.js";
 import { identifierHash } from "./crypto.js";
-export async function catalog(env, actor, id) {
-  if (id) {
-    const p = await product(env, actor.tenant_id, id);
-    const [codes, characteristics] = await env.DB.batch([
-      s(env, "SELECT * FROM product_codes WHERE product_id=?", id),
-      s(env, "SELECT * FROM product_characteristics WHERE product_id=?", id),
-    ]);
-    return {
-      ...p,
-      codes: codes.results,
-      characteristics: characteristics.results,
-    };
-  }
-  return {
-    products: (
-      await s(
-        env,
-        "SELECT * FROM products WHERE tenant_id=? ORDER BY id",
-        actor.tenant_id,
-      ).all()
-    ).results,
-  };
-}
+import { validateParameter, crossCheck } from "./parameter-registry.js";
 export async function setParameter(request, env, actor, rid, key) {
   requireRole(actor, new Set(["admin"]));
   const i = await bodyJson(request),
@@ -52,38 +30,19 @@ export async function setParameter(request, env, actor, rid, key) {
     reason = str(i.reason, "motivo", 1000);
   if (reason.length < 5)
     fail(422, "reason_required", "Descreva o motivo da alteração.");
-  if (
-    [
-      "confidence_min",
-      "potential_min",
-      "completeness_min",
-      "risk_coverage_min",
-    ].includes(key)
-  ) {
-    if (scope !== "global") fail(422, "invalid_scope", "Use escopo global.");
-    number(i.value, "valor", 0, 100);
-  } else if (key === "sanctions_max_age_hours") {
-    if (scope !== "global") fail(422, "invalid_scope", "Use escopo global.");
-    number(i.value, "validade", 1, 720);
-  } else if (key === "volume_min") {
-    const match = scope.match(/^([a-z_]+):(national|international)$/);
-    if (!match)
-      fail(
-        422,
-        "invalid_scope",
-        "Use commodity:national ou commodity:international; unidade MT.",
-      );
+  const current = await parameters(env, actor.tenant_id);
+  i.value = validateParameter(key, scope, i.value, current);
+  crossCheck(key, scope, i.value, current);
+  if (key === "volume_min") {
     const found = await s(
       env,
       "SELECT id FROM products WHERE tenant_id=? AND commodity=? AND active=1 AND identity_status=?",
       actor.tenant_id,
-      match[1],
+      scope.split(":")[0],
       "confirmed",
     ).first();
     if (!found) fail(422, "invalid_scope", "Commodity inválida.");
-    number(i.value, "volume mínimo em MT", 0.000001, 1e12);
-  } else
-    fail(422, "parameter_not_editable", "Parâmetro não editável nesta versão.");
+  }
   const rows = await s(
     env,
     "SELECT * FROM parameters WHERE tenant_id=? AND parameter_key=? AND scope_key=? ORDER BY effective_from DESC,rowid DESC LIMIT 1",
@@ -251,15 +210,7 @@ export async function createCampaign(request, env, actor, rid) {
     if (!/^[A-Z]{2}$/.test(country) || country === "BR")
       fail(422, "invalid_country", "Informe país estrangeiro com duas letras.");
   }
-  const icp = i.icp;
-  if (
-    !icp ||
-    !Array.isArray(icp.userSectors) ||
-    icp.userSectors.length < 1 ||
-    icp.userSectors.length > 20
-  )
-    fail(422, "icp_required", "Preencha o perfil de cliente da campanha.");
-  const sectors = icp.userSectors.map((v) => str(v, "setor usuário", 100));
+  const icp = icpValues(i.icp);
   await commit(env, [
     s(
       env,
@@ -281,15 +232,7 @@ export async function createCampaign(request, env, actor, rid) {
       env,
       `INSERT INTO campaign_icp(campaign_id,user_sectors_json,size_target,region,decision_role,influencer_role,supply_pains,buying_cycle_days,updated_by) VALUES (?,?,?,?,?,?,?,?,?)`,
       id,
-      JSON.stringify(sectors),
-      oneOf(icp.sizeTarget, ["medium", "medium_plus"], "porte"),
-      str(icp.region, "região", 200),
-      str(icp.decisionRole, "decisor", 200),
-      str(icp.influencerRole, "influenciador", 200),
-      str(icp.supplyPains, "dor", 500, true),
-      icp.buyingCycleDays == null
-        ? null
-        : number(icp.buyingCycleDays, "ciclo", 1, 3650),
+      ...icp,
       actor.id,
     ),
     auditStatement(env, actor, rid, "campaign.created", "campaign", id, {
@@ -298,6 +241,127 @@ export async function createCampaign(request, env, actor, rid) {
     }),
   ]);
   return { id, version: 1, status: "draft" };
+}
+// ICP da campanha (K1): setores usuários, porte médio/média-mais, região e papéis de decisão.
+function icpValues(icp) {
+  if (
+    !icp ||
+    typeof icp !== "object" ||
+    !Array.isArray(icp.userSectors) ||
+    icp.userSectors.length < 1 ||
+    icp.userSectors.length > 20
+  )
+    fail(422, "icp_required", "Preencha o perfil de cliente da campanha.");
+  return [
+    JSON.stringify(icp.userSectors.map((v) => str(v, "setor usuário", 100))),
+    oneOf(icp.sizeTarget, ["medium", "medium_plus"], "porte"),
+    str(icp.region, "região", 200),
+    str(icp.decisionRole, "decisor", 200),
+    str(icp.influencerRole, "influenciador", 200),
+    str(icp.supplyPains, "dor", 500, true),
+    icp.buyingCycleDays == null
+      ? null
+      : number(icp.buyingCycleDays, "ciclo", 1, 3650),
+  ];
+}
+const ICP_COLUMNS = [
+  "user_sectors_json",
+  "size_target",
+  "region",
+  "decision_role",
+  "influencer_role",
+  "supply_pains",
+  "buying_cycle_days",
+];
+// Edição versionada: a campanha sobe de versão e a auditoria guarda o ICP anterior e o novo.
+export async function updateIcp(request, env, actor, rid, id) {
+  requireRole(actor, WRITE_ROLES);
+  const c = await campaign(env, actor, id),
+    i = await bodyJson(request);
+  if (i.expectedVersion !== c.version)
+    fail(409, "edit_conflict", "Recarregue a campanha antes de alterar.");
+  if (c.status === "ended")
+    fail(409, "campaign_ended", "Campanha encerrada não muda de perfil.");
+  const before = await s(env, "SELECT * FROM campaign_icp WHERE campaign_id=?", id).first();
+  const values = icpValues(i.icp);
+  await commit(env, [
+    s(
+      env,
+      "UPDATE campaigns SET version=CASE WHEN version=? THEN version+1 ELSE -1 END,updated_at=? WHERE tenant_id=? AND id=?",
+      c.version,
+      now(),
+      actor.tenant_id,
+      id,
+    ),
+    s(
+      env,
+      `INSERT INTO campaign_icp(campaign_id,${ICP_COLUMNS.join(",")},updated_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(campaign_id) DO UPDATE SET ${ICP_COLUMNS.map((k) => `${k}=excluded.${k}`).join(",")},updated_by=excluded.updated_by,updated_at=excluded.updated_at`,
+      id,
+      ...values,
+      actor.id,
+      now(),
+    ),
+    auditStatement(env, actor, rid, "campaign.icp_updated", "campaign", id, {
+      version: c.version + 1,
+      before: before
+        ? Object.fromEntries(ICP_COLUMNS.map((k) => [k, before[k]]))
+        : null,
+      after: Object.fromEntries(ICP_COLUMNS.map((k, n) => [k, values[n]])),
+    }),
+  ]);
+  return { id, version: c.version + 1 };
+}
+export async function revokeDeclaration(request, env, actor, rid, id, declId) {
+  requireRole(actor, APPROVER_ROLES);
+  const c = await campaign(env, actor, id),
+    i = await bodyJson(request);
+  if (i.expectedVersion !== c.version)
+    fail(409, "edit_conflict", "Recarregue a campanha.");
+  const reason = str(i.reason, "motivo", 500);
+  if (reason.length < 5) fail(422, "reason_required", "Descreva o motivo.");
+  const d = await s(
+    env,
+    "SELECT * FROM campaign_declarations WHERE id=? AND campaign_id=?",
+    declId,
+    id,
+  ).first();
+  if (!d) fail(404, "declaration_not_found", "Declaração não encontrada.");
+  if (d.status !== "approved")
+    fail(409, "declaration_revoked", "Declaração já revogada.");
+  await commit(env, [
+    s(
+      env,
+      "UPDATE campaigns SET version=CASE WHEN version=? THEN version+1 ELSE -1 END,updated_at=? WHERE tenant_id=? AND id=?",
+      c.version,
+      now(),
+      actor.tenant_id,
+      id,
+    ),
+    s(
+      env,
+      "UPDATE campaign_declarations SET status='revoked' WHERE id=? AND campaign_id=? AND status='approved'",
+      declId,
+      id,
+    ),
+    auditStatement(env, actor, rid, "campaign.declaration_revoked", "campaign", id, {
+      declarationId: declId,
+      kind: d.kind,
+      reason,
+    }),
+  ]);
+  return { id: declId, revoked: true, version: c.version + 1 };
+}
+export async function listDeclarations(env, actor, id) {
+  await campaign(env, actor, id);
+  return {
+    items: (
+      await s(
+        env,
+        "SELECT * FROM campaign_declarations WHERE campaign_id=? ORDER BY approved_at DESC,rowid DESC",
+        id,
+      ).all()
+    ).results,
+  };
 }
 export async function changeCampaign(
   request,
