@@ -19,6 +19,7 @@ import * as profiles from "./profiles.js";
 import * as emailValidation from "./email-validation.js";
 import * as fichas from "./fichas.js";
 import { handleUnsubscribe } from "./unsubscribe.js";
+import * as sanctions from "./sanctions.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -200,6 +201,25 @@ async function route(request, env, rid) {
     if (action === "defer" && method === "POST") return response(await fichas.setStatus(request, env, actor, rid, id, "deferred"));
     if (action === "discard" && method === "POST") return response(await fichas.setStatus(request, env, actor, rid, id, "discarded"));
   }
+  if (path === "/api/sanctions/sources" && method === "POST")
+    return response(await sanctions.addSource(request, env, actor, rid), 201);
+  if (path === "/api/sanctions/sources" && method === "GET")
+    return response(await sanctions.listSources(env));
+  const sa = path.match(/^\/api\/sanctions\/sources\/([^/]+)$/);
+  if (sa && method === "PATCH")
+    return response(await sanctions.setSourceActive(request, env, actor, rid, sa[1]));
+  const sv = path.match(/^\/api\/sanctions\/sources\/([^/]+)\/versions$/);
+  if (sv && method === "POST") return response(await sanctions.startVersion(request, env, actor, rid, sv[1]), 201);
+  const se = path.match(/^\/api\/sanctions\/versions\/([^/]+)\/(entries|finish)$/);
+  if (se && method === "POST")
+    return response(await (se[2] === "entries" ? sanctions.addEntries : sanctions.finishVersion)(request, env, actor, rid, se[1]));
+  const scr = path.match(/^\/api\/companies\/([^/]+)\/screening$/);
+  if (scr) {
+    if (method === "POST") return response(await sanctions.screenCompany(request, env, actor, rid, scr[1]), 201);
+    if (method === "GET") return response(await sanctions.screeningView(env, actor, scr[1]));
+  }
+  const smd = path.match(/^\/api\/screening-matches\/([^/]+)\/decisions$/);
+  if (smd && method === "POST") return response(await sanctions.decideMatch(request, env, actor, rid, smd[1]), 201);
   const prof = path.match(/^\/api\/companies\/([^/]+)\/profiles$/);
   if (prof) {
     if (method === "GET") return response({ items: await profiles.listProfiles(env, actor, prof[1]) });

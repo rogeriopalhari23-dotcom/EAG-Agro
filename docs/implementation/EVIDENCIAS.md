@@ -130,3 +130,12 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - `docs/OPERACAO.md`: passo humano do Access (bypass só para `/u/*`), segredos e parâmetros do piloto, e a liberação dos adaptadores como portão humano (o `validate-deploy` recusa `queues`/`triggers`).
 - Testes: `tests/unsubscribe.test.mjs` (5 casos).
 - **Depende de validação externa:** aplicação do Access com bypass e teste sem login no domínio real.
+
+## P2-T16 — Sanções pré-envio (parcial)
+
+- `src/sanctions.js`, `complianceStatus` em `src/scores.js`, rotas `/api/sanctions/*`, `/api/companies/:id/screening`, `/api/screening-matches/:id/decisions`.
+- Fontes: cadastro, listagem e ativação só pelo admin com motivo (a 0.3.1 já semeia OFAC SDN, CGU CEIS e CGU CNEP ativas). Importação por versão em lotes de até 300 registros (limite de 64 KB), com hash do arquivo oficial e contagem declarada; contagem diferente → versão `failed` (lista parcial nunca vale).
+- Triagem contra a versão importada mais recente de **todas** as fontes ativas (errata item 5): nome normalizado (sem acento, pontuação e sufixo societário) → revisão (AT8); identificador oficial + país compatível → bloqueio (AT9). Decisão humana auditada (falso positivo, bloqueio confirmado, continuar revisando, alerta de integridade). Lista nova torna a triagem anterior desatualizada.
+- `complianceStatus` para o pré-envio: `clear`, `review`, `blocked` ou `unavailable` (sem política, sem lista, sem triagem ou triagem vencida → nunca liberação; R19.3).
+- Testes: `tests/sanctions.test.mjs` (7 casos).
+- **Bloqueio:** política T11 (quais fontes e validade) e leitores dos arquivos oficiais de cada fonte escolhida (formatos OFAC/CGU). Até lá, nenhuma empresa passa no pré-envio.

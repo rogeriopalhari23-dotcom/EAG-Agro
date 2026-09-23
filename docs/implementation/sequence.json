@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-23T17:19:29.525Z",
+  "updatedAt": "2026-09-23T17:22:47.132Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -499,7 +499,7 @@
     {
       "id": "P2-T16",
       "title": "Triagem de sanções pré-envio",
-      "status": "pending",
+      "status": "partial",
       "dependsOn": [
         "P2-T6"
       ],
@@ -511,8 +511,8 @@
       ],
       "acceptance": "Fontes reais completas e vigentes, matching auditável, falso positivo e bloqueio; política aprovada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": null
+      "evidence": "tests/sanctions.test.mjs",
+      "blockedBy": "Política de compliance T11 (fontes exigidas e validade) e leitores dos arquivos oficiais de cada lista escolhida"
     },
     {
       "id": "P2-T17",
