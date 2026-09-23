@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-23T16:53:56.661Z",
+  "updatedAt": "2026-09-23T16:59:27.004Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -312,7 +312,7 @@
     {
       "id": "P2-T6",
       "title": "Empresas — unidades, evidências, perfil comprador, ICP e contatos",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P2-T1",
         "P1-T7"
@@ -325,7 +325,7 @@
       ],
       "acceptance": "CNPJ raiz/unidade, perfil por empresa/commodity e contato com fonte; evidência de mercado nunca compra.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "tests/profiles.test.mjs",
       "blockedBy": null
     },
     {

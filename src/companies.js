@@ -21,7 +21,10 @@ import {
   productUsable,
   now,
 } from "./store.js";
-import { encryptPii, decryptPii } from "./crypto.js";
+import { encryptPii, decryptPii, identifierHash } from "./crypto.js";
+import { contactTargetFlag, listProfiles } from "./profiles.js";
+import { validTimezone } from "./parameter-registry.js";
+import { isSuppressed } from "./operations.js";
 import { validateFields, completeness } from "./demand.js";
 export async function listCompanies(request, env, actor) {
   const { limit, offset } = page(request),
@@ -108,9 +111,19 @@ export async function getCompany(request, env, actor, id) {
         linkedinUrl: values[4],
         sourceLabel: c.source_label,
         sourceUrl: c.source_url,
+        prospectRole: c.prospect_role,
+        emailValidation: c.email_validation,
+        emailValidatedAt: c.email_validated_at,
+        relationshipNote: c.relationship_note,
+        timezone: c.timezone,
+        targetFlag: contactTargetFlag(values[1], c.relationship_note),
       };
     }),
   );
+  out.units = (
+    await s(env, "SELECT * FROM company_units WHERE tenant_id=? AND company_id=? ORDER BY cnpj", actor.tenant_id, id).all()
+  ).results;
+  out.profiles = await listProfiles(env, actor, id);
   out.demandFields = {};
   if (out.demands.length) {
     const fields = await s(
@@ -149,6 +162,14 @@ export async function createCompany(request, env, actor, rid) {
     registration = registration.replace(/[.\/\s-]/g, "").toUpperCase();
   if (registration && !registrationType)
     fail(422, "registration_type_required", "Informe o tipo de registro.");
+  let cnpjRoot = null;
+  if (country === "BR" && registrationType === "CNPJ" && registration) {
+    if (!/^\d{14}$/.test(registration)) fail(422, "invalid_cnpj", "CNPJ tem 14 dígitos.");
+    cnpjRoot = registration.slice(0, 8);
+    const sameRoot = await s(env, "SELECT id FROM companies WHERE tenant_id=? AND cnpj_root=?", actor.tenant_id, cnpjRoot).first();
+    if (sameRoot)
+      fail(409, "company_duplicate", "Já existe empresa com essa raiz de CNPJ; cadastre a unidade nela.", { id: sameRoot.id });
+  }
   if (registration) {
     const duplicate = await s(
       env,
@@ -169,7 +190,7 @@ export async function createCompany(request, env, actor, rid) {
   await commit(env, [
     s(
       env,
-      `INSERT INTO companies(id,tenant_id,legal_name,trade_name,country_code,registration_id,registration_id_type,buyer_type,owner_user_id,source_label,source_url,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'unconfirmed',?,?,?,?,?,?)`,
+      `INSERT INTO companies(id,tenant_id,legal_name,trade_name,country_code,registration_id,registration_id_type,cnpj_root,buyer_type,owner_user_id,source_label,source_url,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'unconfirmed',?,?,?,?,?,?)`,
       id,
       actor.tenant_id,
       name,
@@ -177,6 +198,7 @@ export async function createCompany(request, env, actor, rid) {
       country,
       registration,
       registrationType,
+      cnpjRoot,
       actor.id,
       source,
       url(i.sourceUrl),
@@ -281,12 +303,16 @@ export async function addContact(request, env, actor, rid, id) {
   ];
   if (values[2] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values[2]))
     fail(422, "invalid_email", "E-mail inválido.");
+  const role = oneOf(i.prospectRole ?? "other", ["decision_maker", "influencer", "provisional_decision_maker", "other"], "papel na prospecção");
+  const emailHash = values[2] ? await identifierHash(env, actor.tenant_id, "email", values[2]) : null;
+  // R2.1.2: contato suprimido nunca fica selecionável; o cadastro registra, a ficha recusa.
+  const suppressed = values[2] ? await isSuppressed(env, actor.tenant_id, "email", values[2]) : false;
   const encrypted = await Promise.all(values.map((v) => encryptPii(v, env)));
   await commit(env, [
     companyLock(env, actor, c),
     s(
       env,
-      `INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,job_title_encrypted,email_encrypted,phone_encrypted,linkedin_url_encrypted,source_label,source_url,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,job_title_encrypted,email_encrypted,phone_encrypted,linkedin_url_encrypted,source_label,source_url,created_by,prospect_role,email_hash,email_validation) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       cid,
       actor.tenant_id,
       id,
@@ -294,13 +320,18 @@ export async function addContact(request, env, actor, rid, id) {
       str(i.sourceLabel, "fonte", 1000),
       url(i.sourceUrl),
       actor.id,
+      role,
+      emailHash,
+      values[2] ? "pending" : null,
     ),
     auditStatement(env, actor, rid, "contact.created", "contact", cid, {
       companyId: id,
       fieldsProvided: values.map(Boolean),
+      prospectRole: role,
+      suppressed,
     }),
   ]);
-  return { id: cid };
+  return { id: cid, suppressed, targetFlag: contactTargetFlag(values[1], null) };
 }
 export async function verifyContact(request, env, actor, rid, companyId) {
   requireRole(actor, WRITE_ROLES);
@@ -624,4 +655,45 @@ export async function createApproval(request, env, actor, rid, id) {
     }),
   ]);
   return { id: aid, status };
+}
+
+// Papel, relacionamento e fuso do contato (R15.1, R15.6, R18.6). Dados pessoais continuam cifrados.
+export async function updateContact(request, env, actor, rid, contactId) {
+  requireRole(actor, WRITE_ROLES);
+  const c = await s(env, "SELECT * FROM contacts WHERE tenant_id=? AND id=?", actor.tenant_id, contactId).first();
+  if (!c) fail(404, "contact_not_found", "Contato não encontrado.");
+  const i = await bodyJson(request);
+  let timezone = c.timezone;
+  if (i.timezone !== undefined) {
+    if (i.timezone !== null && !validTimezone(i.timezone))
+      fail(422, "timezone_invalid", "Fuso IANA inválido, ex.: America/Sao_Paulo.");
+    timezone = i.timezone;
+  }
+  const next = {
+    prospect_role:
+      i.prospectRole === undefined
+        ? c.prospect_role
+        : oneOf(i.prospectRole, ["decision_maker", "influencer", "provisional_decision_maker", "other"], "papel na prospecção"),
+    relationship_note:
+      i.relationshipNote === undefined ? c.relationship_note : str(i.relationshipNote, "relacionamento", 1000, true),
+    timezone,
+  };
+  await commit(env, [
+    s(
+      env,
+      "UPDATE contacts SET prospect_role=?,relationship_note=?,timezone=?,updated_at=? WHERE tenant_id=? AND id=?",
+      next.prospect_role,
+      next.relationship_note,
+      next.timezone,
+      now(),
+      actor.tenant_id,
+      contactId,
+    ),
+    auditStatement(env, actor, rid, "contact.updated", "contact", contactId, {
+      prospectRole: next.prospect_role,
+      relationshipChanged: next.relationship_note !== c.relationship_note,
+      timezone: next.timezone,
+    }),
+  ]);
+  return { id: contactId, prospectRole: next.prospect_role, relationshipNote: next.relationship_note, timezone: next.timezone };
 }

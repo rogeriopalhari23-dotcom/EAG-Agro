@@ -84,3 +84,13 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Busca com raio de até 5 km enfileira a geocodificação de todas as unidades encontradas (Fase 4 §7.6); acima, `POST /api/units/:id/geocode` sob demanda. Fila: erro definitivo do provedor é registrado e descartado; temporário volta à fila.
 - Testes: `tests/geocoding.test.mjs` (5 casos).
 - **Depende de validação externa:** chave e plano contratados (G9 decidiu plano pago), limites reais da conta.
+
+## P2-T6 — Empresas, unidades, perfil comprador, ICP e contatos
+
+- `0011_perfil_comprador.sql`, `src/profiles.js`, mudanças em `src/companies.js` e rotas `/api/companies/:id/profiles`, `PATCH /api/profiles/:id`, `PATCH /api/contacts/:id`.
+- CNPJ manual grava a raiz; outra empresa com a mesma raiz é recusada com o id da existente (unidades pela busca). Ficha da empresa mostra unidades e perfis.
+- Perfil por empresa + unidade (opcional) + produto (R14.1). `final_consumer_confirmed` exige evidência empresarial válida da própria empresa e da mesma commodity, ou confirmação direta de demanda; evidência de mercado nunca comprova compra (R14.2).
+- ICP determinístico (K1/K3): trader → fora; gigante (marcação manual) → fora; porte Receita 01/03 → fora por porte; 05 → no ICP; sem porte → pendente. Ficha: trader só com exceção de gestor com motivo (R14.7); gigante só com relacionamento registrado com autor e data (R14.6); porte desconhecido só com "qualificar o porte" como objetivo da ligação (R14.8).
+- Contatos: papel na prospecção (R15.1), hash HMAC do e-mail, validação `pending`, sinal de supressão no cadastro (R2.1.2), fuso IANA validado, sinal de CEO sem relacionamento e de cargo de operação/RH/logística (R15.6). Dados pessoais continuam cifrados.
+- Política da fila alinhada ao teste existente da revisão: tipo desconhecido volta à fila (e vai para a DLQ), nunca é confirmado.
+- Testes: `tests/profiles.test.mjs` (7 casos); suíte 150/150.

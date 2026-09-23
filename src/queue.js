@@ -1,4 +1,5 @@
-// Despacho das mensagens da fila por tipo. Tipo desconhecido é descartado com registro (sem reprocessar lixo).
+// Despacho das mensagens da fila por tipo. Tipo desconhecido volta à fila e, esgotadas as tentativas,
+// vai para a fila de mensagens mortas (nada é confirmado sem processamento).
 import { runPartition } from "./search.js";
 import { geocodeUnit } from "./geocoding.js";
 import { AdapterError } from "./adapters/errors.js";
@@ -25,7 +26,7 @@ export async function handleQueue(batch, env, extra = {}) {
     const handler = (extra.handlers || handlers)[message.body?.type];
     if (!handler) {
       console.error("queue_unknown_type", { type: message.body?.type ?? null });
-      message.ack();
+      message.retry();
       continue;
     }
     try {

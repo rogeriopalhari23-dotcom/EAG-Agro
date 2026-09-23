@@ -209,9 +209,9 @@ check("P2-T4: estado inteiro dentro do raio vira uma partição por UF", async (
   assert.ok(plan.length < 1500, `partições: ${plan.length}`);
 });
 
-test("P2-T4: fila descarta tipo desconhecido e reentrega erro inesperado", async () => {
+test("P2-T4: fila devolve tipo desconhecido e erro inesperado para nova entrega", async () => {
   const log = [];
   const msg = (type) => ({ body: { type }, ack: () => log.push(`ack:${type}`), retry: () => log.push(`retry:${type}`) });
   await handleQueue({ messages: [msg("nada"), msg("boom")] }, {}, { handlers: { boom: async () => { throw new Error("x"); } } });
-  assert.deepEqual(log, ["ack:nada", "retry:boom"]);
+  assert.deepEqual(log, ["retry:nada", "retry:boom"]);
 });

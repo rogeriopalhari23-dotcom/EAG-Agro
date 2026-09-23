@@ -15,6 +15,7 @@ import * as operations from "./operations.js";
 import * as catalog from "./catalog.js";
 import * as sectors from "./sectors.js";
 import * as search from "./search.js";
+import * as profiles from "./profiles.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -171,6 +172,18 @@ async function route(request, env, rid) {
     if (action === "resume" && method === "POST")
       return response(await search.resumeSearch(request, env, actor, rid, id));
   }
+  const prof = path.match(/^\/api\/companies\/([^/]+)\/profiles$/);
+  if (prof) {
+    if (method === "GET") return response({ items: await profiles.listProfiles(env, actor, prof[1]) });
+    if (method === "POST")
+      return response(await profiles.upsertProfile(request, env, actor, rid, prof[1]));
+  }
+  const profId = path.match(/^\/api\/profiles\/([^/]+)$/);
+  if (profId && method === "PATCH")
+    return response(await profiles.changeProfile(request, env, actor, rid, profId[1]));
+  const contact = path.match(/^\/api\/contacts\/([^/]+)$/);
+  if (contact && method === "PATCH")
+    return response(await companies.updateContact(request, env, actor, rid, contact[1]));
   const geo = path.match(/^\/api\/units\/([^/]+)\/geocode$/);
   if (geo && method === "POST")
     return response(await geocodeUnitRoute(request, env, actor, rid, geo[1]));
