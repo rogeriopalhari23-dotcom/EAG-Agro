@@ -1,5 +1,8 @@
+> **Revisão consolidada:** executar a fila `docs/implementation/sequence.json` e aplicar `docs/revisao/CORRECOES-DOS-PLANOS.md`. O código atual já substitui exemplos antigos; não sobrescrevê-lo com os snippets deste plano.
+
 # EAG Compass v2.0 — Plano 1: Fundação (Etapa 0) — Implementation Plan
 
+> **Revisão técnica 23/09/2026:** ler `../../revisao/CORRECOES-DOS-PLANOS.md` e `../../revisao/RELATORIO.md` antes de executar. Contratos corrigidos de migração, concorrência, envio e escopo prevalecem sobre os exemplos históricos abaixo; tarefas futuras não foram marcadas como implementadas.
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deixar a base 0.3.1 pronta para a v2.0: testes de Worker de verdade, login seguro pelo Cloudflare Access, esquema de dados v2 (catálogo, campanhas, supressão, pausas), scores v2 (DS1), parâmetros aprovados, interface Talhão e o Worker publicado na conta de Rogério — **sem nenhum contato externo** (Etapa 0 do escopo).

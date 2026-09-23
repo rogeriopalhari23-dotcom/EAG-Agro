@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "date": "2026-09-23",
+  "revision": "0.3.1-review.2",
+  "environment": {
+    "os": "Linux",
+    "node": "v24.19.0"
+  },
+  "inputManifest": {
+    "files": 100,
+    "mismatches": 0
+  },
+  "npmCi": "passed; lockfile pinned",
+  "npmCheck": {
+    "nativeTests": 87,
+    "workerdD1Tests": 2,
+    "failed": 0,
+    "migrations": "empty and populated legacy D1; FK checked",
+    "siteBuild": "public allowlist verified",
+    "sequence": "42 tasks, references valid, no dependency cycles"
+  },
+  "browser": {
+    "status": "passed",
+    "engine": "Chromium headless / Playwright",
+    "desktopWidth": 1440,
+    "mobileWidth": 390,
+    "flows": [
+      "company creation",
+      "confirmed field and unconfirmed numeric drafts",
+      "score/gate",
+      "seven screens",
+      "no JS errors or horizontal mobile overflow"
+    ]
+  },
+  "npmAudit": {
+    "knownVulnerabilities": 0,
+    "note": "Audit is a dependency database check, not proof of absence of security defects."
+  },
+  "notExecuted": [
+    "Windows execution",
+    "GitHub CI remote",
+    "Production Access/D1",
+    "Remote migration or deployment",
+    "Real SMTP/IMAP",
+    "Real commercial API integrations",
+    "Full v2 AT1–AT75 end-to-end suite"
+  ]
+}

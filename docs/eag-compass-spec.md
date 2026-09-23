@@ -735,7 +735,7 @@ Todos rodam com endereços internos/controlados e dublês das integrações até
 | AT34 | R26.2, R25.3 | DADO canal WhatsApp `planejado` ou empresa ainda ativa no OpenClaw, ENTÃO a ficha não permite envio por WhatsApp e a empresa não recebe envio do Compass. |
 | AT35 | R21.7, R21.9 | DADO uma sequência de 3 e-mails, ENTÃO os 3 textos enviados contêm a forma de saída. QUANDO o destinatário a aciona após o passo 1, ENTÃO o endereço entra na supressão e os passos 2 e 3 não são enviados. |
 | AT36 | R20.7, R20.8 | DADO resposta de ausência automática com data de retorno explícita, ENTÃO os passos da empresa para a commodity param e, ao chegar a data de retorno, nenhum passo é retomado sem ação humana registrada. |
-| AT37 | R11.12 | DADO busca v1 com raio de 100 km e 12 resultados, QUANDO o raio for alterado para 150 km, ENTÃO existe busca v2 com os novos parâmetros e a v1 continua com raio de 100 km e os mesmos 12 resultados. |
+| AT37 | R11.12 | DADO busca v1 com raio de 100 km e 12 resultados, QUANDO o raio for alterado para 200 km, ENTÃO existe busca v2 com os novos parâmetros e a v1 continua com raio de 100 km e os mesmos 12 resultados. |
 | AT38 | R11.11 | DADO raio 0, −10 ou "abc", ENTÃO a busca é recusada com motivo. |
 | AT39 | R1.3.3, §1.2 | DADO empresa em `Descoberto` sem evidência empresarial, QUANDO a ficha for aprovada, ENTÃO a sequência pode ser ativada e o pipeline continua `Descoberto`. |
 | AT40 | R5.1.2, R5.1.3 | Exemplo EX-CN1 da §6.1.3 → CN = 60. |
@@ -905,11 +905,11 @@ Datas de referência: consulta em 2026-09-22. `M_N = 100 t` é **valor de teste*
 | EX-CN3 | Só CNAE compatível; CNPJ ativo; resposta inicial | 0 + 0 + 15 + 0 + 15 | **CN = 30** (< 50) |
 | EX-CN4 | Dado agregado do país + página institucional "atuamos com grãos"; registro só em base secundária | 0 + 0 + 8 + 0 + 0 | **CN = 8** |
 | EX-CN5 | Regressão: AT5 internacional (registro nominal recente, empresa ativa, decisor verificado, sem demanda) | 30 + 20 + 15 + 15 + 0 | **80**, inalterado |
-| EX-PN1 | Milho; 250 t/op (2,5M); 12 op/ano, anual derivado 3.000 t (30M); especificação e embalagem confirmadas; condição de entrega e data firmes; unidade por endereço a 80 km, raio 150 km | 20 + 20 + 20 + 15 + 10 + 5 | **PN = 90–90** |
+| EX-PN1 | Milho; 250 t/op (2,5M); 12 op/ano, anual derivado 3.000 t (30M); especificação e embalagem confirmadas; condição de entrega e data firmes; unidade por endereço a 80 km, raio 100 km | 20 + 20 + 20 + 15 + 10 + 5 | **PN = 90–90** |
 | EX-PN2 | 250 t/op; op/ano e anual desconhecidos; técnica 15; prontidão não informada; unidade só por centroide da cidade | conhecidas 20 + 15 = 35; desconhecidas 20 + 20 + 10 + 5 = 55 | **PN = 35–90**; gate usa 35 < 40 → critério 3 não atendido |
 | EX-PN3 | Sem `M_N` configurado; demais dados como EX-PN1 | conhecidas 20 + 15 + 10 + 5 = 50; desconhecidas 30 + 20 = 50 | **PN = 50–100**; critério 3 atendido (DS1-b: `M_N` não é exigido) |
 | EX-PN4 | 60 t/op (0,6M); 12 op/ano, anual 720 t (7,2M); demais como EX-PN1 | 0 + 20 + 20 + 15 + 10 + 5 | **PN = 70** e `Abaixo do Mínimo` (DS1-c: `M_N` é também o mínimo; R3.3.1) |
-| EX-PN5 | Como EX-PN1, mas unidade por endereço a 180 km, raio 150 km | 20 + 20 + 20 + 15 + 10 + 0 | **PN = 85** |
+| EX-PN5 | Como EX-PN1, mas unidade por endereço a 180 km, raio 100 km | 20 + 20 + 20 + 15 + 10 + 0 | **PN = 85** |
 
 Os exemplos são os cenários AT40–AT49 (§3.2). R4.3.4–R4.3.6 e R5.1.2 apontam para esta seção. A implementação exige alterar o motor 0.3.1 em três pontos: tabela relativa para qualquer commodity com `M` (hoje só café), catálogo de evidência por mercado e Atualidade condicionada a E (hoje é entrada independente).
 

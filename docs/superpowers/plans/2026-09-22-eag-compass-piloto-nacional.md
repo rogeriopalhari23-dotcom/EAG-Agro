@@ -1,5 +1,8 @@
+> **Revisão consolidada:** executar a fila `docs/implementation/sequence.json` e aplicar `docs/revisao/CORRECOES-DOS-PLANOS.md`. O código atual já substitui exemplos antigos; não sobrescrevê-lo com os snippets deste plano.
+
 # EAG Compass v2.0 — Plano 2: Piloto Nacional (Etapa 1) — Implementation Plan
 
+> **Revisão técnica 23/09/2026:** ler `../../revisao/CORRECOES-DOS-PLANOS.md` e `../../revisao/RELATORIO.md` antes de executar. Contratos corrigidos de migração, concorrência, envio e escopo prevalecem sobre os exemplos históricos abaixo; tarefas futuras não foram marcadas como implementadas.
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Com a Fundação pronta (Plano 1), entregar o piloto nacional: Radar de compradores por raio, empresas com evidências/perfil/ICP, contatos validados, fichas com textos da `/prospeccao-vendas` revisados (PV1–PV12), envio 1 a 1 pela caixa Hostinger com rampa e parada automática, leitura de respostas por IMAP com pausa empresa+commodity, descadastro público de um clique, tarefas manuais, migração do OpenClaw e interface completa — **com o primeiro e-mail externo liberado só depois do teste interno de T1 e de portão humano**.

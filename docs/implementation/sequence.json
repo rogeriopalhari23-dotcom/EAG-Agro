@@ -1,0 +1,780 @@
+{
+  "schemaVersion": 1,
+  "revision": "0.3.1-review.2",
+  "updatedAt": "2026-09-23",
+  "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
+  "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
+  "tasks": [
+    {
+      "id": "P1-T1",
+      "title": "Linha de base no git (decisão de Rogério)",
+      "status": "implemented",
+      "dependsOn": [],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 1",
+      "read": [
+        "README.md"
+      ],
+      "acceptance": "Importar revisão em branch sem reescrever histórico; manifesto e bundle identificam esta entrega.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": "docs/revisao/VALIDACAO.json",
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T2",
+      "title": "Harness de testes e checagem funcionando no Windows",
+      "status": "external",
+      "dependsOn": [
+        "P1-T4",
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 2",
+      "read": [
+        ".github/workflows/ci.yml",
+        "scripts/check.mjs"
+      ],
+      "acceptance": "Executar npm ci/check no Windows e CI real; preservar log e commit.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": "Validação real fora desta máquina"
+    },
+    {
+      "id": "P1-T3",
+      "title": "`wrangler.jsonc` alinhado à conta",
+      "status": "external",
+      "dependsOn": [],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 3",
+      "read": [
+        "wrangler.jsonc",
+        "docs/OPERACAO.md"
+      ],
+      "acceptance": "Conferir conta, plano, IDs, domínio, permissões e custo sem duplicar recursos.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": "Validação real fora desta máquina"
+    },
+    {
+      "id": "P1-T4",
+      "title": "Autenticação pelo Access com JWT validado e HTTP endurecido",
+      "status": "implemented",
+      "dependsOn": [],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 4",
+      "read": [
+        "src/auth.js",
+        "src/http.js"
+      ],
+      "acceptance": "JWT real validado, usuários ativos, quatro perfis, sem auth por e-mail forjado.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": "docs/revisao/VALIDACAO.json",
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T5",
+      "title": "Migração 0003 — esquema v2 da fundação",
+      "status": "implemented",
+      "dependsOn": [],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 5",
+      "read": [
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Migrações vazia/preenchida preservam IDs/filhos e FKs; rollback de lote.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": "docs/revisao/VALIDACAO.json",
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T6",
+      "title": "Scores v2 (DS1) e gate revisado",
+      "status": "implemented",
+      "dependsOn": [
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 6",
+      "read": [
+        "src/scoring.js",
+        "src/scores.js"
+      ],
+      "acceptance": "Aceites v2 e regressões passam; desconhecido não vira zero; gate revalida aprovação/sanções.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": "docs/revisao/VALIDACAO.json",
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T7",
+      "title": "Catálogo com 28 itens e regras de identidade",
+      "status": "partial",
+      "dependsOn": [
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 7",
+      "read": [
+        "src/operations.js",
+        "migrations/0004_seed_catalogo.sql",
+        "docs/eag-compass-perfil.md"
+      ],
+      "acceptance": "Adicionar edição administrativa do catálogo/códigos/características com fonte, escopo de amostra e revisão; nunca inventar NCM/CSO.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T8",
+      "title": "Parâmetros v2 versionados",
+      "status": "partial",
+      "dependsOn": [
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 8",
+      "read": [
+        "src/operations.js",
+        "migrations/0005_seed_parametros_v2.sql"
+      ],
+      "acceptance": "Completar tipos/escopos dos parâmetros operacionais; ausência não vira default comercial inventado.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T9",
+      "title": "Campanhas com ICP, declarações e limite de ativas",
+      "status": "partial",
+      "dependsOn": [
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 9",
+      "read": [
+        "src/operations.js",
+        "public/app.js"
+      ],
+      "acceptance": "Completar edição versionada de ICP e declarações na UI; max. duas commodities por mercado permanece atômico.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T10",
+      "title": "Supressão pseudonimizada e pausas",
+      "status": "implemented",
+      "dependsOn": [
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 10",
+      "read": [
+        "src/operations.js",
+        "src/crypto.js"
+      ],
+      "acceptance": "Supressão HMAC e pausas auditadas; execução futura obrigada a consultar ambas.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": "docs/revisao/VALIDACAO.json",
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T11",
+      "title": "Interface Talhão (casca, Hoje, Parâmetros, Supressão, Campanhas)",
+      "status": "partial",
+      "dependsOn": [
+        "P1-T7",
+        "P1-T8",
+        "P1-T9"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 11",
+      "read": [
+        "public/app.js",
+        "public/app.css",
+        "docs/eag-compass-design.md"
+      ],
+      "acceptance": "Concluir formulários administrativos, fontes aprovadas/licenciadas e testes móveis/desktop dos itens novos.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P1-T12",
+      "title": "Provisionamento, Access e deploy (com portões humanos)",
+      "status": "external",
+      "dependsOn": [
+        "P1-T2",
+        "P1-T3",
+        "P1-T11"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
+      "section": "Tarefa 12",
+      "read": [
+        "docs/OPERACAO.md",
+        "wrangler.jsonc"
+      ],
+      "acceptance": "Restaurar backup, Access/JWT real e quatro perfis no domínio antes da liberação.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": "Validação real fora desta máquina"
+    },
+    {
+      "id": "P2-T1",
+      "title": "Migração 0006 — esquema do piloto",
+      "status": "pending",
+      "dependsOn": [
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 1",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Criar 0006 compatível com 0003 real; unidades, fontes, buscas, fichas, outbox e estados; testar banco preenchido.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T2",
+      "title": "Municípios e distância",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T1"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 2",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Fonte IBGE versionada, Haversine e limites de raio; centroides identificados como estimativas.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T3",
+      "title": "Adaptador Casa dos Dados e setores usuários",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T1"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 3",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Contrato real e fixture Casa dos Dados; timeout/limite/esquema não viram resultado vazio.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T4",
+      "title": "Buscas nacionais versionadas e particionadas",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T2",
+        "P2-T3"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 4",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Busca com origem/raio/versão, cursor, dedup por unidade e estado parcial; repetir job não duplica.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T5",
+      "title": "Geocodificação por endereço (LocationIQ)",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T4"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 5",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Geocodificar apenas lacunas; cache por endereço normalizado/fonte; registrar precisão.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T6",
+      "title": "Empresas — unidades, evidências, perfil comprador, ICP e contatos",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T1",
+        "P1-T7"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 6",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "CNPJ raiz/unidade, perfil por empresa/commodity e contato com fonte; evidência de mercado nunca compra.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T7",
+      "title": "Validação de e-mail (Snov.io)",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T6"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 7",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Validação de e-mail com estados/prazo/custo; sem retry infinito nem confirmar por formato.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T8",
+      "title": "Modelos da `/prospeccao-vendas` e revisor PV",
+      "status": "pending",
+      "dependsOn": [
+        "P1-T9"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 8",
+      "read": [
+        "docs/eag-compass-t12-prospeccao-vendas.md"
+      ],
+      "acceptance": "Obter skill original com hash T12; templates e revisor PV determinísticos onde possível, sem substituir por LinkedIn.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": "Conteúdo original da skill /prospeccao-vendas"
+    },
+    {
+      "id": "P2-T9",
+      "title": "Fichas de aprovação versionadas",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T6",
+        "P2-T8"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 9",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Snapshot imutável, hash por mensagem/destinatário/canal; alterações invalidam aprovação.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T10",
+      "title": "Envio pela Hostinger — agendador, pré-envio, rampa, idempotência",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T9",
+        "P2-T12",
+        "P2-T16"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 10",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Outbox/lease atômicos, pré-envio e rampa compartilhada; aceitação indeterminada nunca reenvia sozinha.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T11",
+      "title": "Leitura de respostas (IMAP) e pausa por resposta",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T10"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 11",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "UIDVALIDITY/UID e Message-ID estáveis, dedup e correlação; resposta ambígua mantém pausa.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T12",
+      "title": "Descadastro público de um clique",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T1",
+        "P1-T10"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 12",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Token validado e POST idempotente; GET seguro; Access bypass apenas /u/*; sem PII pública.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T13",
+      "title": "Efeitos de pausas e mudanças comerciais",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T9",
+        "P1-T10"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 13",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Pausas por empresa/commodity/campanha/operação, supressão e invalidação aplicadas em todos os canais.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T14",
+      "title": "Tarefas manuais, reuniões e linha do tempo",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T9",
+        "P2-T13"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 14",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Tarefas/reuniões com dono e histórico; canais manuais obedecem restrições e exigem ação humana.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T15",
+      "title": "Migração do OpenClaw",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T6",
+        "P1-T10"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 15",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Importar supressões antes de contatos; relatório de conflitos e corte comprovado do executor antigo.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T16",
+      "title": "Triagem de sanções pré-envio",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T6"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 16",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Fontes reais completas e vigentes, matching auditável, falso positivo e bloqueio; política aprovada.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T17",
+      "title": "Canais, teste interno de T1 e liberação (portões humanos)",
+      "status": "pending",
+      "dependsOn": [
+        "P1-T12",
+        "P2-T7",
+        "P2-T10",
+        "P2-T11",
+        "P2-T12",
+        "P2-T13",
+        "P2-T15",
+        "P2-T16"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 17",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Teste interno T1, reputação/limites/retencão, interrupção de emergência; liberação expressa dos canais.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P2-T18",
+      "title": "Interface do piloto",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T4",
+        "P2-T5",
+        "P2-T9",
+        "P2-T14"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md",
+      "section": "Tarefa 18",
+      "read": [
+        "src/worker.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Telas reais Radar/Fichas/Envios/Tarefas, estados de erro/parcial e acessibilidade; nunca simular envio.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T1",
+      "title": "Migração 0009 e parâmetros",
+      "status": "pending",
+      "dependsOn": [
+        "P1-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 1",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Criar 0009/0011 após conciliar numeração; parâmetros D1/D2 não aprovados ficam pendentes.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": "Decisões D1/D2 pendentes para conclusão; schema pode avançar sem defaults não aprovados"
+    },
+    {
+      "id": "P3-T2",
+      "title": "Países com os códigos das duas fontes",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T1"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 2",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Gerar países de fontes oficiais versionadas; mapear ISO2/ISO3 e códigos ativos/históricos sem confundir.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T3",
+      "title": "Adaptador do arquivo completo do MDIC",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T1"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 3",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Implementar CSV com byte anterior, Range/ETag, fronteiras exatas e agregação limitada em memória.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T4",
+      "title": "Adaptador da Comtrade",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T1"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 4",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Confirmar contrato com chave, anos/parceiros/totais, orçamento e paginação; zero e ausência distintos.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T5",
+      "title": "Rotina mensal, versões e atualização manual",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T2",
+        "P3-T3",
+        "P3-T4"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 5",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Jobs/outbox/lease recuperáveis, quota real persistente, ponteiro CAS por país/fonte; falha conserva versão boa.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T6",
+      "title": "Análise de país a partir da lista",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T5"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 6",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Leitura só de R2/D1, sem fetch externo; CIF/FOB separados, participação mesma fonte/ano; AT71–74.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T7",
+      "title": "Seleção de commodities e campanhas",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T6",
+        "P1-T9"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 7",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Recusar commodity fora da lista no serviço/API; identidade pendente bloqueia; AT75.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T8",
+      "title": "Empresas no exterior e condições R12.10",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T7",
+        "P2-T6"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 8",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Três condições R12.10 com evidência nominal validada da mesma empresa; porte e fuso com fonte.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T9",
+      "title": "Modelos em inglês e revisor PV em inglês",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T8",
+        "P3-T8"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 9",
+      "read": [
+        "docs/eag-compass-t12-prospeccao-vendas.md"
+      ],
+      "acceptance": "Templates inglês/português fiéis à skill original, revisor PV e lacunas explícitas.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T10",
+      "title": "Envio, respostas e descadastro no fuso e idioma do destinatário",
+      "status": "pending",
+      "dependsOn": [
+        "P2-T10",
+        "P2-T11",
+        "P2-T12",
+        "P3-T9"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 10",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Janela/DST por destinatário, teto do remetente compartilhado; pausas e supressão bilíngues.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T11",
+      "title": "Interface Internacional e dashboard",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T6",
+        "P3-T7",
+        "P3-T8"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 11",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Lista mensal, fontes/períodos separados e versão antiga visível após falha; fluxo País Primeiro.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    },
+    {
+      "id": "P3-T12",
+      "title": "Validação pelo Worker, chave da Comtrade e liberação (portões humanos)",
+      "status": "pending",
+      "dependsOn": [
+        "P3-T10",
+        "P3-T11",
+        "P2-T17"
+      ],
+      "plan": "docs/superpowers/plans/2026-09-23-eag-compass-internacional.md",
+      "section": "Tarefa 12",
+      "read": [
+        "docs/eag-compass-t6-comexstat.md"
+      ],
+      "acceptance": "Chave/termos Comtrade, fontes pelo Worker, primeira rotina medida e amostra interna; liberação documentada.",
+      "validation": "npm run check; acrescentar testes dos critérios deste item",
+      "evidence": null,
+      "blockedBy": null
+    }
+  ]
+}

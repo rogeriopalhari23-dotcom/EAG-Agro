@@ -3,20 +3,26 @@
   "name": "eag-compass",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-21",
-  "workers_dev": true,
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
+    "head_sampling_rate": 0.1
   },
   "vars": {
-    "ENVIRONMENT": "local",
-    "DEFAULT_TENANT_ID": "eag-internal"
+    "ENVIRONMENT": "production",
+    "ALLOW_LOCAL_AUTH": "false",
+    "DEFAULT_TENANT_ID": "eag-internal",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
   },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"],
-    "not_found_handling": "single-page-application"
+    "run_worker_first": [
+      "/api/*"
+    ],
+    "not_found_handling": "none"
   },
   "d1_databases": [
     {
@@ -26,36 +32,23 @@
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "FILES",
-      "bucket_name": "eag-compass-files"
+  "env": {
+    "local": {
+      "name": "eag-compass-local",
+      "vars": {
+        "ENVIRONMENT": "local",
+        "ALLOW_LOCAL_AUTH": "true",
+        "LOCAL_USER_EMAIL": "admin@local.eag",
+        "DEFAULT_TENANT_ID": "eag-internal"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "eag-compass-db",
+          "database_id": "LOCAL_REPLACE_AFTER_CREATE",
+          "migrations_dir": "migrations"
+        }
+      ]
     }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "CACHE",
-      "id": "LOCAL_REPLACE_AFTER_CREATE"
-    }
-  ],
-  "queues": {
-    "producers": [
-      {
-        "binding": "ASYNC_QUEUE",
-        "queue": "eag-compass-async"
-      }
-    ],
-    "consumers": [
-      {
-        "queue": "eag-compass-async",
-        "max_batch_size": 10,
-        "max_batch_timeout": 5,
-        "max_retries": 3,
-        "dead_letter_queue": "eag-compass-async-dlq"
-      }
-    ]
-  },
-  "triggers": {
-    "crons": ["17 2 * * *"]
   }
 }

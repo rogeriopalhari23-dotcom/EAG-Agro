@@ -1,0 +1,11 @@
+{
+  "version": "0.3.1-review.2",
+  "sourceZip": "eag-compass-20ef963-2026-09-23.zip",
+  "sourceSha256": "f73211849191734fe34747c9f602580781466aeb8b1c537d2408cde97615ac49",
+  "previousSourceSha256": "b24c8f5d6eecba8a31e53ef3c7272ebab8777049689ac6f34a47f6d6b0115690",
+  "originalCommitLabel": "20ef963 (not independently verified against original repository)",
+  "localBaselineCommit": "0f0cdc06b53a536f4cf991b9d83c803be5d828f5",
+  "localReviewCommit": "049ea6c52e5b3569a301c22e0f25d336fc7ebecb",
+  "gitBundle": "revision.bundle",
+  "note": "Independent local review history; no push, no rewriting original repository. Manifest, bundle and this metadata are packaging outputs outside the source commit."
+}

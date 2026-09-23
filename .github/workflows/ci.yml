@@ -1,27 +1,27 @@
 name: Validate EAG Compass
-
 on:
   push:
-    branches: [main]
+    branches: [main, v2-planejamento]
   pull_request:
   workflow_dispatch:
-
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version: '24'
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate application
-        run: npm run check
+      - run: npm ci
+      - run: npm run check
