@@ -24,7 +24,6 @@ function full() {
 const q = (db, sql, ...a) => db.raw.prepare(sql).get(...a);
 function seed(db) {
   db.raw.exec(`
-    INSERT INTO municipalities VALUES (3551702,'Sertãozinho','sertaozinho','SP',-21.1316,-47.9875,'teste','v0');
     INSERT INTO companies(id,tenant_id,legal_name,country_code,source_label,created_by) VALUES ('co','eag-internal','Doces Vale Verde Ltda.','BR','teste','system-admin');
     INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,source_label,created_by) VALUES ('ct','eag-internal','co','x','teste','system-admin');
     INSERT INTO campaigns(id,tenant_id,product_id,market,name,origin_city,origin_uf,radius_km,created_by) VALUES ('cp','eag-internal','product-06','national','Açúcar','Sertãozinho','SP',5,'system-admin');
