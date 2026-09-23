@@ -112,3 +112,13 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Amostras para Rogério (R17.6): `docs/implementation/AMOSTRAS-TEXTOS-PV.md` (gerado por `scripts/gen-amostras-pv.mjs`), revisor sem violações. Faltam a amostra interrompida antes do break (envio real) e a internacional em inglês (Plano 3).
 - Regressão de higiene: `tests/source-hygiene.test.mjs` recusa caracteres de controle no código (uma edição automatizada tinha gravado backspace no lugar de `\b`; corrigido).
 - Testes: `tests/review.test.mjs` (10 casos).
+
+## P2-T9 — Fichas de aprovação
+
+- `src/fichas.js`, `src/unsub-token.js`, rotas `/api/fichas` (criar, listar, ver, `versions`, `approve`, `defer`, `discard`).
+- Criação confere: campanha disponível, identidade do produto, OpenClaw retirado (R25.3), perfil com permissão de ficha (K1/K3/R14.6–R14.8), fuso aprovado (R18.6), endereço físico configurado (R19.13), destinatários da empresa com papel válido, e-mail e fora da supressão, ao menos um decisor.
+- Versão imutável: contexto congelado cifrado com hash; mensagens cifradas com `message_sha256` dos bytes exatos (assunto + corpo); relatório PV; hash da skill e versões dos modelos. Link de descadastro determinístico por versão + destinatário (HMAC), então o hash aprovado já inclui o link.
+- Aprovação por destinatário e canal (errata): gestor envia o hash agregado que viu; conteúdo diferente → 409. Idempotente (AT26). Exige revisão sem violações (R17.3), campanha ativa e na mesma versão (R22.5), canal de e-mail além de `planned` (R26.2). Cria a outbox com as datas da cadência; mesmo e-mail em outra sequência ativa → `waiting_sequence` (R19.8). Pipeline da empresa não muda (AT39).
+- Nova versão (edição de texto, troca de destinatários, regeneração): anterior marcada como substituída, aprovações invalidadas, envios não aceitos → `superseded`; na nova aprovação, as linhas substituídas são reaproveitadas e o passo já aceito fica intacto.
+- Mudança comercial invalida aprovação e bloqueia envios pendentes (`approval_invalidated`): ICP da campanha, declaração aprovada ou revogada, papel do contato.
+- Testes: `tests/fichas.test.mjs` (8 casos).

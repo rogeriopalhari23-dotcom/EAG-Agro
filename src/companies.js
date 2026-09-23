@@ -25,6 +25,7 @@ import { encryptPii, decryptPii, identifierHash } from "./crypto.js";
 import { contactTargetFlag, listProfiles } from "./profiles.js";
 import { validTimezone } from "./parameter-registry.js";
 import { isSuppressed } from "./operations.js";
+import { invalidationStatements } from "./fichas.js";
 import { validateFields, completeness } from "./demand.js";
 export async function listCompanies(request, env, actor) {
   const { limit, offset } = page(request),
@@ -689,6 +690,7 @@ export async function updateContact(request, env, actor, rid, contactId) {
       actor.tenant_id,
       contactId,
     ),
+    ...(next.prospect_role !== c.prospect_role ? invalidationStatements(env, { contactId }, "papel do contato alterado") : []),
     auditStatement(env, actor, rid, "contact.updated", "contact", contactId, {
       prospectRole: next.prospect_role,
       relationshipChanged: next.relationship_note !== c.relationship_note,

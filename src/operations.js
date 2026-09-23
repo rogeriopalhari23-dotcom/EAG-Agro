@@ -23,6 +23,7 @@ import {
 } from "./store.js";
 import { identifierHash } from "./crypto.js";
 import { validateParameter, crossCheck } from "./parameter-registry.js";
+import { invalidationStatements } from "./fichas.js";
 export async function setParameter(request, env, actor, rid, key) {
   requireRole(actor, new Set(["admin"]));
   const i = await bodyJson(request),
@@ -301,6 +302,7 @@ export async function updateIcp(request, env, actor, rid, id) {
       actor.id,
       now(),
     ),
+    ...invalidationStatements(env, { campaignId: id }, "ICP da campanha alterado"),
     auditStatement(env, actor, rid, "campaign.icp_updated", "campaign", id, {
       version: c.version + 1,
       before: before
@@ -343,6 +345,7 @@ export async function revokeDeclaration(request, env, actor, rid, id, declId) {
       declId,
       id,
     ),
+    ...invalidationStatements(env, { campaignId: id }, "declaração revogada"),
     auditStatement(env, actor, rid, "campaign.declaration_revoked", "campaign", id, {
       declarationId: declId,
       kind: d.kind,
@@ -484,6 +487,7 @@ export async function addDeclaration(request, env, actor, rid, id) {
       now(),
       date(i.reviewDueAt, "validade", { optional: true, future: true }),
     ),
+    ...invalidationStatements(env, { campaignId: id }, "declaração alterada"),
     auditStatement(env, actor, rid, "campaign.declaration", "campaign", id, {
       kind,
       declarationId: declId,

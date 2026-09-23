@@ -17,6 +17,7 @@ import * as sectors from "./sectors.js";
 import * as search from "./search.js";
 import * as profiles from "./profiles.js";
 import * as emailValidation from "./email-validation.js";
+import * as fichas from "./fichas.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -172,6 +173,28 @@ async function route(request, env, rid) {
       return response(await search.listCandidates(request, env, actor, id));
     if (action === "resume" && method === "POST")
       return response(await search.resumeSearch(request, env, actor, rid, id));
+  }
+  if (path === "/api/fichas") {
+    if (method === "POST") return response(await fichas.createFicha(request, env, actor, rid), 201);
+    if (method === "GET") {
+      const { limit, offset } = page(request);
+      const status = u.searchParams.get("status");
+      const rows = await s(
+        env,
+        `SELECT f.id,f.company_id,f.campaign_id,f.status,f.current_version,f.updated_at,c.legal_name FROM fichas f JOIN companies c ON c.id=f.company_id WHERE f.tenant_id=?${status ? " AND f.status=?" : ""} ORDER BY f.updated_at DESC LIMIT ? OFFSET ?`,
+        ...[actor.tenant_id, ...(status ? [status] : []), limit + 1, offset],
+      ).all();
+      return response({ items: rows.results.slice(0, limit), nextOffset: rows.results.length > limit ? offset + limit : null });
+    }
+  }
+  const fm = path.match(/^\/api\/fichas\/([^/]+)(?:\/(versions|approve|defer|discard))?$/);
+  if (fm) {
+    const [, id, action] = fm;
+    if (!action && method === "GET") return response(await fichas.getFicha(env, actor, id));
+    if (action === "versions" && method === "POST") return response(await fichas.newVersion(request, env, actor, rid, id), 201);
+    if (action === "approve" && method === "POST") return response(await fichas.approve(request, env, actor, rid, id));
+    if (action === "defer" && method === "POST") return response(await fichas.setStatus(request, env, actor, rid, id, "deferred"));
+    if (action === "discard" && method === "POST") return response(await fichas.setStatus(request, env, actor, rid, id, "discarded"));
   }
   const prof = path.match(/^\/api\/companies\/([^/]+)\/profiles$/);
   if (prof) {

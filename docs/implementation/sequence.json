@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-23T17:10:07.147Z",
+  "updatedAt": "2026-09-23T17:16:19.262Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -366,7 +366,7 @@
     {
       "id": "P2-T9",
       "title": "Fichas de aprovação versionadas",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P2-T6",
         "P2-T8"
@@ -379,7 +379,7 @@
       ],
       "acceptance": "Snapshot imutável, hash por mensagem/destinatário/canal; alterações invalidam aprovação.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "tests/fichas.test.mjs",
       "blockedBy": null
     },
     {
