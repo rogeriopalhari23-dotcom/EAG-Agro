@@ -1,0 +1,61 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "eag-compass",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-21",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "ENVIRONMENT": "local",
+    "DEFAULT_TENANT_ID": "eag-internal"
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "eag-compass-db",
+      "database_id": "LOCAL_REPLACE_AFTER_CREATE",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "eag-compass-files"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "LOCAL_REPLACE_AFTER_CREATE"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "ASYNC_QUEUE",
+        "queue": "eag-compass-async"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "eag-compass-async",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "eag-compass-async-dlq"
+      }
+    ]
+  },
+  "triggers": {
+    "crons": ["17 2 * * *"]
+  }
+}

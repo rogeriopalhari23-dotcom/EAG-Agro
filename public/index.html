@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="Central operacional de prospecção e qualificação da EAG Compass.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307111f'/%3E%3Cpath d='M32 10 46 48 32 42 18 48Z' fill='%232dd4bf'/%3E%3Ccircle cx='32' cy='31' r='5' fill='%23f8fafc'/%3E%3C/svg%3E">
+  <title>EAG Compass — Central de Prospecção</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1626;
+      --panel: rgba(15, 29, 48, .82);
+      --panel-2: #11233a;
+      --line: rgba(148, 163, 184, .16);
+      --line-strong: rgba(148, 163, 184, .28);
+      --text: #edf5ff;
+      --muted: #91a4ba;
+      --cyan: #38bdf8;
+      --teal: #2dd4bf;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --red: #fb7185;
+      --purple: #a78bfa;
+      --shadow: 0 22px 65px rgba(0, 0, 0, .28);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 80% -10%, rgba(56, 189, 248, .13), transparent 28rem),
+        radial-gradient(circle at 18% 105%, rgba(45, 212, 191, .09), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+      font: 16px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; }
+    .app { min-height: 100vh; }
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: 250px;
+      padding: 24px 18px;
+      border-right: 1px solid var(--line);
+      background: rgba(7, 17, 31, .94);
+      backdrop-filter: blur(22px);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; margin: 0 8px 28px; }
+    .brand-mark {
+      width: 42px; height: 42px; border: 1px solid rgba(45, 212, 191, .35); border-radius: 13px;
+      display: grid; place-items: center; background: linear-gradient(145deg, rgba(45,212,191,.19), rgba(56,189,248,.08));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .brand-mark svg { width: 26px; }
+    .brand strong { display: block; letter-spacing: -.02em; font-size: 16px; }
+    .brand small { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+    .nav-label { padding: 0 10px; margin: 18px 0 8px; color: #657b92; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .nav { display: grid; gap: 5px; }
+    .nav button {
+      border: 0; background: transparent; width: 100%; display: flex; align-items: center; gap: 11px;
+      padding: 11px 12px; color: var(--muted); border-radius: 11px; cursor: pointer; text-align: left;
+    }
+    .nav button:hover { background: rgba(148,163,184,.07); color: var(--text); }
+    .nav button.active { color: white; background: linear-gradient(90deg, rgba(45,212,191,.16), rgba(56,189,248,.07)); box-shadow: inset 2px 0 var(--teal); }
+    .nav svg { width: 18px; height: 18px; opacity: .9; }
+    .sidebar-foot { margin-top: auto; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(15,29,48,.58); }
+    .sidebar-foot .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 12px var(--amber); margin-right: 8px; }
+    .sidebar-foot strong { font-size: 12px; }
+    .sidebar-foot p { color: var(--muted); font-size: 12px; margin: 7px 0 0; }
+    main { margin-left: 250px; min-height: 100vh; }
+    .topbar {
+      height: 76px; padding: 0 30px; display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      position: sticky; top: 0; z-index: 15; background: rgba(7,17,31,.78); backdrop-filter: blur(20px); border-bottom: 1px solid var(--line);
+    }
+    .topbar-title h1 { font-size: 19px; line-height: 1.2; margin: 0; letter-spacing: -.02em; }
+    .topbar-title p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .search { position: relative; }
+    .search input { width: 280px; padding: 10px 14px 10px 37px; border-radius: 11px; border: 1px solid var(--line); background: rgba(15,29,48,.74); color: var(--text); outline: none; }
+    .search input:focus { border-color: rgba(56,189,248,.6); box-shadow: 0 0 0 3px rgba(56,189,248,.1); }
+    .search svg { position: absolute; left: 12px; top: 11px; width: 17px; color: var(--muted); }
+    .status-pill, .badge { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; font-size: 13px; white-space: nowrap; }
+    .status-pill .pulse { width: 7px; height: 7px; background: var(--teal); border-radius: 50%; box-shadow: 0 0 0 5px rgba(45,212,191,.09); }
+    .content { padding: 28px 30px 64px; max-width: 1680px; margin: 0 auto; }
+    .view { display: none; animation: enter .25s ease both; }
+    .view.active { display: block; }
+    @keyframes enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+    .section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; margin-bottom: 20px; }
+    .eyebrow { color: var(--teal); text-transform: uppercase; letter-spacing: .12em; font-weight: 800; font-size: 11px; }
+    .section-head h2 { font-size: clamp(24px, 3vw, 34px); line-height: 1.15; margin: 5px 0 0; letter-spacing: -.035em; }
+    .section-head p { max-width: 650px; margin: 7px 0 0; color: var(--muted); }
+    .btn { border: 1px solid var(--line-strong); background: rgba(15,29,48,.8); padding: 9px 13px; border-radius: 10px; cursor: pointer; }
+    .btn:hover { border-color: rgba(56,189,248,.55); background: rgba(22,42,65,.9); }
+    .btn.primary { border-color: rgba(45,212,191,.42); background: var(--teal); color: #05201e; font-weight: 750; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .grid { display: grid; gap: 16px; }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(145deg, rgba(17,35,58,.84), rgba(11,25,42,.78)); box-shadow: var(--shadow); }
+    .card.pad { padding: 20px; }
+    .metric { padding: 18px; min-height: 132px; position: relative; overflow: hidden; }
+    .metric:after { content:""; width: 95px; height: 95px; border-radius: 50%; position: absolute; right: -30px; bottom: -42px; background: radial-gradient(circle, var(--accent, rgba(56,189,248,.25)), transparent 67%); }
+    .metric-top { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; }
+    .metric-icon { width: 31px; height: 31px; display:grid; place-items:center; border:1px solid var(--line); border-radius: 9px; color: var(--accent-color,var(--cyan)); background: rgba(255,255,255,.025); }
+    .metric strong { display: block; font-size: 30px; line-height: 1; margin: 18px 0 7px; letter-spacing: -.04em; }
+    .metric small { color: var(--muted); }
+    .hero-grid { grid-template-columns: minmax(0, 1.55fr) minmax(310px, .75fr); margin-top: 16px; }
+    .panel-head { padding: 18px 20px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+    .panel-head h3 { margin: 0; font-size: 15px; }
+    .panel-head span { color: var(--muted); font-size: 12px; }
+    .pipeline-flow { padding: 22px 18px 23px; display: grid; grid-template-columns: repeat(5,minmax(100px,1fr)); gap: 8px; align-items: center; }
+    .flow-stage { position: relative; padding: 14px 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7,17,31,.46); min-height: 95px; }
+    .flow-stage:not(:last-child):after { content:""; position:absolute; top:50%; right:-9px; width:9px; border-top:1px solid rgba(56,189,248,.45); }
+    .flow-stage b { display:block; font-size: 20px; color: var(--stage,var(--cyan)); }
+    .flow-stage span { display:block; font-size: 12px; margin-top:3px; }
+    .flow-stage small { color: var(--muted); font-size:12px; }
+    .deadline { padding: 20px; }
+    .deadline-date { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 4px; }
+    .deadline-date strong { font-size: 42px; letter-spacing: -.05em; color: var(--amber); }
+    .deadline-date span { color: var(--muted); }
+    .progress { height: 7px; background: rgba(148,163,184,.12); border-radius: 99px; overflow:hidden; margin: 17px 0 8px; }
+    .progress i { display:block; height:100%; background:linear-gradient(90deg,var(--teal),var(--cyan)); border-radius:99px; }
+    .task-list { display:grid; gap:10px; margin-top:14px; }
+    .task { padding:12px; border:1px solid var(--line); border-radius:11px; display:flex; gap:10px; align-items:flex-start; background:rgba(7,17,31,.35); }
+    .task .state { width:8px; height:8px; margin-top:6px; border-radius:50%; background:var(--amber); flex:0 0 auto; }
+    .task strong { display:block; font-size:12px; }
+    .task span { color:var(--muted); font-size:11px; }
+    .filters { display:flex; flex-wrap:wrap; gap:9px; margin-bottom:16px; }
+    .filters select, .filters input { border:1px solid var(--line); color:var(--text); background:rgba(15,29,48,.76); border-radius:10px; padding:9px 12px; outline:none; }
+    .filters input { min-width:240px; }
+    .table-wrap { overflow:auto; }
+    table { width:100%; border-collapse:collapse; min-width:980px; }
+    th { color:#7f94aa; text-transform:uppercase; letter-spacing:.08em; font-size:12px; text-align:left; padding:12px 16px; border-bottom:1px solid var(--line); }
+    td { padding:14px 16px; border-bottom:1px solid rgba(148,163,184,.1); vertical-align:middle; }
+    tbody tr { cursor:pointer; transition:.15s ease; }
+    tbody tr:hover { background:rgba(56,189,248,.045); }
+    .company { display:flex; align-items:center; gap:11px; }
+    .avatar { width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(56,189,248,.17),rgba(167,139,250,.12));border:1px solid var(--line);font-weight:800;font-size:11px;color:#c8eaff; }
+    .company strong { display:block;font-size:13px; }
+    .company small { color:var(--muted); }
+    .badge { padding:5px 9px; font-size:12px; border-color:transparent; }
+    .badge.blue { color:#9bddfa;background:rgba(56,189,248,.12); }
+    .badge.green { color:#9ef0b6;background:rgba(74,222,128,.11); }
+    .badge.amber { color:#fbd97b;background:rgba(251,191,36,.11); }
+    .badge.red { color:#fda4b3;background:rgba(251,113,133,.12); }
+    .badge.purple { color:#c8b8ff;background:rgba(167,139,250,.13); }
+    .muted { color:var(--muted); }
+    .score-mini { display:flex; gap:5px; }
+    .score-mini span { min-width:34px; padding:4px 6px; border-radius:7px; background:rgba(148,163,184,.08); color:var(--muted); font-size:10px; text-align:center; }
+    .empty { text-align:center;padding:42px;color:var(--muted);display:none; }
+    .split { display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.55fr);gap:16px; }
+    .field-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:20px; }
+    .field { border:1px solid var(--line);border-radius:11px;padding:12px;background:rgba(7,17,31,.32); }
+    .field label { display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px; }
+    .field strong { font-size:13px; }
+    .field.wide { grid-column:1/-1; }
+    .score-card { padding:18px; }
+    .score-row { display:grid;grid-template-columns:100px 1fr 72px;align-items:center;gap:10px;margin:15px 0; }
+    .score-row label { font-size:12px; }
+    .score-row .bar { height:7px;border-radius:99px;background:rgba(148,163,184,.1);overflow:hidden; }
+    .score-row .bar i { display:block;height:100%;border-radius:99px;background:var(--bar,var(--cyan)); }
+    .score-row b { text-align:right;font-size:11px;color:var(--muted); }
+    .notice { border:1px solid rgba(251,191,36,.22);background:rgba(251,191,36,.06);padding:13px 14px;border-radius:11px;color:#e9d18d;font-size:12px; }
+    .source-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .source { padding:18px; position:relative; overflow:hidden; }
+    .source-top { display:flex;justify-content:space-between;gap:10px;align-items:start; }
+    .source h3 { margin:0;font-size:15px; }
+    .source p { color:var(--muted);font-size:13px;min-height:58px; }
+    .source dl { margin:16px 0 0;display:grid;grid-template-columns:95px 1fr;gap:7px;font-size:11px; }
+    .source dt { color:var(--muted); }
+    .source dd { margin:0; }
+    .rules { margin-top:16px; }
+    .rule { display:grid;grid-template-columns:35px 1fr auto;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line); }
+    .rule-num { width:29px;height:29px;display:grid;place-items:center;border:1px solid var(--line);border-radius:9px;color:var(--teal);font-weight:800;font-size:11px; }
+    .rule strong { display:block;font-size:12px; }
+    .rule span { color:var(--muted);font-size:11px; }
+    .arch { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:20px; }
+    .arch-node { padding:16px;border:1px solid var(--line);border-radius:13px;background:rgba(7,17,31,.38); }
+    .arch-node small { color:var(--teal);text-transform:uppercase;letter-spacing:.1em;font-weight:800; }
+    .arch-node h3 { margin:7px 0;font-size:15px; }
+    .arch-node p { color:var(--muted);font-size:12px;margin:0; }
+    .email-layout { display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px; }
+    .email-list { padding:8px; }
+    .email-item { width:100%;border:0;background:transparent;color:inherit;text-align:left;border-radius:12px;padding:13px;cursor:pointer;border-bottom:1px solid var(--line); }
+    .email-item:hover,.email-item.active { background:rgba(56,189,248,.07); }
+    .email-item strong { display:block;font-size:12px; }
+    .email-item span { color:var(--muted);font-size:10px; }
+    .email-editor { padding:20px; }
+    .email-meta { display:grid;grid-template-columns:95px 1fr;gap:8px 12px;font-size:12px;padding-bottom:16px;border-bottom:1px solid var(--line); }
+    .email-meta span:nth-child(odd) { color:var(--muted); }
+    .email-body { white-space:pre-wrap;font-family:inherit;color:#cbd8e8;background:rgba(7,17,31,.42);border:1px solid var(--line);border-radius:12px;padding:18px;margin:16px 0;max-height:390px;overflow:auto;font-size:13px; }
+    .email-actions { display:flex;gap:9px;align-items:center;flex-wrap:wrap; }
+    .local-note { color:var(--muted);font-size:11px;margin-left:auto; }
+    .timeline { padding:12px 20px 22px; }
+    .phase { display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line); }
+    .phase-num { width:38px;height:38px;border-radius:11px;display:grid;place-items:center;border:1px solid var(--line);font-weight:800;color:var(--muted); }
+    .phase.done .phase-num { color:var(--green);border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.07); }
+    .phase.active .phase-num { color:var(--amber);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.07);box-shadow:0 0 22px rgba(251,191,36,.08); }
+    .phase strong { display:block;font-size:13px; }
+    .phase span { color:var(--muted);font-size:11px; }
+    .checklist { display:grid;gap:9px;padding:18px; }
+    .check { display:flex;gap:10px;align-items:flex-start;padding:11px;border-radius:10px;background:rgba(7,17,31,.28); }
+    .check i { width:17px;height:17px;border:1px solid var(--line-strong);border-radius:5px;flex:0 0 auto;margin-top:2px; }
+    .check.done i { background:var(--green);border-color:var(--green);box-shadow:inset 0 0 0 4px #17362a; }
+    .check strong { display:block;font-size:12px; }
+    .check span { color:var(--muted);font-size:10px; }
+    .drawer-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:40;opacity:0;pointer-events:none;transition:.2s ease; }
+    .drawer { position:fixed;z-index:41;top:0;right:0;height:100vh;width:min(540px,100%);background:#0a1727;border-left:1px solid var(--line-strong);box-shadow:-30px 0 80px rgba(0,0,0,.42);transform:translateX(103%);transition:.25s ease;overflow:auto; }
+    .drawer.open { transform:none; }
+    .drawer-backdrop.open { opacity:1;pointer-events:auto; }
+    .drawer-head { position:sticky;top:0;background:rgba(10,23,39,.94);backdrop-filter:blur(18px);display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid var(--line);z-index:2; }
+    .drawer-head h3 { margin:0;font-size:16px; }
+    .close { border:1px solid var(--line);background:transparent;width:34px;height:34px;border-radius:10px;cursor:pointer; }
+    .drawer-body { padding:20px; }
+    .drawer-body h4 { margin:24px 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted); }
+    .detail-list { display:grid;grid-template-columns:130px 1fr;gap:9px 14px;padding:14px;border:1px solid var(--line);border-radius:13px;background:rgba(7,17,31,.36);font-size:12px; }
+    .detail-list dt { color:var(--muted); }.detail-list dd { margin:0; }
+    .toast { position:fixed;right:22px;bottom:22px;background:#142942;border:1px solid var(--line-strong);box-shadow:var(--shadow);border-radius:12px;padding:12px 15px;z-index:60;transform:translateY(20px);opacity:0;pointer-events:none;transition:.2s ease;font-size:12px; }
+    .toast.show { transform:none;opacity:1; }
+    dialog { width:min(620px,calc(100% - 28px)); border:1px solid var(--line-strong); border-radius:18px; padding:0; color:var(--text); background:#0a1727; box-shadow:var(--shadow); }
+    dialog::backdrop { background:rgba(0,0,0,.66); backdrop-filter:blur(4px); }
+    .dialog-head { display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line); }
+    .dialog-head h3 { margin:0;font-size:16px; }
+    .form-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;padding:20px; }
+    .form-control { display:grid;gap:6px; }
+    .form-control.wide { grid-column:1/-1; }
+    .form-control label { color:var(--muted);font-size:13px; }
+    .form-control input,.form-control select { width:100%;border:1px solid var(--line);background:rgba(7,17,31,.65);color:var(--text);border-radius:10px;padding:10px 11px;outline:none; }
+    .dialog-actions { display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:15px 20px;border-top:1px solid var(--line); }
+    .mobile-nav { display:none; }
+    @media (max-width:1180px){
+      .grid-4{grid-template-columns:repeat(2,1fr)} .hero-grid,.split{grid-template-columns:1fr}.source-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width:820px){
+      .sidebar{display:none}main{margin-left:0}.topbar{padding:0 16px}.search{display:none}.content{padding:20px 16px 90px}.mobile-nav{display:flex;position:fixed;z-index:30;bottom:0;left:0;right:0;background:rgba(7,17,31,.95);backdrop-filter:blur(18px);border-top:1px solid var(--line);padding:8px;overflow:auto}.mobile-nav button{border:0;background:transparent;color:var(--muted);padding:9px 12px;font-size:10px;min-width:max-content}.mobile-nav button.active{color:var(--teal)}.pipeline-flow{grid-template-columns:1fr}.flow-stage:not(:last-child):after{display:none}.source-grid,.grid-3,.arch{grid-template-columns:1fr}.email-layout{grid-template-columns:1fr}.email-list{display:flex;overflow:auto}.email-item{min-width:220px}.field-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.section-head{align-items:flex-start;flex-direction:column}.local-note{margin-left:0;width:100%}
+    }
+    @media (max-width:540px){.grid-4,.grid-2{grid-template-columns:1fr}.status-pill{display:none}.metric{min-height:115px}.topbar-title p{display:none}.phase{grid-template-columns:48px 1fr}.phase .badge{display:none}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><svg viewBox="0 0 64 64" fill="none"><path d="M32 8 48 50 32 43 16 50 32 8Z" fill="#2dd4bf"/><circle cx="32" cy="31" r="6" fill="#07111f" stroke="#eaf8ff" stroke-width="3"/></svg></div>
+        <div><strong>EAG Compass</strong><small>Buyer Intelligence</small></div>
+      </div>
+      <div class="nav-label">Operação</div>
+      <nav class="nav" id="nav">
+        <button class="active" data-view="overview"><span>◫</span> Visão geral</button>
+        <button data-view="pipeline"><span>⌁</span> Pipeline</button>
+        <button data-view="qualification"><span>✓</span> Qualificação</button>
+        <button data-view="compliance"><span>◇</span> Compliance</button>
+        <button data-view="data"><span>⌘</span> Dados & arquitetura</button>
+        <button data-view="emails"><span>✉</span> Central de e-mails</button>
+        <div class="nav-label">Gestão</div>
+        <button data-view="planning"><span>◷</span> Planejamento</button>
+      </nav>
+      <div class="sidebar-foot"><strong><span class="dot"></span>Fase 4 em execução</strong><p>Pesquisa técnica e validação de fontes. Checkpoint: 05/10/2026.</p></div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div class="topbar-title"><h1 id="pageTitle">Visão geral</h1><p>Operação interna EAG · MVP mono-tenant</p></div>
+        <div class="top-actions">
+          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="globalSearch" placeholder="Buscar empresa, país ou produto"></div>
+          <div class="status-pill"><span class="pulse"></span> Protótipo operacional</div>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="view active" id="overview">
+          <div class="section-head"><div><div class="eyebrow">Comando da operação</div><h2>O que está acontecendo agora</h2><p>Uma leitura única do funil comercial, dos bloqueios técnicos e das próximas decisões do EAG Compass.</p></div><button class="btn" data-go="pipeline">Abrir pipeline →</button></div>
+          <div class="grid grid-4">
+            <article class="card metric" style="--accent-color:var(--cyan);--accent:rgba(56,189,248,.28)"><div class="metric-top"><span>Prospects mapeados</span><span class="metric-icon">⌁</span></div><strong id="metricProspects">7</strong><small>Açúcar e café · base atual</small></article>
+            <article class="card metric" style="--accent-color:var(--teal);--accent:rgba(45,212,191,.28)"><div class="metric-top"><span>Em qualificação</span><span class="metric-icon">✓</span></div><strong id="metricQualifying">4</strong><small>Com dados comerciais pendentes</small></article>
+            <article class="card metric" style="--accent-color:var(--amber);--accent:rgba(251,191,36,.25)"><div class="metric-top"><span>Ações críticas</span><span class="metric-icon">!</span></div><strong id="metricCritical">3</strong><small>Bloqueios ou validações necessárias</small></article>
+            <article class="card metric" style="--accent-color:var(--purple);--accent:rgba(167,139,250,.25)"><div class="metric-top"><span>Fase atual</span><span class="metric-icon">04</span></div><strong>Dados</strong><small>Pesquisa técnica · em execução</small></article>
+          </div>
+          <div class="grid hero-grid">
+            <article class="card"><div class="panel-head"><div><h3>Funil de prospecção</h3><span>Estados definidos na Especificação v1.3</span></div><span id="pipelineTotal">7 empresas</span></div><div class="pipeline-flow">
+              <div class="flow-stage" style="--stage:var(--cyan)"><b id="flowDiscovered">1</b><span>Descoberto</span><small>Indício comercial</small></div>
+              <div class="flow-stage" style="--stage:var(--teal)"><b id="flowProspected">1</b><span>Prospectado</span><small>Evidência empresarial</small></div>
+              <div class="flow-stage" style="--stage:var(--purple)"><b id="flowContact">1</b><span>Em contato</span><small>Contato verificado</small></div>
+              <div class="flow-stage" style="--stage:var(--amber)"><b id="flowQualifying">4</b><span>Qualificação</span><small>Demanda em confirmação</small></div>
+              <div class="flow-stage" style="--stage:var(--green)"><b id="flowQualified">0</b><span>Qualificado</span><small>Gate completo</small></div>
+            </div></article>
+            <article class="card deadline"><div class="eyebrow">Checkpoint técnico</div><div class="deadline-date"><strong>05</strong><span>outubro · 2026</span></div><p class="muted">Decisão Go/No-Go para iniciar Design, baseada em fontes testadas, arquitetura e orçamento bottom-up.</p><div class="progress"><i style="width:38%"></i></div><small class="muted">Fase 4 · progresso documental estimado</small></article>
+          </div>
+          <div class="grid grid-2" style="margin-top:16px">
+            <article class="card"><div class="panel-head"><div><h3>Próximas ações</h3><span>Caminho crítico da Frente B</span></div><button class="btn" data-go="emails">Ver e-mails</button></div><div class="task-list" style="padding:5px 18px 20px">
+              <div class="task"><span class="state" style="background:var(--red)"></span><div><strong>Enviar RFQs para Moody’s Orbis e D&B</strong><span>Solicitar piloto de 60 dias, API/CSV, cobertura e direitos de uso.</span></div></div>
+              <div class="task"><span class="state"></span><div><strong>Validar download OFAC real</strong><span>Arquivo, checksum, importação e mudança de versão.</span></div></div>
+              <div class="task"><span class="state"></span><div><strong>Consolidar orçamento bottom-up</strong><span>Desenvolvimento, QA, infraestrutura, dados e suporte.</span></div></div>
+            </div></article>
+            <article class="card"><div class="panel-head"><div><h3>Decisões já protegidas</h3><span>Regras que evitam falsos positivos</span></div></div><div class="checklist">
+              <div class="check done"><i></i><div><strong>Comex Stat não prova compra de empresa</strong><span>É contexto agregado de país, produto e período.</span></div></div>
+              <div class="check done"><i></i><div><strong>Nome semelhante nunca bloqueia sozinho</strong><span>Match nominal sempre exige revisão humana.</span></div></div>
+              <div class="check done"><i></i><div><strong>Dados desconhecidos reduzem cobertura</strong><span>Não recebem risco zero nem penalidade inventada.</span></div></div>
+            </div></article>
+          </div>
+        </section>
+
+        <section class="view" id="pipeline">
+          <div class="section-head"><div><div class="eyebrow">Pipeline comercial</div><h2>Prospects e oportunidades</h2><p>Clique em uma empresa para ver a demanda conhecida, as lacunas e o próximo passo recomendado.</p></div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span class="badge blue" id="leadCountBadge">7 registros iniciais</span><button class="btn" id="exportPipelineButton">Exportar CSV</button><button class="btn primary" id="newProspectButton">+ Novo prospect</button></div></div>
+          <div class="filters"><input id="leadSearch" placeholder="Filtrar por empresa ou país"><select id="productFilter"><option value="all">Todos os produtos</option><option>Açúcar</option><option>Café</option></select><select id="statusFilter"><option value="all">Todos os estados</option><option>Descoberto</option><option>Prospectado</option><option>Em contato</option><option>Em qualificação</option><option>Bloqueado</option></select></div>
+          <article class="card table-wrap"><table><thead><tr><th>Empresa / mercado</th><th>Produto</th><th>Demanda conhecida</th><th>Estado</th><th>Decisão</th><th>Scores</th><th>Próximo passo</th></tr></thead><tbody id="leadRows"></tbody></table><div class="empty" id="leadEmpty">Nenhum prospect corresponde aos filtros.</div></article>
+        </section>
+
+        <section class="view" id="qualification">
+          <div class="section-head"><div><div class="eyebrow">Qualificação EAG + SPIN</div><h2>Demanda comercial sem dados inventados</h2><p>Exemplo operacional selecionado: Bra Suisse. Campos desconhecidos permanecem explícitos e não reduzem automaticamente o score.</p></div><button class="btn" data-open="bra-suisse">Abrir ficha completa</button></div>
+          <div class="split">
+            <article class="card"><div class="panel-head"><div><h3>Bra Suisse · Suíça</h3><span>Canal aberto · demanda abaixo do mínimo padrão</span></div><span class="badge amber">Aprovação necessária</span></div><div class="field-grid">
+              <div class="field"><label>Produto</label><strong>Açúcar</strong></div><div class="field"><label>Especificação</label><strong>Não confirmada</strong></div>
+              <div class="field"><label>Volume por operação</label><strong>≈ 270 MT</strong></div><div class="field"><label>Volume mínimo EAG</label><strong>500 MT</strong></div>
+              <div class="field"><label>Embalagem</label><strong>Sacas de 50 kg</strong></div><div class="field"><label>Incoterm</label><strong>FOB</strong></div>
+              <div class="field"><label>Pagamento</label><strong>CAD at sight</strong></div><div class="field"><label>Porto / destino</label><strong>Não confirmado</strong></div>
+              <div class="field"><label>Data necessária</label><strong>Não confirmada</strong></div><div class="field"><label>Comprador final</label><strong>Não confirmado</strong></div>
+              <div class="field wide"><label>Pergunta consultiva recomendada</label><strong>“Além do volume inicial, existe previsão de compras recorrentes ou consolidação com outros pedidos?”</strong></div>
+            </div></article>
+            <div class="grid">
+              <article class="card score-card"><div class="panel-head" style="padding:0 0 13px"><div><h3>Scores independentes</h3><span>Sem cálculo enquanto faltam dados mínimos</span></div></div>
+                <div class="score-row"><label>Potential</label><div class="bar"><i style="width:28%;--bar:var(--cyan)"></i></div><b>parcial</b></div>
+                <div class="score-row"><label>Confidence</label><div class="bar"><i style="width:36%;--bar:var(--teal)"></i></div><b>parcial</b></div>
+                <div class="score-row"><label>Risk</label><div class="bar"><i style="width:10%;--bar:var(--amber)"></i></div><b>não calc.</b></div>
+                <div class="score-row"><label>Cobertura risco</label><div class="bar"><i style="width:18%;--bar:var(--purple)"></i></div><b>baixa</b></div>
+                <div class="notice">As barras indicam apenas cobertura demonstrativa da ficha, não scores comerciais aprovados.</div>
+              </article>
+              <article class="card"><div class="panel-head"><div><h3>Gate de qualificação</h3><span>Itens obrigatórios</span></div></div><div class="checklist">
+                <div class="check"><i></i><div><strong>Evidência empresarial nominal</strong><span>Pendente</span></div></div><div class="check"><i></i><div><strong>Decisor e comprador final</strong><span>Pendente</span></div></div><div class="check done"><i></i><div><strong>Demanda operacional iniciada</strong><span>Volume, embalagem, incoterm e pagamento conhecidos</span></div></div>
+              </div></article>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="compliance">
+          <div class="section-head"><div><div class="eyebrow">Compliance e risco</div><h2>Fontes, testes e regras de decisão</h2><p>O status abaixo separa documentação encontrada de integração realmente testada.</p></div><span class="badge amber">Validação parcial</span></div>
+          <div class="grid source-grid">
+            <article class="card source"><div class="source-top"><h3>OFAC SDN</h3><span class="badge amber">Parcial</span></div><p>Documentação oficial confirmada. Falta validar download real, checksum e importação completa.</p><dl><dt>Uso</dt><dd>Sanções internacionais</dd><dt>Integração</dt><dd>Download oficial + índice local</dd><dt>Cron</dt><dd>Diário, baixa apenas se hash mudar</dd></dl></article>
+            <article class="card source"><div class="source-top"><h3>CGU · CEIS/CNEP</h3><span class="badge amber">Token pendente</span></div><p>Listas de integridade administrativa brasileiras. Geram alertas, não bloqueio comercial automático.</p><dl><dt>Uso</dt><dd>Integridade Brasil</dd><dt>Integração</dt><dd>API oficial com token</dd><dt>Escopo</dt><dd>Empresas e sanções brasileiras</dd></dl></article>
+            <article class="card source"><div class="source-top"><h3>Comex Stat</h3><span class="badge blue">Teste pendente</span></div><p>Contexto agregado por país, produto, NCM e período. Nunca é evidência nominal de empresa.</p><dl><dt>Uso</dt><dd>Mercado-alvo</dd><dt>Integração</dt><dd>Adaptador controlado</dd><dt>Falta</dt><dd>Resposta real e limites</dd></dl></article>
+            <article class="card source"><div class="source-top"><h3>CNPJ Brasil</h3><span class="badge blue">Estratégia pendente</span></div><p>Cadastro para empresas brasileiras. Não resolve validação de importadores estrangeiros.</p><dl><dt>Uso</dt><dd>Situação cadastral</dd><dt>Integração</dt><dd>Dados abertos / lote</dd><dt>Falta</dt><dd>Contrato técnico e fallback</dd></dl></article>
+            <article class="card source"><div class="source-top"><h3>Moody’s Orbis</h3><span class="badge red">RFQ não enviado</span></div><p>Possível fonte paga de registro, crédito, UBO, PEP e risco empresarial internacional.</p><dl><dt>Uso</dt><dd>KYC e risco global</dd><dt>Gate</dt><dd>28/09/2026</dd><dt>MVP</dt><dd>Condicional a ROI</dd></dl></article>
+            <article class="card source"><div class="source-top"><h3>Dun & Bradstreet</h3><span class="badge red">RFQ não enviado</span></div><p>Alternativa paga para cadastro, crédito e risco. Precisa confirmar cobertura e direitos derivados.</p><dl><dt>Uso</dt><dd>Risco internacional</dd><dt>Gate</dt><dd>28/09/2026</dd><dt>MVP</dt><dd>Condicional a ROI</dd></dl></article>
+          </div>
+          <div class="grid grid-2 rules">
+            <article class="card pad"><div class="panel-head" style="padding:0 0 12px"><div><h3>Regra de matching</h3><span>Da identificação à decisão</span></div></div>
+              <div class="rule"><span class="rule-num">1</span><div><strong>ID confiável + país compatível</strong><span>Correspondência determinística com lista de bloqueio.</span></div><span class="badge red">Bloqueio</span></div>
+              <div class="rule"><span class="rule-num">2</span><div><strong>País bloqueado pela política EAG</strong><span>Política interna registrada e vigente.</span></div><span class="badge red">Bloqueio</span></div>
+              <div class="rule"><span class="rule-num">3</span><div><strong>Nome exato, parcial ou fuzzy</strong><span>Similaridade define prioridade, nunca decisão automática.</span></div><span class="badge amber">Revisão</span></div>
+            </article>
+            <article class="card pad"><div class="panel-head" style="padding:0 0 12px"><div><h3>Risk Score</h3><span>Risco e cobertura são separados</span></div></div><p class="muted">Componentes conhecidos são ponderados; componentes desconhecidos reduzem a cobertura. Sanção confirmada é um bloqueio jurídico separado do Risk Score.</p><div class="notice">Sem base paga, crédito e histórico financeiro de importadores estrangeiros permanecem pendentes; o resultado deve aparecer como “Risk provisório”.</div></article>
+          </div>
+        </section>
+
+        <section class="view" id="data">
+          <div class="section-head"><div><div class="eyebrow">Frente A</div><h2>Dados e arquitetura técnica</h2><p>Uma arquitetura Cloudflare-first com três unidades lógicas e rastreabilidade desde a origem.</p></div><span class="badge blue">Decisões provisórias aprovadas</span></div>
+          <article class="card"><div class="panel-head"><div><h3>Unidades de execução</h3><span>Separação clara entre interação, processamento e sincronização</span></div></div><div class="arch">
+            <div class="arch-node"><small>Worker 01</small><h3>API</h3><p>CRUD de empresas, contatos, formulários, scores, RBAC e exportação.</p></div>
+            <div class="arch-node"><small>Worker 02</small><h3>Async</h3><p>Importações, matching, recálculo, relatórios e tarefas por Queues.</p></div>
+            <div class="arch-node"><small>Worker 03</small><h3>Cron</h3><p>Sincronização de listas, hashes, versões e verificações programadas.</p></div>
+          </div></article>
+          <div class="grid grid-3" style="margin-top:16px">
+            <article class="card pad"><div class="eyebrow">D1</div><h3>Dados relacionais</h3><p class="muted">Empresas, evidências, contatos, formulário EAG, scores, sanções, decisões e auditoria append-only.</p></article>
+            <article class="card pad"><div class="eyebrow">R2 + KV</div><h3>Arquivos e cache</h3><p class="muted">Datasets versionados, relatórios exportados, hashes e respostas temporárias sem PII em claro.</p></article>
+            <article class="card pad"><div class="eyebrow">Queues</div><h3>Processos resilientes</h3><p class="muted">Importação de fontes, matching, recálculo e retentativas sem bloquear a experiência do vendedor.</p></article>
+          </div>
+          <div class="grid grid-2" style="margin-top:16px">
+            <article class="card"><div class="panel-head"><div><h3>Modelo operacional</h3><span>MVP e preparação futura</span></div></div><div class="checklist"><div class="check done"><i></i><div><strong>MVP mono-tenant EAG</strong><span>Ambiente interno e piloto controlado.</span></div></div><div class="check done"><i></i><div><strong>tenant_id desde o início</strong><span>Preparação estrutural; multi-tenant não ativado no MVP.</span></div></div><div class="check"><i></i><div><strong>Retenção LGPD</strong><span>Prazo depende de validação jurídica/DPO.</span></div></div></div></article>
+            <article class="card"><div class="panel-head"><div><h3>Contratos de dados pendentes</h3><span>Bloqueiam a arquitetura final dos adaptadores</span></div></div><div class="checklist"><div class="check"><i></i><div><strong>Comex Stat</strong><span>Campos reais, resposta, limites e atualização.</span></div></div><div class="check"><i></i><div><strong>OFAC e CGU</strong><span>Download/token, versionamento e ingestão testada.</span></div></div><div class="check"><i></i><div><strong>Orbis / D&B</strong><span>Preço, licença, API, retenção e scores derivados.</span></div></div></div></article>
+          </div>
+        </section>
+
+        <section class="view" id="emails">
+          <div class="section-head"><div><div class="eyebrow">Preparação de contato</div><h2>Central de e-mails</h2><p>Rascunhos prontos para revisão. O envio real será integrado depois da aprovação do fluxo.</p></div><span class="badge amber">Envio desativado</span></div>
+          <div class="email-layout">
+            <article class="card email-list" id="emailList"></article>
+            <article class="card email-editor"><div class="email-meta"><span>Destinatário</span><strong id="emailTo"></strong><span>Assunto</span><strong id="emailSubject"></strong><span>Prazo pedido</span><strong>28/09/2026</strong><span>Status</span><strong id="emailStatus" class="muted">Rascunho não enviado</strong></div><div class="email-body" id="emailBody"></div><div class="email-actions"><button class="btn primary" id="copyEmail">Copiar texto</button><button class="btn" id="markSent">Marcar como enviado</button><button class="btn" disabled>Enviar e-mail</button><span class="local-note">A marcação é salva somente neste navegador.</span></div></article>
+          </div>
+          <div class="grid grid-3" style="margin-top:16px"><article class="card pad"><div class="eyebrow">21/09</div><h3>Envio inicial</h3><p class="muted">RFQ com escopo de piloto, cobertura, API, licença e prazo.</p></article><article class="card pad"><div class="eyebrow">24/09</div><h3>1º follow-up</h3><p class="muted">Confirmar recebimento e disponibilidade de proposta até o gate.</p></article><article class="card pad"><div class="eyebrow">28/09</div><h3>Gate comercial</h3><p class="muted">Cotação recebida ou cenário MVP sem base paga formalizado.</p></article></div>
+        </section>
+
+        <section class="view" id="planning">
+          <div class="section-head"><div><div class="eyebrow">Governança do produto</div><h2>Planejamento e critérios de avanço</h2><p>Histórico das fases, entregas aprovadas e evidências necessárias para o próximo Go/No-Go.</p></div><span class="badge green">Fases 1–3 fechadas</span></div>
+          <div class="split">
+            <article class="card"><div class="panel-head"><div><h3>Fases do produto</h3><span>Fase 4 em andamento</span></div></div><div class="timeline">
+              <div class="phase done"><span class="phase-num">01</span><div><strong>Brainstorm</strong><span>Problema, público, escopo e hipótese.</span></div><span class="badge green">Fechada</span></div>
+              <div class="phase done"><span class="phase-num">02</span><div><strong>Discovery</strong><span>Benchmark preliminar e diferenciação como hipótese.</span></div><span class="badge green">Fechada</span></div>
+              <div class="phase done"><span class="phase-num">03</span><div><strong>Especificação</strong><span>Constituição v1.3 e Spec v1.3 aprovadas.</span></div><span class="badge green">Fechada</span></div>
+              <div class="phase active"><span class="phase-num">04</span><div><strong>Pesquisa técnica</strong><span>Fontes, arquitetura, cotações e orçamento bottom-up.</span></div><span class="badge amber">Ativa</span></div>
+              <div class="phase"><span class="phase-num">05</span><div><strong>Design</strong><span>Fluxos UX/UI e design system.</span></div><span class="badge blue">Próxima</span></div>
+              <div class="phase"><span class="phase-num">06</span><div><strong>Plano detalhado</strong><span>Roadmap e implementação.</span></div></div><div class="phase"><span class="phase-num">07</span><div><strong>Auditoria</strong><span>Red-team e verificação cruzada.</span></div></div><div class="phase"><span class="phase-num">08</span><div><strong>Correção</strong><span>Aplicação dos achados.</span></div></div><div class="phase"><span class="phase-num">09</span><div><strong>Montagem</strong><span>Plano final e aceite.</span></div></div>
+            </div></article>
+            <div class="grid">
+              <article class="card"><div class="panel-head"><div><h3>Gate de 05/10</h3><span>Artefatos concretos</span></div></div><div class="checklist"><div class="check"><i></i><div><strong>Schema D1 revisado e testado</strong></div></div><div class="check"><i></i><div><strong>3 Workers especificados</strong></div></div><div class="check"><i></i><div><strong>Fontes testadas — inclusive falhas</strong></div></div><div class="check"><i></i><div><strong>Cotação ou pendência formal</strong></div></div><div class="check"><i></i><div><strong>Orçamento bottom-up</strong></div></div><div class="check"><i></i><div><strong>Recomendação Go/No-Go</strong></div></div></div></article>
+              <article class="card pad"><div class="eyebrow">Regra de controle</div><h3>Sem hipóteses ocultas</h3><p class="muted">Cada limitação de fonte, custo ou cobertura precisa aparecer na decisão. Falta de API ou resposta comercial também é um resultado documentado.</p></article>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" id="mobileNav"><button class="active" data-view="overview">Visão geral</button><button data-view="pipeline">Pipeline</button><button data-view="qualification">Qualificação</button><button data-view="compliance">Compliance</button><button data-view="data">Dados</button><button data-view="emails">E-mails</button><button data-view="planning">Plano</button></nav>
+  <div class="drawer-backdrop" id="drawerBackdrop"></div><aside class="drawer" id="drawer"><div class="drawer-head"><h3 id="drawerTitle">Empresa</h3><button class="close" id="closeDrawer">×</button></div><div class="drawer-body" id="drawerBody"></div></aside>
+  <dialog id="prospectDialog"><form id="prospectForm"><div class="dialog-head"><div><h3>Novo prospect</h3><span class="muted">Entra como Descoberto com um indício rastreável</span></div><button class="close" type="button" id="closeProspectDialog">×</button></div><div class="form-grid"><div class="form-control wide"><label>Razão social / nome da empresa *</label><input name="legalName" required></div><div class="form-control"><label>País (ISO 2 letras) *</label><input name="countryCode" required maxlength="2" placeholder="BR"></div><div class="form-control"><label>Tipo de comprador</label><select name="buyerType"><option value="unconfirmed">Não confirmado</option><option value="final_buyer">Comprador final</option><option value="intermediary">Intermediário</option></select></div><div class="form-control wide"><label>Fonte do indício *</label><input name="sourceLabel" required placeholder="Ex.: indicação comercial, website, LinkedIn"></div><div class="form-control wide"><label>URL da fonte</label><input name="sourceUrl" type="url" placeholder="https://"></div></div><div class="dialog-actions"><button type="button" class="btn" id="cancelProspect">Cancelar</button><button class="btn primary" type="submit">Salvar prospect</button></div></form></dialog>
+  <dialog id="operationDialog"><form id="operationForm"><div class="dialog-head"><div><h3 id="operationTitle">Atualizar ficha</h3><span class="muted" id="operationSubtitle">Dados rastreáveis e confirmados</span></div><button class="close" type="button" id="closeOperationDialog">×</button></div><div class="form-grid" id="operationFields"></div><div class="dialog-actions"><button type="button" class="btn" id="cancelOperation">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></form></dialog>
+  <div class="toast" id="toast">Concluído</div>
+
+  <script>
+    let leads = [
+      {id:'tanzania',company:'Prospect Tanzânia',country:'Tanzânia',place:'Dar es Salaam',product:'Açúcar',demand:'500 MT · ICUMSA 45 · CIF',status:'Em qualificação',decision:'Possível',decisionTone:'green',next:'Confirmar comprador final e LOI',known:['ICUMSA 45','500 MT','CIF','Sacas 25 kg'],missing:['Comprador final','Evidência empresarial','Decisor','Pagamento'],note:'O contato informou que não é o comprador final. LOI foi solicitada para avançar.'},
+      {id:'uae',company:'Prospect Jebel Ali',country:'Emirados Árabes',place:'Jebel Ali',product:'Açúcar',demand:'25.000 MT/mês · ICUMSA 45',status:'Em qualificação',decision:'Alta escala',decisionTone:'green',next:'Confirmar embalagem e decisor',known:['ICUMSA 45','25.000 MT/mês','Jebel Ali'],missing:['Embalagem','Incoterm','Pagamento','Evidência empresarial'],note:'Demanda declarada de grande escala; precisa comprovação e confirmação operacional.'},
+      {id:'enpra',company:'ENPRA',country:'Equador',place:'Destino não confirmado',product:'Açúcar',demand:'1 contêiner · especificação pendente',status:'Em contato',decision:'Abaixo do mínimo',decisionTone:'amber',next:'Receber especificação e volume em MT',known:['1 contêiner'],missing:['Especificação','Volume exato','Porto','Comprador final'],note:'Oportunidade preservada, mas provavelmente abaixo do mínimo padrão de 500 MT por operação.'},
+      {id:'bra-suisse',company:'Bra Suisse',country:'Suíça',place:'Porto não confirmado',product:'Açúcar',demand:'≈270 MT · FOB · 50 kg',status:'Em qualificação',decision:'Aprovação necessária',decisionTone:'amber',next:'Validar recorrência e consolidação',known:['≈270 MT','FOB','CAD at sight','Sacas 50 kg'],missing:['Especificação','Porto','Comprador final','Evidência empresarial'],note:'Canal aberto. Volume está abaixo do parâmetro atual de açúcar e exige aprovação.'},
+      {id:'oriens',company:'Oriens Logistic',country:'Rússia',place:'Destino não confirmado',product:'Café',demand:'23 MT Arábica + 23 MT Robusta',status:'Bloqueado',decision:'Política EAG',decisionTone:'red',next:'Não avançar sem revisão executiva',known:['23 MT Arábica','23 MT Robusta'],missing:['Demais condições comerciais'],note:'Mercado sinalizado para bloqueio/revisão por política EAG. Não avançar automaticamente.'},
+      {id:'foodmax',company:'Foodmax',country:'Vietnã',place:'Destino não confirmado',product:'Café',demand:'Demanda não confirmada',status:'Prospectado',decision:'Validar',decisionTone:'blue',next:'Confirmar produto, volume e decisor',known:['Empresa identificada'],missing:['Demanda','Volume','Contato','Evidência nominal'],note:'Prospect de café com lacunas operacionais ainda abertas.'},
+      {id:'lurunoa',company:'LURUNOA',country:'Espanha',place:'Destino não confirmado',product:'Café',demand:'Demanda não confirmada',status:'Descoberto',decision:'Investigar',decisionTone:'purple',next:'Buscar evidência empresarial',known:['Empresa identificada'],missing:['Evidência','Demanda','Contato','Decisor'],note:'Somente indício comercial neste momento.'}
+    ];
+    let apiAvailable = false;
+    async function api(path, options={}) {
+      const result = await fetch(path,{...options,headers:{"content-type":"application/json",...(options.headers||{})}});
+      const payload = await result.json().catch(()=>({}));
+      if(!result.ok) throw new Error(payload?.error?.message||`Erro HTTP ${result.status}`);
+      return payload;
+    }
+    function apiLead(row){
+      const labels={discovered:'Descoberto',prospected:'Prospectado',in_contact:'Em contato',qualifying:'Em qualificação',qualified:'Qualificado',confirmed_opportunity:'Oportunidade Confirmada',blocked:'Bloqueado'};
+      return {id:row.id,company:row.trade_name||row.legal_name,country:row.country_code,place:'Destino a confirmar',product:row.commodity==='coffee'?'Café':row.commodity==='sugar'?'Açúcar':'A definir',demand:row.product_variant||'Demanda não confirmada',status:labels[row.pipeline_status]||row.pipeline_status,decision:row.exception_status?row.exception_status.replaceAll('_',' '):'Em análise',decisionTone:row.exception_status?'amber':'blue',next:'Completar dados e evidências',known:['Registro criado no sistema'],missing:['Demanda','Evidência empresarial','Decisor'],note:'Ficha carregada do banco D1. Abra o módulo de qualificação para enriquecer o registro.',scores:{potential:row.potential_min,confidence:row.confidence_score,risk:row.risk_score}};
+    }
+    function updateDashboard(pipeline){
+      const count=(...states)=>states.reduce((sum,state)=>sum+Number(pipeline[state]||0),0);
+      const total=Object.values(pipeline).reduce((sum,value)=>sum+Number(value||0),0);
+      document.getElementById('metricProspects').textContent=total;
+      document.getElementById('metricQualifying').textContent=count('qualifying','Em qualificação');
+      document.getElementById('metricCritical').textContent=leads.filter(lead=>lead.status==='Bloqueado'||['Revisar','Validar','Aprovação'].some(term=>lead.decision.includes(term))).length;
+      document.getElementById('pipelineTotal').textContent=`${total} ${total===1?'empresa':'empresas'}`;
+      document.getElementById('flowDiscovered').textContent=count('discovered','Descoberto');
+      document.getElementById('flowProspected').textContent=count('prospected','Prospectado');
+      document.getElementById('flowContact').textContent=count('in_contact','Em contato');
+      document.getElementById('flowQualifying').textContent=count('qualifying','Em qualificação');
+      document.getElementById('flowQualified').textContent=count('qualified','confirmed_opportunity','Qualificado','Oportunidade Confirmada');
+    }
+    function demoPipeline(){return leads.reduce((result,lead)=>{result[lead.status]=(result[lead.status]||0)+1;return result;},{});}
+    async function hydrateFromApi(){
+      try{
+        const [companyPayload,dashboardPayload]=await Promise.all([api('/api/companies'),api('/api/dashboard')]);
+        apiAvailable=true; leads=companyPayload.companies.map(apiLead); document.querySelector('.status-pill').innerHTML='<span class="pulse"></span> Sistema conectado'; renderLeads(); updateDashboard(dashboardPayload.pipeline||{});
+      }catch(error){ document.querySelector('.status-pill').innerHTML='<span class="pulse" style="background:var(--amber)"></span> Protótipo local'; updateDashboard(demoPipeline()); }
+    }
+    const emails = [
+      {id:'orbis',name:'Moody’s Orbis',to:'Formulário comercial / contato a confirmar',subject:'Cotação para piloto KYC/Compliance — importadores agrícolas',body:`Prezados,
+
+Estamos desenvolvendo uma plataforma interna de descoberta e qualificação de importadores de commodities agrícolas, inicialmente açúcar e café.
+
+Solicitamos proposta para um piloto de 60 dias com 50–100 consultas de empresas, cobrindo prioritariamente Brasil, Argentina, Vietnã, Indonésia e Etiópia.
+
+Precisamos confirmar:
+• cobertura de registro empresarial, crédito, insolvência e risco;
+• disponibilidade de UBO, PEPs e sanções, com preços separados por módulo;
+• acesso via API REST ou exportação CSV, sandbox e quotas;
+• preço por consulta, assinatura, mínimos contratuais e custos excedentes;
+• direitos de retenção, processamento e geração de scores derivados;
+• restrições de redistribuição, residência de dados, DPA, LGPD/GDPR;
+• prazo de implantação, SLA e suporte.
+
+Se possível, gostaríamos de uma amostra ou PoC com cinco empresas. Solicitamos retorno idealmente até 28/09/2026.
+
+Atenciosamente,
+[Nome]
+EAG`},
+      {id:'dnb',name:'Dun & Bradstreet',to:'Formulário comercial / contato a confirmar',subject:'Proposta para piloto de dados empresariais e risco — EAG',body:`Prezados,
+
+A EAG está estruturando uma plataforma interna para descobrir e qualificar importadores de açúcar e café.
+
+Gostaríamos de receber uma proposta para um piloto de 60 dias, com 50–100 consultas de empresas em Brasil, Argentina, Vietnã, Indonésia e Etiópia.
+
+Por favor, detalhem:
+• cobertura cadastral, crédito, risco, sanções, PEPs e UBO;
+• API ou exportação em lote, sandbox, quotas e SLA;
+• preço por consulta e assinatura, contrato mínimo e módulos adicionais;
+• direitos para armazenar resultados e gerar análises/scores internos;
+• restrições de uso, DPA, LGPD/GDPR e residência dos dados;
+• possibilidade de trial com cinco empresas e prazo de onboarding.
+
+Solicitamos retorno, se possível, até 28/09/2026.
+
+Atenciosamente,
+[Nome]
+EAG`}
+    ];
+    const titles={overview:'Visão geral',pipeline:'Pipeline comercial',qualification:'Qualificação EAG',compliance:'Compliance e risco',data:'Dados & arquitetura',emails:'Central de e-mails',planning:'Planejamento'};
+    const esc=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    const navButtons=[...document.querySelectorAll('[data-view]')];
+    function showView(id){
+      document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));
+      navButtons.forEach(b=>b.classList.toggle('active',b.dataset.view===id));
+      document.getElementById('pageTitle').textContent=titles[id];
+      history.replaceState(null,'','#'+id); window.scrollTo({top:0,behavior:'smooth'});
+    }
+    navButtons.forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+    document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.go)));
+    const tone=s=>({Descoberto:'purple',Prospectado:'blue','Em contato':'blue','Em qualificação':'amber',Bloqueado:'red'}[s]||'blue');
+    function renderLeads(){
+      const q=document.getElementById('leadSearch').value.toLowerCase(); const p=document.getElementById('productFilter').value; const s=document.getElementById('statusFilter').value;
+      const rows=leads.filter(l=>(p==='all'||l.product===p)&&(s==='all'||l.status===s)&&(`${l.company} ${l.country} ${l.product} ${l.demand}`.toLowerCase().includes(q)));
+      document.getElementById('leadRows').innerHTML=rows.map(l=>`<tr data-id="${esc(l.id)}"><td><div class="company"><span class="avatar">${esc(l.company.split(/\s/).map(x=>x[0]).join('').slice(0,2))}</span><div><strong>${esc(l.company)}</strong><small>${esc(l.country)} · ${esc(l.place)}</small></div></div></td><td>${esc(l.product)}</td><td>${esc(l.demand)}</td><td><span class="badge ${tone(l.status)}">${esc(l.status)}</span></td><td><span class="badge ${esc(l.decisionTone)}">${esc(l.decision)}</span></td><td><div class="score-mini"><span>P ${esc(l.scores?.potential??'—')}</span><span>C ${esc(l.scores?.confidence??'—')}</span><span>R ${esc(l.scores?.risk??'—')}</span></div></td><td>${esc(l.next)}</td></tr>`).join('');
+      document.getElementById('leadEmpty').style.display=rows.length?'none':'block';
+      document.getElementById('leadCountBadge').textContent=`${rows.length} ${rows.length===1?'registro':'registros'}`;
+      document.querySelectorAll('#leadRows tr').forEach(r=>r.addEventListener('click',()=>openLead(r.dataset.id)));
+    }
+    ['leadSearch','productFilter','statusFilter'].forEach(id=>document.getElementById(id).addEventListener('input',renderLeads)); renderLeads(); updateDashboard(demoPipeline());
+    function csvCell(value){const text=String(value??'').replaceAll('"','""');return `"${text}"`;}
+    document.getElementById('exportPipelineButton').onclick=()=>{
+      const header=['Empresa','País','Produto','Demanda','Estado','Decisão','Potential','Confidence','Risk','Próximo passo'];
+      const rows=leads.map(lead=>[lead.company,lead.country,lead.product,lead.demand,lead.status,lead.decision,lead.scores?.potential??'',lead.scores?.confidence??'',lead.scores?.risk??'',lead.next]);
+      const csv='\uFEFF'+[header,...rows].map(row=>row.map(csvCell).join(';')).join('\r\n');
+      const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+      const link=document.createElement('a');link.href=url;link.download=`eag-compass-pipeline-${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url);toast('Pipeline exportado em CSV');
+    };
+    const drawer=document.getElementById('drawer'),backdrop=document.getElementById('drawerBackdrop');
+    async function openLead(id){ const l=leads.find(x=>x.id===id); if(!l)return; let detail=null;if(apiAvailable){try{detail=await api(`/api/companies/${encodeURIComponent(id)}`)}catch(error){toast(error.message)}} document.getElementById('drawerTitle').textContent=l.company; document.getElementById('drawerBody').innerHTML=`<span class="badge ${tone(l.status)}">${esc(l.status)}</span> <span class="badge ${esc(l.decisionTone)}">${esc(l.decision)}</span><h4>Resumo</h4><dl class="detail-list"><dt>Mercado</dt><dd>${esc(l.country)} · ${esc(l.place)}</dd><dt>Produto</dt><dd>${esc(l.product)}</dd><dt>Demanda</dt><dd>${esc(l.demand)}</dd><dt>Próximo passo</dt><dd>${esc(l.next)}</dd>${detail?`<dt>Evidências</dt><dd>${detail.evidence.length}</dd><dt>Contatos</dt><dd>${detail.contacts.length}</dd>`:''}</dl>${apiAvailable?`<h4>Ações da ficha</h4><div class="email-actions"><button class="btn" data-operation="evidence" data-company="${esc(id)}">+ Evidência</button><button class="btn" data-operation="contact" data-company="${esc(id)}">+ Contato</button><button class="btn" data-operation="demand" data-company="${esc(id)}">Demanda EAG</button><button class="btn" data-operation="risk" data-company="${esc(id)}">+ Risco</button><button class="btn" data-direct-action="recalculate" data-company="${esc(id)}">Recalcular</button><button class="btn primary" data-direct-action="qualify" data-company="${esc(id)}">Avaliar qualificação</button></div>`:''}<h4>Dados conhecidos</h4><div class="checklist">${l.known.map(x=>`<div class="check done"><i></i><div><strong>${esc(x)}</strong></div></div>`).join('')}</div><h4>Lacunas</h4><div class="checklist">${l.missing.map(x=>`<div class="check"><i></i><div><strong>${esc(x)}</strong></div></div>`).join('')}</div><h4>Leitura operacional</h4><div class="notice">${esc(l.note)}</div>`; drawer.classList.add('open');backdrop.classList.add('open');document.querySelectorAll('[data-operation]').forEach(button=>button.onclick=()=>openOperation(button.dataset.operation,button.dataset.company));document.querySelectorAll('[data-direct-action]').forEach(button=>button.onclick=()=>directAction(button.dataset.directAction,button.dataset.company)); }
+    function closeDrawer(){drawer.classList.remove('open');backdrop.classList.remove('open')}; document.getElementById('closeDrawer').onclick=closeDrawer;backdrop.onclick=closeDrawer;document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openLead(b.dataset.open));
+    let selectedEmail='orbis'; const sent=JSON.parse(localStorage.getItem('eag-email-status')||'{}');
+    function renderEmails(){document.getElementById('emailList').innerHTML=emails.map(e=>`<button class="email-item ${e.id===selectedEmail?'active':''}" data-email="${e.id}"><strong>${e.name}</strong><span>${sent[e.id]?'Marcado como enviado':'RFQ · rascunho'}</span></button>`).join('');document.querySelectorAll('[data-email]').forEach(b=>b.onclick=()=>{selectedEmail=b.dataset.email;renderEmails();showEmail()});}
+    function showEmail(){const e=emails.find(x=>x.id===selectedEmail);document.getElementById('emailTo').textContent=e.to;document.getElementById('emailSubject').textContent=e.subject;document.getElementById('emailBody').textContent=e.body;document.getElementById('emailStatus').textContent=sent[e.id]?'Marcado localmente como enviado':'Rascunho não enviado';}
+    renderEmails();showEmail();
+    function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+    document.getElementById('copyEmail').onclick=async()=>{const e=emails.find(x=>x.id===selectedEmail);await navigator.clipboard.writeText(`Assunto: ${e.subject}\n\n${e.body}`);toast('E-mail copiado para a área de transferência')};
+    document.getElementById('markSent').onclick=()=>{sent[selectedEmail]=!sent[selectedEmail];localStorage.setItem('eag-email-status',JSON.stringify(sent));renderEmails();showEmail();toast(sent[selectedEmail]?'Marcado localmente como enviado':'Marcação removida')};
+    document.getElementById('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){showView('pipeline');document.getElementById('leadSearch').value=e.target.value;renderLeads();}});
+    const prospectDialog=document.getElementById('prospectDialog');
+    document.getElementById('newProspectButton').onclick=()=>prospectDialog.showModal(); document.getElementById('closeProspectDialog').onclick=()=>prospectDialog.close(); document.getElementById('cancelProspect').onclick=()=>prospectDialog.close();
+    document.getElementById('prospectForm').addEventListener('submit',async e=>{e.preventDefault();const form=new FormData(e.currentTarget);const data=Object.fromEntries(form.entries());try{if(!apiAvailable)throw new Error('A API ainda não está conectada. Use o projeto Cloudflare local ou publicado.');await api('/api/companies',{method:'POST',body:JSON.stringify(data)});prospectDialog.close();e.currentTarget.reset();toast('Prospect criado como Descoberto');await hydrateFromApi();}catch(error){toast(error.message)}});
+    const operationDialog=document.getElementById('operationDialog');let currentOperation=null;let currentCompany=null;
+    const input=(name,label,type='text',extra='')=>`<div class="form-control"><label>${label}</label><input name="${name}" type="${type}" ${extra}></div>`;
+    function openOperation(type,companyId){currentOperation=type;currentCompany=companyId;const fields=document.getElementById('operationFields');const titles={evidence:'Adicionar evidência',contact:'Cadastrar contato protegido',demand:'Registrar demanda EAG',risk:'Registrar observação de risco'};document.getElementById('operationTitle').textContent=titles[type];
+      if(type==='evidence')fields.innerHTML=`<div class="form-control"><label>Categoria</label><select name="category"><option value="business">Evidência empresarial</option><option value="market">Contexto de mercado</option><option value="commercial_signal">Indício comercial</option></select></div>${input('evidenceType','Tipo de evidência','text','required')}${input('reference','Referência / descrição','text','required')}${input('sourceUrl','URL da fonte','url')}${input('factDate','Data do fato','date')}${input('consultedAt','Data da consulta','datetime-local','required')}<div class="form-control"><label>Validação</label><select name="validationStatus"><option value="pending">Pendente</option><option value="valid">Válida</option><option value="invalid">Inválida</option></select></div>`;
+      if(type==='contact')fields.innerHTML=`${input('fullName','Nome completo','text','required')}${input('jobTitle','Cargo')}${input('email','E-mail','email')}${input('phone','Telefone')}${input('linkedinUrl','LinkedIn','url')}${input('sourceLabel','Fonte','text','required')}${input('sourceUrl','URL da fonte','url')}`;
+      if(type==='risk')fields.innerHTML=`<div class="form-control"><label>Componente</label><select name="component"><option value="registration">Registro</option><option value="credit">Crédito</option><option value="payment">Pagamento</option><option value="reputation">Reputação</option><option value="logistics">Logística</option></select></div>${input('severity','Severidade 0–20','number','required min="0" max="20"')}${input('sourceReference','Fonte / justificativa','text','required')}${input('observedAt','Data da observação','datetime-local','required')}`;
+      if(type==='demand')fields.innerHTML=`<div class="form-control"><label>Commodity</label><select name="commodity"><option value="sugar">Açúcar</option><option value="coffee">Café</option></select></div>${input('productVariant','Produto / variante','text','required')}${input('specification','Especificação')}${input('packaging','Embalagem')}${input('volume','Volume por operação (MT)','number','required min="0" step="0.01"')}${input('destinationCountry','País destino')}${input('deliveryLocation','Porto / local')}${input('incoterm','Incoterm')}${input('requiredDate','Data necessária','date')}${input('operations','Operações por ano','number','min="1"')}${input('paymentMethod','Método de pagamento')}${input('paymentTerm','Prazo de pagamento')}${input('finalBuyer','Comprador final')}${input('decisionMaker','Decisor')}${input('compliance','Restrições de compliance')}`;
+      operationDialog.showModal();
+    }
+    document.getElementById('closeOperationDialog').onclick=()=>operationDialog.close();document.getElementById('cancelOperation').onclick=()=>operationDialog.close();
+    document.getElementById('operationForm').addEventListener('submit',async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget).entries());try{if(currentOperation==='evidence')await api(`/api/companies/${currentCompany}/evidence`,{method:'POST',body:JSON.stringify({...data,consultedAt:new Date(data.consultedAt).toISOString()})});if(currentOperation==='contact')await api(`/api/companies/${currentCompany}/contacts`,{method:'POST',body:JSON.stringify(data)});if(currentOperation==='risk')await api(`/api/companies/${currentCompany}/risk-observations`,{method:'POST',body:JSON.stringify({...data,severity:Number(data.severity),observedAt:new Date(data.observedAt).toISOString()})});if(currentOperation==='demand'){const valueFields={product:data.productVariant,specification:data.specification,packaging:data.packaging,volume_per_operation:{amount:Number(data.volume),unit:'MT'},destination_country:data.destinationCountry,delivery_location:data.deliveryLocation,incoterm:data.incoterm,required_date:data.requiredDate,modality:Number(data.operations||1)>1?'contract':'spot',operations_per_year:Number(data.operations||1),payment_method:data.paymentMethod,payment_term:data.paymentTerm,payment_guarantee:'',final_buyer:data.finalBuyer,decision_maker:data.decisionMaker,compliance_restrictions:data.compliance};const fields=Object.entries(valueFields).map(([key,value])=>({key,status:value!==''&&value!==null?'confirmed':'not_confirmed',value}));await api(`/api/companies/${currentCompany}/demand`,{method:'PUT',body:JSON.stringify({commodity:data.commodity,productVariant:data.productVariant,fields})});}operationDialog.close();e.currentTarget.reset();toast('Ficha atualizada');await hydrateFromApi();await openLead(currentCompany);}catch(error){toast(error.message)}});
+    async function directAction(action,companyId){try{if(action==='recalculate'){await api(`/api/companies/${companyId}/scores/recalculate`,{method:'POST',body:'{}'});toast('Scores recalculados');}if(action==='qualify'){await api(`/api/companies/${companyId}/qualify`,{method:'POST',body:'{}'});toast('Empresa qualificada');}await hydrateFromApi();await openLead(companyId);}catch(error){toast(error.message)}}
+    function registerWebMcp(){const context=document.modelContext;if(!context?.registerTool)return;const fail=message=>{throw new Error(message)};Promise.resolve(context.registerTool({name:'list_prospects',title:'Listar prospects',description:'Lista prospects visíveis no pipeline EAG Compass, com filtros opcionais.',inputSchema:{type:'object',properties:{query:{type:'string'},product:{type:'string',enum:['Açúcar','Café']}},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute(input){const q=(input?.query||'').toLowerCase();return leads.filter(l=>(!q||`${l.company} ${l.country}`.toLowerCase().includes(q))&&(!input?.product||l.product===input.product)).map(l=>({id:l.id,company:l.company,country:l.country,product:l.product,status:l.status,nextStep:l.next}));}})).catch(()=>{});Promise.resolve(context.registerTool({name:'create_prospect',title:'Criar prospect',description:'Cria um prospect no estado Descoberto com nome, país e fonte rastreável.',inputSchema:{type:'object',properties:{legalName:{type:'string'},countryCode:{type:'string',minLength:2,maxLength:2},sourceLabel:{type:'string'},sourceUrl:{type:'string'}},required:['legalName','countryCode','sourceLabel'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},async execute(input){if(!apiAvailable)fail('API indisponível');const created=await api('/api/companies',{method:'POST',body:JSON.stringify(input)});await hydrateFromApi();return created;}})).catch(()=>{});}
+    const initial=location.hash.slice(1);if(titles[initial])showView(initial);
+    hydrateFromApi().then(registerWebMcp);
+  </script>
+</body>
+</html>
