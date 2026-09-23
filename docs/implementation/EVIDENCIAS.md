@@ -102,3 +102,13 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Estados: `pending`, `valid`, `not_valid`, `unknown`, `catchall`, `error`. Só `valid` confirma (G11); formato válido nunca confirma. Prazo: `email_validation_max_age_days:email` (parâmetro novo, sem valor padrão; sem ele a validade fica sem prazo e a interface deve mostrar). Consulta do resultado pela fila com intervalo crescente e no máximo 8 tentativas; depois, `error` registrado. Contato suprimido não é enviado ao provedor. Créditos esgotados viram falha registrada.
 - Testes: `tests/email-validation.test.mjs` (5 casos).
 - **Depende de validação externa:** credenciais, custo real por verificação e comportamento com endereços internos (P2-T17).
+
+## P2-T8 — Modelos da `/prospeccao-vendas` e revisor PV
+
+- **Bloqueio resolvido nesta máquina:** a skill original está em `~/.claude/skills/prospeccao-vendas/`, com `SKILL.md` de SHA-256 `33bd093f5dcb87a7d4aa51d31597c6d6ddfc637097693e3830a38f9b219f9dd8`, igual ao do T12.
+- `src/templates/prospeccao-vendas.js`: textos copiados de `references/scripts-abordagem.md` (E-mails 1, 2 e 4; LinkedIn; ligações L0/L1/L2), com `[SUA EMPRESA]` → EAG Agro e `[COMMODITY]` pelo nome do catálogo. Geração determinística, sem IA. Cadência da tabela de 2 semanas (e-mails nos dias 0, 4, 10 e 14; LinkedIn dia 2; ligações dias 3, 7, 8 e 11).
+- Adaptações registradas para decisão de Rogério: **A-E3** texto do E-mail 3 e do influenciador (a skill não traz texto literal); **A-D14** break movido para a segunda da semana 3, porque a tabela da skill põe E-mail 3 e 4 em dias seguidos, contra a regra da própria skill e o R19.2 item 12 (vale o mais restritivo, T12); **A-K6** volume e prova social só com declaração aprovada; **A-PV4** frase de origem pela fonte registrada; **A-R19** assinatura com endereço físico e saída. O roteiro Level 2 do instrutor fala em "preço competitivo" no teste final: fica como guia de ligação, fora do PV7 dos textos automáticos.
+- `src/review.js`: PV1–PV12 e R19.13 determinísticos, com achado por passo e destinatário. `scripts/check-skill.mjs` no `npm run check`: hash diferente da skill para a checagem (AT50); sem a skill na máquina (CI), só avisa.
+- Amostras para Rogério (R17.6): `docs/implementation/AMOSTRAS-TEXTOS-PV.md` (gerado por `scripts/gen-amostras-pv.mjs`), revisor sem violações. Faltam a amostra interrompida antes do break (envio real) e a internacional em inglês (Plano 3).
+- Regressão de higiene: `tests/source-hygiene.test.mjs` recusa caracteres de controle no código (uma edição automatizada tinha gravado backspace no lugar de `\b`; corrigido).
+- Testes: `tests/review.test.mjs` (10 casos).

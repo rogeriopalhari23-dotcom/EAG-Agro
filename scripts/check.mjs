@@ -15,6 +15,7 @@ run([
     .sort()
     .map((x) => `tests/${x}`),
 ]);
+run(["scripts/check-skill.mjs"]);
 run(["scripts/build-site.mjs"]);
 run(["scripts/validate-site.mjs"]);
 run(["--test", "tests/worker.integration.mjs"]);
