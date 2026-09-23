@@ -122,3 +122,11 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Nova versão (edição de texto, troca de destinatários, regeneração): anterior marcada como substituída, aprovações invalidadas, envios não aceitos → `superseded`; na nova aprovação, as linhas substituídas são reaproveitadas e o passo já aceito fica intacto.
 - Mudança comercial invalida aprovação e bloqueia envios pendentes (`approval_invalidated`): ICP da campanha, declaração aprovada ou revogada, papel do contato.
 - Testes: `tests/fichas.test.mjs` (8 casos).
+
+## P2-T12 — Descadastro público de um clique
+
+- `src/unsubscribe.js`, rota `/u/:token` antes da autenticação e da checagem de origem; `wrangler.jsonc`: `/u/*` em `run_worker_first` e limitador `UNSUB_LIMITER` (20 por 60 s por token, conforme a doc de Rate Limiting). Build de teste (`wrangler deploy --dry-run`) confirmou o binding.
+- Token HMAC da P2-T9 verificado em tempo constante; inválido → 404 genérico. `GET` só confirma (robôs de segurança abrem links); `POST` do botão ou one-click RFC 8058 suprime pelo hash do e-mail já existente (sem decifrar PII), cancela os envios futuros e as tarefas do contato, sem despedida (R21.6), idempotente (AT35). Página sem dado pessoal, com CSP própria restritiva (o Worker agora preserva CSP definida pela resposta), bilíngue.
+- `docs/OPERACAO.md`: passo humano do Access (bypass só para `/u/*`), segredos e parâmetros do piloto, e a liberação dos adaptadores como portão humano (o `validate-deploy` recusa `queues`/`triggers`).
+- Testes: `tests/unsubscribe.test.mjs` (5 casos).
+- **Depende de validação externa:** aplicação do Access com bypass e teste sem login no domínio real.

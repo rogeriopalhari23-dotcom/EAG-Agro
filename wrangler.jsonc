@@ -20,10 +20,19 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "run_worker_first": [
-      "/api/*"
+      "/api/*",
+      "/u/*"
     ],
     "not_found_handling": "none"
   },
+  // Descadastro público (/u/*): limite por token. namespace_id único na conta; período 10 ou 60 s (doc Rate Limiting).
+  "ratelimits": [
+    {
+      "name": "UNSUB_LIMITER",
+      "namespace_id": "2001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

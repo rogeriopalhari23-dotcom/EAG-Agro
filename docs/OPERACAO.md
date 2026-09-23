@@ -35,3 +35,10 @@ Registros de score idênticos são reaproveitados após recalcular dados e gate.
 ## Rollback
 
 Backup de dados e chaves é obrigatório antes da migração real. Não executar down destrutivo. Código antigo 0.3.1 não é compatível com todo o novo schema. Em incidente, suspender mutações, restaurar o banco e o código da mesma versão em ambiente separado, validar e então reabrir. Nenhum rollback ou teste remoto foi executado nesta revisão.
+
+## Piloto nacional — passos humanos antes de liberar (P2-T12, P2-T17)
+
+- **Descadastro público `/u/*`:** criar no Zero Trust uma aplicação self-hosted só para `<domínio>/u/*` com política **Bypass Everyone**. Não ampliar o bypass para `/api/*` nem para arquivos. Testar sem login: `GET` mostra a confirmação e `POST` suprime.
+- **Segredos do piloto:** `UNSUB_TOKEN_KEY` (32 bytes em base64; nunca trocar sem estratégia para os links já enviados), `CASADOSDADOS_API_KEY`, `LOCATIONIQ_KEY`, `SNOV_CLIENT_ID`, `SNOV_CLIENT_SECRET`, credenciais da caixa Hostinger. Variáveis não secretas: `PUBLIC_BASE_URL` (https, sem barra final), `EAG_POSTAL_ADDRESS`, `SENDER_NAME`, `LOCATIONIQ_HOST`, `LOCATIONIQ_PLAN`.
+- **Adaptadores (fila e cron):** o código usa a fila `ASYNC_QUEUE` para buscas, geocodificação e validação de e-mail, mas `scripts/validate-deploy.mjs` recusa publicar com `queues` ou `triggers` enquanto os adaptadores não forem liberados. A liberação é um portão humano: criar a fila e a DLQ, adicionar os bindings e ajustar o portão no mesmo commit, com a autorização registrada.
+- **Parâmetros sem valor padrão que o piloto exige:** `send_timezone:national`, `send_window:national`, `email_validation_max_age_days:email`, e a lista setor → CNAE em `/api/sectors`.

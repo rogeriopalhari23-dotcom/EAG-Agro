@@ -18,6 +18,7 @@ import * as search from "./search.js";
 import * as profiles from "./profiles.js";
 import * as emailValidation from "./email-validation.js";
 import * as fichas from "./fichas.js";
+import { handleUnsubscribe } from "./unsubscribe.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -27,6 +28,9 @@ async function route(request, env, rid) {
   const u = new URL(request.url),
     path = u.pathname,
     method = request.method;
+  // Descadastro público: fora da autenticação e da checagem de origem (o provedor de e-mail faz o POST).
+  const unsub = path.match(/^\/u\/([^/]+)$/);
+  if (unsub) return handleUnsubscribe(request, env, unsub[1]);
   if (!path.startsWith("/api/")) {
     if (!["GET", "HEAD"].includes(method))
       fail(405, "method_not_allowed", "Método não permitido.");
@@ -357,8 +361,9 @@ export default {
       }
     }
     const headers = new Headers(result.headers);
+    // Cabeçalhos de segurança padrão; uma resposta com política própria mais restrita (ex.: /u/*) a mantém.
     for (const [key, value] of Object.entries(securityHeaders))
-      headers.set(key, value);
+      if (!headers.has(key)) headers.set(key, value);
     headers.set("x-request-id", rid);
     if (new URL(request.url).protocol === "https:")
       headers.set("strict-transport-security", "max-age=31536000");
