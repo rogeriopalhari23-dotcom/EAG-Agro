@@ -33,7 +33,7 @@ const item = (over = {}) => ({
   ...over,
 });
 const env = { CASADOSDADOS_API_KEY: "chave-secreta-de-teste" };
-const query = { cnaes: ["1093701"], uf: "SP", municipality: "Sertãozinho", page: 1 };
+const query = { cnaes: ["1093701"], uf: "SP", municipalities: ["Sertãozinho", "Ribeirão Preto"], page: 1 };
 function fake(status, body, capture = {}) {
   return async (url, init) => {
     capture.url = url;
@@ -51,7 +51,7 @@ test("P2-T3: corpo pede resultado completo, só ativas, exclui MEI e filtra UF/m
   assert.deepEqual(cap.body.situacao_cadastral, ["ATIVA"]);
   assert.equal(cap.body.mei.excluir_optante, true);
   assert.deepEqual(cap.body.uf, ["sp"]);
-  assert.deepEqual(cap.body.municipio, ["sertaozinho"]);
+  assert.deepEqual(cap.body.municipio, ["sertaozinho", "ribeirao preto"]);
   assert.equal(cap.body.limite, 1000);
   assert.equal(r.items[0].cnpj, "11222333000181");
   assert.equal(r.items[0].postalCode, "14160000");
@@ -86,11 +86,16 @@ test("P2-T3: falhas nunca viram lista vazia", async () => {
 });
 
 test("P2-T3: filtro de município não aplicado invalida a partição", async () => {
-  const outra = item({ endereco: { ...item().endereco, municipio: "RIBEIRAO PRETO" } });
+  const outra = item({ endereco: { ...item().endereco, municipio: "FRANCA" } });
   await assert.rejects(
     searchEstablishments(env, query, fake(200, { total: 2, cnpjs: [item(), outra] })),
     (e) => e.kind === "filter_not_applied",
   );
+});
+
+test("P2-T3: no máximo 25 municípios por consulta; UF inteira sem filtro de município", () => {
+  assert.throws(() => requestBody({ ...query, municipalities: Array.from({ length: 26 }, (_, i) => "m" + i) }), /Até 25/);
+  assert.equal(requestBody({ ...query, municipalities: [] }).municipio, undefined);
 });
 
 test("P2-T3: segunda página espera só o restante; zero resultados comprovados é lista vazia legítima", async () => {

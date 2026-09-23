@@ -22,11 +22,15 @@ const norm = (v) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
-export function requestBody({ cnaes, uf, municipality, page, limit = PAGE_LIMIT }) {
+export const MAX_MUNICIPALITIES = 25;
+// municipalities: lista de nomes oficiais da mesma UF (vazia/ausente = UF inteira).
+export function requestBody({ cnaes, uf, municipalities = [], page, limit = PAGE_LIMIT }) {
   if (!Array.isArray(cnaes) || !cnaes.length || cnaes.some((c) => !/^\d{7}$/.test(c)))
     throw new AdapterError("invalid_request", "CNAE deve ter 7 dígitos.");
   if (!/^[A-Z]{2}$/.test(uf)) throw new AdapterError("invalid_request", "UF inválida.");
   if (!Number.isInteger(page) || page < 1) throw new AdapterError("invalid_request", "Página inválida.");
+  if (!Array.isArray(municipalities) || municipalities.length > MAX_MUNICIPALITIES)
+    throw new AdapterError("invalid_request", `Até ${MAX_MUNICIPALITIES} municípios por consulta.`);
   return {
     codigo_atividade_principal: cnaes,
     incluir_atividade_secundaria: true,
@@ -34,7 +38,7 @@ export function requestBody({ cnaes, uf, municipality, page, limit = PAGE_LIMIT 
     situacao_cadastral: ["ATIVA"],
     mei: { excluir_optante: true },
     uf: [uf.toLowerCase()],
-    municipio: [norm(municipality)],
+    ...(municipalities.length ? { municipio: municipalities.map(norm) } : {}),
     limite: limit,
     pagina: page,
   };
@@ -92,10 +96,9 @@ export async function searchEstablishments(env, query, fetchImpl = fetch) {
   if (items.length !== expected)
     throw new AdapterError("incomplete", `Casa dos Dados: página ${body.pagina} com ${items.length} de ${expected} itens esperados.`);
   // O filtro de localização precisa ter sido aplicado; senão a partição não vale.
-  const foreign = items.filter(
-    (i) => i.uf !== query.uf || norm(i.municipalityName) !== norm(query.municipality),
-  );
+  const allowed = new Set((query.municipalities || []).map(norm));
+  const foreign = items.filter((i) => i.uf !== query.uf || (allowed.size && !allowed.has(norm(i.municipalityName))));
   if (foreign.length)
-    throw new AdapterError("filter_not_applied", `Casa dos Dados: ${foreign.length} itens fora de ${query.municipality}/${query.uf}.`);
+    throw new AdapterError("filter_not_applied", `Casa dos Dados: ${foreign.length} itens fora dos municípios pedidos em ${query.uf}.`);
   return { total: data.total, items, page: body.pagina, limit: body.limite };
 }

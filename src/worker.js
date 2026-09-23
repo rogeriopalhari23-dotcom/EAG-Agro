@@ -14,6 +14,8 @@ import * as companies from "./companies.js";
 import * as operations from "./operations.js";
 import * as catalog from "./catalog.js";
 import * as sectors from "./sectors.js";
+import * as search from "./search.js";
+import { handleQueue } from "./queue.js";
 import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
 export const VERSION = "0.3.1-review.2";
@@ -144,6 +146,29 @@ async function route(request, env, rid) {
       return response(
         await catalog.updateCharacteristic(request, env, actor, rid, id, subId),
       );
+  }
+  if (path === "/api/searches") {
+    if (method === "POST")
+      return response(await search.startSearch(request, env, actor, rid), 201);
+    if (method === "GET") {
+      const campaignId = str(u.searchParams.get("campaignId"), "campanha", 80);
+      const rows = await s(
+        env,
+        "SELECT id,version,status,radius_km,candidates_count,api_calls,coverage_note,created_at,finished_at FROM searches WHERE tenant_id=? AND campaign_id=? ORDER BY version DESC",
+        actor.tenant_id,
+        campaignId,
+      ).all();
+      return response({ items: rows.results });
+    }
+  }
+  const sr = path.match(/^\/api\/searches\/([^/]+)(?:\/(candidates|resume))?$/);
+  if (sr) {
+    const [, id, action] = sr;
+    if (!action && method === "GET") return response(await search.getSearch(env, actor, id));
+    if (action === "candidates" && method === "GET")
+      return response(await search.listCandidates(request, env, actor, id));
+    if (action === "resume" && method === "POST")
+      return response(await search.resumeSearch(request, env, actor, rid, id));
   }
   if (path === "/api/sectors") {
     if (method === "GET") return response(await sectors.listSectors(env, actor));
@@ -292,8 +317,8 @@ export default {
       headers.set("strict-transport-security", "max-age=31536000");
     return new Response(result.body, { status: result.status, headers });
   },
-  async queue(batch) {
-    for (const message of batch.messages) message.retry();
+  async queue(batch, env) {
+    await handleQueue(batch, env);
   },
   async scheduled() {
     throw new Error(
