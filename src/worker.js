@@ -16,6 +16,7 @@ import * as catalog from "./catalog.js";
 import * as sectors from "./sectors.js";
 import * as search from "./search.js";
 import * as profiles from "./profiles.js";
+import * as emailValidation from "./email-validation.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -181,6 +182,12 @@ async function route(request, env, rid) {
   const profId = path.match(/^\/api\/profiles\/([^/]+)$/);
   if (profId && method === "PATCH")
     return response(await profiles.changeProfile(request, env, actor, rid, profId[1]));
+  const val = path.match(/^\/api\/contacts\/([^/]+)\/validate-email$/);
+  if (val && method === "POST")
+    return response(await emailValidation.validateContact(request, env, actor, rid, val[1]));
+  const valCo = path.match(/^\/api\/companies\/([^/]+)\/validate-emails$/);
+  if (valCo && method === "POST")
+    return response(await emailValidation.validateCompanyContacts(request, env, actor, rid, valCo[1]));
   const contact = path.match(/^\/api\/contacts\/([^/]+)$/);
   if (contact && method === "PATCH")
     return response(await companies.updateContact(request, env, actor, rid, contact[1]));

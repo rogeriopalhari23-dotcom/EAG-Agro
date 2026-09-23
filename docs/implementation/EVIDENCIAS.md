@@ -94,3 +94,11 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Contatos: papel na prospecção (R15.1), hash HMAC do e-mail, validação `pending`, sinal de supressão no cadastro (R2.1.2), fuso IANA validado, sinal de CEO sem relacionamento e de cargo de operação/RH/logística (R15.6). Dados pessoais continuam cifrados.
 - Política da fila alinhada ao teste existente da revisão: tipo desconhecido volta à fila (e vai para a DLQ), nunca é confirmado.
 - Testes: `tests/profiles.test.mjs` (7 casos); suíte 150/150.
+
+## P2-T7 — Validação de e-mail (Snov.io)
+
+- Contrato conferido na documentação (`https://snov.io/api`, 2026-09-23): token OAuth `client_credentials` (3.600 s, Bearer); `POST /v2/email-verification/start` com até 10 `emails[]` → `task_hash`; `GET /v2/email-verification/result` → `completed`/`in_progress` (e `not_enough_credits`); `smtp_status` valid/not_valid/unknown com `unknown_status_reason` (catchall, banned); limite de 60 requisições/min. O custo em créditos da verificação **não aparece na página** (o "1 crédito" do levantamento anterior não foi confirmado); o sistema conta chamadas por tarefa (`api_calls`).
+- `0012_validacao_email.sql`, `src/adapters/snov.js`, `src/email-validation.js`, rotas `POST /api/contacts/:id/validate-email` e `POST /api/companies/:id/validate-emails` (até 10 por tarefa, uma chamada para vários contatos). Token reaproveitado em KV.
+- Estados: `pending`, `valid`, `not_valid`, `unknown`, `catchall`, `error`. Só `valid` confirma (G11); formato válido nunca confirma. Prazo: `email_validation_max_age_days:email` (parâmetro novo, sem valor padrão; sem ele a validade fica sem prazo e a interface deve mostrar). Consulta do resultado pela fila com intervalo crescente e no máximo 8 tentativas; depois, `error` registrado. Contato suprimido não é enviado ao provedor. Créditos esgotados viram falha registrada.
+- Testes: `tests/email-validation.test.mjs` (5 casos).
+- **Depende de validação externa:** credenciais, custo real por verificação e comportamento com endereços internos (P2-T17).

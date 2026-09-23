@@ -29,6 +29,7 @@ export const DEFINITIONS = {
   send_step_up_max_hard_bounce_pct: { scopes: /^email$/, type: "number", min: 0, max: 100, label: "Subida de degrau: hard bounce abaixo de (%)", requiredBy: "envio" },
   send_window: { scopes: /^(national|international)$/, type: "window", label: "Janela de envio no fuso do destinatário", requiredBy: "envio" },
   send_timezone: { scopes: /^national$/, type: "timezone", label: "Fuso do mercado nacional", requiredBy: "envio nacional" },
+  email_validation_max_age_days: { scopes: /^email$/, type: "integer", min: 1, max: 365, label: "Validade da validação de e-mail (dias)", requiredBy: "pré-envio (R19.2 item 11)" },
   campaign_review_days: { scopes: /^global$/, type: "integer", min: 1, max: 3650, label: "Revisão de campanha (dias)", requiredBy: "campanhas" },
   period_default_months: { scopes: /^international$/, type: "integer", min: 1, max: 60, label: "Período padrão da análise de país (meses)", requiredBy: "lista internacional (D1)" },
   country_list_refresh_day: { scopes: /^international$/, type: "integer", min: 1, max: 28, label: "Dia da atualização mensal da lista", requiredBy: "lista internacional" },
