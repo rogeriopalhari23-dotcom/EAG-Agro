@@ -20,6 +20,8 @@ import * as emailValidation from "./email-validation.js";
 import * as fichas from "./fichas.js";
 import { handleUnsubscribe } from "./unsubscribe.js";
 import * as sanctions from "./sanctions.js";
+import * as changes from "./changes.js";
+import * as sending from "./sending.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -179,6 +181,9 @@ async function route(request, env, rid) {
     if (action === "resume" && method === "POST")
       return response(await search.resumeSearch(request, env, actor, rid, id));
   }
+  if (path === "/api/sending/today" && method === "GET") return response(await sending.today(env, actor));
+  const res = path.match(/^\/api\/sending\/outbox\/([^/]+)\/resolve$/);
+  if (res && method === "POST") return response(await sending.resolveIndeterminate(request, env, actor, rid, res[1]));
   if (path === "/api/fichas") {
     if (method === "POST") return response(await fichas.createFicha(request, env, actor, rid), 201);
     if (method === "GET") {
@@ -235,6 +240,10 @@ async function route(request, env, rid) {
   const valCo = path.match(/^\/api\/companies\/([^/]+)\/validate-emails$/);
   if (valCo && method === "POST")
     return response(await emailValidation.validateCompanyContacts(request, env, actor, rid, valCo[1]));
+  const disc = path.match(/^\/api\/companies\/([^/]+)\/discard$/);
+  if (disc && method === "POST") return response(await changes.discardCompany(request, env, actor, rid, disc[1]));
+  const dpd = path.match(/^\/api\/contacts\/([^/]+)\/delete-personal-data$/);
+  if (dpd && method === "POST") return response(await changes.deletePersonalData(request, env, actor, rid, dpd[1]));
   const contact = path.match(/^\/api\/contacts\/([^/]+)$/);
   if (contact && method === "PATCH")
     return response(await companies.updateContact(request, env, actor, rid, contact[1]));
@@ -392,9 +401,11 @@ export default {
   async queue(batch, env) {
     await handleQueue(batch, env);
   },
-  async scheduled() {
-    throw new Error(
-      "Scheduled adapter unavailable; no cron must be configured.",
-    );
+  // Cron só é configurado quando os adaptadores forem liberados (portão humano em scripts/validate-deploy.mjs).
+  async scheduled(controller, env) {
+    const tenant = env.DEFAULT_TENANT_ID;
+    if (controller.cron === "*/5 * * * *") await sending.tick(env, tenant);
+    else if (controller.cron === "17 2 * * *") await sending.evaluateRamp(env, tenant);
+    else console.error("scheduled_unknown_cron", { cron: controller.cron });
   },
 };

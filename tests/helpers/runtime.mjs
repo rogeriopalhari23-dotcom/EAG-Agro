@@ -14,6 +14,8 @@ export async function runtime() {
     bundle: true,
     format: "esm",
     platform: "browser",
+    // Módulos do runtime (ex.: cloudflare:sockets do worker-mailer) ficam externos, como no wrangler.
+    external: ["cloudflare:*"],
     write: false,
   });
   const m = new Miniflare(

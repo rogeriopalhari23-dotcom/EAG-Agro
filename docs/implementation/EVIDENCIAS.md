@@ -139,3 +139,19 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - `complianceStatus` para o pré-envio: `clear`, `review`, `blocked` ou `unavailable` (sem política, sem lista, sem triagem ou triagem vencida → nunca liberação; R19.3).
 - Testes: `tests/sanctions.test.mjs` (7 casos).
 - **Bloqueio:** política T11 (quais fontes e validade) e leitores dos arquivos oficiais de cada fonte escolhida (formatos OFAC/CGU). Até lá, nenhuma empresa passa no pré-envio.
+
+## P2-T10 — Envio pela Hostinger (agendador, pré-envio, rampa, idempotência)
+
+- `src/sending.js`, `src/adapters/mailbox.js` (`worker-mailer@1.2.1`, MIT, sem dependências; instalado com versão exata; importação dinâmica porque usa `cloudflare:sockets`), `src/timezone.js`, rotas `GET /api/sending/today` e `POST /api/sending/outbox/:id/resolve`, `scheduled` (5 min: `tick`; diário: `evaluateRamp`). O cron continua **fora** do `wrangler.jsonc` pelo portão do `validate-deploy`.
+- Lease do remetente em D1 (`sender_state`) com token; no máximo um envio por execução; teto diário do remetente (soma dos mercados) pela rampa; intervalo aleatório entre o mínimo e o máximo do parâmetro; janela no fuso do destinatário.
+- Pré-envio R19.2: supressão (cancela), pausas de operação/campanha/empresa/commodity, campanha e identidade do produto, OpenClaw, triagem de sanções (indisponível segura, AT28), aprovação vigente da versão corrente, e-mail validado e no prazo (AT52), canal habilitado ou teste interno só para `INTERNAL_TEST_RECIPIENTS` (R26.2), nenhum e-mail ao mesmo endereço no dia ou no dia anterior no fuso dele (AT53), data do passo.
+- Texto enviado = texto aprovado: decifrado e conferido contra o hash da mensagem e da outbox antes do envio; diferença bloqueia (`content_mismatch`) (AT25). Cabeçalhos `Message-ID` estável, `List-Unsubscribe` e `List-Unsubscribe-Post` (R21.10).
+- Resultado: aceito → contagem e próximo horário; 4xx → nova tentativa (até 3); 5xx → `perm_failed`, supressão por bounce e cancelamento do resto (R19.7); resposta não confirmada ou lease vencido → `indeterminate`, **nunca reenviado sem resolução humana** com evidência (gatilho no banco; AT27). Parada automática por hard bounce ≥ limite ou aviso do provedor cria pausa de operação; só a retomada da operação libera (AT69). Subida de degrau após 14 dias com bounce abaixo do limite.
+- Harness do workerd: `cloudflare:*` externo no esbuild (como o wrangler). `wrangler deploy --dry-run`: 312 KiB.
+- Testes: `tests/sending.test.mjs` (11 casos, com transporte SMTP falso; nenhum e-mail real enviado).
+- **Depende de validação externa:** caixa Hostinger real (porta 465, autenticação), mensagens de erro reais do servidor para calibrar 4xx/5xx, teste interno de T1 (P2-T17).
+
+## P2-T13 — Pausas e mudanças comerciais em todos os canais
+
+- `src/restrictions.js` (motivos comuns a envio e tarefas manuais), pausa de commodity pausa as campanhas de todas as variantes (retomar exige reativar cada campanha, R22.3), `src/changes.js`: descarte de empresa (cancela envios, tarefas e fichas, mantém histórico, R23.4) e exclusão de dados pessoais do contato (apaga campos cifrados, mantém o hash para a supressão, auditoria sem PII, aviso sobre a janela de recuperação do D1; R23.5–R23.6). Retomada da operação limpa a parada automática.
+- Testes: casos P2-T13 em `tests/sending.test.mjs`.

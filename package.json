@@ -21,12 +21,13 @@
     "verify:package": "node scripts/verify-package.mjs"
   },
   "devDependencies": {
-    "wrangler": "4.136.1",
+    "esbuild": "0.28.1",
     "miniflare": "5.20260921.0-alpha",
-    "esbuild": "0.28.1"
+    "wrangler": "4.136.1"
   },
   "dependencies": {
-    "jose": "6.2.12"
+    "jose": "6.2.12",
+    "worker-mailer": "1.2.1"
   },
   "engines": {
     "node": ">=24 <25"

@@ -601,6 +601,19 @@ export async function createPause(request, env, actor, rid) {
       scope,
       scopeRef: ref,
     }),
+    // R22.3: commodity suspensa pausa as campanhas dela (todas as variantes); retomar exige reativar cada campanha.
+    ...(scope === "commodity"
+      ? [
+          s(
+            env,
+            "UPDATE campaigns SET status='paused',version=version+1,updated_at=? WHERE tenant_id=? AND status IN ('active','waiting') AND product_id IN (SELECT id FROM products WHERE tenant_id=? AND commodity=?)",
+            now(),
+            actor.tenant_id,
+            actor.tenant_id,
+            ref,
+          ),
+        ]
+      : []),
   ]);
   return { id };
 }
@@ -638,6 +651,10 @@ export async function resumePause(request, env, actor, rid, id) {
       id,
       rid,
     ),
+    // Retomar a operação libera também a parada automática do remetente (R19.12: só gestor retoma).
+    ...(p.scope === "operation"
+      ? [s(env, "UPDATE sender_state SET stopped_at=NULL,stopped_reason=NULL WHERE tenant_id=?", actor.tenant_id)]
+      : []),
   ]);
   if (!result[0].meta.changes) fail(409, "pause_resumed", "Pausa já retomada.");
   return { id, resumed: true };

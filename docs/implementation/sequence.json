@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-23T17:22:47.132Z",
+  "updatedAt": "2026-09-23T17:35:43.438Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -385,7 +385,7 @@
     {
       "id": "P2-T10",
       "title": "Envio pela Hostinger — agendador, pré-envio, rampa, idempotência",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P2-T9",
         "P2-T12",
@@ -399,7 +399,7 @@
       ],
       "acceptance": "Outbox/lease atômicos, pré-envio e rampa compartilhada; aceitação indeterminada nunca reenvia sozinha.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "tests/sending.test.mjs",
       "blockedBy": null
     },
     {
@@ -442,7 +442,7 @@
     {
       "id": "P2-T13",
       "title": "Efeitos de pausas e mudanças comerciais",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P2-T9",
         "P1-T10"
@@ -455,7 +455,7 @@
       ],
       "acceptance": "Pausas por empresa/commodity/campanha/operação, supressão e invalidação aplicadas em todos os canais.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "tests/sending.test.mjs",
       "blockedBy": null
     },
     {
