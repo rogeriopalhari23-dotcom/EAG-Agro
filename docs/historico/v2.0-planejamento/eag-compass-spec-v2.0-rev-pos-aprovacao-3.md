@@ -5,7 +5,7 @@
 **Produto:** EAG Compass — descoberta, aprovação e prospecção de compradores de commodities agrícolas (Nacional + Internacional)
 **Versão:** 2.0
 **Data:** 2026-09-22
-**Status:** **APROVADA por Rogério Palhari (Administrador) em 2026-09-22.** Fase 3 encerrada. Conteúdo idêntico ao rascunho 5 (`historico/v2.0-planejamento/…-rascunho5.md`), exceto estas linhas de controle e a ativação de R17.8. Pendências com regra vigente especificada: B1. **Revisão pós-aprovação 1 (2026-09-22):** limites de raio definidos por Rogério (B3) — R11.14, R11.16, R11.17, parâmetros de raio, AT66–AT67. Versão aprovada original em `historico/v2.0-planejamento/eag-compass-spec-v2.0-aprovada-2026-09-22.md`. **Revisão pós-aprovação 2 (2026-09-22):** volume de envio aprovado por Rogério — parâmetros de envio, R19.10–R19.12, AT68–AT69. **Revisão pós-aprovação 3 (2026-09-22):** envio pela caixa Hostinger com risco do §12 assumido por Rogério — R19.13, premissa e gatilho, AT70. **Revisão pós-aprovação 4 (2026-09-23):** lista mensal de compras agrícolas de todos os países, pela fonte oficial do importador e com a parte do Brasil, decidida por Rogério — decisão 2 ajustada, R1.4.1, R12.2, R12.3, R12.6, R12.6.1, R12.11–R12.15, T6, T13, parâmetros, premissas, AT71–AT75. Versão anterior em `historico/v2.0-planejamento/eag-compass-spec-v2.0-rev-pos-aprovacao-3.md`.
+**Status:** **APROVADA por Rogério Palhari (Administrador) em 2026-09-22.** Fase 3 encerrada. Conteúdo idêntico ao rascunho 5 (`historico/v2.0-planejamento/…-rascunho5.md`), exceto estas linhas de controle e a ativação de R17.8. Pendências com regra vigente especificada: B1. **Revisão pós-aprovação 1 (2026-09-22):** limites de raio definidos por Rogério (B3) — R11.14, R11.16, R11.17, parâmetros de raio, AT66–AT67. Versão aprovada original em `historico/v2.0-planejamento/eag-compass-spec-v2.0-aprovada-2026-09-22.md`. **Revisão pós-aprovação 2 (2026-09-22):** volume de envio aprovado por Rogério — parâmetros de envio, R19.10–R19.12, AT68–AT69. **Revisão pós-aprovação 3 (2026-09-22):** envio pela caixa Hostinger com risco do §12 assumido por Rogério — R19.13, premissa e gatilho, AT70.
 **Rascunhos anteriores:** `docs/historico/v2.0-planejamento/eag-compass-spec-v2.0-rascunho1.md` e `…-rascunho2.md`, `…-rascunho3.md` e `…-rascunho4.md`.
 **Versão substituída:** Especificação v1.3 (2026-09-21), arquivada sem alteração em `docs/historico/v1.3/eag-compass-spec-v1.3.md`.
 **Constituição associada:** `docs/eag-compass-constituicao.md` (v2.0, aprovada em 2026-09-22).
@@ -52,9 +52,8 @@ Estado das dependências na data desta Spec — **nenhuma integração externa f
 | T3 | LinkedIn por modalidade autorizada | Não testado; SNAP informa não aceitar novos parceiros (BEN §4) | Etapa 1 |
 | T4 | Fontes de empresas/estabelecimentos no Brasil | Leitura documental de páginas; nada testado | Etapa 1 |
 | T5 | Geocodificação, mapa, raio | Não testado | Etapa 1 |
-| T6 | Comex Stat e arquivo completo do MDIC — exportações Brasil→país | Contrato conferido por consulta real em 2026-09-23, a partir da rede doméstica (`docs/eag-compass-t6-comexstat.md`); acesso pelo Worker não testado | Etapa 3 |
+| T6 | Comex Stat — exportações Brasil→país | Documentação lida; nenhuma consulta de dados executada | Etapa 3 |
 | T7 | Fontes de empresas no exterior | Não testado | Etapa 3 |
-| T13 | UN Comtrade — importações declaradas pelo próprio país (todas as origens e origem Brasil) | Consulta de pré-visualização, sem chave, executada em 2026-09-23 (Alemanha, China); chave gratuita, limites reais e termos de reutilização não testados | Etapa 3 |
 | T8 | Pesquisa com evidências (Camada 2) | Não testado | Etapa 1 |
 | T9 | Plano, recursos e custos Cloudflare | Não comprovado; Wrangler autenticado não comprova recursos | Etapa 0 |
 | T10 | Hospedagem, autenticação e perfis | Não comprovado | Etapa 0 |
@@ -161,7 +160,7 @@ Acréscimo v2.0 (ESC §2.5):
 
 #### R1.4 — Contexto de mercado — **Revisado** [Depende de T6]
 
-- **R1.4.1:** QUANDO o sistema registrar dado de comércio de um país (R12), DEVE registrar fonte, país declarante, origem (todas as origens ou Brasil), destino, código NCM/HS e versão da classificação, descrição, período, quantidade e unidade, valor, moeda e base de valor (CIF ou FOB), data da consulta e data de atualização da fonte. *(Revisado na revisão pós-aprovação 4.)*
+- **R1.4.1:** QUANDO o sistema consultar histórico comercial Brasil→país (R12), DEVE registrar origem Brasil, destino, código NCM/HS e versão da classificação, descrição, período, quantidade e unidade, valor e moeda, data da consulta, data de atualização da fonte e fonte.
 - **R1.4.2:** A interface DEVE exibir: "O dado confirma exportação do Brasil para o país; não comprova compra por nenhuma empresa específica."
 - **R1.4.3:** Evidência de mercado NÃO DEVE alterar Confidence nem classificar empresa.
 
@@ -271,8 +270,7 @@ Mantidos os parâmetros v1.3 e a regra de alteração (Administrador; valor ante
 | --- | --- | --- |
 | `param_volume_min[commodity, mercado, oferta?]` | sem valor salvo onde não configurado | Substitui `[commodity, supplier?]`. No Nacional é o próprio `M_N[commodity]` (R4.3.5); valores por commodity pendentes (Rogério). |
 | `param_radius_km_min`, `param_radius_km_max`, `param_radius_km_step`, `param_radius_km_default` | **5 / 1.500 / 100 / 5** — valores permitidos: 5, 100, 200, …, 1.500 km (decisão de Rogério, 2026-09-22) | Aprovado (B3) |
-| `param_period_default_months` (Internacional) | **12 meses** — proposta D1 do Plano 3 | Pendente (aprovação de Rogério) |
-| `param_country_list_refresh` (Internacional) | **mensal** (Rogério, 2026-09-23); dia 10 de cada mês, depois da atualização do MDIC (proposta) | Frequência aprovada; dia pendente |
+| `param_period_default_months` (Internacional) | **a definir em T6** | Pendente |
 | `param_send_daily_limit[canal, remetente]` | **E-mail: 5/dia (semana 1), 10 (semana 2), 15 (semana 3), 20 (semana 4 em diante)**, contando follow-ups | Aprovado por Rogério (2026-09-22) |
 | `param_send_interval_minutes` | **15–25 min**, com variação aleatória entre envios | Aprovado (2026-09-22) |
 | `param_send_stop_hard_bounce_pct` | **3%** na semana; e **< 2%** como condição para subir de degrau | Aprovado (2026-09-22) |
@@ -393,20 +391,14 @@ Como Rogério, quero informar só o país, ver o que ele comprou do Brasil e esc
 Origem: ESC §1, §2.4 (País Primeiro 1–9), decisão 2 da Fase 3; BEN §3.
 
 - **R12.1:** QUANDO o usuário iniciar uma análise internacional, o sistema DEVE exigir apenas o país e NÃO DEVE exigir commodity, NCM, lote ou preço.
-- **R12.2:** O sistema DEVE montar a análise a partir da **lista mensal de compras agrícolas do país** (R12.11), sem consultar fontes externas a cada pedido. Para cada commodity, a lista traz: (a) as **importações declaradas pelo próprio país**, de todas as origens e de origem Brasil (fonte oficial do importador, T13); e (b) as **exportações do Brasil para o país** (fonte oficial brasileira, T6). Importações feitas pelo Brasil NÃO DEVEM entrar. O período padrão é `param_period_default_months`, ajustável pelo usuário dentro do que a lista guarda, e o período usado é registrado. *(Revisado na revisão pós-aprovação 4.)*
-- **R12.3:** O resultado DEVE listar as commodities agrícolas identificadas conforme classificação agrícola versionada, com código e descrição NCM/HS, quantidade e unidade, valor e moeda, período, última ocorrência disponível, fonte, data de atualização e a versão mensal da lista usada.
+- **R12.2:** O sistema DEVE consultar as **exportações do Brasil para o país** (nunca importações do Brasil) no período padrão `param_period_default_months`, ajustável pelo usuário, e registrar o período usado.
+- **R12.3:** O resultado DEVE listar as commodities agrícolas identificadas conforme classificação agrícola versionada, com código e descrição NCM/HS, quantidade e unidade, valor e moeda, período, última ocorrência disponível, fonte e data de atualização.
 - **R12.4:** O sistema DEVE destacar a correspondência com o catálogo EAG (R10) sem restringir o panorama ao catálogo, e sem usar código `pendente` como correspondência comprovada.
 - **R12.5:** O sistema NÃO DEVE somar unidades incompatíveis, duplicar totais por mapeamentos sobrepostos, nem inferir variedade/qualidade que o código não distingue.
-- **R12.6:** O sistema DEVE usar três estados distintos por país e fonte: `compra identificada`, `nenhum registro no período`, `dados indisponíveis`. SE a consulta falhar, for parcial ou exceder limites, ENTÃO o sistema DEVE exibir `dados indisponíveis` ou `parcial`, nunca `nenhum registro`.
-- **R12.6.1:** SE o país ainda não tiver declarado à fonte do importador o período pedido, ENTÃO o sistema DEVE exibir "sem declaração do país desde <último período disponível>" e mostrar o último período declarado, nunca `nenhum registro`. *(Novo na revisão pós-aprovação 4.)*
+- **R12.6:** O sistema DEVE usar três estados distintos por consulta: `compra identificada`, `nenhum registro no período`, `dados indisponíveis`. SE a consulta falhar, for parcial ou exceder limites, ENTÃO o sistema DEVE exibir `dados indisponíveis` ou `parcial`, nunca `nenhum registro`.
 - **R12.7:** QUANDO o usuário selecionar uma ou mais commodities e autorizar a busca, o sistema DEVE registrar a seleção, o autor, a data e a análise que a fundamentou, e criar uma campanha por commodity (R16).
 - **R12.8:** O sistema NÃO DEVE iniciar busca de empresas no país antes da seleção registrada em R12.7.
 - **R12.9:** SE a commodity selecionada não estiver no catálogo confirmado da EAG, ENTÃO o sistema DEVE exigir validação comercial registrada antes de permitir ficha para essa campanha.
-- **R12.11:** O sistema DEVE atualizar **uma vez por mês**, de forma automática, a lista de compras agrícolas de **todos os países** disponíveis nas fontes (R12.2) e guardá-la na plataforma. Consultas de país DEVEM ler a lista guardada. *(Novo — decisão de Rogério em 2026-09-23.)*
-- **R12.12:** Cada atualização DEVE gerar uma versão mensal com data, fontes, período coberto e estado por país e fonte. SE a atualização de um país falhar, ENTÃO o sistema DEVE manter a versão anterior desse país visível com o aviso "não atualizado em <mês>", e NÃO DEVE substituí-la por lista vazia. *(Novo.)*
-- **R12.13:** As duas fontes DEVEM aparecer lado a lado e NÃO DEVEM ser somadas. A parte do Brasil DEVE ser calculada só dentro da fonte do importador (origem Brasil ÷ todas as origens, mesmo período, mesma base de valor). *(Novo.)*
-- **R12.14:** A busca de empresas no país DEVE partir somente de commodity presente na lista do país com `compra identificada` em ao menos uma das fontes, e da seleção registrada em R12.7. *(Novo.)*
-- **R12.15:** O Administrador PODE pedir a atualização de um país fora do ciclo mensal, no máximo uma vez por dia por país, com o motivo registrado; a nova versão segue R12.12. *(Novo.)*
 - **R12.10:** Para cada empresa encontrada, o sistema DEVE registrar separadamente, com evidência própria: `importa do Brasil`, `compra a commodity`, `consome como matéria-prima`. O dado agregado do país NÃO DEVE preencher nenhuma dessas condições.
 
 ### Módulo 13 — Descoberta em duas camadas e evidências — **Novo**
@@ -769,11 +761,6 @@ Todos rodam com endereços internos/controlados e dublês das integrações até
 | AT68 | R19.10 | DADO semana 1 da rampa e 8 passos prontos no dia, ENTÃO só 5 são enviados, com intervalos entre 15 e 25 min, e os 3 restantes vão para o próximo dia útil sem violar a regra de dias não seguidos. |
 | AT69 | R19.11, R19.12 | DADO hard bounce de 3% na semana, ENTÃO toda a operação de envio pausa, Rogério é alertado e nenhum envio sai até a retomada por Administrador; DADO 2 semanas limpas, ENTÃO o degrau sobe e a subida é registrada. |
 | AT70 | R19.13 | DADO e-mail de sequência sem o endereço físico da EAG na assinatura, ENTÃO o revisor aponta a falta e a ficha não pode ser aprovada. |
-| AT71 | R12.2, R12.11 | DADO lista do mês gerada, QUANDO a análise de um país é pedida, ENTÃO nenhuma chamada a fonte externa ocorre e a versão mensal usada é exibida. |
-| AT72 | R12.12 | DADO falha na atualização mensal de um país, ENTÃO a versão anterior desse país continua visível com "não atualizado em <mês>"; nunca `nenhum registro`. |
-| AT73 | R12.6.1 | DADO país sem declaração do último ano na fonte do importador, ENTÃO aparece "sem declaração do país desde <período>" e o último período declarado; as exportações do Brasil (T6) continuam visíveis. |
-| AT74 | R12.13 | DADO commodity com dados nas duas fontes, ENTÃO os valores aparecem lado a lado, sem soma, e a parte do Brasil usa só a fonte do importador. |
-| AT75 | R12.14 | DADO commodity fora da lista do país, QUANDO a busca de empresas é pedida, ENTÃO é recusada. |
 
 ---
 
@@ -814,7 +801,6 @@ Retirado da lista v1.3: "automação completa de follow-up" (agora permitida par
 | 2026-09-22 | B1 — ausência automática? | Pendente. Até exceção aprovada: mesma pausa por resposta da revisão 3 e nenhuma retomada automática. | R20.7, R20.8, AT36 |
 | 2026-09-22 | Limites de raio (B3)? | Mínimo 5 km, máximo 1.500 km; começa em 5 km e aumenta de 100 em 100 (100, 200, …, 1.500). No raio máximo, todos os possíveis compradores mais próximos devem ser listados. | R11.14, R11.16, R11.17, AT66, AT67 |
 | 2026-09-22 | Consultar a Hostinger sobre o §12? | Não. Envio pela caixa Hostinger com o risco assumido. | R19.13, premissas, AT70 |
-| 2026-09-23 | Internacional: pesquisar a cada pedido? | Não. Pesquisar em fontes oficiais dos países importadores todas as commodities compradas por eles, guardar a lista na plataforma e atualizá-la uma vez por mês; buscar importadores só a partir dela. A lista mostra as compras do país (todas as origens) e a parte do Brasil, para todos os países. | Decisão 2, R12.2, R12.11–R12.15, AT71–AT75 |
 | 2026-09-22 | Volume diário de envio? | Baixo volume, a partir de pesquisa: 5 → 10 → 15 → 20/dia (semanas 1–4+), 15–25 min entre envios, parada automática. Aprovado. | R19.10–R19.12, parâmetros de envio, AT68, AT69 |
 | 2026-09-22 | DS2 — moeda? | Preservar USD como base e BRL para visualização (com taxa, fonte e data) até alteração aprovada. | R3.1.4 |
 | 2026-09-22 | DS3 — estados? | Preservar os estados existentes, salvo mudança necessária e justificada. | §1.2 (pipeline mantido; duas mudanças justificadas), R1.3, AT39 |
@@ -921,8 +907,7 @@ Os exemplos são os cenários AT40–AT49 (§3.2). R4.3.4–R4.3.6 e R5.1.2 apon
 | Hospedagem Cloudflare (Workers, D1, R2, KV, Queues, Cron) | T9 mostrar limite do plano ou custo inviável | Stack (Fase 4), constituição P11 |
 | E-mail `rogeriopalhari@eagagro.com` viável para envio e recebimento | T1 falhar em autenticação, recebimento ou correlação | Etapa 1 inteira; canal alternativo |
 | Fontes abertas + geocodificação sustentam o piloto nacional | Cobertura ou precisão insuficientes em T4/T5 | Adaptador pago (R13.7), orçamento |
-| Comex Stat / arquivo completo do MDIC fornece exportações do Brasil por país e NCM | T6 indicar ausência, sigilo, bloqueio do Worker ou limites incompatíveis | R12, fonte alternativa |
-| UN Comtrade (conta gratuita: 500 chamadas/dia e até 100 mil registros por chamada, conforme a página de planos em 2026-09-23) cobre as importações declaradas dos países e permite guardar a lista para uso interno | Limite menor, termos de reutilização contrários ou atraso de declaração que esvazie a lista | R12.11, R12.13; plano pago ou fonte alternativa |
+| Comex Stat fornece exportações por país e NCM | T6 indicar ausência, sigilo ou limites incompatíveis | R12, fonte alternativa |
 | LinkedIn só em modo assistido | T3 comprovar capacidade autorizada | R15.3, R26.5 |
 | Volume do piloto: 5–10 envios aprovados; descoberta sem limite fixo | Custo por empresa (T8) acima do aceitável | Limites de busca, R13.5 |
 | `/prospeccao-vendas` 1.0.0, curso EAG Agro (SHA-256 `33bd093f…9dd8`), lida em 2026-09-22 (T12 rev. 3) | Skill atualizada de novo (hash diferente) | Nova leitura T12, PV, R17, R28; geração bloqueada até lá (R17.8) |
@@ -938,7 +923,7 @@ Os exemplos são os cenários AT40–AT49 (§3.2). R4.3.4–R4.3.6 e R5.1.2 apon
 | Decisão da Fase 3 | Requisitos |
 | --- | --- |
 | 1. Nacional: commodity + cidade/UF do fornecedor + raio ajustável → compradores | R11.1–R11.17, AT15–AT19, AT37, AT38, AT66, AT67 |
-| 2. Internacional: país → histórico agrícola Brasil → commodities → empresas — **ajustada por Rogério em 2026-09-23**: país → lista mensal guardada das compras agrícolas do país (fonte do importador, todas as origens e parte do Brasil, mais exportações do Brasil) → commodities → empresas | R12.1–R12.15, R1.4, AT20–AT23, AT71–AT75 |
+| 2. Internacional: país → histórico agrícola Brasil → commodities → empresas | R12.1–R12.10, R1.4, AT20–AT23 |
 | 3. Consumidores finais prioritários; traders elegíveis — **revisada por K3/K1 em 2026-09-22**: indústrias usuárias de porte médio/média-mais têm prioridade; traders visíveis e classificados, com ficha só por exceção | R2.4, R14.3, R14.6–R14.8, R11.9, AT12, AT19, AT59, AT63 |
 | 4. Prospecção por commodity, sem lote, preço ou oferta | R1.1.2, R1.3.3, R11.1, R12.1, R16.1–R16.2, R7.2.2, AT15, AT39 |
 | 5. Textos finais aprovados por empresa; execução e interrupções | R17, R18, R19, R20, R21, R22, R28, AT24–AT33, AT35, AT36, AT51–AT60 |

@@ -2,8 +2,8 @@
 
 **Expansão:** Nacional + Internacional
 **Iniciado:** 2026-09-22
-**Atualização:** 2026-09-23 — revisão documental 23 do status — Fases 3–5 concluídas; **Fase 6: os três planos escritos; Spec com revisão pós-aprovação 4 (lista mensal do Internacional); aguardando revisão de Rogério**
-**Revisões anteriores:** rev. 4 a 22 arquivadas em `docs/historico/v2.0-planejamento/`.
+**Atualização:** 2026-09-23 — revisão documental 22 do status — Fases 3–5 concluídas; **Fase 6: os três planos escritos (Fundação, Piloto Nacional, Internacional), aguardando revisão de Rogério**
+**Revisões anteriores:** rev. 4 a 21 arquivadas em `docs/historico/v2.0-planejamento/`.
 **Método:** `/planejar`
 **Código-base:** 0.3.1. Os 14/14 testes são relato de leitura anterior; nesta fase não houve reexecução de testes nem alteração de código.
 
@@ -20,7 +20,7 @@
 | **3. Spec + Constituição v2.0** | ✅ **Concluída em 2026-09-22 — aprovadas expressamente por Rogério** ("Aprovo a Spec e a Constituição, pode fechar a Fase 3"). | `docs/eag-compass-spec.md`, `docs/eag-compass-constituicao.md` |
 | **4. Pesquisa técnica** | ✅ **Concluída em 2026-09-22 — stack aprovada por Rogério** ("aprovo a stack"). Detalhes e decisões G1–G11, volume e risco Hostinger em §11. Pendente para o plano: G6 | `docs/eag-compass-pesquisa-tecnica.md` |
 | **5. Design** | ✅ **Concluída em 2026-09-22 — telas e design doc aprovados por Rogério** ("aprovo"). Caminho `design-lab`, direção Talhão, protótipo de 8 telas; lista de requisitos com UI ainda sem tela registrada no design doc §4 | `docs/eag-compass-design.md`, `design/fase5/` |
-| **6. Plano** | **Em andamento (iniciada em 2026-09-22 com autorização de Rogério).** Dividida em 3 planos: **Plano 1 — Fundação (Etapa 0) escrito** (12 tarefas); **Plano 2 — Piloto Nacional (Etapa 1) escrito** (18 tarefas; migrações 0006–0008; primeiro e-mail externo só após o roteiro de T1 da tarefa 17 e liberação por escrito de Rogério); **Plano 3 — Internacional (Etapa 3), revisão 2 de 2026-09-23** (12 tarefas; migrações 0009–0011; refeito pela decisão de Rogério: lista mensal de compras agrícolas de todos os países, fonte do importador — UN Comtrade — mais exportações do Brasil — arquivo completo do MDIC; D1 e D2 a aprovar; conta Comtrade e termos de reutilização pendentes na tarefa 12). Planos 2 e 3 ainda **não revisados por Rogério**. **T6 (Comex Stat/MDIC) e T13 (UN Comtrade):** contratos conferidos por consulta real em 2026-09-23, a partir da rede doméstica; acesso pelo Worker e chamada com chave da Comtrade não testados; registro em `docs/eag-compass-t6-comexstat.md` rev. 2 (`a387c4c1…`). Linha de base medida: 14/14 testes; `npm run check` falha no Windows; migrações 0001–0002 aplicadas localmente. Ajuste da G5: identidade pelo JWT do Access (ctx.access não chega com Static Assets) | `docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md` (`30dc72a5…`), `docs/superpowers/plans/2026-09-23-eag-compass-internacional.md` rev. 2 (`da71efa4…`), `docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md` (`8080a03e…`) |
+| **6. Plano** | **Em andamento (iniciada em 2026-09-22 com autorização de Rogério).** Dividida em 3 planos: **Plano 1 — Fundação (Etapa 0) escrito** (12 tarefas); **Plano 2 — Piloto Nacional (Etapa 1) escrito** (18 tarefas; migrações 0006–0008; primeiro e-mail externo só após o roteiro de T1 da tarefa 17 e liberação por escrito de Rogério); **Plano 3 — Internacional (Etapa 3) escrito em 2026-09-23** (10 tarefas; migrações 0009–0011; decisões D1–D4 propostas, a aprovar). Planos 2 e 3 ainda **não revisados por Rogério**. **T6 (Comex Stat):** contrato conferido por consulta real em 2026-09-23, a partir da rede doméstica; acesso pelo Worker não testado; 7 armadilhas registradas em `docs/eag-compass-t6-comexstat.md` (`ae43cb86…`). Linha de base medida: 14/14 testes; `npm run check` falha no Windows; migrações 0001–0002 aplicadas localmente. Ajuste da G5: identidade pelo JWT do Access (ctx.access não chega com Static Assets) | `docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md` (`30dc72a5…`), `docs/superpowers/plans/2026-09-23-eag-compass-internacional.md` (`50bc9286…`), `docs/superpowers/plans/2026-09-22-eag-compass-piloto-nacional.md` (`8080a03e…`) |
 | 7–9 | Pendentes | — |
 
 ## Ferramentas do projeto (adicionadas por Rogério em 2026-09-22)
@@ -111,16 +111,12 @@
 | `historico/v2.0-planejamento/eag-compass-spec-v2.0-rev-pos-aprovacao-1.md` | `8de80be0a950535bd4d0cad002ac122b2be361ab9043f1101ff865e96d2d2649` |
 | `historico/v2.0-planejamento/eag-compass-spec-v2.0-rev-pos-aprovacao-2.md` | `a387646655d61e6f3d313d448c946e0fdc3e4e935217f9dd51d8c15c0790b299` |
 | `historico/v2.0-planejamento/eag-compass-planejamento-status-rev21.md` | `2f9b14177f91a00d16d5325ac57d9496ef56cab633a7f4696cdcaf471afafec4` |
-| `historico/v2.0-planejamento/eag-compass-planejamento-status-rev22.md` | `234c2923cbe0eb40279be874852d70e940b71eedde8f62bfdf019ca3624eb4cb` |
-| `historico/v2.0-planejamento/eag-compass-spec-v2.0-rev-pos-aprovacao-3.md` | `12a646ac9f78367d8c32b8bcebca19ffb3cb0cb31e92b9f1543e5258ef822448` |
-| `historico/v2.0-planejamento/eag-compass-t6-comexstat-rev1.md` | `ae43cb86a0592aa345e5e8defb36e9119e9b27bc7108d64c5618209ccdffdeb0` |
-| `historico/v2.0-planejamento/plano3-internacional-rev1.md` | `50bc9286bebfea13f1f3e9e01646b9aac7532a6f75a772e5ae06280f5945a921` |
 
 Linhas após rev9 acrescentadas na rev. 21 (hashes calculados em 2026-09-23 sobre os arquivos do histórico, que não são alterados depois de arquivados).
 
 Todas as cópias foram conferidas por hash contra a origem no momento do arquivamento. Os originais v1.3 no Desktop não foram alterados.
 
-**Spec vigente (revisão pós-aprovação 4, 2026-09-23):** `766ee039885aba5550fee7e6d43b077af4e0790cb6c63b1348e59810fb03c3d6`. **Documentos aprovados (originais):** Spec v2.0 `77cb42594bee8a2267d488c00d67a1d9f689a584c0ea126e32cc1e66fe0f1edf`; Constituição v2.0 `a4b80ae84140cfcf56125b1488e2ab9d7702ae4fdaab4248eb5514553cf48a11`; T12 rev. 4 `0101217dcb8be8776c7c751c16800c606f869c5e2658e4734535df7afee7200b`. O conteúdo aprovado é o do rascunho 5; mudaram só as linhas de controle e a ativação de R17.8 (hash de referência `33bd093f…9dd8`, conferido no fechamento).
+**Documentos aprovados (vigentes):** Spec v2.0 `77cb42594bee8a2267d488c00d67a1d9f689a584c0ea126e32cc1e66fe0f1edf`; Constituição v2.0 `a4b80ae84140cfcf56125b1488e2ab9d7702ae4fdaab4248eb5514553cf48a11`; T12 rev. 4 `0101217dcb8be8776c7c751c16800c606f869c5e2658e4734535df7afee7200b`. O conteúdo aprovado é o do rascunho 5; mudaram só as linhas de controle e a ativação de R17.8 (hash de referência `33bd093f…9dd8`, conferido no fechamento).
 
 ## Números (Spec v2.0 aprovada)
 

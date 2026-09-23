@@ -2,18 +2,29 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Sobre a Fundação (Plano 1) e o Piloto Nacional (Plano 2), entregar o fluxo **País Primeiro**:
-1. Rogério informa só o país.
-2. O Compass mostra o que o Brasil exportou de agrícola para ele (Comex Stat), com os três estados de R12.6.
-3. Rogério escolhe as commodities, e cada uma vira uma campanha.
-4. As empresas do país entram com evidência separada para cada condição de R12.10.
-5. Fichas e envios reaproveitam o Plano 2, no idioma da campanha (inglês por padrão) e no fuso de cada destinatário.
+**Revisão 2 (2026-09-23):** refeita após a decisão de Rogério de **pesquisar uma vez por mês** as compras agrícolas de **todos os países**, em fontes oficiais do lado do importador, guardar a lista na plataforma e buscar importadores só a partir dela (Spec, revisão pós-aprovação 4: R12.2, R12.11–R12.15, AT71–AT75). A revisão 1 foi arquivada em `docs/historico/v2.0-planejamento/plano3-internacional-rev1.md`.
 
-**Architecture:** Mesmo Worker. A análise de país roda em **Queue**, uma mensagem por ano civil, espaçadas com `delaySeconds`, porque a API bloqueia chamadas próximas (T6 C5). As linhas ficam no D1 e a resposta bruta no R2, para reprodutibilidade (R8.2). **Nenhuma fonte nominal paga** de empresas no exterior nesta etapa. Descoberta de empresas é a Camada 2 (pesquisa com evidência registrada por Rogério), conforme H-I1 do benchmark. Fonte paga só por adaptador e após decisão registrada (R13.7).
+**Goal:** Sobre a Fundação (Plano 1) e o Piloto Nacional (Plano 2), entregar o fluxo **País Primeiro** apoiado numa lista mensal:
+1. Todo mês, uma rotina automática monta, para cada país, a lista das commodities agrícolas que ele compra. São duas fontes oficiais, lado a lado:
+   - **as importações declaradas pelo próprio país** (UN Comtrade), de todas as origens e de origem Brasil;
+   - **as exportações do Brasil para o país** (arquivo completo do MDIC).
+2. Rogério escolhe o país e vê a lista pronta, sem nenhuma consulta externa.
+3. Ele escolhe as commodities, e cada uma vira uma campanha. A busca de importadores só parte de commodity presente na lista.
+4. As empresas entram com evidência separada para cada condição de R12.10.
+5. Fichas e envios reaproveitam o Plano 2, no idioma da campanha e no fuso de cada destinatário.
 
-**Tech Stack:** Plano 2 sem dependências novas. `Intl.DateTimeFormat` com `timeZone` IANA para validar fusos (disponível no runtime de Workers).
+**Architecture:**
+- **Rotina mensal (Cron no dia 10 + Queue).**
+  - **MDIC:** o arquivo anual é lido em pedaços de 8 MB por `Range`, uma mensagem de fila por pedaço, e agregado por país × NCM × mês.
+  - **Comtrade:** 3 chamadas por país (cerca de 300 subposições cada), espalhadas por 2 dias para caber no limite gratuito de 500 chamadas/dia.
+  - **Consolidação:** cada país vira um JSON no R2 (`trade-list/<versão>/<ISO3>.json`). O D1 guarda só o índice: versão, estado por país e fonte, e o ponteiro da versão vigente de cada país.
+  - **Falha:** um país que falha continua apontando para a versão anterior (R12.12).
+- **Consulta:** ler o JSON do país no R2. Nenhuma chamada externa (AT71).
+- **Empresas:** a descoberta segue manual, pela Camada 2 com evidência, sem fonte nominal paga (R13.7).
 
-**Spec:** `docs/eag-compass-spec.md` · **Constituição:** `docs/eag-compass-constituicao.md` · **Evidência T6:** `docs/eag-compass-t6-comexstat.md` (testes reais de 2026-09-23) · **Skill:** `/prospeccao-vendas` (SHA-256 `33bd093f…9dd8`) · **Design:** `docs/eag-compass-design.md` (tela Internacional) · **Pré-requisito:** Planos 1 e 2 concluídos (migrações 0001–0008).
+**Tech Stack:** Plano 2, sem dependências novas. `TextDecoder('windows-1252')` para as tabelas do MDIC (codificação não é UTF-8, T6 §7). `DecompressionStream` não é usado, porque os arquivos são CSV sem compressão. `Intl.DateTimeFormat` para fusos. `limits.cpu_ms: 300000` no `wrangler.jsonc` (Workers Paid; o padrão é 30 s): `https://developers.cloudflare.com/workers/platform/limits/`.
+
+**Spec:** `docs/eag-compass-spec.md` (revisão pós-aprovação 4) · **Constituição:** `docs/eag-compass-constituicao.md` · **Evidências T6/T13:** `docs/eag-compass-t6-comexstat.md` (rev. 2) · **Skill:** `/prospeccao-vendas` (SHA-256 `33bd093f…9dd8`) · **Design:** `docs/eag-compass-design.md` (tela Internacional) · **Pré-requisito:** Planos 1 e 2 concluídos (migrações 0001–0008).
 
 ---
 
@@ -21,14 +32,15 @@
 
 Todas as dos Planos 1 e 2 continuam valendo. Acrescentam-se:
 
-- **Exportações do Brasil, nunca importações** (R12.2). O corpo da chamada tem `flow: "export"` fixo no adaptador, sem parâmetro.
-- **Dado de país não é dado de empresa** (R1.4.3, R12.10, AT23). As linhas da análise **não** entram na tabela `evidence` (que exige `company_id`) nem alimentam Confidence, ICP ou condições de empresa.
-- **"Nenhum registro" só com prova** (R12.6). Exige: todas as partes anuais com `200` + `success:true`, e o código do país validado em `/tables/countries/<id>`. Qualquer outra situação → `dados indisponíveis` ou `parcial`.
-- **Soma só de `metricKG` (kg líquido) e `metricFOB` (US$)** (R12.5, T6 C6). Quantidade estatística é secundária: exibida com a unidade da NCM, nunca somada.
-- **Espaçamento mínimo de 20 s entre chamadas ao Comex Stat** (T6 C5), em todo o sistema.
-- **Idioma:** campanhas em **inglês** por padrão. Países de língua portuguesa usam os modelos em português. A ficha registra a lacuna 🔴: a skill não tem método específico para exportação (PV12, R28.15).
-- **Fuso por destinatário** (R18.6). Sem fuso IANA válido no contato, a ficha não é aprovada. Janela e "dias não seguidos" são calculados no fuso dele (R19.2 itens 7 e 12).
-- **Envio compartilha a rampa** do Plano 2. O teto diário é por remetente e soma Nacional e Internacional (R19.10).
+- **Consulta de país nunca chama fonte externa.** Só a rotina mensal e o pedido manual de R12.15 fazem isso (R12.2, AT71).
+- **Nunca apagar a lista boa com uma lista pior.** O ponteiro de um país só avança quando a nova versão desse país e dessa fonte termina completa (R12.12, AT72).
+- **Fontes lado a lado, nunca somadas.** Comtrade vem em CIF, na visão do importador; MDIC vem em FOB, na visão do Brasil. A parte do Brasil é calculada só dentro da Comtrade (R12.13, AT74).
+- **Exportações do Brasil, nunca importações do Brasil.** A rotina lê só `EXP_*.csv` do MDIC e `flowCode=M` do país declarante na Comtrade (R12.2).
+- **"Nenhum registro" só com prova.** Fonte respondeu completa e sem linhas → `no_record`. País sem declaração do período → "sem declaração desde …" (R12.6.1). Qualquer falha → `data_unavailable`.
+- **Soma só de kg líquido e valor.** A quantidade estatística é secundária, com unidade, nunca somada (T6 C6).
+- **Dado de país não é dado de empresa.** Nada da lista entra em `evidence`, Confidence, ICP ou `company_conditions` (R1.4.3, AT23).
+- **Idioma e fuso:** como na revisão 1. Inglês por padrão, português para países lusófonos, lacuna 🔴 na ficha, fuso IANA por contato, teto diário somando os dois mercados.
+- **Chave da Comtrade** (`COMTRADE_KEY`) só como secret. Nunca em log nem em URL gravada (a URL leva `subscription-key`, então ela é removida antes de registrar).
 
 ### Portões
 
@@ -45,11 +57,11 @@ Seção `## Portões` obrigatória no relatório de cada tarefa, com antes e dep
 
 ## Review Focus
 
-1. **Consulta "vazia" que na verdade é erro de formato.** País como número ou período atravessando o ano: a API responde "sucesso" sem linhas (T6 C1, C2). Nunca pode virar `nenhum registro no período`. Teste na Tarefa 3.
-2. **429 no meio da análise.** Um ano veio e o outro esgotou as tentativas: a análise fica `parcial`, mostra o ano que falta e não soma o total como se fosse o período inteiro. Teste na Tarefa 4.
-3. **NCM que casa com dois produtos do catálogo** (código HS de 4 dígitos e NCM de 8 do mesmo item). A linha aparece nos dois produtos, mas o total do país a conta uma vez. Teste na Tarefa 4.
-4. **Destinatário em fuso diferente do de Rogério.** Um passo aprovado às 16h em São Paulo para um contato em Tóquio só sai entre 09:00 e 17:00 de Tóquio, e o "dia civil anterior" é o de Tóquio. Teste na Tarefa 8.
-5. **Resposta em inglês.** "Please remove me", "unsubscribe", "send me your price list" e "Out of office" são classificados como no português. Teste na Tarefa 8.
+1. **Linha do CSV cortada na fronteira do pedaço de 8 MB.** A linha partida entre dois pedaços precisa ser contada uma vez e inteira. Pedaço repetido pela fila não pode duplicar totais. Teste na Tarefa 3.
+2. **Mês em que a Comtrade ou o MDIC falham para parte dos países.** Os que falharam mantêm a versão anterior com "não atualizado em <mês>"; os demais avançam. Teste na Tarefa 5.
+3. **País que declara com atraso** (a China tem 2025, outros param em 2023). Mostrar "sem declaração desde 2023" e o último ano, nunca `nenhum registro`, e seguir mostrando o MDIC. Teste na Tarefa 6.
+4. **Código de país divergente entre fontes** (EUA 842 na Comtrade; no MDIC, 249 e mais dois códigos de ilhas; Alemanha com duas entradas `DEU` na Comtrade, uma expirada). Um país errado mostraria a lista de outro. Teste na Tarefa 2.
+5. **Destinatário em outro fuso e respostas em inglês:** mesmos casos da revisão 1. Teste na Tarefa 10.
 
 ---
 
@@ -58,18 +70,19 @@ Seção `## Portões` obrigatória no relatório de cada tarefa, com antes e dep
 | Arquivo | Responsabilidade | Dona |
 | --- | --- | --- |
 | `migrations/0009_internacional.sql` | Esquema | T1 |
-| `migrations/0010_seed_paises.sql` | Países (código Comex, ISO, idioma) | T2 |
-| `migrations/0011_seed_parametros_internacional.sql` | Parâmetros internacionais | T1 |
-| `scripts/gen-paises-sql.mjs` | Gera a 0010 a partir de `/tables/countries` | T2 |
-| `src/adapters/comexstat.js` | Chamadas, validações C1–C7, normalização | T3 |
-| `src/country-analysis.js` | Análise por país, partes anuais, estados, catálogo | T4 |
-| `src/selections.js` | Seleção de commodities → campanhas | T5 |
-| `src/foreign-companies.js` | Empresa estrangeira, condições R12.10, porte, fuso | T6 |
-| `src/templates/prospeccao-vendas-en.js` | Modelos em inglês + roteiros | T7 |
-| `src/review.js` | Regras PV em inglês (modifica) | T7 |
-| `src/sending.js`, `src/inbound.js`, `src/unsubscribe.js`, `src/fichas.js` | Fuso por destinatário, inglês (modifica) | T8 |
-| `public/*` | Tela Internacional e dashboard | T9 |
-| `docs/eag-compass-t6-comexstat.md` | Registro de T6 (acrescenta o teste pelo Worker) | T10 |
+| `migrations/0010_seed_paises.sql` | Países com os códigos das duas fontes | T2 |
+| `migrations/0011_seed_parametros_internacional.sql` | Parâmetros | T1 |
+| `scripts/gen-paises-sql.mjs` | Gera a 0010 | T2 |
+| `src/adapters/mdic-bulk.js` | Leitura por pedaços do arquivo completo e das tabelas | T3 |
+| `src/adapters/comtrade.js` | Chamadas à Comtrade | T4 |
+| `src/trade-list.js` | Rotina mensal, versões, consolidação, ponteiros | T5 |
+| `src/country-analysis.js` | Leitura da lista, estados, catálogo | T6 |
+| `src/selections.js` | Seleção → campanhas; trava de R12.14 | T7 |
+| `src/foreign-companies.js` | Empresas no exterior e condições R12.10 | T8 |
+| `src/templates/prospeccao-vendas-en.js`, `src/review.js` | Inglês | T9 |
+| `src/fichas.js`, `src/sending.js`, `src/inbound.js`, `src/unsubscribe.js` | Fuso e idioma do destinatário | T10 |
+| `public/*` | Tela Internacional e dashboard | T11 |
+| `docs/eag-compass-t6-comexstat.md` | Testes pelo Worker | T12 |
 
 ---
 
@@ -79,24 +92,27 @@ Seção `## Portões` obrigatória no relatório de cada tarefa, com antes e dep
 | --- | --- | --- |
 | Migrações | `0009_internacional.sql`, `0010_seed_paises.sql`, `0011_seed_parametros_internacional.sql` | T1, T2, T1 |
 | Migrações futuras | `0012_*` em diante | Fase de manutenção |
-| Tabelas novas | `countries`, `country_analyses`, `country_analysis_parts`, `country_analysis_lines`, `commodity_selections`, `commercial_validations`, `company_conditions` | T1 (DDL), T2 (seed de `countries`) |
+| Tabelas novas | `countries`, `country_mdic_codes`, `trade_list_versions`, `trade_list_status`, `trade_list_current`, `trade_list_jobs`, `trade_list_manual_refresh`, `country_analyses`, `commodity_selections`, `commercial_validations`, `company_conditions` | T1 (DDL), T2 (seed de `countries`) |
 | Colunas novas | `contacts.timezone`; `companies.size_band`, `companies.size_source`, `companies.size_checked_at`; `campaigns.analysis_id`, `campaigns.selection_id` | T1 |
-| Rotas | `GET /api/countries`, `POST /api/country-analyses`, `GET /api/country-analyses/:id`, `POST /api/country-analyses/:id/retry` | T4 |
-| Rotas | `POST /api/country-analyses/:id/selections`, `POST /api/commercial-validations` | T5 |
-| Rotas | `POST /api/foreign-companies`, `PUT /api/companies/:id/conditions/:productId`, `PATCH /api/companies/:id/size` | T6 |
-| Mensagens de fila (`body.type`) | `comex_part` | T4 |
-| Chave KV | `comex:next_at` (próximo horário livre para chamar a API) | T3 |
-| Prefixo R2 | `comex/<analysisId>/<year>.json` | T4 |
-| Parâmetros | `param_period_default_months:international` = `12`; `agri_classification:international` = `{"version":"sh-01-24@2026-09-23","chapters":["01","02","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24"],"excluded":["03"]}`; `send_hours:international` = `{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}`; `comex_min_interval_s` = `20` | T1 (seed 0011) |
-| Parâmetro de liberação | `international_enabled` (**não semeado**; só admin grava, com `evidenceRef`) | T10 |
-| Vars | `COMEX_BASE_URL` = `https://api-comexstat.mdic.gov.br` | T3 |
-| Constantes | `TEMPLATES_EN_VERSION = "pv-en-1.0.0"` | T7 |
+| Cron | `"0 6 10 * *"` (dia 10, 06:00 UTC) — início da rotina mensal | T5 |
+| Mensagens de fila (`body.type`) | `mdic_chunk`, `comtrade_call`, `trade_consolidate` | T5 |
+| Prefixos R2 | `trade-staging/<versionId>/mdic/<ano>/<n>.json`, `trade-staging/<versionId>/comtrade/<ISO3>/<parte>.json`, `trade-list/<versionId>/<ISO3>.json`, `trade-ref/<versionId>/ncm.json` | T3, T4, T5 |
+| Rotas | `GET /api/countries`, `GET /api/trade-list/versions`, `POST /api/trade-list/refresh/:iso3` (admin, R12.15) | T5 |
+| Rotas | `POST /api/country-analyses`, `GET /api/country-analyses/:id` | T6 |
+| Rotas | `POST /api/country-analyses/:id/selections`, `POST /api/commercial-validations` | T7 |
+| Rotas | `POST /api/foreign-companies`, `PUT /api/companies/:id/conditions/:productId`, `PATCH /api/companies/:id/size` | T8 |
+| Secrets | `COMTRADE_KEY` | T4, T12 |
+| Vars | `MDIC_BULK_BASE` = `https://balanca.economia.gov.br/balanca/bd`, `COMTRADE_BASE` = `https://comtradeapi.un.org` | T3, T4 |
+| Config | `limits.cpu_ms: 300000` | T3 |
+| Parâmetros (seed 0011) | `param_period_default_months:international` = `12` (D1, pendente); `agri_classification:international` = `{"version":"sh-01-24@2026-09-23","chapters":["01","02","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24"],"excluded":["03"]}` (D2, pendente); `trade_list_mdic_years` = `2` (ano corrente e anterior); `trade_list_comtrade_years` = `3` (últimos três anos declarados); `comtrade_calls_per_day` = `400`; `trade_list_retention_versions` = `3`; `send_hours:international` = `{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}` | T1 |
+| Parâmetro de liberação | `international_enabled` (**não semeado**; só admin grava, com `evidenceRef`) | T12 |
+| Constantes | `TEMPLATES_EN_VERSION = "pv-en-1.0.0"` | T9 |
 
 ---
 
-## Tarefa 1: Migração 0009 e parâmetros internacionais
+## Tarefa 1: Migração 0009 e parâmetros
 
-**Requisito:** R1.4.1, R12.2–R12.10, R13.4, R14 (porte estrangeiro), R18.6, R7.1.
+**Requisito:** R1.4.1, R12.2–R12.15, R13.4, R14 (porte estrangeiro), R18.6, R7.1.
 
 **Files:** Create `migrations/0009_internacional.sql`, `migrations/0011_seed_parametros_internacional.sql`, `test/migracao-0009.test.mjs`
 
@@ -106,47 +122,79 @@ Seção `## Portões` obrigatória no relatório de cada tarefa, com antes e dep
 PRAGMA defer_foreign_keys = true;
 
 CREATE TABLE countries (
-  comex_id TEXT PRIMARY KEY CHECK (length(comex_id) = 3),   -- "023"; sempre texto com zeros (T6 C1)
-  name_pt TEXT NOT NULL, iso3 TEXT, iso_numeric TEXT,
+  iso3 TEXT PRIMARY KEY CHECK (length(iso3) = 3),
+  name_pt TEXT NOT NULL, name_en TEXT NOT NULL,
+  comtrade_code INTEGER,                                               -- reporterCode ativo (≠ ISO numérico em vários países)
   default_language TEXT NOT NULL DEFAULT 'en' CHECK (default_language IN ('en','pt-BR')),
   source TEXT NOT NULL, loaded_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_countries_comtrade ON countries(comtrade_code) WHERE comtrade_code IS NOT NULL;
+
+-- O MDIC tem vários CO_PAIS por ISO-3 (ex.: USA = 249 Estados Unidos, 396 Johnston, 873 Wake; DEU = 023 Alemanha, 025 Alemanha Oriental).
+CREATE TABLE country_mdic_codes (
+  mdic_code TEXT PRIMARY KEY CHECK (length(mdic_code) = 3),   -- CO_PAIS, texto com zeros
+  iso3 TEXT NOT NULL REFERENCES countries(iso3),
+  name_pt TEXT NOT NULL
+);
+
+CREATE TABLE trade_list_versions (
+  id TEXT PRIMARY KEY,                       -- ex.: '2026-10' ou '2026-10-manual-DEU-<uuid>'
+  kind TEXT NOT NULL CHECK (kind IN ('monthly','manual')),
+  reference_month TEXT NOT NULL,             -- 'YYYY-MM' da rotina
+  classification_version TEXT NOT NULL,
+  mdic_last_modified_json TEXT,              -- {"2026":"Fri, 04 Sep 2026 …"}
+  status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running','complete','partial','failed')),
+  started_at TEXT NOT NULL, finished_at TEXT, note TEXT
+);
+
+CREATE TABLE trade_list_status (
+  version_id TEXT NOT NULL REFERENCES trade_list_versions(id),
+  iso3 TEXT NOT NULL REFERENCES countries(iso3),
+  source TEXT NOT NULL CHECK (source IN ('comtrade','mdic')),
+  state TEXT NOT NULL CHECK (state IN ('purchase_identified','no_record','data_unavailable','not_declared','pending')),
+  last_period TEXT,                          -- 'YYYY' (Comtrade) ou 'YYYY-MM' (MDIC)
+  lines INTEGER NOT NULL DEFAULT 0, error TEXT, updated_at TEXT NOT NULL,
+  PRIMARY KEY (version_id, iso3, source)
+);
+
+CREATE TABLE trade_list_current (
+  iso3 TEXT NOT NULL REFERENCES countries(iso3),
+  source TEXT NOT NULL CHECK (source IN ('comtrade','mdic')),
+  version_id TEXT NOT NULL REFERENCES trade_list_versions(id),
+  r2_key TEXT NOT NULL, content_sha256 TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (iso3, source)
+);
+
+CREATE TABLE trade_list_jobs (
+  id TEXT PRIMARY KEY, version_id TEXT NOT NULL REFERENCES trade_list_versions(id),
+  kind TEXT NOT NULL CHECK (kind IN ('mdic_chunk','comtrade_call','consolidate')),
+  job_key TEXT NOT NULL,                     -- 'mdic:2026:7' | 'comtrade:DEU:2' | 'consolidate:DEU'
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0, error TEXT, done_at TEXT,
+  UNIQUE (version_id, job_key)
+);
+
+CREATE TABLE trade_list_manual_refresh (
+  iso3 TEXT NOT NULL REFERENCES countries(iso3), day TEXT NOT NULL,
+  version_id TEXT NOT NULL REFERENCES trade_list_versions(id),
+  requested_by TEXT NOT NULL, reason TEXT NOT NULL,
+  PRIMARY KEY (iso3, day)                    -- R12.15: 1 por dia por país
 );
 
 CREATE TABLE country_analyses (
   id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  country_comex_id TEXT NOT NULL REFERENCES countries(comex_id),
-  period_from TEXT NOT NULL, period_to TEXT NOT NULL,            -- 'YYYY-MM'
-  classification_version TEXT NOT NULL,
-  source_updated_at TEXT,                                        -- de /general/dates/updated
-  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','complete','partial','unavailable')),
-  result_state TEXT CHECK (result_state IN ('purchase_identified','no_record','data_unavailable','partial')),
-  coverage_note TEXT, request_key TEXT NOT NULL, created_by TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), finished_at TEXT,
-  UNIQUE (tenant_id, request_key)
-);
-
-CREATE TABLE country_analysis_parts (
-  id TEXT PRIMARY KEY, analysis_id TEXT NOT NULL REFERENCES country_analyses(id),
-  year INTEGER NOT NULL, month_from TEXT NOT NULL, month_to TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done','failed')),
-  http_status INTEGER, attempts INTEGER NOT NULL DEFAULT 0, error TEXT,
-  r2_key TEXT, rows_count INTEGER, done_at TEXT,
-  UNIQUE (analysis_id, year)
-);
-
-CREATE TABLE country_analysis_lines (
-  analysis_id TEXT NOT NULL REFERENCES country_analyses(id),
-  ncm TEXT NOT NULL CHECK (length(ncm) = 8), year INTEGER NOT NULL, month INTEGER NOT NULL,
-  description TEXT NOT NULL,
-  fob_usd INTEGER NOT NULL, net_kg INTEGER NOT NULL,
-  stat_qty INTEGER, stat_unit TEXT, stat_consistent INTEGER CHECK (stat_consistent IN (0,1)),
-  PRIMARY KEY (analysis_id, ncm, year, month)
+  iso3 TEXT NOT NULL REFERENCES countries(iso3),
+  period_months INTEGER NOT NULL,
+  comtrade_version_id TEXT REFERENCES trade_list_versions(id),
+  mdic_version_id TEXT REFERENCES trade_list_versions(id),
+  snapshot_sha256 TEXT NOT NULL,             -- hash do que foi exibido (R8.2)
+  created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
 CREATE TABLE commodity_selections (
   id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
   analysis_id TEXT NOT NULL REFERENCES country_analyses(id),
-  items_json TEXT NOT NULL,              -- [{ productId|null, ncms: [...], label }]
+  items_json TEXT NOT NULL,                  -- [{ productId|null, hs6: [...], label }]
   selected_by TEXT NOT NULL, selected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
@@ -176,320 +224,375 @@ ALTER TABLE campaigns ADD COLUMN analysis_id TEXT REFERENCES country_analyses(id
 ALTER TABLE campaigns ADD COLUMN selection_id TEXT REFERENCES commodity_selections(id);
 ```
 
-- `0011` insere os 4 parâmetros de Recursos nomeados, com o mesmo formato de linha da `0005` do Plano 1 (`scope`, `key`, `value_json`, `valid_from`, `approved_by = 'system-admin'`, `source = 'Plano 3 — proposta D1–D4 de docs/eag-compass-t6-comexstat.md'`). **Os valores D1–D4 são propostas.** ✋ Rogério aprova os valores antes do merge desta tarefa. Até lá, a tarefa não é concluída.
+- A `0011` insere os parâmetros de Recursos nomeados no formato da `0005` do Plano 1. `source` = `Plano 3 rev. 2 — propostas D1–D2 e rotina mensal (Spec R12.11)`.
+- ✋ Rogério aprova os valores D1 (período padrão de 12 meses) e D2 (capítulos 01–24 sem o 03) antes do merge. **Até lá a tarefa não termina.**
 
 **Intenções de teste:**
-- *condição confirmada exige evidência*: `status='confirmed'` com `evidence_id NULL` → erro de CHECK. **Falha se:** o CHECK sair (AT23).
-- *código de país com 3 caracteres*: inserir `'23'` → erro. **Falha se:** o CHECK de comprimento sair (T6 C1).
-- *linha única por NCM, ano e mês*: **Falha se:** a chave primária composta sair (duplicaria totais, R12.5).
-- *campanhas antigas intactas*: campanhas do Plano 2 continuam com `analysis_id NULL`. **Falha se:** o `ALTER` exigir valor.
+- *condição confirmada exige evidência*: **Falha se:** o CHECK sair (AT23).
+- *um ponteiro por país e fonte*: dois `trade_list_current` para `DEU`/`comtrade` → erro. **Falha se:** a chave primária sair (a consulta leria duas versões).
+- *uma atualização manual por dia*: **Falha se:** a chave `(iso3, day)` sair (R12.15).
+- *tarefa de fila única por versão*: `(version_id, job_key)` repetido → erro. **Falha se:** a UNIQUE sair (pedaço duplicado duplicaria totais).
+- *código da Comtrade único e código do MDIC com um só país*: **Falha se:** o índice único ou a chave primária de `country_mdic_codes` saírem (Review Focus 4).
 
-**Defesas (5g):** rota, saída, CSRF e cookie — não se aplicam. Campo opcional — `contacts.timezone` nulo = "fuso pendente" (bloqueia aprovação, T8); `companies.size_band` nulo = `pending_size`. Exclusão — não se aplica. Config de teste — harness do Plano 1.
-**Commit:** `feat: esquema do internacional e parâmetros propostos`
+**Defesas (5g):** rota, saída, CSRF e cookie — não se aplicam. Campo opcional — país sem linha em `country_mdic_codes` ou com `comtrade_code` nulo = país sem aquela fonte (estado `data_unavailable` com nota "país sem código nesta fonte"). Exclusão — versões antigas podadas pela T5 conforme `trade_list_retention_versions`, nunca a vigente de nenhum país. Config de teste — harness do Plano 1.
+**Commit:** `feat: esquema da lista mensal e do internacional`
 
 ---
 
-## Tarefa 2: Países
+## Tarefa 2: Países com os códigos das duas fontes
 
-**Requisito:** R12.1, R12.2, PV12.
+**Requisito:** R12.1, R12.2, PV12; Review Focus 4.
 
 **Files:** Create `scripts/gen-paises-sql.mjs`, `migrations/0010_seed_paises.sql` (gerado e commitado), `tests/paises.test.mjs`
 
-**Contrato:**
-- O script chama `GET https://api-comexstat.mdic.gov.br/tables/countries?language=pt` uma vez. Resposta copiada em T6: `{"data":{"list":[{"id":"994","text":"A Designar"},{"id":"013","text":"Afeganistão"},…]}}`.
-- Para ISO chama `GET /tables/countries/<id>?language=pt`, **respeitando 20 s entre chamadas** (≈ 250 países ≈ 85 min; roda **uma vez**, fora do CI). Resposta copiada: `{"data":{"id":"023","country":"Alemanha","coPaisIson3":"276","coPaisIsoa3":"DEU"}}`. Se interrompido, retoma pelo arquivo parcial `scripts/.paises-cache.json` (fora do git).
-- `default_language`: `pt-BR` para `AGO`, `CPV`, `GNB`, `MOZ`, `PRT`, `STP`, `TLS` (países de língua oficial portuguesa, lista da CPLP: `https://www.cplp.org/id-2597.aspx`, a conferir pelo executor); todos os outros `en` (PV12: inglês por padrão).
-- Exclui os ids sem país real (`994` "A Designar" e os que não tiverem `coPaisIsoa3`). Os excluídos vão listados em comentário na migração.
-- `source` = `comexstat:/tables/countries@2026-MM-DD`.
+**Contrato (fontes conferidas em 2026-09-23, T6 §7 e §8):**
+- `GET ${MDIC_BULK_BASE}/tabelas/PAIS.csv`, com cabeçalho `"CO_PAIS";"CO_PAIS_ISON3";"CO_PAIS_ISOA3";"NO_PAIS";"NO_PAIS_ING";"NO_PAIS_ESP"`, decodificado com `new TextDecoder('windows-1252')`.
+- `GET ${COMTRADE_BASE}/files/v1/app/reference/Reporters.json` → `results[]` com `reporterCode`, `reporterCodeIsoAlpha3`, `isGroup`, `entryExpiredDate`. Só entradas com `isGroup === false` e **sem** `entryExpiredDate`.
+- Junção pelo ISO-3. Os resultados vão para três listas no relatório:
+  - países só no MDIC (sem declaração à Comtrade);
+  - países só na Comtrade;
+  - ISO-3 com mais de uma entrada **ativa na Comtrade**, que **param o script com erro** e exigem decisão.
+- **MDIC com vários códigos por ISO-3 é normal** (conferido em 2026-09-23: `USA` = `249` Estados Unidos, `396` Johnston, `873` Wake; `DEU` = `023` Alemanha, `025` Alemanha Oriental). Todos entram em `country_mdic_codes` e as exportações do país **somam todos os seus códigos**. A lista de ISO-3 com mais de um código vai no relatório para Rogério conferir.
+- Exclui `"000"`/`ZZZ` ("Não Definido") e códigos sem ISO-3.
+- `default_language`: `pt-BR` para `AGO`, `CPV`, `GNB`, `MOZ`, `PRT`, `STP`, `TLS` (lista da CPLP a conferir pelo executor em `https://www.cplp.org/`); o resto `en`.
+- O script roda local, uma vez, com 2 downloads, e a saída é commitada. A rotina mensal (T5) **não** reescreve `countries`: país novo exige rodar o script e criar uma migração nova.
 
 **Intenções de teste:**
-- *código sempre com 3 dígitos em texto*: todo `comex_id` casa `^\d{3}$`. **Falha se:** o script converter para número (T6 C1).
-- *Portugal em português, Alemanha em inglês*: **Falha se:** a regra de idioma inverter.
-- *"A Designar" fora*: **Falha se:** `994` aparecer como país selecionável.
+- *EUA com códigos certos*: `USA` → `comtrade_code 842` e códigos MDIC `249`, `396` e `873`. **Falha se:** a junção da Comtrade usar o ISO numérico (840), ou se o MDIC ficar só com um código (Review Focus 4).
+- *Alemanha pela entrada ativa*: `DEU` → `comtrade_code 276`, não 280. **Falha se:** o filtro de `entryExpiredDate` sair.
+- *acentos corretos*: `name_pt` de `AFG` = "Afeganistão". **Falha se:** o CSV for lido como UTF-8.
+- *Portugal em português*: **Falha se:** a regra de idioma inverter.
 
 **Defesas (5g):** script local, sem rota. Config de teste — `node --test` lendo a migração gerada.
-**Commit:** `feat: tabela de países do Comex Stat`
+**Commit:** `feat: países com códigos do MDIC e da Comtrade`
 
 ---
 
-## Tarefa 3: Adaptador Comex Stat
+## Tarefa 3: Adaptador do arquivo completo do MDIC
 
-**Requisito:** R12.2, R12.5, R12.6, R13.5, T6; Review Focus 1.
+**Requisito:** R12.2, R12.3, R12.5, R1.4.1; Review Focus 1.
 
-**Files:** Create `src/adapters/comexstat.js`, `test/comexstat.test.mjs`
+**Files:** Create `src/adapters/mdic-bulk.js`, `test/mdic-bulk.test.mjs`; Modify `wrangler.jsonc` (`limits.cpu_ms: 300000`)
 
-**Contrato (fonte: `docs/eag-compass-t6-comexstat.md`, consultas reais de 2026-09-23; documentação oficial bloqueada por desafio da Cloudflare):**
-- `export function splitPeriodByYear(from, to): { year, monthFrom, monthTo }[]` — `('2025-09','2026-08')` → `[{2025,'2025-09','2025-12'},{2026,'2026-01','2026-08'}]` (T6 C2).
-- `export async function fetchExportsByNcm(env, { countryComexId, monthFrom, monthTo }, fetchImpl = fetch): Promise<{ httpStatus, raw: string, rows: NormalizedRow[] }>`
-  - Recusa localmente, sem chamar a API: `countryComexId` fora de `^\d{3}$`; `monthFrom` e `monthTo` de anos diferentes; formato fora de `YYYY-MM`. Lança `AdapterError('invalid_request')`.
-  - `POST ${COMEX_BASE_URL}/general?language=pt`, cabeçalhos `content-type: application/json` e `user-agent: EAG-Compass/2.0 (+rogeriopalhari@eagagro.com)`. Timeout de 30 s (`AbortSignal.timeout(30000)`).
-  - Corpo fixo: `{ flow: "export", monthDetail: true, period: { from, to }, filters: [{ filter: "country", values: [countryComexId] }, { filter: "chapter", values: <capítulos do parâmetro agri_classification> }], details: ["ncm"], metrics: ["metricFOB","metricKG","metricStatistic"] }`.
-  - `NormalizedRow = { ncm, year, month, description, fobUsd, netKg, statQty }` — `Number()` em cada métrica (T6 C7); `NaN` → linha rejeitada e a parte vira `failed` com o motivo "valor não numérico".
-  - Erros: 429 → `AdapterError('temporary', { retryAfterS: 20 })`; 400 → `AdapterError('invalid_request')` (sem nova tentativa, T6 C4); 5xx, timeout ou HTML no lugar de JSON (desafio da Cloudflare) → `AdapterError('temporary')`, com o último caso registrado como `blocked_by_challenge` no `error`. `success !== true` com 200 → `AdapterError('temporary')`.
-- `export async function reserveSlot(env, now): Promise<number>` — lê KV `comex:next_at`. Devolve em quantos segundos a chamada pode acontecer (0 se já pode) e grava `next_at = max(now, next_at) + comex_min_interval_s`. **Limitação declarada:** o KV não é transacional. Com um só usuário e a fila com `max_concurrency` padrão, a sobreposição é rara, e o 429 é tratado como temporário.
-- `export async function ncmUnit(env, ncm, fetchImpl)` — `GET /tables/ncm?search=<ncm>&language=pt` → `unit` (ex.: `"TONELADA METRICA LIQUIDA"`), com cache KV `comex:ncm:<ncm>` por 30 dias.
-- `export function statConsistency({ netKg, statQty, unit }): 0|1|null` — só para unidade com "TONELADA": `|statQty − netKg/1000| / (netKg/1000) ≤ 0,05` → 1, senão 0. Outras unidades → `null` (T6 C6).
+**Contrato (T6 §7):**
+- `export async function headYear(env, year, fetchImpl = fetch): Promise<{ size, lastModified }>`: `HEAD ${MDIC_BULK_BASE}/comexstat-bd/ncm/EXP_${year}.csv`. 404 → ano ainda não publicado.
+- `export function chunkRanges(size, chunkBytes = 8_388_608): { n, start, end }[]`.
+- `export async function processChunk(env, { year, n, start, end, agriChapters }, fetchImpl = fetch): Promise<Aggregate>`:
+  - `GET` com `Range: bytes=${start}-${end + 65535}`. Exige 206; 200 → erro `range_unsupported`.
+  - **Regra de fronteira:** o pedaço `n > 0` descarta tudo até o primeiro `\n`, inclusive. Cada pedaço processa as linhas que **começam** dentro de `[start, end]`, e a linha que começa antes de `end` e termina depois é lida até o fim com os 64 KB extras. Assim cada linha pertence a exatamente um pedaço.
+  - O pedaço 0 descarta o cabeçalho. Confere se ele é literalmente `"CO_ANO";"CO_MES";"CO_NCM";"CO_UNID";"CO_PAIS";"SG_UF_NCM";"CO_VIA";"CO_URF";"QT_ESTAT";"KG_LIQUIDO";"VL_FOB"`; diferente → erro `layout_changed`, sem processar.
+  - Parse: separador `;`, aspas removidas dos códigos, métricas com `Number()`. Mantém só as linhas cujo `CO_NCM` começa por um capítulo de `agriChapters`.
+  - Agrega `key = CO_PAIS|CO_NCM|CO_ANO-CO_MES` (a consolidação da T5 soma os `CO_PAIS` de um mesmo ISO-3 via `country_mdic_codes`) → `{ fob, kg, qt }`.
+  - Grava em R2 `trade-staging/<versionId>/mdic/<ano>/<n>.json` e marca o job `done`. O mesmo pedaço reprocessado sobrescreve o mesmo objeto, então não duplica.
+- `export async function loadNcmTable(env, fetchImpl)`: `GET ${MDIC_BULK_BASE}/tabelas/NCM.csv` (windows-1252). Monta `{ ncm → { sh6, unit, name_pt, name_en } }` só dos capítulos agrícolas e grava em `trade-ref/<versionId>/ncm.json`.
+- Erros: 5xx, timeout (60 s) ou HTML de desafio da Cloudflare → temporário (`retry` da fila); 404 no ano corrente antes da primeira publicação → ano ignorado, com nota.
 
-**Fixtures:** as respostas copiadas em `docs/eag-compass-t6-comexstat.md` §2 e §3: lista de café com 3 linhas; `{"data":{"list":[]},"success":true}`; `{"error":{"code":429,"message":"Você excedeu o limite de solicitações. Por favor, tente novamente em 10 segundos."}}`; `{"error":{"code":400,"message":"Filtro inválido"}}`; a página HTML "Just a moment...".
+**Fixtures:** o cabeçalho e as linhas copiados em T6 §7. Um arquivo sintético de 3 pedaços, montado a partir dessas linhas, com uma linha cortada exatamente na fronteira.
 
 **Intenções de teste:**
-- *período atravessando o ano é dividido*: **Falha se:** o adaptador aceitar `2025-09..2026-08` numa chamada só (Review Focus 1).
-- *país numérico é recusado antes de chamar*: `fetchImpl` não é chamado. **Falha se:** `23` for convertido silenciosamente.
-- *valores em texto viram número*: `"300582403"` → `300582403`. **Falha se:** a soma concatenar textos.
-- *429 é temporário com espera*: **Falha se:** 429 virar resultado vazio.
-- *página de desafio é temporária e registrada*: HTML → `temporary` com `blocked_by_challenge`. **Falha se:** o `JSON.parse` quebrar sem classificar.
-- *estatística inconsistente marcada*: out/2025 do fixture (39.231.664 kg, 819.606 t) → 0. **Falha se:** a razão usar kg sem dividir por 1000.
-- *fluxo sempre export*: o corpo capturado tem `flow === "export"`. **Falha se:** existir parâmetro de fluxo.
+- *linha na fronteira contada uma vez*: a soma dos 3 pedaços é igual à soma do arquivo inteiro processado de uma vez. **Falha se:** a regra de fronteira perder ou duplicar a linha (Review Focus 1).
+- *pedaço reprocessado não duplica*: processar o pedaço 1 duas vezes e consolidar → mesmo total. **Falha se:** o staging acumular em vez de sobrescrever.
+- *layout mudou para tudo*: cabeçalho com coluna a mais → `layout_changed`. **Falha se:** o parser seguir por posição com colunas erradas.
+- *só capítulos agrícolas*: a linha `28353910` do fixture é descartada. **Falha se:** o filtro usar número em vez de prefixo de texto.
+- *servidor sem Range*: 200 → erro. **Falha se:** o adaptador baixar o arquivo inteiro em memória (128 MB por isolate).
 
-**Defesas (5g):** rota — não cria. Saída — descrições da NCM exibidas com `textContent`. CSRF e cookie — não se aplicam. Campo opcional — `metricStatistic` ausente → `statQty null`. Exclusão — não se aplica. Config de teste — `fetchImpl` injetado; KV do harness.
-**Commit:** `feat: adaptador Comex Stat com as armadilhas de T6`
+**Defesas (5g):** rota — não cria. Saída — nomes de NCM exibidos com `textContent`. Campo opcional — `QT_ESTAT` vazio → `qt null`. Exclusão — staging apagado pela T5 ao fechar a versão. Config de teste — `fetchImpl` injetado que atende `Range` sobre um buffer.
+**Commit:** `feat: leitura por pedaços do arquivo completo do MDIC`
 
 ---
 
-## Tarefa 4: Análise de país
+## Tarefa 4: Adaptador da Comtrade
 
-**Requisito:** R12.1–R12.6, R12.8, R1.4.1–R1.4.3, R10.3, R13.5, R8.2, AT20–AT23; Review Focus 2 e 3.
+**Requisito:** R12.2, R12.3, R12.6.1, R12.13; T13.
 
-**Files:** Create `src/country-analysis.js`, `test/analise-pais.test.mjs`; Modify `src/queue.js` (tipo `comex_part`), `src/worker.js` (rotas)
+**Files:** Create `src/adapters/comtrade.js`, `test/comtrade.test.mjs`
+
+**Contrato (T6 §8; ✋ o executor confere a chamada com chave na T12 antes de liberar):**
+- Lista de subposições: `GET ${COMTRADE_BASE}/files/v1/app/reference/HS.json` → `results[]` com `id` de 6 dígitos e `aggrLevel 6`, filtrados pelos capítulos agrícolas (894 em 2026-09-23). Divididos em 3 blocos em ordem crescente, gravados em `trade-ref/<versionId>/hs6-blocks.json`.
+- `export async function availableYears(env, comtradeCode, fetchImpl)`: `GET ${COMTRADE_BASE}/public/v1/getDA/C/A/HS?reporterCode=<code>` → anos presentes (resposta copiada em T6 §8). Nenhum ano → `not_declared` sem gastar chamadas de dados.
+- `export async function fetchImports(env, { comtradeCode, years, hs6Block }, fetchImpl)`:
+  - `GET ${COMTRADE_BASE}/data/v1/get/C/A/HS?reporterCode=<code>&period=<anos separados por vírgula>&partnerCode=0,76&flowCode=M&cmdCode=<bloco>&subscription-key=<COMTRADE_KEY>`.
+  - Os nomes dos parâmetros vêm da página da API (T6 §8). O executor confere `partnerCode` com dois valores e `period` com lista na chamada real da T12. Se não aceitar, faz uma chamada por parceiro e o orçamento de chamadas é recalculado **antes** de codar a T5.
+  - Normaliza: `{ hs6: cmdCode, year: refYear, origin: partnerCode === 76 ? 'brazil' : 'world', valueUsd: cifvalue ?? primaryValue, basis: cifvalue != null ? 'CIF' : 'primary', netKg: netWgt || null, qty, qtyUnitCode }`.
+  - Descarta linhas com `partner2Code` ou `customsCode` diferentes do total, se a resposta trouxer desdobramentos. **O executor confere na resposta real** quais valores representam o total e registra.
+- Erros: 401/403 → `auth` (para a rotina e alerta o admin); 429 → temporário, `retry` com `delaySeconds: 3600`; 5xx/timeout → temporário. **Resposta com `count` igual ao limite de registros → erro `truncated`**, porque nunca se aceita lista cortada como completa.
+- A URL registrada em log e em `error` passa por `redact(url)`, que remove `subscription-key`.
+
+**Fixtures:** o registro copiado em T6 §8, com `partnerCode` 0 e 76 em versões sintéticas. A resposta de `getDA` copiada.
+
+**Intenções de teste:**
+- *chave nunca aparece*: erro 500 com a URL → a mensagem não contém o valor do secret. **Falha se:** `redact` não for aplicado.
+- *lista cortada não passa*: `count` = 100000 → `truncated`. **Falha se:** a resposta for aceita.
+- *sem declaração não gasta chamada*: `getDA` vazio → nenhuma chamada a `/data`. **Falha se:** o adaptador chamar mesmo assim.
+- *CIF marcado*: `basis === 'CIF'`. **Falha se:** o valor for rotulado como FOB (R12.13).
+
+**Defesas (5g):** rota — não cria. Secret — `COMTRADE_KEY` só via `env`. Campo opcional — `netWgt` 0 → `null` ("peso não declarado"), nunca 0 kg. Config de teste — `fetchImpl` injetado.
+**Commit:** `feat: adaptador da Comtrade`
+
+---
+
+## Tarefa 5: Rotina mensal, versões e atualização manual
+
+**Requisito:** R12.11, R12.12, R12.15, R13.5, R8.2, AT72; Review Focus 2.
+
+**Files:** Create `src/trade-list.js`, `test/lista-mensal.test.mjs`; Modify `src/queue.js` (tipos `mdic_chunk`, `comtrade_call`, `trade_consolidate`), `src/worker.js` (`scheduled` para `"0 6 10 * *"`, rotas), `wrangler.jsonc` (cron)
 
 **Interfaces:**
-- `export async function startAnalysis(env, actor, { countryComexId, periodMonths? })`:
-  - Exige só o país (R12.1, AT20). Sem commodity, NCM, lote ou preço.
-  - `periodMonths` padrão `param_period_default_months:international`; aceita 1–60 (422 `period_invalid`).
-  - Período: termina no mês de `GET /general/dates/updated`. Essa chamada também respeita `reserveSlot`; o resultado fica em cache KV de 12 h.
-  - `request_key` = SHA-256 de `country|from|to|classification_version|YYYY-MM-DD`; análise repetida no mesmo dia → devolve a existente.
-  - Valida o país em `/tables/countries/<id>`, que precisa responder `"message":"País encontrado"`. Isso cobre a condição de `no_record` (D4).
-  - Cria uma parte por ano (`splitPeriodByYear`). Envia `comex_part` com `delaySeconds` = `reserveSlot`, uma por vez: a mensagem seguinte só é enfileirada quando a anterior termina.
-- `runPart(env, { analysisId, partId })`:
-  - Chama `fetchExportsByNcm`.
-  - Grava a resposta bruta no R2 `comex/<analysisId>/<year>.json`.
-  - Insere as linhas em lotes de até 12 por `INSERT` (8 colunas × 12 = 96 parâmetros, abaixo do limite de 100 parâmetros por consulta do D1: `https://developers.cloudflare.com/d1/platform/limits/`, a conferir pelo executor).
-  - Unidade por NCM (`ncmUnit`) só para as NCMs da resposta, com `stat_consistent`.
-  - `temporary` → `retry({ delaySeconds: 30 })` até `max_retries` (3) e depois `failed`.
-- Fechamento da análise:
-  - Todas as partes `done` e linhas > 0 → `purchase_identified`.
-  - Todas `done`, 0 linhas e país validado → `no_record`.
-  - Alguma `failed` e alguma `done` → `partial`, com `coverage_note` "Faltam os meses X–Y (motivo)". Os totais só aparecem com o aviso "período incompleto".
-  - Todas `failed` ou país não validado → `data_unavailable` (R12.6, AT21).
-- `export async function getAnalysis(env, actor, analysisId)`:
-  - Devolve cabeçalho (R1.4.1: origem Brasil, destino, período, fonte "Comex Stat/MDIC", `source_updated_at`, data da consulta, versão da classificação).
-  - Devolve linhas agrupadas por NCM: soma de `fob_usd` e `net_kg`, última ocorrência (ano-mês mais recente com valor > 0), estatística só por mês com unidade e marca de inconsistência (R12.3, R12.5).
-  - **Correspondência com o catálogo (R12.4):**
-    - `product_codes` com `code_system='NCM'` e `code` igual à NCM → `match: 'confirmed'` se `status='confirmed'`, `'pending_code'` se `pending` (AT22).
-    - `code_system='HS'` de 4 ou 6 dígitos que é prefixo da NCM → mesma regra.
-    - Uma NCM pode aparecer em mais de um produto. O **total do país** é a soma das linhas por NCM, calculada uma vez (Review Focus 3).
-  - O aviso literal de R1.4.2: "O dado confirma exportação do Brasil para o país; não comprova compra por nenhuma empresa específica."
-- `POST /api/country-analyses/:id/retry` — reenvia as partes `failed` sem duplicar linhas (chave primária).
-- Nenhuma rota de busca de empresas é oferecida a partir da análise antes da seleção (T5). A tela só mostra o botão "Escolher commodities" (R12.8).
+- `export async function startMonthlyRun(env, now)`:
+  1. Cria a versão `YYYY-MM` (`kind='monthly'`); se já existir, sai, porque o cron é idempotente.
+  2. MDIC:
+     - `headYear` do ano corrente e do anterior (`trade_list_mdic_years`);
+     - `loadNcmTable`;
+     - um job `mdic_chunk` por pedaço (cerca de 24 no total), enviados com `sendBatch` (≤ 100 por lote).
+  3. Comtrade:
+     - para cada país com `comtrade_code`, `availableYears`;
+     - para cada bloco, um job `comtrade_call`;
+     - espalhados com `delaySeconds` de modo que no máximo `comtrade_calls_per_day` (400) caiam em cada janela de 24 h;
+     - `delaySeconds` ≤ 86.400 (doc de Queues), então o 2º dia recebe atraso de 86.400 s.
+  4. Estado de cada país e fonte em `trade_list_status` como `pending`.
+- `handleComtradeCall` / `handleMdicChunk`: gravam o staging, marcam o job `done` e, quando todos os jobs de uma fonte de um país (Comtrade) ou todos os pedaços (MDIC) terminam, enfileiram `trade_consolidate` para os países afetados.
+- `consolidateCountry(env, versionId, iso3)`:
+  - Junta o staging do país, monta `trade-list/<versionId>/<ISO3>.json` e grava o hash.
+  - Formato do JSON: `{ iso3, versionId, sources: { comtrade: { state, lastPeriod, lines: [{ hs6, year, origin, valueUsd, basis, netKg, qty, qtyUnitCode }] }, mdic: { state, lastPeriod, lastModified, lines: [{ ncm, hs6, ym, fobUsd, netKg, qt, unit }] } }, classificationVersion }`.
+  - Por fonte: completa com linhas → `purchase_identified`; completa sem linhas → `no_record`; sem declaração → `not_declared`; algum job `failed` → `data_unavailable`.
+  - **Ponteiro:** `trade_list_current` só é atualizado para as fontes do país que ficaram **completas** (`purchase_identified`, `no_record`, `not_declared`). Fonte com falha mantém o ponteiro anterior, e o status da versão registra "não atualizado em <mês>" (R12.12, AT72).
+- Fechamento da versão:
+  - `complete` se todos os países e fontes estão completos; `partial` caso contrário.
+  - Poda: apaga do R2 as versões além de `trade_list_retention_versions` **que não sejam apontadas** por nenhum `trade_list_current`.
+  - Apaga o staging.
+  - Grava em `audit_log` as contagens: países, linhas, chamadas feitas e falhas (R13.5).
+- `POST /api/trade-list/refresh/:iso3` `{ reason }` (admin, R12.15): 1 por dia por país (`trade_list_manual_refresh`, 409 se repetir). Cria uma versão `manual` só para esse país: Comtrade com 3 chamadas; MDIC reaproveita o staging do mês se existir, senão os pedaços completos do ano (o arquivo não é por país).
+- `GET /api/trade-list/versions`: versões com contagens por estado. `GET /api/countries`: países com o estado vigente de cada fonte e a data da versão.
 
-**Fixtures:** respostas da T3. Dublê que devolve linhas para 2025 e 429 persistente para 2026. Catálogo com o mesmo café em `NCM 09011110 confirmed` e `HS 0901 pending`.
-
-**Intenções de teste:**
-- *só o país basta*: `startAnalysis({ countryComexId: "023" })` → 200. **Falha se:** exigir commodity (AT20).
-- *falha vira indisponível, nunca nenhum registro*: todas as partes 429 → `data_unavailable`. **Falha se:** a ausência de linhas decidir o estado (AT21).
-- *um ano falha, outro não*: → `partial` com a nota dos meses faltantes. **Falha se:** o total for exibido sem o aviso (Review Focus 2).
-- *vazio com país validado*: → `no_record`. **Falha se:** a validação do país for pulada.
-- *código pendente não comprova*: a linha do café aparece como `confirmed` pelo NCM e `pending_code` pelo HS, e o destaque "no catálogo" usa só o `confirmed`. **Falha se:** `pending` contar como correspondência (AT22).
-- *NCM em dois produtos conta uma vez no total*: **Falha se:** o total do país somar por produto (Review Focus 3).
-- *dado do país não toca empresas*: após a análise, `evidence`, `company_conditions` e `scores` sem nenhuma linha nova. **Falha se:** a análise gravar evidência (AT23, R1.4.3).
-- *reprodutível*: toda parte `done` tem `r2_key` preenchido e o objeto existe no R2 com o mesmo texto recebido. **Falha se:** a resposta bruta não for guardada (R8.2).
+**Intenções de teste (dublês dos adaptadores; relógio injetado):**
+- *cron duas vezes não duplica*: `startMonthlyRun` duas vezes no mesmo dia → uma versão, sem jobs duplicados. **Falha se:** a versão não for checada.
+- *falha mantém o anterior*: mês 1 completo para `DEU`; no mês 2 a Comtrade falha para `DEU` e o MDIC funciona → ponteiro Comtrade de `DEU` continua no mês 1, ponteiro MDIC avança, status "não atualizado em <mês 2>". **Falha se:** o país ficar com lista vazia (AT72, Review Focus 2).
+- *orçamento diário respeitado*: 219 países × 3 blocos → nenhuma janela de 24 h com mais de 400 chamadas agendadas. **Falha se:** tudo for enfileirado sem atraso.
+- *não declarado não gasta*: país sem ano em `getDA` → 0 jobs de Comtrade e estado `not_declared`.
+- *atualização manual 1 por dia*: segunda chamada no mesmo dia → 409. **Falha se:** a trava sair (R12.15).
+- *poda não apaga o vigente*: com retenção 3 e um país ainda apontando para a versão 1, a versão 1 desse país continua no R2. **Falha se:** a poda for só por idade.
 
 **Defesas (5g):**
-- Rota: autenticada. `POST` para admin, commercial_manager e seller_analyst. Cap 64 KB.
-- Saída: descrições com `textContent`.
+- Rota: `refresh` só para admin; cap 2 KB; `reason` ≥ 10 caracteres.
+- Saída: listas sem PII.
+- CSRF: `assertSameOrigin`. Cookie: não se aplica.
+- Exclusão: poda descrita acima.
+- Config de teste: `scheduled` chamado com `{ cron: "0 6 10 * *", scheduledTime }` (interface `scheduled()` citada no Plano 2 T10).
+
+**Commit:** `feat: rotina mensal da lista de compras por país`
+
+---
+
+## Tarefa 6: Análise de país a partir da lista
+
+**Requisito:** R12.1–R12.6.1, R12.13, R1.4.1–R1.4.3, R10.3, R8.2, AT20–AT23, AT71, AT73, AT74; Review Focus 3.
+
+**Files:** Create `src/country-analysis.js`, `test/analise-pais.test.mjs`; Modify `src/worker.js` (rotas)
+
+**Interfaces:**
+- `export async function createAnalysis(env, actor, { iso3, periodMonths? })`:
+  - Exige só o país (AT20).
+  - Lê os dois ponteiros de `trade_list_current` e os JSON do R2. **Nenhum `fetch` externo** (AT71).
+  - `periodMonths` (padrão do parâmetro, 1–24 limitado ao que o MDIC guarda) filtra as linhas do MDIC. A Comtrade é **anual** e mostra os anos declarados guardados, com o rótulo "anual, visão do importador".
+  - Grava `country_analyses` com as versões e o `snapshot_sha256` do que foi montado (R8.2).
+- `export async function getAnalysis(env, actor, id)` → por subposição SH6 (chave comum às duas fontes; a NCM de 8 dígitos do MDIC aparece como detalhe):
+  - **Comtrade (visão do importador):** valor de todas as origens, valor de origem Brasil, **parte do Brasil = Brasil ÷ todas**, mesmo ano e mesma base (R12.13); peso quando declarado; último ano.
+  - **MDIC (visão do Brasil):** FOB e kg no período, última ocorrência, quantidade estatística com unidade e marca de inconsistência.
+  - Estado por fonte (R12.6):
+    - `not_declared` → "sem declaração do país desde <lastPeriod>", com os anos guardados exibidos e nunca "nenhum registro" (R12.6.1, AT73);
+    - ponteiro de versão antiga → "não atualizado em <mês>" (AT72).
+  - Correspondência com o catálogo (R12.4, AT22): igual à revisão 1, agora pelo SH6 (`product_codes` HS de 4/6 dígitos como prefixo, ou NCM igual à do MDIC).
+  - O aviso literal de R1.4.2.
+  - **Nenhuma soma entre fontes** (AT74).
+- Uma linha só aparece com `compra identificada` se tiver valor > 0 em pelo menos uma fonte. Isso define a lista selecionável para a T7 (R12.14).
+
+**Intenções de teste:**
+- *nenhuma chamada externa*: `fetch` global substituído por um que falha o teste se for chamado. **Falha se:** a análise consultar fonte (AT71).
+- *país atrasado*: Comtrade `not_declared` com último ano 2023 e MDIC com dados → mensagem "sem declaração do país desde 2023" e MDIC visível. **Falha se:** aparecer "nenhum registro" (AT73, Review Focus 3).
+- *parte do Brasil só na Comtrade*: café com Comtrade (todas 100, Brasil 30) e MDIC FOB 40 → parte 30%; nenhum campo com 70 ou 140. **Falha se:** o MDIC entrar na conta (AT74).
+- *código pendente não comprova*: **Falha se:** `pending` contar como correspondência (AT22).
+- *análise não toca empresas*: **Falha se:** gravar em `evidence`, `company_conditions` ou `scores` (AT23).
+
+**Defesas (5g):**
+- Rota: autenticada; perfis operacionais. Cap 2 KB.
+- Saída: `textContent`.
 - CSRF: `assertSameOrigin`. Cookie: não se aplica.
 - Campo opcional: `periodMonths` ausente = parâmetro.
 - Exclusão: análises nunca apagadas.
-- Config de teste: fila testada chamando `handleQueue` com lote simulado, como no Plano 2 T4.
+- Config de teste: R2 do harness com JSON de fixture.
 
-**Commit:** `feat: análise de país com três estados e correspondência ao catálogo`
-
----
-
-## Tarefa 5: Seleção de commodities e campanhas
-
-**Requisito:** R12.7–R12.9, R16.1, R28.17, AT61.
-
-**Files:** Create `src/selections.js`, `test/selecao.test.mjs`; Modify `src/worker.js` (rotas)
-
-**Interfaces:**
-- `export async function selectCommodities(env, actor, analysisId, { items: [{ productId?: string, ncms: string[], label: string }] })`:
-  - Só admin ou commercial_manager.
-  - Exige análise `purchase_identified` ou `partial`. `no_record` e `data_unavailable` → 409, porque não há base registrada.
-  - Grava `commodity_selections` com autor e data (R12.7).
-  - Para cada item com `productId`, cria uma campanha `international` (Plano 1 `createCampaign`) com `country_code` = ISO-3 do país, `language` = `countries.default_language`, `analysis_id` e `selection_id`. O ICP da campanha é preenchido depois pelo usuário, porque é obrigatório para ativar (Plano 1 T9).
-  - Ativar a 3ª commodity no mercado internacional deixa a campanha em `waiting` com aviso; a regra de 2 ativas é a do Plano 1 T9 (R28.17, AT61).
-- Item **sem** `productId` (fora do catálogo) cria campanha em `draft` marcada "validação comercial pendente". `POST /api/commercial-validations` `{ selectionId, label, decision, reason }` (admin) registra a decisão. Sem `approved`, `createFicha` (Plano 2 T9) recusa com 409 `commercial_validation_pending` (R12.9).
-- **Decisão:** um item fora do catálogo exige cadastrar o produto (Plano 1 T7) como `identity_status='pending'` para a campanha existir. O Plano 1 exige `product_id` NOT NULL.
-
-**Intenções de teste:**
-- *seleção registrada antes de campanha*: **Falha se:** existir campanha com `analysis_id` sem `selection_id` (R12.8).
-- *fora do catálogo sem validação não gera ficha*: **Falha se:** `createFicha` não consultar `commercial_validations` (R12.9).
-- *terceira ativa espera*: **Falha se:** o limite contar Nacional e Internacional juntos (R28.17 é por mercado).
-- *análise indisponível não permite seleção*: **Falha se:** `data_unavailable` aceitar seleção.
-
-**Defesas (5g):**
-- Rota: autenticada, só gestores. Cap 64 KB; no máximo 20 itens, cada `label` ≤ 200 caracteres e NCMs `^\d{8}$`.
-- Saída: JSON. CSRF: `assertSameOrigin`. Cookie: não se aplica.
-- Campo opcional: `productId` ausente = fora do catálogo.
-- Exclusão: seleções nunca apagadas.
-- Config de teste: harness.
-
-**Commit:** `feat: seleção de commodities gera campanhas internacionais`
+**Commit:** `feat: análise de país a partir da lista mensal`
 
 ---
 
-## Tarefa 6: Empresas no exterior e condições R12.10
+## Tarefa 7: Seleção de commodities e campanhas
 
-**Requisito:** R12.10, R13.2–R13.4, R13.6, R13.7, R14.1–R14.8 (porte estrangeiro), R1.1, R1.2, R15, R18.6, T7.
+**Requisito:** R12.7–R12.9, R12.14, R16.1, R28.17, AT61, AT75.
 
-**Files:** Create `src/foreign-companies.js`, `test/empresas-exterior.test.mjs`; Modify `src/companies.js` (Plano 2: `icpStatus` aceita `sizeBand`), `src/worker.js` (rotas)
+**Files:** Create `src/selections.js`, `test/selecao.test.mjs`; Modify `src/worker.js` (rotas), `src/fichas.js` (trava de R12.9)
 
-**Interfaces:**
-- `export async function createForeignCompany(env, actor, { countryIso3, legalName, tradeName?, registrationId?, registrationIdType?, sourceLabel, sourceUrl?, campaignId })`:
-  - `country_code` = ISO-3 e deve existir em `countries`.
-  - Dedup por `(country_code, registration_id)` quando houver; sem identificador → dedup por nome normalizado **gera pendência, não fusão** (R1.1.4, escopo §59).
-  - `registrationIdType` livre com até 40 caracteres (ex.: "Handelsregister HRB", "EIN", "SIREN"). Sem lista fixa, porque não há fonte validada (T7).
-  - Cria as 3 linhas de `company_conditions` do produto da campanha em `pending` (R12.10).
-- `export async function setCondition(env, actor, companyId, productId, condition, { status, evidenceId? })`:
-  - `confirmed` exige `evidenceId` de evidência da **mesma empresa**, `category` diferente de `market` e `validation_status='valid'` (422 `condition_needs_company_evidence`).
-  - A evidência precisa ter `metadata_json.supports` contendo o nome da condição (R13.4). `addEvidence` do Plano 2 T6 passa a aceitar `supports: string[]`.
-  - `not_found` exige nota. Nunca é preenchida por dedução (R13.3).
-- `export async function setSize(env, actor, companyId, { sizeBand, source })` — porte manual com fonte e data (R14.6).
-- **ICP estrangeiro:** `icpStatus` recebe `sizeBand` quando não há `porteCodigo`: `small` → `out_small`; `giant` sem relacionamento → `out_giant`; `medium` e `medium_plus` → `in_icp`; ausente → `pending_size`. As regras de trader e exceção ficam iguais às do Plano 2 T6.
-- **Fuso do contato:** `PATCH /api/contacts/:id` (Plano 2) aceita `timezone`, validado com `new Intl.DateTimeFormat('en-US', { timeZone })` dentro de try/catch; inválido → 422 `timezone_invalid`.
-- **Camada 2 — sem fonte paga:** a interface mostra links de pesquisa **montados, não executados** (busca web com o nome da empresa e a commodity; página da empresa no LinkedIn) para Rogério abrir. O Compass não raspa nenhum site. Um adaptador pago de dados nominais **não** faz parte deste plano (R13.7): exige decisão de custo, cobertura e qualidade registrada depois do piloto.
-- Sanções (Plano 2 T16) valem igual para empresas estrangeiras: `screenCompany` com `country_code`.
+Mesmo contrato da revisão 1, com três mudanças:
+- **Cada item** precisa ter todas as suas subposições `hs6` presentes na análise com `compra identificada`; senão 422 `not_in_country_list` (R12.14, AT75).
+- A seleção exige análise com ao menos uma fonte `purchase_identified`.
+- `commodity_selections.items_json` usa `hs6` no lugar de `ncms`.
+
+Continuam iguais à revisão 1:
+- uma campanha por item com `productId`, `language` do país, `analysis_id` e `selection_id`;
+- item fora do catálogo → produto `identity_status='pending'` + validação comercial obrigatória antes de ficha (R12.9);
+- 3ª campanha ativa no mercado internacional → `waiting` (R28.17, AT61).
 
 **Intenções de teste:**
-- *dado de país não confirma condição*: evidência `category='market'` → 422. **Falha se:** a checagem de categoria sair (AT23).
-- *evidência de outra empresa não serve*: **Falha se:** a checagem de `company_id` sair.
-- *evidência precisa dizer o que sustenta*: sem `supports` → 422. **Falha se:** R13.4 não for exigido.
-- *mesmo registro, mesma empresa*: dois cadastros com o mesmo país e `registration_id` → uma empresa. **Falha se:** a dedup usar só o nome.
-- *fuso inválido recusado*: `"Europe/Berlim"` → 422. **Falha se:** o texto for gravado sem validar.
-- *porte médio entra no ICP*: **Falha se:** empresa estrangeira ficar sempre `pending_size` por falta de código da Receita.
+- *fora da lista é recusado*: **Falha se:** a checagem de R12.14 sair (AT75).
+- *seleção antes de campanha*, *validação comercial*, *terceira espera*: como na revisão 1. **Falha se:** qualquer uma delas sair.
+
+**Defesas (5g):** como na revisão 1. Cap 64 KB, no máximo 20 itens, `hs6` casando `^\d{6}$`.
+**Commit:** `feat: seleção de commodities a partir da lista do país`
+
+---
+
+## Tarefa 8: Empresas no exterior e condições R12.10
+
+Sem mudança de contrato em relação à **Tarefa 6 da revisão 1** (arquivada em `plano3-internacional-rev1.md`), reproduzida aqui para quem lê só este arquivo.
+
+**Requisito:** R12.10, R13.2–R13.4, R13.6, R13.7, R14 (porte estrangeiro), R1.1, R1.2, R15, R18.6, T7.
+
+**Files:** Create `src/foreign-companies.js`, `test/empresas-exterior.test.mjs`; Modify `src/companies.js`, `src/worker.js`
+
+**Interfaces:**
+- `createForeignCompany(env, actor, { countryIso3, legalName, tradeName?, registrationId?, registrationIdType?, sourceLabel, sourceUrl?, campaignId })`:
+  - O país precisa existir em `countries`.
+  - Dedup por `(country_code, registration_id)`. Sem identificador, o nome parecido gera pendência, não fusão.
+  - Cria as 3 condições em `pending`.
+- `setCondition(env, actor, companyId, productId, condition, { status, evidenceId? })`:
+  - `confirmed` exige evidência da **mesma empresa**, `category` diferente de `market`, `validation_status='valid'` e `metadata_json.supports` com o nome da condição (R13.4).
+  - `not_found` exige nota.
+- `setSize(env, actor, companyId, { sizeBand, source })` (gestores); `icpStatus` usa `sizeBand` quando não há código da Receita: `small` → `out_small`; `giant` sem relacionamento → `out_giant`; `medium`/`medium_plus` → `in_icp`; ausente → `pending_size`.
+- `contacts.timezone` validado com `Intl.DateTimeFormat`; inválido → 422 `timezone_invalid`.
+- Camada 2 com links de pesquisa **montados, não executados**. Sem raspagem e sem fonte paga (R13.7).
+- **Novo:** a interface mostra, ao lado da empresa, a linha da lista mensal do país para a commodity da campanha, marcada "dado do país, não da empresa" (R1.4.2).
+
+**Intenções de teste:**
+- *dado de país não confirma condição*: evidência `market` → 422 (AT23).
+- *evidência de outra empresa não serve*.
+- *evidência precisa dizer o que sustenta*: sem `supports` → 422.
+- *mesmo registro, mesma empresa*.
+- *fuso inválido recusado*: "Europe/Berlim" → 422.
+- *porte médio entra no ICP*.
+
+Cada teste **falha se** a respectiva checagem sair.
 
 **Defesas (5g):**
-- Rota: autenticada; perfis operacionais; `setSize` e exceções só para gestores. Cap 64 KB; textos ≤ 500.
+- Rota: autenticada; `setSize` e exceções só para gestores. Cap 64 KB; textos ≤ 500.
 - Saída: `textContent`.
 - CSRF: `assertSameOrigin`. Cookie: não se aplica.
-- Campo opcional: `registrationId` ausente = pendência de dedup.
-- Exclusão: a do Plano 2 T13.
 - Config de teste: harness.
 
 **Commit:** `feat: empresas no exterior com evidência por condição`
 
 ---
 
-## Tarefa 7: Modelos em inglês e revisor PV em inglês
+## Tarefa 9: Modelos em inglês e revisor PV em inglês
+
+Sem mudança em relação à **Tarefa 7 da revisão 1**, reproduzida aqui:
 
 **Requisito:** PV1–PV12, R17.1–R17.6, R28.9, R28.15, AT24, AT53–AT55.
 
-**Files:** Create `src/templates/prospeccao-vendas-en.js`, `tests/revisor-en.test.mjs`; Modify `src/review.js`, `src/templates/prospeccao-vendas.js` (seleção por idioma)
+**Files:** Create `src/templates/prospeccao-vendas-en.js`, `tests/revisor-en.test.mjs`; Modify `src/review.js`, `src/templates/prospeccao-vendas.js`
 
-**Contrato:**
-- A skill só tem textos em português. A versão em inglês é uma **tradução fiel** dos mesmos blocos de `references/scripts-abordagem.md`: E-mails 1–4, variante ao influenciador e roteiros L0/L1/L2/LinkedIn. A estrutura, a ordem das frases e os pedidos são os mesmos, com a única troca dos marcadores. O assunto do E-mail 1 fica `<Commodity> supplier`.
-- ✋ **Portão humano:** o executor escreve a tradução e a apresenta **lado a lado com o português** no relatório. Rogério aprova o texto antes do merge. Sem aprovação, a tarefa não termina e `TEMPLATES_EN_VERSION` não é publicado.
-- Assinatura em inglês: `Rogério Palhari · EAG Agro` + `EAG_POSTAL_ADDRESS` + `To stop receiving these messages, reply "unsubscribe" or use this link: <URL>`.
-- `generateSequence` recebe `language` ('pt-BR' | 'en') e escolhe o conjunto de modelos. Países lusófonos usam o português.
-- A ficha internacional recebe o aviso fixo de R28.15: "A /prospeccao-vendas não tem método específico para exportação (lacuna 🔴). Sequência aplicada no idioma da campanha."
-- **Revisor em inglês.** As mesmas funções PV com listas por idioma:
+- **Tradução fiel** dos blocos da skill: E-mails 1–4, variante ao influenciador e roteiros L0/L1/L2/LinkedIn. Assunto do E-mail 1: `<Commodity> supplier`.
+- ✋ **Portão:** a tradução é apresentada **lado a lado com o português** e só entra com a aprovação de Rogério.
+- Assinatura em inglês: nome, endereço (`EAG_POSTAL_ADDRESS`) e `To stop receiving these messages, reply "unsubscribe" or use this link: <URL>`.
+- `generateSequence` recebe `language`. Países lusófonos usam o português.
+- Aviso fixo de R28.15 na ficha internacional.
+- Revisor em inglês:
   - PV1: "start a conversation" e "20 minutes".
   - PV7: `/\bUS\$|\bprice|pricing|quot(e|ation)|\blots?\b|stock|inventory|certif|payment|delivery (time|date)/i`.
-  - PV9: `^[A-Z][a-z]+( [a-z]+)* supplier$`, sem `%` nem dígitos.
+  - PV9: `^[A-Z][a-z]+( [a-z]+)* supplier$`.
   - PV10: "sorry to bother", "apologies for", "could you forward me to purchasing".
-  - PV12: a ficha tem idioma definido e o aviso de lacuna → `ok`.
-  - R19.13: assinatura com endereço, link e "unsubscribe".
-- `SKILL_SHA256` e o portão `check:skill` são os mesmos do Plano 2. Se a skill mudar, a tradução também precisa ser refeita (R17.8).
+  - PV12 e R19.13 como na revisão 1.
 
 **Intenções de teste:**
-- *sequência em inglês padrão passa no revisor*: **Falha se:** a tradução violar o próprio revisor.
-- *"competitive price" reprova PV7*: **Falha se:** a lista em inglês não for usada para campanha `en` (AT24).
-- *"70% of manufacturers struggle" reprova PV9*: **Falha se:** a regex aceitar dígitos (AT55).
-- *Portugal usa português*: **Falha se:** o idioma vier fixo em inglês.
-- *ficha internacional traz a lacuna*: **Falha se:** o aviso de R28.15 faltar.
+- *a sequência padrão em inglês passa*: **Falha se:** a tradução violar o próprio revisor.
+- *"competitive price" reprova PV7* (AT24).
+- *"70% of manufacturers struggle" reprova PV9* (AT55).
+- *Portugal usa português*: **Falha se:** o idioma vier fixo.
+- *ficha traz a lacuna*: **Falha se:** o aviso de R28.15 faltar.
 
-**Defesas (5g):** rota — não cria. Saída — texto puro. CSRF e cookie — não se aplicam. Campo opcional — `firstName` ausente → "Hi," sem nome. Exclusão — não se aplica. Config de teste — `node --test`.
+**Defesas (5g):** sem rota nova; texto puro; `firstName` ausente → "Hi,".
 **Commit:** `feat: modelos e revisor PV em inglês`
 
 ---
 
-## Tarefa 8: Envio, respostas e descadastro no fuso e idioma do destinatário
+## Tarefa 10: Envio, respostas e descadastro no fuso e idioma do destinatário
 
-**Requisito:** R18.6, R19.2 itens 7 e 12, R19.10, R20, R21.7, R21.10, R28.13; Review Focus 4 e 5.
+Sem mudança em relação à **Tarefa 8 da revisão 1**, reproduzida aqui:
+
+**Requisito:** R18.6, R19.2 itens 7 e 12, R19.10, R20, R21.7, R21.10, R28.13; Review Focus 5.
 
 **Files:** Modify `src/fichas.js`, `src/sending.js`, `src/inbound.js`, `src/unsubscribe.js`; Create `test/internacional-envio.test.mjs`
 
-**Contrato:**
-- `createFicha` e `approveFicha` (Plano 2 T9):
-  - Campanha `international` → cada destinatário precisa de `contacts.timezone`; senão 422 `timezone_pending` (R18.6).
-  - Campanha `national` → vale o `send_timezone:national`, como no Plano 2.
-- `preSendCheck` (Plano 2 T10):
-  - Item 7: janela `send_hours:<market>` no fuso do contato (internacional) ou em `America/Sao_Paulo` (nacional).
-  - Item 12: "dia civil anterior" calculado no fuso do contato.
-  - Conversão com `Intl.DateTimeFormat(..., { timeZone, hour12: false, year, month, day, hour, minute, weekday })`, sem biblioteca externa.
-  - O teto diário da rampa é contado no dia civil de `America/Sao_Paulo` (remetente) e soma os dois mercados (R19.10).
-  - Feriados: **não tratados** nesta versão. Fica registrado como limitação na ficha internacional.
-- `inbound.classify` (Plano 2 T11) ganha as listas em inglês:
-  - unsubscribe: `unsubscribe|remove me|stop|opt out|take me off`;
-  - auto_reply: assunto `Automatic reply|Auto-Reply|Out of Office|OOO`;
-  - pedido de preço (R28.13): `price|pricing|quote|quotation|price list|catalog(ue)?|proposal|presentation`. A orientação da tarefa é a mesma da skill, em português, porque é para Rogério.
-- Página `/u/*` (Plano 2 T12) bilíngue, português e inglês na mesma página, sem dado pessoal.
+- Campanha internacional exige `contacts.timezone` em cada destinatário (422 `timezone_pending`, R18.6).
+- `preSendCheck`: janela `send_hours:<market>` e "dia civil anterior" no fuso do contato. O teto diário é contado no dia de `America/Sao_Paulo` e soma os dois mercados (R19.10). Feriados não são tratados; a limitação fica registrada.
+- `inbound.classify` em inglês:
+  - `unsubscribe|remove me|stop|opt out|take me off`;
+  - auto-resposta: `Automatic reply|Auto-Reply|Out of Office|OOO`;
+  - pedido de preço: `price|pricing|quote|quotation|price list|catalog(ue)?|proposal|presentation`.
+- Página `/u/*` bilíngue, sem dado pessoal.
 
 **Intenções de teste (relógio injetado):**
-- *Tóquio fora da janela espera*: passo pronto às 16:00 de São Paulo (04:00 do dia seguinte em Tóquio) fica `pending` e sai no primeiro cron dentro de 09:00–17:00 de Tóquio. **Falha se:** a janela usar o fuso do servidor ou de São Paulo (Review Focus 4).
-- *dias não seguidos no fuso do destinatário*: e-mail aceito às 23:30 de São Paulo, que já é o dia seguinte em Berlim → o próximo só sai dois dias civis depois em Berlim. **Falha se:** o item 12 usar o dia de São Paulo.
-- *teto soma os mercados*: 3 nacionais e 3 internacionais no mesmo dia com teto 5 → o 6º fica para o próximo dia útil. **Falha se:** cada mercado tiver o próprio teto.
-- *respostas em inglês*: "Please remove me from your list" → `unsubscribe`; assunto "Out of Office: back Monday" → `auto_reply` (pausa, B1 pendente); "Could you send me your price list?" → `human` com orientação. **Falha se:** alguma cair em `human` sem a regra certa (Review Focus 5).
-- *ficha sem fuso não aprova*: **Falha se:** o nacional passar a exigir fuso por contato (regressão do Plano 2).
+- *Tóquio fora da janela espera*.
+- *dias não seguidos no fuso do destinatário*.
+- *o teto soma os mercados*.
+- *respostas em inglês* ("Please remove me from your list", "Out of Office: back Monday", "Could you send me your price list?").
+- *ficha sem fuso não aprova, e o nacional não passa a exigir fuso por contato*.
 
-**Defesas (5g):** rotas existentes, sem novas. Saída — página `/u/*` sem dado pessoal. Campo opcional — `timezone` nulo bloqueia só o internacional. Config de teste — relógio e dublês injetados como no Plano 2.
+Cada teste **falha se** a regra usar o fuso errado, tiver teto por mercado ou deixar de classificar.
+
 **Commit:** `feat: envio e respostas no fuso e idioma do destinatário`
 
 ---
 
-## Tarefa 9: Interface Internacional e dashboard
+## Tarefa 11: Interface Internacional e dashboard
 
-**Requisito:** R12 (tela), R24.1, R24.3, R1.4.2, R28.17; design doc §4 linha "Internacional".
+**Requisito:** R12 (tela), R12.6.1, R12.12, R12.13, R12.15, R24.1, R24.3, R1.4.2, R28.17.
 
 **Files:** Modify `public/index.html`, `public/app.css`, `public/app.js`, `scripts/validate-site.mjs`
 
 **Contrato:**
-- **Tela Internacional**, seguindo `design/fase5/compass-prototipo.html` e os tokens do Plano 1:
-  1. Escolha do país: lista de `GET /api/countries`, com busca por nome.
-  2. Período (padrão do parâmetro, ajustável).
-  3. Estado da análise com os três rótulos de R12.6, mais "parcial" com a nota de cobertura e o botão "Tentar de novo".
-  4. Tabela por NCM: descrição, kg líquido, US$ FOB, última ocorrência e estatística com unidade e marca "inconsistente na fonte".
-  5. Destaque "no catálogo EAG" só para `confirmed`; `pending_code` mostra "código pendente".
-  6. O aviso de R1.4.2 fixo acima da tabela.
-  7. Botão "Escolher commodities" → seleção → campanhas, com aviso de espera da 3ª.
-- **Empresa estrangeira:** as 3 condições de R12.10 como três linhas com estado e evidência; links de pesquisa montados; porte com fonte; fuso por contato.
-- **Dashboard (R24.1, R24.3):** um seletor Nacional/Internacional sobre a mesma base. No Internacional aparecem as análises, as seleções e as campanhas que cada uma originou.
-- Tudo por `textContent`. `validate-site.mjs` passa a exigir `data-screen="internacional"`, `/api/country-analyses`, `/api/foreign-companies`.
+- **Países:** lista com busca. Cada país mostra o estado das duas fontes e a data da versão vigente, com "não atualizado em <mês>" quando for o caso.
+- **Análise:**
+  - tabela por SH6 com dois blocos lado a lado: **"Compras declaradas pelo país (CIF, anual)"**, com todas as origens, Brasil e a parte do Brasil; e **"Exportações do Brasil (FOB, mensal)"**;
+  - "sem declaração desde …" quando for o caso;
+  - destaque do catálogo só para `confirmed`;
+  - aviso de R1.4.2;
+  - nenhuma coluna de soma entre fontes.
+- **Seleção:** só linhas com `compra identificada` são selecionáveis (R12.14).
+- **Admin:** tela "Lista mensal" com as versões, as contagens e o botão "Atualizar este país" (motivo obrigatório, R12.15).
+- **Empresa estrangeira e dashboard:** como na revisão 1.
+- Tudo por `textContent`. `validate-site.mjs` passa a exigir `data-screen="internacional"`, `/api/country-analyses`, `/api/trade-list/versions`, `/api/foreign-companies`.
 
-**Verificação:** manual, como no Plano 2 T18: "Alemanha → análise → café aparece com correspondência → escolher café → campanha → cadastrar importador com evidência de 'importa do Brasil' → fuso Europe/Berlin → ficha em inglês". Capturas em 1440 px anexadas ao relatório. Automático: `npm run check`.
-**Defesas (5g):** saída — `textContent`. CSRF — same-origin. Campo opcional — estados vazios acionáveis. Config de teste — não se aplica.
-**Commit:** `feat: interface internacional e dashboard por mercado`
+**Verificação:** manual: "Lista mensal → Alemanha → café com as duas fontes e a parte do Brasil → escolher café → campanha → importador com evidência → fuso Europe/Berlin → ficha em inglês". Automático: `npm run check`.
+**Commit:** `feat: interface internacional com a lista mensal`
 
 ---
 
-## Tarefa 10: Validação de T6 pelo Worker e amostra internacional (portões humanos)
+## Tarefa 12: Validação pelo Worker, chave da Comtrade e liberação (portões humanos)
 
-**Requisito:** T6, R17.6 (caso internacional em inglês), R26.
+**Requisito:** T6, T13, R17.6, R26, premissas da Spec.
 
 **Files:** Modify `docs/eag-compass-t6-comexstat.md` (seção "Teste pelo Worker"), `docs/eag-compass-t1-validacao.md` (amostra internacional)
 
 **Roteiro (✋ com Rogério; cada resultado registrado com data):**
-1. Com o Worker publicado (Plano 1 T12), rodar a análise da Alemanha pelo Compass e comparar com a consulta de 2026-09-23. Resultado esperado: café 09011110 presente, 2025 com 340.503.519 kg no ano. **Se** a API responder com o desafio da Cloudflare (`blocked_by_challenge`), a análise fica `data_unavailable`, o item volta à Fase 4 e o fluxo Internacional **não** é liberado. Não há contorno improvisado.
-2. Medir o número de 429 em 10 análises seguidas e ajustar `comex_min_interval_s` só se necessário (parâmetro, sem redeploy).
-3. **Amostra R17.6:** gerar uma sequência internacional em inglês (importador fictício, contato interno com fuso de outro país) e enviá-la ao endereço interno pelo modo `internal_test` do Plano 2. Rogério revisa o texto e o horário de chegada.
-4. ✋ Liberação do Internacional: com 1–3 registrados como OK, Rogério autoriza por escrito "liberar internacional". Antes disso, fichas internacionais podem ser criadas, mas não aprovadas: `approveFicha` exige o parâmetro `international_enabled` = `true`, que só um admin grava, com `evidenceRef`.
+1. **Conta Comtrade:** Rogério cria a conta gratuita em `https://comtradedeveloper.un.org/`, assina o produto gratuito e grava a chave com `npx wrangler secret put COMTRADE_KEY`. Claude não cria contas.
+2. **Termos:** ler a "Policy on use and re-dissemination" da Comtrade e registrar se permite guardar a lista para uso interno. Se não permitir, a Comtrade sai da rotina e a Spec volta para revisão (premissa da Spec).
+3. **Chamada real com chave** para `DEU` e um bloco. Conferir `partnerCode=0,76`, `period` com lista, o que significa `partner2Code`/`customsCode` no total, e o `count`. Registrar as respostas copiadas e ajustar o orçamento de chamadas se preciso.
+4. **Pelo Worker publicado:** uma versão `manual` para `DEU`. Conferir que o MDIC responde ao Worker sem desafio da Cloudflare e que os totais de café 2025 batem com T6 (340.503.519 kg). Se algum host bloquear o Worker, o fluxo Internacional **não** é liberado e o item volta à Fase 4.
+5. **Primeira rotina mensal completa** (disparada manualmente, com o mesmo código do cron). Medir a duração, as chamadas por dia, os 429 e o tamanho no R2, e registrar.
+6. **Amostra R17.6:** uma sequência em inglês para um contato interno em outro fuso, pelo modo `internal_test` do Plano 2. Rogério revisa o texto e o horário.
+7. ✋ Com 1–6 registrados, Rogério autoriza por escrito "liberar internacional". Só então o admin grava `international_enabled = true` com `evidenceRef`; antes disso fichas internacionais não são aprovadas.
 
-**Intenções de teste (automáticas):**
-- *internacional desligado não aprova*: **Falha se:** a ausência do parâmetro liberar.
-
-**Defesas (5g):** parâmetro só admin; nenhuma rota nova.
-**Commit:** `docs: validação de T6 pelo Worker e amostra internacional`
+**Intenções de teste (automáticas):** *internacional desligado não aprova*. **Falha se:** a ausência do parâmetro liberar.
+**Commit:** `docs: validação das fontes pelo Worker e amostra internacional`
 
 ---
 
@@ -497,22 +600,24 @@ ALTER TABLE campaigns ADD COLUMN selection_id TEXT REFERENCES commodity_selectio
 
 | Requisito | Tarefa |
 | --- | --- |
-| R1.4.1–R1.4.3 | T4, T9 |
-| R12.1–R12.6 | T2, T3, T4, T9 |
-| R12.7–R12.9 | T5 |
-| R12.10 | T6 |
-| R13.2–R13.7 (internacional) | T4, T6 |
-| R14 (porte estrangeiro) | T6 |
-| R17.6 (caso internacional), PV12, R28.15 | T7, T10 |
-| R18.6, R19.2 itens 7 e 12, R19.10 | T8 |
-| R20, R21 (inglês) | T8 |
-| R24.1, R24.3 | T9 |
-| R28.17 (internacional) | T5 |
-| AT20–AT23, AT61 | T4, T5, T6 |
-| R7.1 `param_period_default_months` | T1 (proposta D1, a aprovar) |
+| R1.4.1–R1.4.3 | T3, T4, T6, T11 |
+| R12.1–R12.6.1 | T2, T3, T4, T6, T11 |
+| R12.7–R12.9, R12.14 | T7 |
+| R12.10 | T8 |
+| R12.11, R12.12, R12.15 | T5, T11 |
+| R12.13 | T4, T6, T11 |
+| R13.2–R13.7 (internacional) | T5, T8 |
+| R14 (porte estrangeiro) | T8 |
+| R17.6 (caso internacional), PV12, R28.15 | T9, T12 |
+| R18.6, R19.2 itens 7 e 12, R19.10, R20, R21 (inglês) | T10 |
+| R24.1, R24.3 | T11 |
+| R28.17 (internacional) | T7 |
+| AT20–AT23, AT61, AT71–AT75 | T5, T6, T7, T8 |
+| Premissas T6/T13 | T12 |
 
 **Fora deste plano:**
-- Fonte paga de dados nominais de importadores (Volza, Panjiva, ImportGenius): exige decisão registrada (R13.7) após o piloto.
+- Fonte paga de importadores (R13.7).
 - Feriados por país.
 - Idiomas além de inglês e português.
-- Caminho alternativo por arquivos anuais do MDIC: só se o teste da T10 falhar.
+- Plano pago da Comtrade: só se a T12 mostrar limite insuficiente.
+- A API do Comex Stat: deixa de ser usada. As armadilhas C1–C7 ficam registradas em T6 para uso futuro.

@@ -1,4 +1,4 @@
-# T6 e T13 — Comex Stat, arquivo do MDIC e UN Comtrade: registro de testes reais (rev. 2)
+# T6 — Comex Stat: registro de testes reais
 
 **Data:** 2026-09-23
 **Executado por:** Claude, a partir da máquina de Rogério (Windows, rede doméstica), com `curl` e Node 24 (`fetch`).
@@ -74,37 +74,6 @@ Outras respostas copiadas:
 ## 6. Caminho alternativo se o Worker for bloqueado
 
 O MDIC publica os arquivos completos por ano (CSV de exportação por NCM e país) para download. **Não conferido nesta sessão:** URL, formato e tamanho. Se a API bloquear o Worker, o Plano 3 volta à Fase 4 para esse item, sem improvisar.
-
-## 7. Arquivo completo do MDIC (acrescentado na rev. 2, 2026-09-23)
-
-Com a decisão de Rogério de montar uma **lista mensal de todos os países** (Spec R12.11), a fonte brasileira passa a ser o **arquivo completo** do MDIC. A API fica sem uso na análise, o que elimina C1, C2 e C5.
-
-| Item | Resultado conferido |
-| --- | --- |
-| `https://balanca.economia.gov.br/balanca/bd/comexstat-bd/ncm/EXP_2026.csv` | 200; `Content-Length: 75055366`; `Last-Modified: Fri, 04 Sep 2026 18:05:56 GMT`; aceita `Range` (206) |
-| `…/ncm/EXP_2025.csv` | 200; `Content-Length: 113715007`; `Last-Modified: Thu, 05 Feb 2026 18:21:06 GMT` |
-| Cabeçalho (copiado) | `"CO_ANO";"CO_MES";"CO_NCM";"CO_UNID";"CO_PAIS";"SG_UF_NCM";"CO_VIA";"CO_URF";"QT_ESTAT";"KG_LIQUIDO";"VL_FOB"` |
-| Linha (copiada) | `"2026";"01";"02023000";"10";"589";"MT";"07";"0230154";22356;22356;89125` — códigos entre aspas, métricas sem aspas; separador `;` |
-| `…/bd/tabelas/PAIS.csv` | `"CO_PAIS";"CO_PAIS_ISON3";"CO_PAIS_ISOA3";"NO_PAIS";"NO_PAIS_ING";"NO_PAIS_ESP"`; ex.: `"013";"004";"AFG";"Afeganistão";"Afghanistan";"Afganistan"`; **codificação não é UTF-8** (acentos quebrados na leitura como UTF-8; tratar como Latin-1/Windows-1252) |
-| Vários códigos por país | `PAIS.csv` repete ISO-3: `"249";"840";"USA";"Estados Unidos"`, `"396";"840";"USA";"Johnston, Ilhas"`, `"873";"840";"USA";"Wake, Ilha"`; `"023";"276";"DEU";"Alemanha"`, `"025";"278";"DEU";"Alemanha Oriental"`. Um país do Compass agrega todos os seus `CO_PAIS`. |
-| `…/bd/tabelas/NCM.csv` | `"CO_NCM";"CO_UNID";"CO_SH6";…;"NO_NCM_POR";"NO_NCM_ESP";"NO_NCM_ING"` — traz a subposição SH6 de cada NCM e o nome em inglês |
-| Proteção | O host `balanca.economia.gov.br` respondeu sem desafio da Cloudflare (a partir da rede doméstica). Pelo Worker: não testado. |
-
-Fonte da página de downloads: [Base de dados do Comex Stat — arquivos para download](https://balanca.economia.gov.br/index.php/comercio-exterior/estatisticas-de-comercio-exterior/9-assuntos/categ-comercio-exterior/2551-base-de-dados-do-comercio-exterior-brasileiro-arquivos-para-download); [Estatísticas em dados abertos (MDIC)](https://www.gov.br/mdic/pt-br/assuntos/comercio-exterior/estatisticas/base-de-dados-bruta).
-
-## 8. UN Comtrade — fonte do importador (T13, acrescentado na rev. 2)
-
-| Item | Resultado conferido |
-| --- | --- |
-| Planos | Conta gratuita (Basic Individual): "500 calls/day", "max 100K records per call" (Data API). Premium Individual: 5.000/dia. [Página de planos](https://uncomtrade.org/docs/subscriptions/) |
-| Chave | API completa exige conta e `subscription-key`; sem chave só a pré-visualização (`public/v1/preview`), limitada a 500 registros. [UN Comtrade API](https://uncomtrade.org/docs/un-comtrade-api/) |
-| Consulta sem chave | `GET https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=276&period=2025&partnerCode=0&flowCode=M&cmdCode=09` → 200, `"count":500`; registro com `refYear 2025`, `flowCode "M"`, `classificationCode "H6"`, `cifvalue`, `fobvalue null`, `netWgt`, `qty`, `qtyUnitCode`, `primaryValue` |
-| Disponibilidade | `GET …/public/v1/getDA/C/M/HS?reporterCode=276` → Alemanha com mensal até `period 202606` (liberado em 2026-08-28). China: anual 2022–2025. |
-| Valor | Importações declaradas em **CIF** (`cifvalue`; `fobvalue` nulo no exemplo). O MDIC é **FOB**. Por isso as fontes não são somadas (Spec R12.13). |
-| Códigos de país | `https://comtradeapi.un.org/files/v1/app/reference/Reporters.json` (255 entradas, 219 ativas e não grupo). **Diferem do ISO numérico:** EUA 842, França 251, Índia 699, Suíça 757, Noruega 579. Há entradas expiradas com o mesmo ISO-3 (ex.: `DEU` 280, `entryExpiredDate 1990-12-31`); usar só as sem `entryExpiredDate`. |
-| Produtos | `https://comtradeapi.un.org/files/v1/app/reference/HS.json`: **894 subposições SH6** nos capítulos 01–24 sem o 03 (6.257 caracteres juntas) → 3 chamadas de ~300 códigos por país. Nenhum código agregado "agrícola" na tabela (só `TOTAL`). |
-| Parceiro Brasil | `partnerCode=76`; todas as origens `partnerCode=0`. |
-| Não testado | Chamada com chave; limite por segundo da conta gratuita; termos de reutilização ("Policy on use and re-dissemination", citada sem texto na página de planos). |
 
 ## Fontes
 
