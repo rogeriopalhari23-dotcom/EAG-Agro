@@ -13,6 +13,7 @@ import { statement as s, parameters } from "./store.js";
 import * as companies from "./companies.js";
 import * as operations from "./operations.js";
 import * as catalog from "./catalog.js";
+import * as sectors from "./sectors.js";
 import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
 export const VERSION = "0.3.1-review.2";
@@ -144,6 +145,16 @@ async function route(request, env, rid) {
         await catalog.updateCharacteristic(request, env, actor, rid, id, subId),
       );
   }
+  if (path === "/api/sectors") {
+    if (method === "GET") return response(await sectors.listSectors(env, actor));
+    if (method === "POST")
+      return response(await sectors.addSectorCnae(request, env, actor, rid), 201);
+  }
+  const sec = path.match(/^\/api\/sectors\/([a-z0-9_]+)\/(\d{7})$/);
+  if (sec && method === "DELETE")
+    return response(
+      await sectors.removeSectorCnae(request, env, actor, rid, sec[1], sec[2]),
+    );
   if (path === "/api/parameters" && method === "GET") {
     const current = await parameters(env, actor.tenant_id);
     return response({ parameters: current, definitions: definitionsView(current) });
