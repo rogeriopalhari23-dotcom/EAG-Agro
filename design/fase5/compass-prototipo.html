@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EAG Compass — Protótipo (direção Talhão)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.17 0.035 152); --side: oklch(0.15 0.035 152); --surface: oklch(0.20 0.038 152); --surface-2: oklch(0.23 0.04 152);
+    --text: oklch(0.95 0.015 120); --muted: oklch(0.74 0.03 135); --line: oklch(0.32 0.03 150 / .7); --line-strong: oklch(0.45 0.03 150);
+    --accent: #F9D428; --on-accent: #002F09; --danger: oklch(0.70 0.16 28);
+    --display: "Barlow Condensed", sans-serif; --body: "Roboto", system-ui, sans-serif; --data: "IBM Plex Mono", monospace;
+    --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 28px; --t-2xl: 44px; --t-hero: 96px;
+    --p1: 8px; --p2: 16px; --p3: 24px; --p4: 40px; --p5: 64px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--body); font-size: var(--t-md); line-height: 1.5; color: var(--text); background-color: var(--bg);
+    background-image: repeating-radial-gradient(ellipse at 88% 8%, transparent 0 38px, oklch(0.30 0.035 150 / .35) 38px 39px); background-attachment: fixed; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .app { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+  .side { background: var(--side); border-right: 1px solid var(--line); padding: var(--p4) var(--p3); display: flex; flex-direction: column; gap: var(--p4); position: sticky; top: 0; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 28px; height: 28px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+  .brand-name { font-family: var(--display); font-weight: 700; font-size: var(--t-lg); }
+  .nav { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+  .nav button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; min-height: 44px; background: none; border: 0; border-left: 2px solid transparent; color: var(--muted); text-align: left; }
+  .nav button:hover { color: var(--text); background: var(--surface); }
+  .nav button[aria-current="page"] { color: var(--text); border-left-color: var(--accent); background: var(--surface); }
+  .count { font-family: var(--data); font-size: var(--t-xs); color: var(--accent); }
+  .who { margin-top: auto; font-size: var(--t-sm); color: var(--muted); display: flex; flex-direction: column; }
+  .who strong { color: var(--text); font-weight: 500; }
+
+  .main { padding: var(--p4) var(--p5) 120px; max-width: 1360px; min-width: 0; }
+  .screen { display: none; flex-direction: column; gap: var(--p5); opacity: 0; transform: translateY(6px); transition: opacity .2s ease, transform .2s ease; }
+  .screen.on { display: flex; }
+  .screen.show { opacity: 1; transform: none; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: var(--p3); flex-wrap: wrap; color: var(--muted); font-size: var(--t-sm); }
+  .demo { font-family: var(--data); font-size: var(--t-xs); border: 1px dashed var(--line-strong); padding: 6px 10px; }
+  h1.title { font-family: var(--display); font-weight: 700; font-size: 56px; line-height: 1; text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 600; font-size: var(--t-lg); }
+  .lead { color: var(--muted); max-width: 60ch; text-wrap: pretty; }
+  .big { font-family: var(--display); font-weight: 700; font-size: 168px; line-height: .85; color: var(--accent); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 18px; border: 1px solid var(--line-strong); background: transparent; transition: transform .12s ease, background .15s ease, border-color .15s ease, opacity .15s ease; white-space: nowrap; }
+  .btn:hover { border-color: var(--text); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; min-height: 48px; padding: 12px 22px; }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.danger { border-color: var(--danger); color: var(--danger); }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; }
+  .link { background: none; border: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: var(--t-sm); min-height: 44px; }
+  .link:hover { color: var(--text); }
+  .actions { display: flex; gap: var(--p2); flex-wrap: wrap; align-items: center; }
+
+  .split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--p5); }
+  .split.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .stack { display: flex; flex-direction: column; gap: var(--p2); min-width: 0; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--p2); }
+
+  .kv { display: flex; flex-direction: column; gap: 10px; font-size: var(--t-sm); border-top: 1px solid var(--line); padding-top: var(--p2); }
+  .kvi { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px var(--p3); }
+  .kvi dt { color: var(--muted); }
+  .kvi dd { font-family: var(--data); }
+  .meter { flex-basis: 100%; height: 6px; background: var(--line); position: relative; }
+  .meter i { position: absolute; inset: 0 auto 0 0; background: var(--accent); transition: width .4s ease; }
+
+  .rows { list-style: none; border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, .9fr) auto; gap: var(--p2); align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .row.clickable { cursor: pointer; transition: background .15s ease; }
+  .row.clickable:hover { background: var(--surface); }
+  .name { font-weight: 500; }
+  .sub { color: var(--muted); font-size: var(--t-sm); }
+  .meta { font-family: var(--data); font-size: var(--t-sm); color: var(--muted); }
+  .tag { font-family: var(--data); font-size: var(--t-xs); padding: 4px 8px; border: 1px solid var(--line-strong); white-space: nowrap; justify-self: end; }
+  .tag.warn { border-color: var(--accent); color: var(--accent); }
+  .tag.stop { border-color: var(--danger); color: var(--danger); }
+  .tag.fill { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+  .list { list-style: none; border-top: 1px solid var(--line); }
+  .list li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: var(--p2); padding: 14px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .lvl { font-family: var(--data); font-size: var(--t-xs); border: 1px solid var(--line-strong); height: 28px; display: grid; place-items: center; }
+  .lvl.hot { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .list strong { display: block; font-weight: 500; }
+  .list p { color: var(--muted); font-size: var(--t-sm); }
+
+  .box { border: 1px solid var(--line); padding: var(--p3); background: oklch(0.17 0.035 152 / .6); }
+  .note { font-size: var(--t-sm); color: var(--muted); }
+  .note b { color: var(--text); font-weight: 500; }
+
+  /* Form */
+  .form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: var(--p2); align-items: start; }
+  .form > .btn { margin-top: 27px; }
+  #radarList .row { grid-template-columns: minmax(0, 1fr) 64px 84px auto; }
+  .radar-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: var(--p4); }
+  .radar-split > .stack:first-child { position: sticky; top: 24px; align-self: start; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field label { font-size: var(--t-sm); color: var(--muted); }
+  .field input, .field select, .field textarea { background: var(--surface); border: 1px solid var(--line-strong); padding: 10px 12px; min-height: 44px; width: 100%; }
+  .field input[aria-invalid="true"], .field textarea[aria-invalid="true"] { border-color: var(--danger); }
+  .err { color: var(--danger); font-size: var(--t-xs); min-height: 16px; }
+  .help { color: var(--muted); font-size: var(--t-xs); }
+
+  /* Map schematic */
+  .map { position: relative; aspect-ratio: 16 / 10; border: 1px solid var(--line); background:
+      linear-gradient(oklch(0.24 0.03 150 / .5) 1px, transparent 1px) 0 0 / 40px 40px,
+      linear-gradient(90deg, oklch(0.24 0.03 150 / .5) 1px, transparent 1px) 0 0 / 40px 40px, var(--surface); overflow: hidden; }
+  .map-label { position: absolute; left: 12px; bottom: 10px; font-family: var(--data); font-size: var(--t-xs); color: var(--muted); }
+  .ring { position: absolute; left: 50%; top: 50%; border: 1.5px dashed var(--accent); border-radius: 50%; transform: translate(-50%, -50%); transition: width .35s ease, height .35s ease; }
+  .origin { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; background: var(--accent); transform: translate(-50%, -50%) rotate(45deg); }
+  .pin { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--text); border: 2px solid var(--bg); }
+  .pin.est { background: transparent; border: 2px dashed var(--text); }
+  .pin.trader { background: var(--muted); }
+  .legend { display: flex; gap: var(--p3); flex-wrap: wrap; font-size: var(--t-xs); color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--text); }
+  .legend i.est { background: transparent; border: 2px dashed var(--text); }
+  .legend i.trader { background: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--line-strong); }
+  .seg button { background: none; border: 0; padding: 8px 14px; min-height: 40px; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  .skeleton { height: 18px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: sk 1.2s infinite linear; }
+  @keyframes sk { to { background-position: -200% 0; } }
+
+  /* Ficha */
+  .pv { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px var(--p3); font-size: var(--t-sm); }
+  .pv li { display: flex; gap: 10px; align-items: baseline; }
+  .pv .ok { font-family: var(--data); color: var(--muted); }
+  .pv .bad { font-family: var(--data); color: var(--danger); }
+  .email { border: 1px solid var(--line); background: var(--surface); }
+  .email-head { display: flex; justify-content: space-between; gap: var(--p2); padding: 10px 16px; border-bottom: 1px solid var(--line); font-family: var(--data); font-size: var(--t-xs); color: var(--muted); flex-wrap: wrap; }
+  .email-body { padding: 16px; font-size: var(--t-sm); display: flex; flex-direction: column; gap: 10px; }
+  .email-body .subj { font-weight: 500; font-size: var(--t-md); }
+  .missing { outline: 1px dashed var(--danger); outline-offset: 4px; color: var(--danger); }
+  .steps { display: flex; gap: 4px; flex-wrap: wrap; }
+  .steps button { background: none; border: 1px solid var(--line-strong); padding: 8px 12px; min-height: 40px; font-family: var(--data); font-size: var(--t-xs); color: var(--muted); }
+  .steps button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+  /* Timeline */
+  .tl { list-style: none; border-left: 1px solid var(--line-strong); margin-left: 6px; display: flex; flex-direction: column; gap: var(--p3); padding-left: var(--p3); }
+  .tl li { position: relative; }
+  .tl li::before { content: ""; position: absolute; left: calc(-1 * var(--p3) - 5px); top: 6px; width: 9px; height: 9px; background: var(--bg); border: 1px solid var(--line-strong); }
+  .tl li.key::before { background: var(--accent); border-color: var(--accent); }
+  .tl time { display: block; font-family: var(--data); font-size: var(--t-xs); color: var(--muted); }
+  .tl strong { display: block; font-weight: 500; }
+
+  /* Ramp */
+  .ramp { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .ramp div { border-top: 4px solid var(--line-strong); padding-top: 8px; font-size: var(--t-sm); color: var(--muted); }
+  .ramp div.now { border-top-color: var(--accent); color: var(--text); }
+  .ramp b { display: block; font-family: var(--display); font-size: var(--t-xl); font-weight: 700; color: inherit; }
+
+  /* Banner, toast, dialog */
+  .banner { display: none; border: 1px solid var(--danger); color: var(--text); padding: var(--p2) var(--p3); gap: var(--p2); align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .banner.on { display: flex; }
+  .banner b { color: var(--danger); }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; background: var(--accent); color: var(--on-accent); padding: 12px 18px; font-weight: 500; transition: opacity .2s ease, transform .2s ease; pointer-events: none; z-index: 60; max-width: 90vw; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  dialog { background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); padding: var(--p4); max-width: 520px; width: calc(100% - 32px); }
+  dialog::backdrop { background: oklch(0.1 0.02 150 / .7); }
+  dialog h2 { font-size: var(--t-xl); margin-bottom: var(--p2); }
+  dialog p { color: var(--muted); margin-bottom: var(--p3); }
+
+  table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+  th { text-align: left; font-weight: 500; color: var(--muted); padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line-strong); }
+  td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num { font-family: var(--data); }
+  input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .side { position: static; height: auto; flex-direction: row; align-items: center; padding: var(--p2); gap: var(--p2); overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    .nav { flex-direction: row; }
+    .nav button { white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; }
+    .nav button[aria-current="page"] { border-bottom-color: var(--accent); }
+    .nav li.desk { display: none; }
+    .who { display: none; }
+    .main { padding: var(--p3) var(--p2) 100px; }
+    .screen { gap: var(--p4); }
+    .split, .split.even { grid-template-columns: minmax(0, 1fr); gap: var(--p4); }
+    .row { grid-template-columns: minmax(0, 1fr) auto; }
+    .row .meta { display: none; }
+    .form { grid-template-columns: minmax(0, 1fr); }
+    .big { font-size: 96px; }
+    h1.title { font-size: 38px; }
+    .pv { grid-template-columns: minmax(0, 1fr); }
+    .ramp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="brand-mark" aria-hidden="true">EAG</div><span class="brand-name">Compass</span></div>
+    <ul class="nav" aria-label="Seções">
+      <li><button type="button" data-go="hoje" aria-current="page">Hoje <span class="count" id="navHoje">9</span></button></li>
+      <li><button type="button" data-go="radar">Radar Nacional</button></li>
+      <li class="desk"><button type="button" data-go="internacional">Internacional</button></li>
+      <li><button type="button" data-go="ficha">Aprovações <span class="count" id="navAprov">3</span></button></li>
+      <li><button type="button" data-go="envios">Envios</button></li>
+      <li><button type="button" data-go="tarefas">Tarefas <span class="count">4</span></button></li>
+      <li class="desk"><button type="button" data-go="empresa">Empresas</button></li>
+      <li class="desk"><button type="button" data-go="config">Parâmetros e supressão</button></li>
+    </ul>
+    <div class="who"><strong>Rogério Palhari</strong><span>Administrador</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="banner" id="pauseBanner" role="status"><span><b>Envios pausados.</b> Operação inteira em pausa por decisão do Administrador. Nenhum e-mail sai até a retomada.</span><button class="btn" type="button" id="resumeBtn">Retomar envios</button></div>
+
+    <!-- ================= HOJE ================= -->
+    <section class="screen on show" data-screen="hoje" aria-label="Hoje">
+      <div class="top"><span>Terça-feira, 22 de setembro · rampa de envio: semana 1</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <div class="split">
+        <div class="stack">
+          <div class="big" id="hojeNum">3</div>
+          <h1 class="title" id="hojeTitle">fichas esperam sua aprovação</h1>
+          <p class="lead">Açúcar ICUMSA 45 no raio de 100 km de Sertãozinho/SP. Textos já revisados pelos critérios PV; nenhum envio sai antes da sua aprovação.</p>
+          <div class="actions"><button class="btn primary" type="button" data-go="ficha">Revisar fichas</button></div>
+        </div>
+        <div class="stack" style="justify-content:flex-end">
+          <h2>Envio de hoje</h2>
+          <dl class="kv">
+            <div class="kvi"><dt>Enviados</dt><dd id="hojeSent">3 de 5</dd><div class="meter"><i style="width:60%" id="hojeMeter"></i></div></div>
+            <div class="kvi"><dt>Próximo envio</dt><dd id="hojeNext">10:42</dd></div>
+            <div class="kvi"><dt>Devoluções na semana</dt><dd>0,0%</dd></div>
+            <div class="kvi"><dt>Marcações de spam</dt><dd>0</dd></div>
+            <div class="kvi"><dt>Avisos da Hostinger</dt><dd>nenhum</dd></div>
+          </dl>
+        </div>
+      </div>
+      <div class="split">
+        <section class="stack">
+          <div class="head"><h2>Aguardando aprovação</h2><button class="link" type="button" data-go="ficha">Ver todas</button></div>
+          <ul class="rows" id="hojeFichas">
+            <li class="row clickable" data-go="ficha" data-ficha="doces"><div><div class="name">Doces Vale Verde Ltda.</div><div class="sub">Balas e confeitos · média · sócio-administrador (provisório)</div></div><span class="meta">Franca/SP</span><span class="meta">91 km · endereço</span><span class="tag warn" id="tagDoces">Falta endereço físico</span></li>
+            <li class="row clickable" data-go="ficha"><div><div class="name">Bebidas Serra do Mar Indústria e Comércio de Refrigerantes Ltda.</div><div class="sub">Refrigerantes · média-mais · comprador + gestor de compras</div></div><span class="meta">Ribeirão Preto/SP</span><span class="meta">38 km · estimado</span><span class="tag">PV ok</span></li>
+            <li class="row clickable" data-go="ficha"><div><div class="name">Laticínios Campo Alto S.A.</div><div class="sub">Sobremesas lácteas · média-mais · gestor de compras</div></div><span class="meta">Bebedouro/SP</span><span class="meta">54 km · endereço</span><span class="tag">PV ok</span></li>
+          </ul>
+        </section>
+        <section class="stack">
+          <div class="head"><h2>Respostas e tarefas</h2><button class="link" type="button" data-go="tarefas">Abrir tarefas</button></div>
+          <ul class="list">
+            <li><span class="lvl hot">RESP</span><div><strong>Indústria de Sorvetes Polar Sul respondeu</strong><p>Pediu tabela de preços. Envios automáticos pausados para açúcar nesta empresa. Orientação da skill: qualificar e propor a reunião.</p></div><button class="link" type="button" data-go="empresa">Abrir</button></li>
+            <li><span class="lvl">L0</span><div><strong>Ligar para Chocolates Mantiqueira</strong><p>Sem e-mail validado do comprador. Descobrir nome e e-mail.</p></div><button class="link" type="button" data-go="tarefas">Abrir</button></li>
+            <li><span class="lvl">L2</span><div><strong>Ligar para João, Bebidas Serra do Mar</strong><p>E-mail 1 enviado ontem. 3 perguntas + teste condicional.</p></div><button class="link" type="button" data-go="tarefas">Abrir</button></li>
+          </ul>
+        </section>
+      </div>
+      <div class="box actions" style="justify-content:space-between">
+        <p class="note">Radar em andamento · açúcar · Sertãozinho/SP · raio 100 km · <b>342 candidatos</b> em 61 municípios · cobertura <b>parcial</b> (1 município com falha)</p>
+        <button class="link" type="button" data-go="radar">Abrir radar</button>
+      </div>
+    </section>
+
+    <!-- ================= RADAR ================= -->
+    <section class="screen" data-screen="radar" aria-label="Radar Nacional">
+      <div class="top"><span>Radar Nacional · busca de compradores próximos ao fornecedor conhecido</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <h1 class="title">Radar de compradores</h1>
+      <form class="form" id="radarForm" novalidate>
+        <div class="field"><label for="rCommodity">Commodity</label>
+          <select id="rCommodity"><option>Açúcar ICUMSA 45</option><option>Açúcar ICUMSA 150</option><option>Milho não GMO</option><option>Farelo de soja</option></select></div>
+        <div class="field"><label for="rCidade">Cidade do fornecedor</label><input id="rCidade" value="Sertãozinho" autocomplete="off"><span class="err" id="rCidadeErr"></span></div>
+        <div class="field"><label for="rUf">UF</label><input id="rUf" value="SP" maxlength="2" autocomplete="off"><span class="err" id="rUfErr"></span></div>
+        <div class="field"><label for="rRaio">Raio</label>
+          <select id="rRaio"><option value="5">5 km</option><option value="100" selected>100 km</option><option value="200">200 km</option><option value="300">300 km</option><option value="500">500 km</option><option value="800">800 km</option><option value="1000">1.000 km</option><option value="1500">1.500 km</option></select>
+          <span class="help">5 km e de 100 em 100 até 1.500 km</span></div>
+        <button class="btn primary" type="submit">Buscar compradores</button>
+      </form>
+      <div class="split radar-split">
+        <div class="stack">
+          <div class="map" id="map" role="img" aria-label="Mapa esquemático com a cidade de referência e o raio">
+            <div class="ring" id="ring" style="width:56%;height:89.6%"></div>
+            <div class="origin" title="Sertãozinho/SP — ponto representativo da cidade (aproximado)"></div>
+            <span class="pin" style="left:38%;top:34%" title="Bebidas Serra do Mar — 38 km"></span>
+            <span class="pin est" style="left:61%;top:58%" title="Laticínios Campo Alto — estimado"></span>
+            <span class="pin" style="left:30%;top:62%"></span><span class="pin trader" style="left:68%;top:30%"></span>
+            <span class="pin est" style="left:45%;top:72%"></span><span class="pin" style="left:57%;top:40%"></span>
+            <span class="map-label">Mapa real: MapLibre + PMTiles no R2 · © OpenStreetMap</span>
+          </div>
+          <div class="legend"><span><i></i>endereço</span><span><i class="est"></i>estimado (centro do município)</span><span><i class="trader"></i>trader (fora do ICP)</span><span>◆ ponto de referência aproximado</span></div>
+        </div>
+        <div class="stack">
+          <div class="head"><h2 id="radarCount">342 candidatos</h2>
+            <div class="seg" role="group" aria-label="Ordenar"><button type="button" aria-pressed="true" data-sort="icp">Aderência ICP</button><button type="button" aria-pressed="false" data-sort="dist">Mais próximos</button></div></div>
+          <p class="note" id="radarCov">Busca v2 · raio 100 km · Casa dos Dados · 61 municípios · cobertura <b>parcial</b>: Pontal/SP falhou (tempo esgotado). <button class="link" type="button" id="retryBtn">Tentar de novo</button></p>
+          <ul class="rows" id="radarList">
+            <li class="row"><div><div class="name">Bebidas Serra do Mar Ind. e Com. de Refrigerantes</div><div class="sub">Refrigerantes · média-mais · consumidor final possível</div></div><span class="meta">38 km</span><span class="meta">estimado</span><span class="tag fill">Ficha</span></li>
+            <li class="row"><div><div class="name">Laticínios Campo Alto S.A.</div><div class="sub">Sobremesas lácteas · média-mais</div></div><span class="meta">54 km</span><span class="meta">endereço</span><span class="tag fill">Ficha</span></li>
+            <li class="row"><div><div class="name">Doces Vale Verde Ltda.</div><div class="sub">Balas e confeitos · média</div></div><span class="meta">91 km</span><span class="meta">endereço</span><span class="tag fill">Ficha</span></li>
+            <li class="row"><div><div class="name">Panificadora Estrela da Manhã Ltda.</div><div class="sub">Panificação · porte desconhecido</div></div><span class="meta">22 km</span><span class="meta">estimado</span><span class="tag warn">Porte pendente</span></li>
+            <li class="row"><div><div class="name">Açúcar &amp; Grãos Comercial Exportadora Ltda.</div><div class="sub">Trader/distribuidor · fora do ICP</div></div><span class="meta">17 km</span><span class="meta">endereço</span><span class="tag">Exceção</span></li>
+            <li class="row"><div><div class="name">Sorvetes do Zé MEI</div><div class="sub">Sorvetes · MEI · fora do ICP (porte)</div></div><span class="meta">6 km</span><span class="meta">estimado</span><span class="tag">Sem ficha</span></li>
+          </ul>
+          <p class="note">Versões desta origem: <b>v2 · 100 km</b> (atual) · v1 · 5 km (12 candidatos, preservada)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= INTERNACIONAL ================= -->
+    <section class="screen" data-screen="internacional" aria-label="Internacional">
+      <div class="top"><span>Internacional · país primeiro</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <h1 class="title">O que o país compra do Brasil</h1>
+      <form class="form" id="intlForm" novalidate style="grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto">
+        <div class="field"><label for="iPais">País</label><input id="iPais" value="Marrocos" autocomplete="off"><span class="err" id="iPaisErr"></span></div>
+        <div class="field"><label for="iPeriodo">Período</label><select id="iPeriodo"><option>Últimos 12 meses</option><option>Últimos 24 meses</option></select></div>
+        <button class="btn primary" type="submit">Analisar país</button>
+      </form>
+      <div class="stack">
+        <p class="note">Exportações do Brasil para o país · Comex Stat · atualizado em [data da fonte]. <b>O dado confirma exportação do Brasil para o país; não comprova compra por nenhuma empresa específica.</b></p>
+        <table>
+          <thead><tr><th>Selecionar</th><th>Commodity (NCM)</th><th>Situação</th><th>Quantidade</th><th>Valor FOB</th><th>Portfólio EAG</th></tr></thead>
+          <tbody id="intlBody">
+            <tr><td><input type="checkbox" class="ck" aria-label="Selecionar açúcar"></td><td>Açúcar de cana, bruto (1701.14)</td><td>compra identificada</td><td class="num">[t]</td><td class="num">[US$]</td><td>sim · NCM confirmado</td></tr>
+            <tr><td><input type="checkbox" class="ck" aria-label="Selecionar milho"></td><td>Milho em grão (1005.90)</td><td>compra identificada</td><td class="num">[t]</td><td class="num">[US$]</td><td>sim · NCM pendente</td></tr>
+            <tr><td><input type="checkbox" class="ck" aria-label="Selecionar farelo"></td><td>Farelo de soja (2304.00)</td><td>compra identificada</td><td class="num">[t]</td><td class="num">[US$]</td><td>sim · NCM pendente</td></tr>
+            <tr><td><input type="checkbox" class="ck" aria-label="Selecionar café"></td><td>Café não torrado (0901.11)</td><td>nenhum registro no período</td><td class="num">—</td><td class="num">—</td><td>sim</td></tr>
+            <tr><td><input type="checkbox" disabled aria-label="Indisponível"></td><td>Óleo de soja (1507)</td><td><span class="tag warn">dados indisponíveis</span></td><td class="num">—</td><td class="num">—</td><td>sim</td></tr>
+          </tbody>
+        </table>
+        <div class="actions" style="justify-content:space-between"><span class="err" id="intlErr"></span><span class="note" id="intlSel">Nenhuma selecionada · máximo de 2 campanhas ativas por mercado</span><button class="btn primary" type="button" id="intlGo" disabled>Buscar empresas</button></div>
+      </div>
+    </section>
+
+    <!-- ================= FICHA DE APROVAÇÃO ================= -->
+    <section class="screen" data-screen="ficha" aria-label="Ficha de aprovação">
+      <div class="top"><span>Ficha de aprovação · v1 · campanha Açúcar ICUMSA 45 · Nacional</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <div class="stack">
+        <h1 class="title">Doces Vale Verde Ltda.</h1>
+        <p class="lead">Balas e confeitos · Franca/SP · 91 km (endereço) · CNPJ ativo desde 2009 · LTDA · porte médio · perfil: possível consumidor final</p>
+      </div>
+      <div class="split">
+        <div class="stack">
+          <div class="head"><h2>Sequência congelada</h2><div class="steps" role="group" aria-label="Passos"><button type="button" aria-pressed="true" data-step="1">E-mail 1</button><button type="button" aria-pressed="false" data-step="2">E-mail 2</button><button type="button" aria-pressed="false" data-step="3">E-mail 3</button><button type="button" aria-pressed="false" data-step="4">E-mail 4 · break</button></div></div>
+          <article class="email">
+            <div class="email-head"><span>De: rogeriopalhari@eagagro.com</span><span>Para: Carla Mendes · gestora de compras (influenciadora)</span><span id="stepWhen">Seg · janela 9h–17h (BRT)</span></div>
+            <div class="email-body" id="emailBody">
+              <p class="subj">Fornecedor açúcar</p>
+              <p>Olá, Carla, tudo bem?</p>
+              <p>Encontrei seu contato no site da Doces Vale Verde e tomei a liberdade de te enviar uma mensagem rápida.</p>
+              <p>Sou da EAG Agro; atuamos na comercialização de commodities agrícolas para indústrias. Meu objetivo neste primeiro contato é apenas iniciar uma conversa, para entender se faz sentido apresentar a EAG como possível fornecedor de açúcar para vocês.</p>
+              <p>Você teria cerca de 20 minutos ainda esta semana?</p>
+              <p>Rogério Palhari · EAG Agro<br><span class="missing" id="addrLine">[endereço físico da EAG ausente]</span><br>Para não receber mais mensagens, responda "sair" ou use <u>este link</u>.</p>
+            </div>
+          </article>
+          <p class="note">Frases de volume disponível e prova social <b>omitidas</b>: a campanha não tem declaração aprovada (R16.8).</p>
+        </div>
+        <div class="stack">
+          <h2>Revisor PV · <span id="pvScore">11 de 12</span></h2>
+          <ul class="pv" id="pvList">
+            <li><span class="ok">OK</span>PV1 Estrutura do E-mail 1</li><li><span class="ok">OK</span>PV2 Sem anexo nem portfólio</li>
+            <li><span class="ok">OK</span>PV3 Pede o próximo passo</li><li><span class="ok">OK</span>PV4 Afirmações com fonte</li>
+            <li><span class="ok">OK</span>PV5 Dias diferentes</li><li><span class="ok">OK</span>PV6 Break só no fim</li>
+            <li><span class="ok">OK</span>PV7 Sem preço ou lote</li><li><span class="ok">OK</span>PV8 Destinatário do ICP</li>
+            <li><span class="ok">OK</span>PV9 Assunto direto</li><li><span class="ok">OK</span>PV10 Tom e português</li>
+            <li><span class="ok">OK</span>PV11 Influenciador</li><li id="pvAddr"><span class="bad">FALTA</span>R19.13 Endereço físico</li>
+          </ul>
+          <div class="box stack">
+            <p class="note"><b>Falta o endereço físico da EAG na assinatura.</b> Os termos da Hostinger (§12) exigem; sem ele a ficha não pode ser aprovada.</p>
+            <div class="actions"><button class="btn" type="button" id="fixAddr">Usar assinatura padrão da EAG</button></div>
+          </div>
+          <dl class="kv">
+            <div class="kvi"><dt>Evidências</dt><dd>2 indícios · 1 documento</dd></div>
+            <div class="kvi"><dt>Supressão</dt><dd>nenhuma</dd></div>
+            <div class="kvi"><dt>Sanções</dt><dd>sem correspondência</dd></div>
+            <div class="kvi"><dt>E-mail do destinatário</dt><dd>validado · Snov.io</dd></div>
+            <div class="kvi"><dt>Prova para Rogério</dt><dd><button class="link" type="button" id="proofBtn">Enviar prova</button></dd></div>
+          </dl>
+          <div class="actions">
+            <button class="btn primary" type="button" id="approveBtn" disabled>Aprovar ficha v1</button>
+            <button class="btn" type="button" id="deferBtn">Adiar</button>
+            <button class="btn danger" type="button" id="discardBtn">Descartar</button>
+          </div>
+          <p class="help" id="approveHelp">Aprovação bloqueada até todos os critérios passarem.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= EMPRESA + LINHA DO TEMPO ================= -->
+    <section class="screen" data-screen="empresa" aria-label="Empresa">
+      <div class="top"><span>Empresa · pipeline: Descoberto · campanha Açúcar ICUMSA 45</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <div class="stack"><h1 class="title">Indústria de Sorvetes Polar Sul</h1><p class="lead">Sorvetes e picolés · Jaboticabal/SP · 29 km (endereço) · média-mais · consumidor final possível</p></div>
+      <div class="split">
+        <div class="stack">
+          <h2>Linha do tempo</h2>
+          <ul class="tl">
+            <li class="key"><time>22/09 08:14</time><strong>Resposta de Marcos Alves (comprador)</strong><p class="note">"Pode me mandar sua tabela de preços e uma apresentação?" · Envios automáticos de açúcar pausados nesta empresa (todos os decisores e canais).</p></li>
+            <li><time>21/09 10:31</time><strong>E-mail 2 aceito pelo provedor</strong><p class="note">Ficha v1 · passo 2 · Hostinger SMTP</p></li>
+            <li><time>17/09 09:48</time><strong>E-mail 1 aceito pelo provedor</strong><p class="note">Assunto: Fornecedor açúcar</p></li>
+            <li><time>16/09 16:05</time><strong>Ficha v1 aprovada por Rogério Palhari</strong><p class="note">Textos congelados · skill 33bd093f…</p></li>
+            <li><time>15/09 11:20</time><strong>Evidência: rotulagem oficial com açúcar</strong><p class="note">Documento da empresa · 20 pontos Confidence</p></li>
+            <li><time>15/09 11:02</time><strong>Descoberta no Radar</strong><p class="note">Busca v2 · Sertãozinho/SP · 100 km</p></li>
+          </ul>
+        </div>
+        <div class="stack">
+          <h2>Próxima ação</h2>
+          <div class="box stack">
+            <p class="note"><b>Orientação da /prospeccao-vendas:</b> não enviar preço nem apresentação. Qualificar (usina ou trading? spot ou contrato? volume mensal?) e propor uma conversa de 20–30 min com duas opções de dia.</p>
+            <p class="note">O Compass não responde por você. Você responde da sua caixa e registra o resultado aqui.</p>
+            <div class="actions"><button class="btn primary" type="button" id="meetBtn">Registrar reunião agendada</button><button class="btn" type="button" data-go="tarefas">Criar tarefa de ligação</button></div>
+          </div>
+          <dl class="kv">
+            <div class="kvi"><dt>Potential</dt><dd>35–90 (intervalo)</dd></div>
+            <div class="kvi"><dt>Confidence</dt><dd>60</dd></div>
+            <div class="kvi"><dt>Risk</dt><dd>não calculável · cobertura 0%</dd></div>
+            <div class="kvi"><dt>Outras commodities</dt><dd>milho: sequência ativa · alerta</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ENVIOS ================= -->
+    <section class="screen" data-screen="envios" aria-label="Envios">
+      <div class="top"><span>Envios · caixa rogeriopalhari@eagagro.com (Hostinger)</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <h1 class="title">Rampa de envio</h1>
+      <div class="ramp"><div class="now"><b>5/dia</b>Semana 1 · atual</div><div><b>10/dia</b>Semana 2</div><div><b>15/dia</b>Semana 3</div><div><b>20/dia</b>Semana 4+</div></div>
+      <p class="note">Sobe um degrau após 2 semanas sem marcação de spam, com devoluções abaixo de 2% e sem aviso da Hostinger. Intervalo de 15–25 min entre envios, só em horário comercial.</p>
+      <div class="split">
+        <div class="stack">
+          <div class="head"><h2>Fila de hoje</h2><span class="meta" id="queueInfo">3 enviados · 2 na fila</span></div>
+          <ul class="rows" id="queue">
+            <li class="row"><div><div class="name">Bebidas Serra do Mar · E-mail 2</div><div class="sub">João Ribeiro · comprador</div></div><span class="meta">08:52</span><span class="meta">aceito</span><span class="tag">enviado</span></li>
+            <li class="row"><div><div class="name">Chocolates Mantiqueira · E-mail 1</div><div class="sub">compras@ → aguardando nome (L0)</div></div><span class="meta">—</span><span class="meta">bloqueado</span><span class="tag stop">sem e-mail validado</span></li>
+            <li class="row"><div><div class="name">Laticínios Campo Alto · E-mail 3</div><div class="sub">Paula Nogueira · gestora de compras</div></div><span class="meta">10:42</span><span class="meta">na fila</span><span class="tag warn">próximo</span></li>
+          </ul>
+        </div>
+        <div class="stack">
+          <h2>Pausas e alertas</h2>
+          <dl class="kv">
+            <div class="kvi"><dt>Devoluções na semana</dt><dd>0,0% · limite 3%</dd></div>
+            <div class="kvi"><dt>Marcações de spam</dt><dd>0</dd></div>
+            <div class="kvi"><dt>Avisos da Hostinger</dt><dd>nenhum</dd></div>
+            <div class="kvi"><dt>Pausas ativas</dt><dd>Polar Sul · açúcar (resposta)</dd></div>
+          </dl>
+          <div class="actions"><button class="btn danger" type="button" id="pauseAll">Pausar todos os envios</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAREFAS ================= -->
+    <section class="screen" data-screen="tarefas" aria-label="Tarefas">
+      <div class="top"><span>Tarefas manuais · ligações e LinkedIn assistido · ordem: menor prioridade primeiro</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <h1 class="title">Ligações de hoje</h1>
+      <div class="split">
+        <div class="stack">
+          <ul class="list" id="taskList">
+            <li><span class="lvl">L0</span><div><strong>Chocolates Mantiqueira · recepção</strong><p>"Veja se você consegue me ajudar: estou procurando o responsável pela área de compras. Encontro ele neste número?" Se não passar: pedir o e-mail e para quem endereçar.</p></div><button class="link" type="button" data-task="L0">Registrar</button></li>
+            <li><span class="lvl">L2</span><div><strong>João Ribeiro · Bebidas Serra do Mar</strong><p>Permissão (5 min) → motivo → 3 perguntas → teste condicional → propor vídeo de 20–30 min, duas opções de dia.</p></div><button class="link" type="button" data-task="L2">Registrar</button></li>
+            <li><span class="lvl">IN</span><div><strong>LinkedIn · gestora de compras, Laticínios Campo Alto</strong><p>Convite com nota curta. Envio manual; o Compass só registra.</p></div><button class="link" type="button" data-task="IN">Registrar</button></li>
+          </ul>
+        </div>
+        <form class="stack box" id="taskForm" novalidate>
+          <h2 id="taskTitle">Registrar ligação L2 · João Ribeiro</h2>
+          <div class="field"><label for="q1">Compra direto da usina ou via trading?</label><select id="q1"><option value="">Não confirmado</option><option>Usina</option><option>Trading</option><option>Outro</option></select></div>
+          <div class="field"><label for="q2">Spot ou contrato mensal?</label><select id="q2"><option value="">Não confirmado</option><option>Spot</option><option>Contrato mensal</option></select></div>
+          <div class="field"><label for="q3">Volume mensal médio (t)</label><input id="q3" inputmode="decimal" placeholder=""><span class="err" id="q3Err"></span></div>
+          <div class="field"><label for="q4">Resultado</label><select id="q4"><option value="">Selecione</option><option>Reunião agendada</option><option>Pediu retorno</option><option>Não atendeu</option><option>Sem interesse</option></select><span class="err" id="q4Err"></span></div>
+          <div class="actions"><button class="btn primary" type="submit">Salvar registro</button></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ================= PARÂMETROS E SUPRESSÃO ================= -->
+    <section class="screen" data-screen="config" aria-label="Parâmetros e supressão">
+      <div class="top"><span>Somente Administrador · toda alteração registra valor anterior, novo, motivo e vigência</span><span class="demo">Dados de exemplo · fictícios</span></div>
+      <h1 class="title">Parâmetros e supressão</h1>
+      <div class="split even">
+        <div class="stack">
+          <h2>Parâmetros</h2>
+          <table><thead><tr><th>Parâmetro</th><th>Valor</th><th>Situação</th></tr></thead><tbody>
+            <tr><td>Raio permitido</td><td class="num">5 · 100–1.500 km</td><td>aprovado</td></tr>
+            <tr><td>Envio diário (rampa)</td><td class="num">5 → 10 → 15 → 20</td><td>aprovado</td></tr>
+            <tr><td>Intervalo entre envios</td><td class="num">15–25 min</td><td>aprovado</td></tr>
+            <tr><td>Parada por devoluções</td><td class="num">3% na semana</td><td>aprovado</td></tr>
+            <tr><td>M_N açúcar (Nacional)</td><td class="num">—</td><td><span class="tag warn">sem valor</span></td></tr>
+            <tr><td>Período padrão Internacional</td><td class="num">—</td><td><span class="tag warn">a definir em T6</span></td></tr>
+          </tbody></table>
+        </div>
+        <div class="stack">
+          <h2>Supressão</h2>
+          <p class="note">Identificadores pseudonimizados. Reimportação nunca remove uma supressão.</p>
+          <table><thead><tr><th>Identificador</th><th>Canal</th><th>Motivo</th><th>Data</th></tr></thead><tbody>
+            <tr><td class="num">sha256:9f2c…a41e</td><td>e-mail</td><td>descadastro por link</td><td class="num">19/09</td></tr>
+            <tr><td class="num">sha256:04bb…7d10</td><td>e-mail</td><td>resposta "sair"</td><td class="num">12/09</td></tr>
+            <tr><td class="num">sha256:c7e1…002f</td><td>e-mail</td><td>importado do OpenClaw</td><td class="num">05/09</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <form method="dialog" id="dlgForm">
+    <h2 id="dlgTitle">Descartar a ficha de Doces Vale Verde?</h2>
+    <p id="dlgText">A empresa sai da prospecção desta campanha. O motivo e o histórico ficam registrados.</p>
+    <div class="field" id="dlgReasonWrap"><label for="dlgReason">Motivo (obrigatório)</label><textarea id="dlgReason" rows="3"></textarea><span class="err" id="dlgErr"></span></div>
+    <div class="actions" style="margin-top:var(--p3)"><button class="btn danger" type="submit" value="ok" id="dlgOk">Descartar</button><button class="btn" type="submit" value="cancel">Manter ficha</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var state = { approved: false, addrFixed: false, paused: false };
+
+  function toast(msg) { var t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('on'); }, 2600); }
+
+  function go(name) {
+    var cur = $('.screen.on');
+    var next = $('.screen[data-screen="' + name + '"]');
+    if (!next || cur === next) return;
+    cur.classList.remove('show');
+    setTimeout(function () {
+      cur.classList.remove('on');
+      next.classList.add('on');
+      requestAnimationFrame(function () { next.classList.add('show'); });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 160);
+    $$('.nav button').forEach(function (b) { b.toggleAttribute('aria-current', b.dataset.go === name); if (b.dataset.go === name) b.setAttribute('aria-current', 'page'); });
+    try { location.hash = name; } catch (e) {}
+  }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-go]');
+    if (el) { e.preventDefault(); go(el.dataset.go); }
+  });
+
+  // Radar
+  var ringSizes = { '5': 8, '100': 56, '200': 72, '300': 84, '500': 96, '800': 110, '1000': 120, '1500': 140 };
+  var counts = { '5': 12, '100': 342, '200': 1180, '300': 2240, '500': 4105, '800': 7390, '1000': 9820, '1500': 16450 };
+  $('#radarForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var ok = true, cidade = $('#rCidade'), uf = $('#rUf');
+    if (!cidade.value.trim()) { cidade.setAttribute('aria-invalid', 'true'); $('#rCidadeErr').textContent = 'Informe a cidade onde está o fornecedor.'; ok = false; } else { cidade.removeAttribute('aria-invalid'); $('#rCidadeErr').textContent = ''; }
+    if (!/^[A-Za-z]{2}$/.test(uf.value.trim())) { uf.setAttribute('aria-invalid', 'true'); $('#rUfErr').textContent = 'UF com 2 letras, por exemplo SP.'; ok = false; } else { uf.removeAttribute('aria-invalid'); $('#rUfErr').textContent = ''; }
+    if (!ok) return;
+    var r = $('#rRaio').value, list = $('#radarList');
+    list.innerHTML = '<li class="row"><div class="skeleton" style="width:70%"></div><span></span><span></span><span></span></li><li class="row"><div class="skeleton" style="width:55%"></div><span></span><span></span><span></span></li><li class="row"><div class="skeleton" style="width:62%"></div><span></span><span></span><span></span></li>';
+    $('#radarCount').textContent = 'Buscando…';
+    var s = ringSizes[r]; $('#ring').style.width = s + '%'; $('#ring').style.height = (s * 1.6) + '%';
+    setTimeout(function () {
+      list.innerHTML = radarRows;
+      $('#radarCount').textContent = counts[r].toLocaleString('pt-BR') + ' candidatos';
+      $('#radarCov').innerHTML = 'Busca v3 · raio ' + Number(r).toLocaleString('pt-BR') + ' km · Casa dos Dados · cobertura <b>' + (Number(r) >= 1000 ? 'em andamento por UF' : 'completa') + '</b>. A busca anterior foi preservada.';
+      toast('Nova versão da busca criada (raio ' + Number(r).toLocaleString('pt-BR') + ' km).');
+    }, 900);
+  });
+  var radarRows = $('#radarList').innerHTML;
+  $('#retryBtn').addEventListener('click', function () { $('#radarCov').innerHTML = 'Busca v2 · raio 100 km · Casa dos Dados · 61 municípios · cobertura <b>completa</b>.'; toast('Pontal/SP consultado de novo: 4 candidatos novos.'); });
+  $$('.seg button').forEach(function (b) { b.addEventListener('click', function () {
+    $$('.seg button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    var rows = $$('#radarList .row');
+    rows.sort(function (a, c) {
+      if (b.dataset.sort === 'dist') return parseInt(a.children[1].textContent) - parseInt(c.children[1].textContent);
+      return rows.indexOf(a) - rows.indexOf(c);
+    });
+    if (b.dataset.sort === 'icp') { $('#radarList').innerHTML = radarRows; return; }
+    rows.forEach(function (r) { $('#radarList').appendChild(r); });
+  }); });
+
+  // Internacional
+  function updIntl() {
+    var sel = $$('#intlBody .ck:checked');
+    $('#intlGo').disabled = sel.length === 0 || sel.length > 2;
+    $('#intlErr').textContent = sel.length > 2 ? 'Máximo de 2 campanhas ativas por mercado. Desmarque uma.' : '';
+    $('#intlSel').textContent = sel.length ? sel.length + ' selecionada(s) · máximo de 2 ativas' : 'Nenhuma selecionada · máximo de 2 campanhas ativas por mercado';
+  }
+  $$('#intlBody .ck').forEach(function (c) { c.addEventListener('change', updIntl); });
+  $('#intlGo').addEventListener('click', function () { toast('Seleção registrada. Busca de empresas em fila (1 campanha por commodity).'); });
+  $('#intlForm').addEventListener('submit', function (e) { e.preventDefault(); var p = $('#iPais'); if (!p.value.trim()) { p.setAttribute('aria-invalid', 'true'); $('#iPaisErr').textContent = 'Informe o país.'; return; } p.removeAttribute('aria-invalid'); $('#iPaisErr').textContent = ''; toast('Análise de ' + p.value.trim() + ' atualizada.'); });
+
+  // Ficha
+  var bodies = {
+    '1': null,
+    '2': '<p class="subj">Re: Fornecedor açúcar</p><p>Carla, tudo bem? Você chegou a ver o e-mail que te enviei dias atrás? A melhor forma de falar com você é por aqui mesmo?</p>',
+    '3': '<p class="subj">Re: Fornecedor açúcar</p><p>Carla, retomo em poucas linhas: queria entender como vocês compram açúcar hoje e se faz sentido uma conversa de 20 minutos.</p>',
+    '4': '<p class="subj">Re: Fornecedor açúcar</p><p>Acho que agora não é o melhor momento, Carla. Tentei contato algumas vezes e não quero insistir além do necessário. Se em algum momento esse tema fizer sentido, é só responder este e-mail.</p>'
+  };
+  var when = { '1': 'Seg · janela 9h–17h (BRT)', '2': 'Sex · semana 1', '3': 'Qui · semana 2', '4': 'Sex · semana 2 · só se não houver interrupção' };
+  bodies['1'] = $('#emailBody').innerHTML;
+  function sig() { return '<p>Rogério Palhari · EAG Agro<br>' + (state.addrFixed ? 'Al. Rio Negro, 503 · Alphaville Industrial · Barueri/SP' : '<span class="missing">[endereço físico da EAG ausente]</span>') + '<br>Para não receber mais mensagens, responda "sair" ou use <u>este link</u>.</p>'; }
+  $$('.steps button').forEach(function (b) { b.addEventListener('click', function () {
+    $$('.steps button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    var k = b.dataset.step, html = k === '1' ? bodies['1'].replace(/<p>Rogério[\s\S]*<\/p>\s*$/, '') + sig() : bodies[k] + sig();
+    $('#emailBody').innerHTML = html; $('#stepWhen').textContent = when[k];
+  }); });
+  $('#fixAddr').addEventListener('click', function () {
+    state.addrFixed = true;
+    $$('#emailBody .missing').forEach(function (m) { m.classList.remove('missing'); m.textContent = 'Al. Rio Negro, 503 · Alphaville Industrial · Barueri/SP'; });
+    bodies['1'] = $('#emailBody').innerHTML;
+    $('#pvAddr').innerHTML = '<span class="ok">OK</span>R19.13 Endereço físico';
+    $('#pvScore').textContent = '12 de 12';
+    $('#approveBtn').disabled = false;
+    $('#approveHelp').textContent = 'Todos os critérios passaram. A aprovação congela os 4 textos desta versão.';
+    this.disabled = true; this.textContent = 'Assinatura padrão aplicada';
+    $('#tagDoces').className = 'tag'; $('#tagDoces').textContent = 'PV ok';
+    toast('Assinatura com endereço físico aplicada aos 4 e-mails.');
+  });
+  $('#proofBtn').addEventListener('click', function () { toast('Prova dos 4 e-mails enviada para rogeriopalhari@eagagro.com. Não conta como envio.'); });
+  $('#approveBtn').addEventListener('click', function () {
+    if (state.approved) return;
+    state.approved = true;
+    this.disabled = true; this.textContent = 'Ficha v1 aprovada';
+    $('#approveHelp').textContent = 'Aprovada por Rogério Palhari agora. E-mail 1 entrou na fila de envios.';
+    var q = $('#queue');
+    var li = document.createElement('li'); li.className = 'row'; li.style.opacity = '0'; li.style.transition = 'opacity .3s ease';
+    li.innerHTML = '<div><div class="name">Doces Vale Verde · E-mail 1</div><div class="sub">Carla Mendes · gestora de compras</div></div><span class="meta">11:09</span><span class="meta">na fila</span><span class="tag">aprovado agora</span>';
+    q.appendChild(li); requestAnimationFrame(function () { li.style.opacity = '1'; });
+    $('#queueInfo').textContent = '3 enviados · 3 na fila';
+    $('#hojeNum').textContent = '2'; $('#navAprov').textContent = '2'; $('#navHoje').textContent = '8';
+    var fr = $('#hojeFichas [data-ficha="doces"]'); if (fr) fr.remove();
+    toast('Ficha aprovada. E-mail 1 programado para 11:09.');
+    setTimeout(function () { go('envios'); }, 900);
+  });
+  var dlg = $('#dlg');
+  function openDlg(kind) {
+    $('#dlgTitle').textContent = kind === 'discard' ? 'Descartar a ficha de Doces Vale Verde?' : 'Adiar a ficha de Doces Vale Verde?';
+    $('#dlgText').textContent = kind === 'discard' ? 'A empresa sai da prospecção desta campanha. O motivo e o histórico ficam registrados.' : 'A ficha sai da fila de aprovação até você reabri-la. Nada é enviado.';
+    $('#dlgOk').textContent = kind === 'discard' ? 'Descartar' : 'Adiar';
+    $('#dlgOk').className = kind === 'discard' ? 'btn danger' : 'btn primary';
+    $('#dlgReason').value = ''; $('#dlgErr').textContent = ''; $('#dlgReason').removeAttribute('aria-invalid');
+    dlg.dataset.kind = kind; dlg.showModal();
+  }
+  $('#discardBtn').addEventListener('click', function () { openDlg('discard'); });
+  $('#deferBtn').addEventListener('click', function () { openDlg('defer'); });
+  $('#dlgForm').addEventListener('submit', function (e) {
+    if (e.submitter && e.submitter.value === 'ok') {
+      if ($('#dlgReason').value.trim().length < 5) { e.preventDefault(); $('#dlgReason').setAttribute('aria-invalid', 'true'); $('#dlgErr').textContent = 'Escreva o motivo (pelo menos 5 caracteres). Ele fica no histórico.'; return; }
+      toast(dlg.dataset.kind === 'discard' ? 'Ficha descartada com motivo registrado.' : 'Ficha adiada com motivo registrado.');
+    }
+  });
+
+  // Envios: pausa
+  $('#pauseAll').addEventListener('click', function () {
+    $('#dlgTitle').textContent = 'Pausar todos os envios?';
+    $('#dlgText').textContent = 'Nenhum e-mail sai até a retomada por um Administrador. Os passos pendentes ficam guardados.';
+    $('#dlgOk').textContent = 'Pausar envios'; $('#dlgOk').className = 'btn danger';
+    $('#dlgReason').value = ''; $('#dlgErr').textContent = '';
+    dlg.dataset.kind = 'pause'; dlg.showModal();
+  });
+  dlg.addEventListener('close', function () {
+    if (dlg.returnValue === 'ok' && dlg.dataset.kind === 'pause') { state.paused = true; $('#pauseBanner').classList.add('on'); $('#pauseAll').disabled = true; $('#hojeNext').textContent = 'pausado'; }
+  });
+  $('#resumeBtn').addEventListener('click', function () { state.paused = false; $('#pauseBanner').classList.remove('on'); $('#pauseAll').disabled = false; $('#hojeNext').textContent = '10:42'; toast('Envios retomados. Verificações refeitas antes de cada envio.'); });
+
+  // Tarefas
+  var titles = { L0: 'Registrar ligação L0 · Chocolates Mantiqueira', L2: 'Registrar ligação L2 · João Ribeiro', IN: 'Registrar LinkedIn · Laticínios Campo Alto' };
+  $$('[data-task]').forEach(function (b) { b.addEventListener('click', function () { $('#taskTitle').textContent = titles[b.dataset.task]; $('#q1').focus(); }); });
+  $('#taskForm').addEventListener('submit', function (e) {
+    e.preventDefault(); var ok = true, q3 = $('#q3'), v = q3.value.trim().replace(',', '.');
+    if (v && (isNaN(Number(v)) || Number(v) < 0)) { q3.setAttribute('aria-invalid', 'true'); $('#q3Err').textContent = 'Use só números, em toneladas (ex.: 120).'; ok = false; } else { q3.removeAttribute('aria-invalid'); $('#q3Err').textContent = ''; }
+    if (!$('#q4').value) { $('#q4').setAttribute('aria-invalid', 'true'); $('#q4Err').textContent = 'Escolha o resultado da ligação.'; ok = false; } else { $('#q4').removeAttribute('aria-invalid'); $('#q4Err').textContent = ''; }
+    if (!ok) return;
+    toast('Registro salvo na linha do tempo. Respostas entram como "Confirmado" com método e data.');
+    this.reset();
+  });
+  $('#meetBtn').addEventListener('click', function () { toast('Reunião registrada. Tarefa de confirmação criada para a manhã do dia.'); });
+
+  var h = (location.hash || '').replace('#', '');
+  if (h && $('.screen[data-screen="' + h + '"]')) { $('.screen.on').classList.remove('on', 'show'); var s = $('.screen[data-screen="' + h + '"]'); s.classList.add('on', 'show'); $$('.nav button').forEach(function (b) { if (b.dataset.go === h) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); }); }
+})();
+</script>
+</body>
+</html>

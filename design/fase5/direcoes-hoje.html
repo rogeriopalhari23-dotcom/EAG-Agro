@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EAG Compass — Direções visuais (painel Hoje)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Lato:wght@400;700&family=Roboto:wght@400;500;700&family=Saira+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ===== Escala comum ===== */
+  :root {
+    --brand-green: #002F09;
+    --brand-yellow: #F9D428;
+    --type-xs: 12px; --type-sm: 14px; --type-md: 16px; --type-lg: 20px; --type-xl: 28px; --type-2xl: 44px; --type-hero: 96px;
+    --pad-1: 8px; --pad-2: 16px; --pad-3: 24px; --pad-4: 40px; --pad-5: 64px;
+    --radius: 0px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: "Roboto", system-ui, sans-serif; font-size: var(--type-md); line-height: 1.5; background: var(--bg); color: var(--text); transition: background .25s ease, color .25s ease; }
+  button { font: inherit; cursor: pointer; }
+  a { color: inherit; }
+
+  /* ===== Seletor de direção (fora do design) ===== */
+  .switcher { position: fixed; z-index: 50; right: 16px; bottom: 16px; display: flex; gap: 4px; padding: 6px; background: #111; border: 1px solid #333; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .switcher button { background: transparent; color: #bbb; border: 1px solid transparent; padding: 8px 12px; min-height: 36px; }
+  .switcher button[aria-pressed="true"] { background: var(--brand-yellow); color: #111; }
+  .switcher button:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+
+  /* ===== Estrutura ===== */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .side { border-right: 1px solid var(--line); padding: var(--pad-4) var(--pad-3); display: flex; flex-direction: column; gap: var(--pad-4); background: var(--side-bg, transparent); }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 28px; height: 28px; background: var(--brand-yellow); display: grid; place-items: center; color: var(--brand-green); font-weight: 700; font-size: 13px; letter-spacing: .02em; }
+  .brand-name { font-family: var(--display); font-weight: 700; font-size: var(--type-lg); letter-spacing: .01em; }
+  .nav { display: flex; flex-direction: column; gap: 2px; list-style: none; }
+  .nav a { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; min-height: 44px; text-decoration: none; color: var(--muted); border-left: 2px solid transparent; }
+  .nav a:hover { color: var(--text); background: var(--hover); }
+  .nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .nav a[aria-current="page"] { color: var(--text); border-left-color: var(--accent); background: var(--hover); }
+  .nav .count { font-family: var(--data); font-size: var(--type-xs); color: var(--accent); }
+  .who { margin-top: auto; font-size: var(--type-sm); color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+  .who strong { color: var(--text); font-weight: 500; }
+
+  .main { padding: var(--pad-4) var(--pad-5); display: flex; flex-direction: column; gap: var(--pad-5); max-width: 1360px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: var(--pad-3); }
+  .date { color: var(--muted); font-size: var(--type-sm); }
+  .demo { font-family: var(--data); font-size: var(--type-xs); color: var(--muted); border: 1px dashed var(--line-strong); padding: 6px 10px; }
+
+  .hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--pad-5); align-items: end; }
+  .hero-num { font-family: var(--display-num); font-weight: 700; font-size: var(--type-hero); line-height: .9; color: var(--accent); letter-spacing: -.02em; }
+  .hero-title { font-family: var(--display); font-weight: 700; font-size: var(--type-2xl); line-height: 1.05; text-wrap: balance; max-width: 16ch; }
+  .hero-text { color: var(--muted); max-width: 52ch; margin-top: var(--pad-2); text-wrap: pretty; }
+  .cta { display: inline-flex; align-items: center; gap: 10px; margin-top: var(--pad-3); background: var(--accent); color: var(--on-accent); border: 0; padding: 14px 22px; min-height: 48px; font-weight: 700; border-radius: var(--radius); transition: transform .12s ease, filter .15s ease; }
+  .cta:hover { filter: brightness(1.06); }
+  .cta:active { transform: translateY(1px); }
+  .cta:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+
+  .health { display: flex; flex-direction: column; gap: var(--pad-2); }
+  .health h3, .block h3 { font-family: var(--display); font-weight: 600; font-size: var(--type-lg); }
+  .kv { display: flex; flex-direction: column; gap: 10px; font-size: var(--type-sm); border-top: 1px solid var(--line); padding-top: var(--pad-2); }
+  .kvi { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px var(--pad-3); }
+  .kv dt { color: var(--muted); }
+  .kv dd { font-family: var(--data); text-align: right; }
+  .meter { height: 6px; background: var(--line); position: relative; flex-basis: 100%; }
+  .meter i { position: absolute; inset: 0 auto 0 0; width: 60%; background: var(--accent); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--pad-5); }
+  .block { display: flex; flex-direction: column; gap: var(--pad-2); }
+  .block-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--pad-2); }
+  .link { color: var(--muted); font-size: var(--type-sm); text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; min-height: 44px; }
+  .link:hover { color: var(--text); }
+
+  .rows { list-style: none; border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, .8fr) auto; gap: var(--pad-2); align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .row-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub { color: var(--muted); font-size: var(--type-sm); }
+  .row-meta { font-family: var(--data); font-size: var(--type-sm); color: var(--muted); }
+  .tag { font-family: var(--data); font-size: var(--type-xs); padding: 4px 8px; border: 1px solid var(--line-strong); color: var(--text); white-space: nowrap; justify-self: end; }
+  .tag.warn { border-color: var(--accent); color: var(--accent); }
+
+  .side-list { list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+  .side-list li { display: grid; grid-template-columns: 44px 1fr; gap: var(--pad-2); padding: 14px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .lvl { font-family: var(--data); font-size: var(--type-xs); border: 1px solid var(--line-strong); height: 28px; display: grid; place-items: center; }
+  .lvl.hot { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .side-list p { font-size: var(--type-sm); color: var(--muted); }
+  .side-list strong { display: block; font-weight: 500; color: var(--text); }
+
+  .search { display: grid; grid-template-columns: 1fr auto; gap: var(--pad-2); align-items: center; padding: var(--pad-3); border: 1px solid var(--line); }
+  .search p { color: var(--muted); font-size: var(--type-sm); }
+  .search b { font-family: var(--data); font-weight: 500; color: var(--text); }
+
+  /* ================= DIREÇÃO 1 — TALHÃO ================= */
+  [data-dir="talhao"] {
+    --bg: oklch(0.17 0.035 152); --side-bg: oklch(0.15 0.035 152); --text: oklch(0.95 0.015 120); --muted: oklch(0.74 0.03 135);
+    --line: oklch(0.32 0.03 150 / .7); --line-strong: oklch(0.45 0.03 150); --hover: oklch(0.22 0.04 152);
+    --accent: #F9D428; --on-accent: #002F09;
+    --display: "Barlow Condensed", sans-serif; --display-num: "Barlow Condensed", sans-serif; --data: "IBM Plex Mono", monospace;
+  }
+  [data-dir="talhao"] body, body[data-dir="talhao"] {
+    background-color: var(--bg);
+    background-image: repeating-radial-gradient(ellipse at 88% 8%, transparent 0 38px, oklch(0.30 0.035 150 / .35) 38px 39px);
+    background-attachment: fixed;
+  }
+  body[data-dir="talhao"] .hero-title { font-size: 56px; text-transform: uppercase; letter-spacing: .01em; }
+  body[data-dir="talhao"] .hero-num { font-size: 168px; }
+
+  /* ================= DIREÇÃO 2 — MESA DE OPERAÇÕES ================= */
+  body[data-dir="operacoes"] {
+    --bg: #0c0f0d; --side-bg: #0c0f0d; --text: #e9ece8; --muted: #9aa39b; --line: #232a25; --line-strong: #37403a; --hover: #141916;
+    --accent: #F9D428; --on-accent: #0c0f0d;
+    --display: "IBM Plex Sans", sans-serif; --display-num: "IBM Plex Mono", monospace; --data: "IBM Plex Mono", monospace;
+    background-color: var(--bg);
+    background-image: linear-gradient(#161c18 1px, transparent 1px), linear-gradient(90deg, #161c18 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  body[data-dir="operacoes"] .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  body[data-dir="operacoes"] .side { flex-direction: row; align-items: center; padding: 0 var(--pad-5); height: 64px; border-right: 0; border-bottom: 1px solid var(--line); gap: var(--pad-3); position: sticky; top: 0; background: #0c0f0dee; }
+  body[data-dir="operacoes"] .nav { flex-direction: row; }
+  body[data-dir="operacoes"] .nav a { border-left: 0; border-bottom: 2px solid transparent; font-size: var(--type-sm); padding: 10px 10px; }
+  body[data-dir="operacoes"] .nav a[aria-current="page"] { border-bottom-color: var(--accent); background: transparent; }
+  body[data-dir="operacoes"] .nav li:nth-child(n+7) { display: none; }
+  body[data-dir="operacoes"] .who { margin: 0 0 0 auto; flex-direction: row; gap: 8px; }
+  body[data-dir="operacoes"] .hero { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; border: 1px solid var(--line); padding: var(--pad-4); background: #0e1210; position: relative; }
+  body[data-dir="operacoes"] .hero::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: repeating-linear-gradient(-45deg, var(--accent) 0 8px, #0c0f0d 8px 16px); }
+  body[data-dir="operacoes"] .hero-num { font-size: 120px; font-weight: 600; }
+  body[data-dir="operacoes"] .hero-title { font-size: 34px; font-weight: 600; }
+  body[data-dir="operacoes"] .row-name { font-family: var(--data); font-size: var(--type-sm); }
+  body[data-dir="operacoes"] .search { background: #0e1210; }
+
+  /* ================= DIREÇÃO 3 — EDITORIAL ================= */
+  body[data-dir="editorial"] {
+    --bg: #10160f; --side-bg: #0d120c; --text: #eeeadb; --muted: #a8ab98; --line: #2a3226; --line-strong: #414b3a; --hover: #161d14;
+    --accent: #F9D428; --on-accent: #10160f;
+    --display: "Archivo", sans-serif; --display-num: "Archivo", sans-serif; --data: "IBM Plex Mono", monospace;
+    font-family: "Lato", sans-serif;
+    background: radial-gradient(1200px 600px at 100% 0%, #16230f 0%, transparent 60%), var(--bg);
+  }
+  body[data-dir="editorial"] .app { grid-template-columns: 200px 1fr; }
+  body[data-dir="editorial"] .hero { grid-template-columns: 1fr; gap: var(--pad-3); }
+  body[data-dir="editorial"] .hero-num { display: none; }
+  body[data-dir="editorial"] .hero-title { font-size: 76px; font-weight: 800; letter-spacing: -.025em; max-width: 14ch; line-height: .98; }
+  .t-num { display: none; } body[data-dir="editorial"] .t-num { display: inline; color: var(--accent); }
+  body[data-dir="editorial"] .health { flex-direction: row; flex-wrap: wrap; gap: var(--pad-5); }
+  body[data-dir="editorial"] .health h3 { display: none; }
+  body[data-dir="editorial"] .kv { border-top: 0; padding-top: 0; flex-direction: row; flex-wrap: wrap; gap: var(--pad-3) var(--pad-5); }
+  body[data-dir="editorial"] .kvi { flex-direction: column-reverse; justify-content: flex-end; gap: 2px; }
+  body[data-dir="editorial"] .kv dd { text-align: left; font-size: var(--type-xl); font-family: "Archivo", sans-serif; font-weight: 700; }
+  body[data-dir="editorial"] .meter { display: none; }
+  body[data-dir="editorial"] .grid { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
+  body[data-dir="editorial"] .block h3 { font-family: "Archivo"; font-size: var(--type-xl); font-weight: 700; }
+
+  /* ================= DIREÇÃO 4 — MANIFESTO ================= */
+  body[data-dir="manifesto"] {
+    --bg: #0b1410; --side-bg: #08100c; --text: #e8efe8; --muted: #93a79a; --line: #1f3027; --line-strong: #345041; --hover: #10201a;
+    --accent: #F9D428; --on-accent: #0b1410;
+    --display: "Saira Condensed", sans-serif; --display-num: "Saira Condensed", sans-serif; --data: "IBM Plex Mono", monospace;
+    background-color: var(--bg);
+    background-image: linear-gradient(180deg, #0e1a14 0, var(--bg) 360px);
+  }
+  body[data-dir="manifesto"] .hero-title { text-transform: uppercase; font-size: 48px; letter-spacing: .02em; }
+  body[data-dir="manifesto"] .hero-num { font-size: 140px; -webkit-text-stroke: 2px var(--accent); color: transparent; }
+  body[data-dir="manifesto"] .rows { border-top: 2px solid var(--text); }
+  body[data-dir="manifesto"] .row { grid-template-columns: 48px minmax(0, 2.6fr) minmax(0, 1fr) minmax(0, .9fr) auto; }
+  body[data-dir="manifesto"] .row::before { counter-increment: man; content: "Nº " counter(man, decimal-leading-zero); font-family: var(--data); font-size: var(--type-xs); color: var(--muted); }
+  body[data-dir="manifesto"] .rows { counter-reset: man; }
+  body[data-dir="manifesto"] .tag { border: 2px solid currentColor; text-transform: uppercase; letter-spacing: .08em; transform: rotate(-3deg); font-weight: 600; }
+  body[data-dir="manifesto"] .tag.warn { color: var(--accent); }
+  body[data-dir="manifesto"] .block h3 { text-transform: uppercase; letter-spacing: .06em; font-size: var(--type-xl); }
+  body[data-dir="manifesto"] .search { border: 2px dashed var(--line-strong); }
+
+  /* Direção 1 também usa a regra body[...] */
+  body[data-dir="talhao"] { --bg: oklch(0.17 0.035 152); }
+
+  /* ===== Mobile (≤ 768px): celular só o básico ===== */
+  @media (max-width: 768px) {
+    .app, body[data-dir] .app { grid-template-columns: minmax(0, 1fr); }
+    .side, .main { min-width: 0; }
+    .top { flex-wrap: wrap; }
+    .row-name { white-space: normal; }
+    .row .row-meta { display: none; }
+    .switcher { left: 8px; right: 8px; bottom: 8px; justify-content: space-between; }
+    .switcher button { padding: 8px 6px; }
+    .side, body[data-dir] .side { position: static; flex-direction: row; height: auto; padding: var(--pad-2); border-right: 0; border-bottom: 1px solid var(--line); gap: var(--pad-2); overflow-x: auto; }
+    .nav, body[data-dir] .nav { flex-direction: row; }
+    .nav a { white-space: nowrap; }
+    .nav li:nth-child(n+4), body[data-dir] .nav li:nth-child(n+4) { display: none; }
+    .who { display: none; }
+    .main { padding: var(--pad-3) var(--pad-2); gap: var(--pad-4); }
+    .hero, body[data-dir] .hero { grid-template-columns: minmax(0, 1fr); gap: var(--pad-3); padding: var(--pad-3); }
+    .hero-num, body[data-dir] .hero-num { font-size: 88px; }
+    .hero-title, body[data-dir] .hero-title { font-size: 34px; }
+    .grid, body[data-dir] .grid { grid-template-columns: minmax(0, 1fr); }
+    .row, body[data-dir] .row { grid-template-columns: minmax(0, 1fr) auto; }
+    .search { grid-template-columns: minmax(0, 1fr); }
+    .row .row-meta:nth-of-type(2), body[data-dir="manifesto"] .row::before { display: none; }
+    body[data-dir="editorial"] .kv { gap: var(--pad-2) var(--pad-3); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body data-dir="talhao">
+
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">EAG</div>
+      <span class="brand-name">Compass</span>
+    </div>
+    <ul class="nav">
+      <li><a href="#" aria-current="page">Hoje <span class="count">9</span></a></li>
+      <li><a href="#">Radar Nacional</a></li>
+      <li><a href="#">Internacional</a></li>
+      <li><a href="#">Aprovações <span class="count">3</span></a></li>
+      <li><a href="#">Envios</a></li>
+      <li><a href="#">Tarefas <span class="count">4</span></a></li>
+      <li><a href="#">Empresas</a></li>
+      <li><a href="#">Supressão</a></li>
+      <li><a href="#">Parâmetros</a></li>
+    </ul>
+    <div class="who"><strong>Rogério Palhari</strong><span>Administrador</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <span class="date">Terça-feira, 22 de setembro · rampa de envio: semana 1</span>
+      <span class="demo">Dados de exemplo · fictícios</span>
+    </div>
+
+    <section class="hero">
+      <div>
+        <div class="hero-num">3</div>
+        <h1 class="hero-title"><span class="t-num">3 </span>fichas esperam sua aprovação</h1>
+        <p class="hero-text">Açúcar ICUMSA 45 no raio de 100 km de Sertãozinho/SP. Textos já revisados pelos critérios PV; nenhum envio sai antes da sua aprovação.</p>
+        <button class="cta" type="button">Revisar fichas</button>
+      </div>
+      <div class="health">
+        <h3>Envio de hoje</h3>
+        <dl class="kv">
+          <div class="kvi"><dt>Enviados</dt><dd>3 de 5</dd><div class="meter"><i></i></div></div>
+          <div class="kvi"><dt>Próximo envio</dt><dd>10:42</dd></div>
+          <div class="kvi"><dt>Devoluções na semana</dt><dd>0,0%</dd></div>
+          <div class="kvi"><dt>Marcações de spam</dt><dd>0</dd></div>
+          <div class="kvi"><dt>Avisos da Hostinger</dt><dd>nenhum</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="block">
+        <div class="block-head"><h3>Aguardando aprovação</h3><button class="link" type="button">Ver todas</button></div>
+        <ul class="rows">
+          <li class="row"><div><div class="row-name">Bebidas Serra do Mar Indústria e Comércio de Refrigerantes Ltda.</div><div class="row-sub">Refrigerantes · média-mais · comprador + gestor de compras</div></div><span class="row-meta">Ribeirão Preto/SP</span><span class="row-meta">38 km · estimado</span><span class="tag">PV ok</span></li>
+          <li class="row"><div><div class="row-name">Doces Vale Verde Ltda.</div><div class="row-sub">Balas e confeitos · média · sócio-administrador (provisório)</div></div><span class="row-meta">Franca/SP</span><span class="row-meta">91 km · endereço</span><span class="tag warn">Falta endereço físico</span></li>
+          <li class="row"><div><div class="row-name">Laticínios Campo Alto S.A.</div><div class="row-sub">Sobremesas lácteas · média-mais · gestor de compras</div></div><span class="row-meta">Bebedouro/SP</span><span class="row-meta">54 km · endereço</span><span class="tag">PV ok</span></li>
+        </ul>
+      </section>
+
+      <section class="block">
+        <div class="block-head"><h3>Respostas e tarefas</h3><button class="link" type="button">Abrir tarefas</button></div>
+        <ul class="side-list">
+          <li><span class="lvl hot">RESP</span><div><strong>Indústria de Sorvetes Polar Sul respondeu</strong><p>Pediu tabela de preços. Contatos automáticos pausados para açúcar. Orientação da skill: propor a reunião.</p></div></li>
+          <li><span class="lvl">L0</span><div><strong>Ligar para Chocolates Mantiqueira</strong><p>Sem e-mail validado do comprador. Descobrir nome e e-mail.</p></div></li>
+          <li><span class="lvl">L2</span><div><strong>Ligar para João, Bebidas Serra do Mar</strong><p>E-mail 1 enviado ontem. 3 perguntas + teste condicional.</p></div></li>
+          <li><span class="lvl">IN</span><div><strong>LinkedIn: gestor de compras, Laticínios Campo Alto</strong><p>Convite com nota. Envio manual, modo assistido.</p></div></li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="search">
+      <p>Radar em andamento · açúcar · Sertãozinho/SP · raio 100 km · <b>342 candidatos</b> em 61 municípios · Casa dos Dados página 1 de 1 · cobertura <b>parcial</b> (1 município com falha)</p>
+      <button class="link" type="button">Abrir radar</button>
+    </section>
+  </main>
+</div>
+
+<nav class="switcher" aria-label="Escolher direção visual">
+  <button type="button" data-set="talhao" aria-pressed="true">1 Talhão</button>
+  <button type="button" data-set="operacoes" aria-pressed="false">2 Operações</button>
+  <button type="button" data-set="editorial" aria-pressed="false">3 Editorial</button>
+  <button type="button" data-set="manifesto" aria-pressed="false">4 Manifesto</button>
+</nav>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll('.switcher button');
+    function set(dir) {
+      document.body.setAttribute('data-dir', dir);
+      buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.set === dir)); });
+      try { localStorage.setItem('eag-compass-dir', dir); } catch (e) {}
+    }
+    buttons.forEach(function (b) { b.addEventListener('click', function () { set(b.dataset.set); }); });
+    var fromHash = (location.hash || '').replace('#', '');
+    var saved = null; try { saved = localStorage.getItem('eag-compass-dir'); } catch (e) {}
+    set(['talhao', 'operacoes', 'editorial', 'manifesto'].indexOf(fromHash) >= 0 ? fromHash : (saved || 'talhao'));
+  })();
+</script>
+</body>
+</html>

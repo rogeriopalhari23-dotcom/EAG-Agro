@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "mcp-brasil": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcp-brasil==0.14.0",
+        "python",
+        "-m",
+        "mcp_brasil.server"
+      ],
+      "env": {}
+    }
+  }
+}
