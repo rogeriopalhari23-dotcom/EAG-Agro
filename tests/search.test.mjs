@@ -63,6 +63,7 @@ async function drain(env, fetchImpl, now) {
   let guard = 0;
   while (env.sent.length && guard++ < 200) {
     const msg = env.sent.shift();
+    if (msg.body.type !== "search_partition") continue;
     await runPartition(env, msg.body.partitionId, { fetchImpl, now: now?.() });
   }
 }

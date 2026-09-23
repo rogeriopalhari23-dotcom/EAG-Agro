@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-23T16:50:24.119Z",
+  "updatedAt": "2026-09-23T16:53:56.661Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -294,7 +294,7 @@
     {
       "id": "P2-T5",
       "title": "Geocodificação por endereço (LocationIQ)",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P2-T4"
       ],
@@ -306,7 +306,7 @@
       ],
       "acceptance": "Geocodificar apenas lacunas; cache por endereço normalizado/fonte; registrar precisão.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "tests/geocoding.test.mjs",
       "blockedBy": null
     },
     {

@@ -16,6 +16,7 @@ import * as catalog from "./catalog.js";
 import * as sectors from "./sectors.js";
 import * as search from "./search.js";
 import { handleQueue } from "./queue.js";
+import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
 export const VERSION = "0.3.1-review.2";
@@ -170,6 +171,9 @@ async function route(request, env, rid) {
     if (action === "resume" && method === "POST")
       return response(await search.resumeSearch(request, env, actor, rid, id));
   }
+  const geo = path.match(/^\/api\/units\/([^/]+)\/geocode$/);
+  if (geo && method === "POST")
+    return response(await geocodeUnitRoute(request, env, actor, rid, geo[1]));
   if (path === "/api/sectors") {
     if (method === "GET") return response(await sectors.listSectors(env, actor));
     if (method === "POST")

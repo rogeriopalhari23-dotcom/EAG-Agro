@@ -5,6 +5,7 @@ import { originPoint, municipalitiesWithin, haversineKm, classifyInsideRadius, r
 import { cnaesForSectors } from "./sectors.js";
 import { searchEstablishments, SOURCE as CDD_SOURCE, PAGE_LIMIT, MAX_MUNICIPALITIES } from "./adapters/casadosdados.js";
 import { AdapterError } from "./adapters/errors.js";
+import { enqueueGeocoding, GEOCODE_ALL_UNDER_KM } from "./geocoding.js";
 
 const LEASE_MS = 120000;
 const MAX_ATTEMPTS = 3;
@@ -200,6 +201,21 @@ export async function runPartition(env, partitionId, deps = {}) {
       deps.fetchImpl,
     );
     await persistItems(env, search, search.tenant_id, result.items, at);
+    if (search.radius_km <= GEOCODE_ALL_UNDER_KM && result.items.length) {
+      const ids = [];
+      for (const group of chunks(result.items.map((x) => x.cnpj)))
+        ids.push(
+          ...(
+            await s(
+              env,
+              `SELECT id FROM company_units WHERE tenant_id=? AND street IS NOT NULL AND geo_precision NOT IN ('address','manual') AND cnpj IN (${group.map(() => "?").join(",")})`,
+              search.tenant_id,
+              ...group,
+            ).all()
+          ).results.map((r) => r.id),
+        );
+      await enqueueGeocoding(env, ids, deps.geocodeEnqueue ? { enqueue: deps.geocodeEnqueue } : deps);
+    }
     const statements = [
       env.DB.prepare(`UPDATE search_partitions SET status='done',result_total=?,done_at=?,error_kind=NULL,error=NULL WHERE ${fence}`).bind(result.total, at, part.id, owner, part.lease_token),
       env.DB.prepare("UPDATE searches SET api_calls=api_calls+1 WHERE id=?").bind(search.id),

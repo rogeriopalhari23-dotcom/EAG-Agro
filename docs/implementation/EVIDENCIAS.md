@@ -76,3 +76,11 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Candidatos paginados no SQL, ordem por ICP (perfil registrado ou provisório pelo porte, marcado) ou distância com desconhecido no fim.
 - Testes: `tests/search.test.mjs` (11 casos). Banco local: 0009 aplicada (versão final reaplicada só no banco de desenvolvimento, sem dados de busca).
 - **Depende de validação externa:** limite de nomes por `municipio[]` aceito pela API (usado 25) e consumo de saldo por consulta, na chamada real (P2-T17).
+
+## P2-T5 — Geocodificação (LocationIQ)
+
+- Contrato conferido na documentação (forward geocoding e tabela de erros, 2026-09-23): 404 "Unable to geocode" = não encontrado; 429 por segundo/minuto/dia; 403 serviço não habilitado ou acesso restrito.
+- `src/adapters/locationiq.js`, `src/geocoding.js`, `0010_geocode_cache.sql`: só unidades sem endereço preciso e com logradouro; cache por SHA-256 de fonte + endereço normalizado (inclusive "não encontrado"); resposta no nível da cidade continua centroide; coordenada fora do Brasil é erro. Plano `paid` grava a coordenada e recalcula distância e situação no raio em todas as buscas da unidade; plano gratuito (ou sem `LOCATIONIQ_PLAN`) só usa o resultado na hora e guarda o cache por 48 h, conforme o direito de armazenamento da página de preços.
+- Busca com raio de até 5 km enfileira a geocodificação de todas as unidades encontradas (Fase 4 §7.6); acima, `POST /api/units/:id/geocode` sob demanda. Fila: erro definitivo do provedor é registrado e descartado; temporário volta à fila.
+- Testes: `tests/geocoding.test.mjs` (5 casos).
+- **Depende de validação externa:** chave e plano contratados (G9 decidiu plano pago), limites reais da conta.

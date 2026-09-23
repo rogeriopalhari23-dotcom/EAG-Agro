@@ -1,8 +1,23 @@
 // Despacho das mensagens da fila por tipo. Tipo desconhecido é descartado com registro (sem reprocessar lixo).
 import { runPartition } from "./search.js";
+import { geocodeUnit } from "./geocoding.js";
+import { AdapterError } from "./adapters/errors.js";
 
+// Erro definitivo de provedor (chave, dado inválido) é registrado e descartado; temporário volta à fila.
+const tolerant = (fn) => async (env, body) => {
+  try {
+    await fn(env, body);
+  } catch (e) {
+    if (e instanceof AdapterError && !e.retryable) {
+      console.error("queue_provider_error", { kind: e.kind });
+      return;
+    }
+    throw e;
+  }
+};
 const handlers = {
   search_partition: (env, body) => runPartition(env, body.partitionId),
+  geocode_unit: tolerant((env, body) => geocodeUnit(env, body.unitId)),
 };
 
 export async function handleQueue(batch, env, extra = {}) {
