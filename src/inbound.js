@@ -7,7 +7,7 @@ import { parseMessage, header, addressOf, messageIds } from "./mime.js";
 import { imapClient } from "./adapters/imap.js";
 
 const UNSUB_RE = /^\s*(?:please,?\s+|por favor,?\s+)?(sair|descadastr\w*|remover|remova[- ]me|me (tire|remova)|unsubscribe|remove me|stop|opt[ -]?out|take me off)\b/im;
-const PRICE_RE = /pre[çc]o|tabela|cota[çc][ãa]o|apresenta[çc][ãa]o|proposta|price|pricing|quote|quotation|catalog/i;
+const PRICE_RE = /pre[çc]o|tabela|cota[çc][ãa]o|apresenta[çc][ãa]o|proposta|price|pricing|quote|quotation|catalog|proposal|presentation/i;
 const AUTO_SUBJECT = /^(resposta autom[áa]tica|automatic reply|auto[- ]?reply|out of office|aus[êe]ncia|f[ée]rias|ooo\b)/i;
 const PROVIDER_ALERT = /suspens|bloque|limit|spam|abuse|abuso|blacklist|violation|viola[çc][ãa]o/i;
 const LOOKBACK_DAYS = 60;

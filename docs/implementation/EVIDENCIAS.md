@@ -294,3 +294,11 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - `scripts/amostras-en.mjs` → `docs/implementation/AMOSTRAS-TEXTOS-EN.md` (português e inglês lado a lado, com as decisões a conferir).
 - Testes: `tests/review-en.test.mjs` (7 casos: sequência padrão passa, estrutura igual à do português, AT24 "competitive price", AT55 "70% of manufacturers", PV10, volume sem declaração, PV12 sem lacuna ou sem aprovação, nomes e siglas).
 - **Portão humano:** Rogério aprova a tradução lado a lado; só então o admin grava `templates_en_approved`.
+
+## P3-T10 — Envio, respostas e descadastro no fuso e idioma do destinatário
+
+- `src/sending.js`: janela `send_window:<mercado da campanha>` no fuso do destinatário; internacional só envia com `international_enabled` vigente (revogar segura envios já aprovados — `international_not_enabled`) e com fuso do contato (`timezone_pending`); "dia civil anterior" no fuso do contato (já existia); teto diário do remetente contado no dia de São Paulo e somando os dois mercados (teste). Feriados por país não são tratados (limitação declarada no plano).
+- `src/fichas.js` (P3-T9/T10): ficha internacional exige fuso de cada destinatário (R18.6; já recusava na geração); nacional continua usando o fuso do mercado.
+- `src/inbound.js`: pedido de preço em inglês inclui "proposal" e "presentation" (o resto — unsubscribe/remove me/stop/opt out/take me off, Automatic reply/Out of Office/OOO, price/pricing/quote/quotation/catalog — já existia).
+- `src/unsubscribe.js`: todas as páginas de `/u/*` com a frase em inglês e botão "Confirmar descadastro · Unsubscribe"; sem dado pessoal.
+- Testes: `tests/international-send.test.mjs` (6 casos de ponta a ponta com a campanha nascida de seleção: sem fuso não gera; ficha em inglês com lacuna e PV12 aguardando a tradução; internacional desligado não aprova (T12); liberado envia só às 10h de Tóquio e não às 22h; revogação segura o envio; Portugal em português; teto único somando mercados; respostas em inglês classificadas).

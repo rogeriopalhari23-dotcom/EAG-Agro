@@ -39,18 +39,18 @@ export async function handleUnsubscribe(request, env, token) {
   if (!["GET", "HEAD", "POST"].includes(request.method)) return new Response(null, { status: 405, headers: { allow: "GET, POST" } });
   if (env.UNSUB_LIMITER) {
     const { success } = await env.UNSUB_LIMITER.limit({ key: `u:${String(token).slice(0, 64)}` });
-    if (!success) return html("Muitas tentativas", "<h1>Muitas tentativas. Tente de novo em um minuto.</h1>", 429);
+    if (!success) return html("Muitas tentativas", "<h1>Muitas tentativas. Tente de novo em um minuto.</h1><p class=\"en\">Too many attempts. Please try again in a minute.</p>", 429);
   }
   const target = await resolve(env, token);
   if (!target) return notFound();
   if (request.method !== "POST")
     return html(
       "Descadastro",
-      `<h1>Não quer mais receber mensagens da EAG Agro?</h1><form method="post"><input type="hidden" name="List-Unsubscribe" value="One-Click"><button type="submit">Confirmar descadastro</button></form><p class="en">Don't want to receive messages from EAG Agro? Confirm above.</p>`,
+      `<h1>Não quer mais receber mensagens da EAG Agro?</h1><form method="post"><input type="hidden" name="List-Unsubscribe" value="One-Click"><button type="submit">Confirmar descadastro · Unsubscribe</button></form><p class="en">Don't want to receive messages from EAG Agro? Confirm above.</p>`,
     );
   // POST do botão ou one-click do provedor (RFC 8058: form-urlencoded ou multipart; sem cookie).
   const len = Number(request.headers.get("content-length") || 0);
-  if (len > MAX_BODY) return html("Pedido inválido", "<h1>Pedido inválido.</h1>", 413);
+  if (len > MAX_BODY) return html("Pedido inválido", "<h1>Pedido inválido.</h1><p class=\"en\">Invalid request.</p>", 413);
   const at = new Date().toISOString();
   await env.DB.batch([
     env.DB.prepare(

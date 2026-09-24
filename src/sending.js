@@ -72,6 +72,11 @@ export async function preSendCheck(env, row, ctx) {
   if (!approval || approval.status !== "approved" || approval.superseded_at || approval.version_no !== approval.current_version)
     return { block: "approval_invalidated" }; // 3
   const contact = await s(env, "SELECT * FROM contacts WHERE id=?", row.contact_id).first();
+  if (ctx.market === "international") {
+    // Internacional (P3-T10): só com a liberação vigente e com o fuso do destinatário registrado (R18.6).
+    if (ctx.internationalEnabled !== true) return { skip: "international_not_enabled" };
+    if (!contact.timezone) return { skip: "timezone_pending" };
+  }
   if (contact.email_validation !== "valid") return { skip: "email_not_validated" }; // 11
   if (contact.email_validation_expires_at && contact.email_validation_expires_at <= ctx.at) return { skip: "email_validation_expired" };
   const email = await decryptPii(contact.email_encrypted, env);
@@ -118,9 +123,9 @@ export async function tick(env, tenant, deps = {}) {
     const p = await parameters(env, tenant);
     const ramp = p["send_daily_ramp:email"],
       interval = p["send_interval_minutes:email"],
-      window = p["send_window:national"],
       nationalTz = p["send_timezone:national"];
-    if (!Array.isArray(ramp) || !interval || !window || !nationalTz) return { ...out, reason: "parameters_missing" }; // R7.1.1
+    if (!Array.isArray(ramp) || !interval || !p["send_window:national"] || !nationalTz) return { ...out, reason: "parameters_missing" }; // R7.1.1
+    const internationalEnabled = p["international_enabled:international"]?.enabled === true;
     const senderDay = localDate(at, SENDER_TZ);
     const sentToday = state.day === senderDay ? state.sent_today : 0;
     const cap = ramp[Math.min(state.ramp_step, ramp.length - 1)];
@@ -129,14 +134,14 @@ export async function tick(env, tenant, deps = {}) {
     const candidates = (
       await s(
         env,
-        `SELECT o.*,f.campaign_id FROM send_outbox o JOIN fichas f ON f.id=o.ficha_id
+        `SELECT o.*,f.campaign_id,c.market FROM send_outbox o JOIN fichas f ON f.id=o.ficha_id JOIN campaigns c ON c.id=f.campaign_id
          WHERE o.tenant_id=? AND o.channel='email' AND o.status IN ('pending','temp_failed') AND (o.next_attempt_at IS NULL OR o.next_attempt_at<=?)
          ORDER BY o.planned_date,o.step_no,o.created_at LIMIT 100`,
         tenant, at,
       ).all()
     ).results;
     for (const row of candidates) {
-      const check = await preSendCheck(env, row, { at, nationalTz, campaignId: row.campaign_id });
+      const check = await preSendCheck(env, row, { at, nationalTz, campaignId: row.campaign_id, market: row.market, internationalEnabled });
       if (check.cancel || check.block) {
         await env.DB.batch([
           s(env, "UPDATE send_outbox SET status=?,block_reason=?,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')", check.cancel ? "cancelled" : "blocked", check.cancel || check.block, at, row.id),
@@ -146,6 +151,12 @@ export async function tick(env, tenant, deps = {}) {
       }
       if (check.skip) {
         await s(env, "UPDATE send_outbox SET block_reason=?,updated_at=? WHERE id=?", check.skip, at, row.id).run();
+        continue;
+      }
+      // Janela do mercado da campanha, no fuso do destinatário (R19.2 item 7); teto do dia segue único (soma dos mercados).
+      const window = p[`send_window:${row.market}`];
+      if (!window) {
+        await s(env, "UPDATE send_outbox SET block_reason='window_missing',updated_at=? WHERE id=?", at, row.id).run();
         continue;
       }
       if (!inWindow(at, check.tz, window)) {

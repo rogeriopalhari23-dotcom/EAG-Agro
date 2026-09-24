@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T14:08:00.968Z",
+  "updatedAt": "2026-09-24T14:13:02.371Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -721,7 +721,7 @@
     {
       "id": "P3-T10",
       "title": "Envio, respostas e descadastro no fuso e idioma do destinatário",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P2-T10",
         "P2-T11",
@@ -735,7 +735,7 @@
       ],
       "acceptance": "Janela/DST por destinatário, teto do remetente compartilhado; pausas e supressão bilíngues.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": null
     },
     {
