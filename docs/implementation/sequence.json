@@ -542,7 +542,7 @@
     {
       "id": "P2-T18",
       "title": "Interface do piloto",
-      "status": "done",
+      "status": "implemented",
       "dependsOn": [
         "P2-T4",
         "P2-T5",
