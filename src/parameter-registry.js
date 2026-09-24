@@ -33,6 +33,12 @@ export const DEFINITIONS = {
   campaign_review_days: { scopes: /^global$/, type: "integer", min: 1, max: 3650, label: "Revisão de campanha (dias)", requiredBy: "campanhas" },
   period_default_months: { scopes: /^international$/, type: "integer", min: 1, max: 60, label: "Período padrão da análise de país (meses)", requiredBy: "lista internacional (D1)" },
   country_list_refresh_day: { scopes: /^international$/, type: "integer", min: 1, max: 28, label: "Dia da atualização mensal da lista", requiredBy: "lista internacional" },
+  agri_classification: { scopes: /^international$/, type: "classification", label: "Commodities agrícolas (capítulos SH, versão)", requiredBy: "lista internacional (D2)" },
+  trade_list_mdic_years: { scopes: /^international$/, type: "integer", min: 1, max: 5, label: "Anos do arquivo do MDIC na lista", requiredBy: "lista internacional" },
+  trade_list_comtrade_years: { scopes: /^international$/, type: "integer", min: 1, max: 5, label: "Anos declarados da Comtrade na lista", requiredBy: "lista internacional" },
+  comtrade_calls_per_day: { scopes: /^international$/, type: "integer", min: 1, max: 100000, label: "Chamadas à Comtrade por dia (teto)", requiredBy: "lista internacional" },
+  trade_list_retention_versions: { scopes: /^international$/, type: "integer", min: 1, max: 24, label: "Versões da lista guardadas", requiredBy: "lista internacional" },
+  international_enabled: { scopes: /^international$/, type: "release", label: "Internacional liberado (T12)", requiredBy: "aprovação de fichas internacionais" },
 };
 
 function numberIn(v, d, integer = false) {
@@ -103,6 +109,26 @@ export function validateParameter(key, scope, value, current = {}) {
         fail(422, "invalid_parameter_value", "Horários HH:MM com início antes do fim.");
       ascendingIntegers(value.weekdays, { min: 1, max: 7, maxLength: 7 });
       return { start: value.start, end: value.end, weekdays: value.weekdays };
+    }
+    case "classification": {
+      if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.version !== "string" || !/^[a-z0-9@._-]{3,60}$/i.test(value.version))
+        fail(422, "invalid_parameter_value", 'Informe {"version":"sh-01-24@AAAA-MM-DD","chapters":["01",…],"excluded":["03"]}.');
+      const ch = (list, max) => {
+        if (!Array.isArray(list) || list.length > max || list.some((c, i) => !/^\d{2}$/.test(c) || c === "00" || (i && c <= list[i - 1])))
+          fail(422, "invalid_parameter_value", "Capítulos com dois dígitos, em ordem crescente, sem repetição.");
+        return list;
+      };
+      const chapters = ch(value.chapters, 97), excluded = ch(value.excluded ?? [], 97);
+      if (!chapters.length) fail(422, "invalid_parameter_value", "Informe ao menos um capítulo.");
+      if (excluded.some((c) => chapters.includes(c))) fail(422, "invalid_parameter_value", "Capítulo excluído não pode estar na lista.");
+      return { version: value.version, chapters, excluded };
+    }
+    case "release": {
+      if (!value || typeof value !== "object" || typeof value.enabled !== "boolean")
+        fail(422, "invalid_parameter_value", 'Informe {"enabled":true,"evidenceRef":"docs/…#…"}.');
+      if (value.enabled && !/^docs\/[\w./-]+\.md#[\w-]+$/.test(value.evidenceRef ?? ""))
+        fail(422, "evidence_required", "Liberar exige a referência ao registro de validação (docs/…#…).");
+      return value.enabled ? { enabled: true, evidenceRef: value.evidenceRef } : { enabled: false };
     }
     case "timezone":
       if (!validTimezone(value)) fail(422, "invalid_parameter_value", "Fuso IANA inválido, ex.: America/Sao_Paulo.");

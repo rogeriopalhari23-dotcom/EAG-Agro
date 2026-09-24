@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T04:22:01.088Z",
+  "updatedAt": "2026-09-24T13:04:30.656Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -563,7 +563,7 @@
     {
       "id": "P3-T1",
       "title": "Migração 0009 e parâmetros",
-      "status": "pending",
+      "status": "partial",
       "dependsOn": [
         "P1-T5"
       ],
@@ -574,13 +574,13 @@
       ],
       "acceptance": "Criar 0009/0011 após conciliar numeração; parâmetros D1/D2 não aprovados ficam pendentes.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": "Decisões D1/D2 pendentes para conclusão; schema pode avançar sem defaults não aprovados"
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Aprovação de Rogério: D1 (período padrão 12 meses), D2 (capítulos SH 01–24 sem 03) e valores da rotina mensal"
     },
     {
       "id": "P3-T2",
       "title": "Países com os códigos das duas fontes",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P3-T1"
       ],
@@ -591,7 +591,7 @@
       ],
       "acceptance": "Gerar países de fontes oficiais versionadas; mapear ISO2/ISO3 e códigos ativos/históricos sem confundir.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": null
     },
     {
