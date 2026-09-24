@@ -1,7 +1,7 @@
 # Estado das 42 tarefas — 2026-09-24
 
 Fonte da verdade: `docs/implementation/sequence.json` (`npm run next`). Evidência de cada item: `docs/implementation/EVIDENCIAS.md`.
-Branch `v2-revisao-2`, sem push. `npm run check` no Windows: 287 testes + 2 workerd/D1 passando; UI smoke (Playwright + Chrome) com 13 telas.
+Branch `v2-revisao-2`, sem push. `npm run check` no Windows: 294 testes + 2 workerd/D1 passando; UI smoke (Playwright + Chrome) com 13 telas.
 
 **Resumo:** 33 implementadas · 4 parciais · 5 externas (portões humanos). Nenhuma mensagem externa foi enviada, nenhum deploy, nenhuma conta criada, nenhum recurso Cloudflare criado ou apagado.
 
@@ -20,7 +20,7 @@ Implementadas, mas **só com fixtures** (a validação real do provedor é exter
 | Tarefa | Falta | Quem |
 | --- | --- | --- |
 | P2-T15 Migração do OpenClaw | Exportação real do OpenClaw e inventário do executor antigo para o corte | Rogério |
-| P2-T16 Triagem de sanções | Política de compliance T11 (fontes exigidas e validade) e leitores dos arquivos oficiais escolhidos | Rogério |
+| P2-T16 Triagem de sanções | Política de compliance T11 (fontes exigidas, validade, pessoas físicas, raiz de CNPJ) e rodar `scripts/import-sanctions.mjs` em produção — os leitores de OFAC, CEIS e CNEP já estão prontos e conferidos nos arquivos reais | Rogério |
 | P3-T1 Esquema e parâmetros internacionais | Aprovar D1 (12 meses), D2 (capítulos SH 01–24 sem 03) e os valores da rotina | Rogério |
 | P3-T9 Modelos em inglês | Aprovar a tradução lado a lado em `AMOSTRAS-TEXTOS-EN.md` | Rogério |
 
