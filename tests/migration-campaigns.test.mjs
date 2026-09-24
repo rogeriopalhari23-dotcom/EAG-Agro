@@ -63,7 +63,7 @@ const campaign = (productId = "product-03", extra = {}) => ({
 test("Campanhas: raio permitido, máximo 2 commodities, variantes e mercado separados", async (t) => {
   const x = setup();
   t.after(x.close);
-  const { api } = x;
+  const { api, DB } = x;
   assert.equal(
     (
       await api(
@@ -81,6 +81,12 @@ test("Campanhas: raio permitido, máximo 2 commodities, variantes e mercado sepa
   async function activate(p, extra) {
     const c = await api("/api/campaigns", "POST", campaign(p, extra));
     assert.equal(c.status, 201);
+    // Plano 3 (R12.8, R12.14): campanha internacional só ativa a partir de seleção registrada na lista do país.
+    if (extra?.market === "international")
+      DB.raw.exec(`
+        INSERT INTO country_analyses(id,tenant_id,iso3,period_months,snapshot_sha256,created_by) VALUES ('an-ca','eag-internal','CAN',12,'h','system-admin');
+        INSERT INTO commodity_selections(id,tenant_id,analysis_id,items_json,selected_by) VALUES ('sel-ca','eag-internal','an-ca','[{"campaignId":"${c.data.id}","productId":"${p}","needsCommercialValidation":false}]','system-admin');
+        UPDATE campaigns SET analysis_id='an-ca',selection_id='sel-ca' WHERE id='${c.data.id}';`);
     return api(`/api/campaigns/${c.data.id}/activate`, "POST", {
       expectedVersion: 1,
     });
