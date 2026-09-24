@@ -20,7 +20,10 @@ test("P1-T12: config real aponta para o Worker e o D1 existentes e usa workers.d
 });
 
 test("P1-T12: portão recusa publicar sem Access configurado", () => {
-  assert.throws(() => validateConfig(real()), /ACCESS_TEAM_DOMAIN/);
+  const semAccess = real();
+  semAccess.vars = { ...semAccess.vars, ACCESS_TEAM_DOMAIN: "", ACCESS_AUD: "" };
+  assert.throws(() => validateConfig(semAccess), /ACCESS_TEAM_DOMAIN/);
+  assert.deepEqual(validateConfig(real()), { address: "workers.dev" }, "config real com Access preenchido passa no portão");
   assert.deepEqual(validateConfig(ready()), { address: "workers.dev" });
 });
 

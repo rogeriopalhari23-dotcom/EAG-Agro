@@ -15,8 +15,8 @@
     "ENVIRONMENT": "production",
     "ALLOW_LOCAL_AUTH": "false",
     "DEFAULT_TENANT_ID": "eag-internal",
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_TEAM_DOMAIN": "https://quiet-bird-4d88.cloudflareaccess.com",
+    "ACCESS_AUD": "dceee9f35553eef827d15e9ec6d0ac59747283b83e15340db966c4657f4a080f"
   },
   "assets": {
     "directory": "./dist",

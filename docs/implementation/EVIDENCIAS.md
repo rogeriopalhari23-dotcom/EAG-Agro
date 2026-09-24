@@ -378,3 +378,9 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 - Indícios de que o OpenClaw em uso roda na VPS da Hostinger: chave `~/.ssh/eag_openclaw` e o guia de instalação na VPS em Downloads. A base de contatos e descadastros deve estar lá.
 - **Bloqueio atualizado:** exportação feita na VPS (ou autorização de Rogério para leitura por SSH, só leitura) e inventário do que ainda roda no executor antigo para comprovar o corte.
 - **Tentativa por SSH (2026-09-24, autorizada por Rogério, só leitura):** `srv1644560.hstgr.cloud` não resolve mais no DNS; o IP `2.24.78.149` (mesma chave ed25519 que o nome no `known_hosts`) apresentou **chave de host diferente** (`SHA256:zA4NvA5n8KMmxOVbyKdsgYdRn1I4LQjFREnM6y/1JX8`). Conexão recusada pela verificação estrita; nada foi executado nem lido no servidor e a checagem não foi contornada. Provável reinstalação/troca da VPS — Rogério confere a impressão digital no hPanel e se há backup do OpenClaw antigo.
+
+## P1-T12 — Access configurado (2026-09-24)
+
+- Rogério habilitou o Zero Trust no painel (time `quiet-bird-4d88`); R2 ainda não habilitado (só a lista mensal depende dele).
+- Criado pela API, com autorização dele ("pronto" depois de "eu crio os dois apps de Access pela API"): provedor de login **One-time PIN** (`c8166e03-…`); aplicação **EAG Compass** (`5c5864c5-…`) em `eag-compass-production.rogeriopalhari23.workers.dev`, sessão de 24 h, só One-time PIN, política *Allow* para `rogeriopalhari23@gmail.com` (os outros três perfis entram quando Rogério informar os e-mails); aplicação **EAG Compass — descadastro público** (`5c87c934-…`) em `…/u`, política *Bypass — Everyone*.
+- `wrangler.jsonc`: `ACCESS_TEAM_DOMAIN` = `https://quiet-bird-4d88.cloudflareaccess.com`, `ACCESS_AUD` = AUD da aplicação principal. `validate-deploy` passa (`workers.dev`); `wrangler deploy --dry-run` lê Access e o D1 `eag_compass`. **Nada publicado; banco remoto não migrado.**
