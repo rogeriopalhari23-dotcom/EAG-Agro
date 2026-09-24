@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T14:25:40.066Z",
+  "updatedAt": "2026-09-24T14:26:15.334Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -760,7 +760,7 @@
     {
       "id": "P3-T12",
       "title": "Validação pelo Worker, chave da Comtrade e liberação (portões humanos)",
-      "status": "pending",
+      "status": "external",
       "dependsOn": [
         "P3-T10",
         "P3-T11",
@@ -773,8 +773,8 @@
       ],
       "acceptance": "Chave/termos Comtrade, fontes pelo Worker, primeira rotina medida e amostra interna; liberação documentada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": null
+      "evidence": "docs/eag-compass-t6-comexstat.md",
+      "blockedBy": "Portões humanos: conta e chave da Comtrade de Rogério, termos de uso, chamada real, teste pelo Worker (certificado do MDIC), rotina completa medida, amostra em inglês e autorização por escrito"
     }
   ]
 }

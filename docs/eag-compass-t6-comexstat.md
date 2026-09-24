@@ -111,3 +111,21 @@ Fonte da página de downloads: [Base de dados do Comex Stat — arquivos para do
 - Consultas reais listadas acima (2026-09-23).
 - Pacote R `comexr` (CRAN), manual: https://cran.r-project.org/web/packages/comexr/refman/comexr.html — endpoints `/general`, `/tables/*`, formato de `period` `YYYY-MM`, idiomas `pt`/`en`/`es`.
 - Busca que indicou a especificação oficial `https://api-comexstat.mdic.gov.br/docs/doc.yaml` (bloqueada por desafio da Cloudflare; não lida).
+
+## 9. Teste pelo Worker (Plano 3 T12 — roteiro, não iniciado em 2026-09-24)
+
+Cada passo é feito com Rogério e registrado aqui com data, resultado e a resposta copiada. Fixtures dos testes automatizados **não** substituem este registro.
+
+| # | Passo | Resultado esperado | Data | Resultado / evidência |
+| --- | --- | --- | --- | --- |
+| 1 | Rogério cria a conta gratuita em https://comtradedeveloper.un.org/, assina o produto gratuito e grava `npx wrangler secret put COMTRADE_KEY` (Claude não cria contas) | Chave só como secret | | |
+| 2 | Ler a "Policy on use and re-dissemination" da Comtrade | Permite guardar a lista para uso interno; se não permitir, a Comtrade sai da rotina e a Spec volta para revisão | | |
+| 3 | Chamada real com chave para `DEU` e um bloco (`src/adapters/comtrade.js`) | Conferir: cabeçalho `Ocp-Apim-Subscription-Key` aceito; `partnerCode=0,76` e `period` com lista aceitos; valores de total de `partner2Code`/`customsCode`/`motCode`; `count`; ajustar o orçamento de chamadas se preciso | | |
+| 4 | Pelo Worker publicado: `POST /api/trade-list/refresh/DEU` | MDIC responde ao Worker **apesar do certificado incompleto** (ver P3-T2 em EVIDENCIAS: o servidor não envia o intermediário Sectigo); totais de café 2025 batem com a seção 2 (340.503.519 kg). Se o Worker for recusado, o Internacional não é liberado e o item volta à Fase 4 | | |
+| 5 | Primeira rotina mensal completa (`POST /api/trade-list/run`, mesmo código do cron) | Duração, chamadas por dia, 429, CPU por pedaço do MDIC no workerd e tamanho no R2 medidos e registrados | | |
+| 6 | Amostra R17.6 internacional: sequência em inglês para contato interno em outro fuso, pelo modo `internal_test` | Rogério revisa texto e horário (depende da aprovação da tradução — `docs/implementation/AMOSTRAS-TEXTOS-EN.md`) | | |
+| 7 | Com 1–6 registrados, Rogério autoriza por escrito "liberar internacional" | Admin grava `international_enabled` = `{"enabled":true,"evidenceRef":"docs/eag-compass-t6-comexstat.md#liberacao-internacional"}` | | |
+
+### Liberação internacional
+
+Preencher só com os passos 1–7 registrados: data, texto e canal da autorização de Rogério.

@@ -50,3 +50,15 @@ Formato aceito (o arquivo exportado do OpenClaw precisa ser convertido para ele;
 2. `POST /api/openclaw/imports/:id/suppressions` com `{"emails": [...]}` — todos os descadastrados, em lotes de até 200. Depois `POST .../close-suppressions`.
 3. `POST /api/openclaw/imports/:id/contacts` com `{"rows": [{"line","company","cnpj","contactName","email","status":"ativo|pausado|respondeu","lastSent","campaign"}]}`.
 4. `GET /api/openclaw/imports/:id` mostra contagens e conflitos. Para cada empresa `ativo`, desligar no OpenClaw e registrar `POST /api/openclaw/transfers` com a evidência; só então a empresa volta a ter ficha e envio.
+
+## Internacional — lista mensal e liberação (Plano 3)
+
+Passos humanos, nesta ordem; nada disso foi criado automaticamente:
+
+1. **Parâmetros** (Parâmetros, escopo `international`): `agri_classification` (D2, proposta `{"version":"sh-01-24@2026-09-23","chapters":["01",…,"24" sem "03"],"excluded":["03"]}`), `period_default_months` (D1, proposta 12), `trade_list_mdic_years` (2), `trade_list_comtrade_years` (3), `comtrade_calls_per_day` (400), `trade_list_retention_versions` (3), `country_list_refresh_day` (10), `send_window` internacional. Sem eles a rotina não começa.
+2. **R2**: criar o bucket e o binding `FILES` no `wrangler.jsonc` (a lista mensal guarda um JSON por país e fonte). Fila e cron seguem o portão do `validate-deploy`.
+3. **Comtrade**: `COMTRADE_KEY` como secret (conta de Rogério). Sem chave, a rotina completa só o MDIC e marca a Comtrade como indisponível ("Chave da Comtrade não configurada."); depois de gravar a chave, "Retomar Comtrade" na tela Lista mensal.
+4. **Primeira rotina**: tela Lista mensal → "Rodar a rotina do mês agora" (com motivo). A partir daí o cron diário (`17 2 * * *`) começa a versão do mês no dia configurado e retoma o que estiver pendente; a Comtrade respeita o teto diário (o que não cabe espera o dia seguinte).
+5. **Tradução**: Rogério aprova `docs/implementation/AMOSTRAS-TEXTOS-EN.md`; o admin grava `templates_en_approved` no escopo `pv-en-1.0.0`. Antes disso, ficha em inglês não é aprovada (PV12).
+6. **Liberação**: roteiro em `docs/eag-compass-t6-comexstat.md` seção 9; só com todos os passos registrados o admin grava `international_enabled`. Revogar (`{"enabled":false}`) segura na hora os envios internacionais já aprovados.
+7. **Atualização manual de um país**: tela Lista mensal, 1 por dia por país, com motivo; reaproveita o MDIC do mês quando o arquivo não mudou.

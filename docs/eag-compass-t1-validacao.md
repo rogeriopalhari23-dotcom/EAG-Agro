@@ -29,6 +29,7 @@ Estado atual: **não iniciado** (2026-09-24).
 | 11 | Amostras R17.6 (`docs/implementation/AMOSTRAS-TEXTOS-PV.md`) revisadas, inclusive A-E3 e A-D14 | Aprovação ou correções registradas | | |
 | 12 | Busca real de 5 km na Casa dos Dados | Filtro de município aplicado; consumo de saldo por consulta anotado; limite de nomes em `municipio[]` confirmado | | |
 | 13 | Uma semana na rampa de 5/dia só com endereços internos | Hard bounce, spam e avisos da Hostinger zerados | | |
+| 14 | (Internacional, Plano 3 T12 passo 6) Sequência em inglês para contato interno com fuso de outro país | Sai só na janela do fuso do destinatário; texto aprovado lado a lado | | |
 
 ## Liberação
 
