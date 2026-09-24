@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T13:04:30.656Z",
+  "updatedAt": "2026-09-24T13:10:43.887Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -597,7 +597,7 @@
     {
       "id": "P3-T3",
       "title": "Adaptador do arquivo completo do MDIC",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P3-T1"
       ],
@@ -608,8 +608,8 @@
       ],
       "acceptance": "Implementar CSV com byte anterior, Range/ETag, fronteiras exatas e agregação limitada em memória.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": null
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Validação pelo Worker (T12): certificado incompleto de balanca.economia.gov.br e CPU por pedaço"
     },
     {
       "id": "P3-T4",

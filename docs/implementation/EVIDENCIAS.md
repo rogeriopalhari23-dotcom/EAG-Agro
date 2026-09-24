@@ -209,3 +209,15 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Idioma `pt-BR`: AGO, CPV, GNB, MOZ, PRT, STP, TLS. Guiné Equatorial (CPLP) fica em inglês — a conferir por Rogério.
 - Testes: `tests/countries.test.mjs` (5 casos: EUA 842 + 249/396/873, Alemanha 276 e não 280, acentos windows-1252, Reino Unido/Espanha pelo nome certo, cabeçalho diferente recusado, duas entradas ativas param a geração).
 - **Risco para a T12 (comprovado):** `balanca.economia.gov.br` entrega só o certificado folha (sem o intermediário Sectigo "Public Server Authentication CA OV R36"); `openssl` retorna `Verify return code: 21` e o Node recusa (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`) sem `--use-system-ca`. HTTP redireciona para HTTPS. Se o `fetch` do Worker também recusar, a fonte MDIC não funciona pelo Worker e o item volta à Fase 4 (Plano 3 T12 passo 4).
+
+## P3-T3 — Arquivo completo do MDIC por pedaços
+
+- `src/adapters/mdic-bulk.js`: `headYear` (tamanho, ETag, Last-Modified; 404 = ano não publicado), `chunkRanges` (8 MiB), `processChunk`, `linesOf`, `aggregate`, `loadNcmTable`.
+- Errata item 1 (fronteira): pede-se o byte anterior ao início do pedaço; a linha em curso só é descartada quando esse byte não é LF. Última linha sem LF é lida; linha maior que a margem de 64 KB → erro `line_too_long` (nunca truncamento).
+- Errata item 2 (versão consistente): cada pedaço exige 206, `Content-Range` com o intervalo pedido e o tamanho registrado, e ETag/Last-Modified iguais aos do início; diferença → `source_changed` (a rotina refaz o ano inteiro). Servidor que ignora Range → `range_unsupported` (o arquivo nunca é baixado inteiro).
+- Errata item 3 (memória): o agregado de um pedaço real de 128 KB tinha ~600 chaves para ~1.950 linhas (o arquivo não é ordenado por país); estimativa para 8 MiB: ~36 mil chaves (~2 MB de JSON). `limits.cpu_ms` **não** foi alterado: sem medição no workerd não se presume que resolva algo (medir na T12).
+- Métricas: `VL_FOB` e `KG_LIQUIDO` somados; `QT_ESTAT` vazio fica nulo (não vira zero). Só capítulos da classificação vigente, por prefixo de texto.
+- Conexão cortada no meio do corpo → erro temporário (observado duas vezes na `NCM.csv` real: `TypeError: terminated`).
+- Testes: `tests/mdic-bulk.test.mjs` (9 casos), incluindo a propriedade "soma dos pedaços = arquivo inteiro" para todos os tamanhos de pedaço de 1 byte ao arquivo inteiro, com LF, CRLF e sem LF final.
+- **Leitura real (rede doméstica, 2026-09-24, só leitura):** `EXP_2026.csv` → 75.055.366 bytes, ETag `"4794106-65aac1ebd8ade"`, `Last-Modified: Fri, 04 Sep 2026 18:05:56 GMT`, 9 pedaços de 8 MiB; pedaços 0 e 1 de 128 KB lidos por Range (206) com cabeçalho conferido, 1.949 + 1.963 linhas, sem perda nem duplicação na fronteira. `NCM.csv` lida uma vez completa (açúcar 17011400 → SH6 170114, "Outros açúcares de cana"); nas outras duas tentativas a conexão caiu.
+- **Depende de validação externa (T12):** leitura pelo Worker (certificado incompleto do servidor, ver P3-T2) e o tempo de CPU por pedaço no workerd.
