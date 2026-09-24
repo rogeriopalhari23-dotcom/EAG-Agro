@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T14:53:56.410Z",
+  "updatedAt": "2026-09-24T14:59:05.747Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -52,8 +52,8 @@
       ],
       "acceptance": "Conferir conta, plano, IDs, domínio, permissões e custo sem duplicar recursos.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": "Validação real fora desta máquina"
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Decisões de Rogério sobre a conta (inventário em EVIDENCIAS P1-T3): nome do Worker (eag-compass-production existe), banco eag_compass existente x eag-compass-db do config (conteúdo não lido), fila, habilitar R2 e Access (Zero Trust)"
     },
     {
       "id": "P1-T4",

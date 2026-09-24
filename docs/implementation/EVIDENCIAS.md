@@ -322,3 +322,20 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - **Leitura real (2026-09-24, só leitura, rede doméstica):** OFAC SDN.CSV 5.695.076 bytes / ALT.CSV 1.063.989 bytes → 19.391 registros, 11.857 não individuais (entidades, embarcações, aeronaves), 41 lotes, 0,7 s. CEIS `20260923_CEIS.zip` (CSV de 34 MB) → 23.734 sanções, 14.543 de pessoa jurídica (14.531 com CNPJ), 92 lotes, 3,6 s. CNEP `20260923_CNEP.zip` → 1.811 sanções, 1.783 PJ (1.771 com CNPJ), 11 lotes. Todas as linhas com a contagem de colunas esperada. **Nada foi importado em produção.**
 - Testes: `tests/sanctions-parsers.test.mjs` (7 casos, incluindo importação pela API seguida de triagem: CNPJ exato → 2 bloqueios (CEIS e CNEP); nome da OFAC → 1 revisão; contagem divergente → versão falha).
 - **Bloqueio restante:** política T11 (fontes exigidas, validade, pessoas físicas, raiz de CNPJ) e a execução da importação em produção pelo admin.
+
+## P1-T3 — Conferência da conta Cloudflare (só leitura, 2026-09-24)
+
+Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado ou apagado). Conta `Rogeriopalhari23@gmail.com's Account` (tipo `standard`), subdomínio workers.dev `rogeriopalhari23`.
+
+| Recurso | Na conta | No `wrangler.jsonc` | Consequência |
+| --- | --- | --- | --- |
+| Worker | `eag-compass-production` (alterado em 2026-09-22) | `name: "eag-compass"` | Um deploy como está criaria **um segundo Worker**. Decidir: publicar sobre `eag-compass-production` ou aposentá-lo |
+| D1 | `eag_compass` (`d6a5873b-f768-4516-96b8-1f865db8aaa4`, criado em 2026-09-22) | `eag-compass-db` com `LOCAL_REPLACE_AFTER_CREATE` | `db:migrate:remote` não acharia o banco (nome diferente) ou levaria a criar outro. O banco existente pode ter dados e migrações da 0.3.1 — **não foi lido** (leitura de dados de produção negada pela regra de permissões desta sessão) |
+| Filas | `eag-sanctions-queue`, `eag-scores-queue` (da 0.3.1); nenhuma DLQ listada | nenhuma (portão do `validate-deploy`); o código usa um binding `ASYNC_QUEUE` | Decidir reaproveitar uma delas ou criar `eag-compass-async` + DLQ na liberação |
+| R2 | **não habilitado** na conta ("Please enable R2 through the Cloudflare Dashboard") | não configurado | A lista mensal (P3-T5) precisa do R2 habilitado pelo painel e do binding `FILES` |
+| Access (Zero Trust) | **não habilitado** | o Worker exige JWT do Access | Sem Access, a API em produção responde 401 para todos. Habilitar o Zero Trust e criar a aplicação para o hostname workers.dev, com Bypass só em `/u/*` |
+| Zonas / domínio próprio | nenhuma | — | URL seria `eag-compass-production.rogeriopalhari23.workers.dev` (ou o nome escolhido) |
+| KV | nenhum | nenhum (errata: lease/outbox em D1) | ok |
+| Plano | não lido (a assinatura respondeu erro de autenticação ao token) | `limits` não usado | Filas existirem indica Workers Paid; confirmar no painel |
+
+**Estado:** continua `external`. Próximos passos são de Rogério (decisões acima) antes de P1-T12: nome do Worker, banco (reaproveitar `eag_compass` depois de ler/copiar o conteúdo, ou criar novo), fila, habilitar R2 e Access.
