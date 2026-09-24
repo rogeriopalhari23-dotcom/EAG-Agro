@@ -41,7 +41,9 @@ async function world(t, { country = "JP", language = "en", email = TOKYO, tz = "
 const release = (api, key, scope) => api(`/api/parameters/${key}`, "PUT", { scope, value: { enabled: true, evidenceRef: "docs/eag-compass-t1-validacao.md#liberacao" }, reason: "Liberação registrada no teste" });
 
 test("P3-T10: ficha internacional sem fuso do destinatário não é gerada; com fuso sai em inglês (R18.6, PV12)", async (t) => {
-  const { api, companyId, dm } = await world(t);
+  const { api, DB, companyId, dm } = await world(t);
+  // Cenário "tradução sem aprovação vigente": a aprovação de 2026-09-24 perde a vigência.
+  DB.raw.exec("UPDATE parameters SET effective_to='2026-09-24T00:00:01Z' WHERE parameter_key='templates_en_approved'");
   const noTz = await api("/api/fichas", "POST", { companyId, campaignId: "cp-int", recipients: [dm] });
   assert.equal(noTz.data.error.code, "timezone_pending");
   assert.equal((await api(`/api/contacts/${dm}`, "PATCH", { timezone: "Asia/Tokyo" })).status, 200);

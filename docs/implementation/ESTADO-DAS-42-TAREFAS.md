@@ -3,11 +3,11 @@
 Fonte da verdade: `docs/implementation/sequence.json` (`npm run next`). Evidência de cada item: `docs/implementation/EVIDENCIAS.md`.
 Branch `v2-revisao-2`, sem push. `npm run check` no Windows: 294 testes + 2 workerd/D1 passando; UI smoke (Playwright + Chrome) com 13 telas.
 
-**Resumo:** 33 implementadas · 4 parciais · 5 externas (portões humanos). Nenhuma mensagem externa foi enviada, nenhum deploy, nenhuma conta criada, nenhum recurso Cloudflare criado ou apagado.
+**Resumo:** 35 implementadas · 2 parciais · 5 externas (portões humanos). Nenhuma mensagem externa foi enviada, nenhum deploy, nenhuma conta criada, nenhum recurso Cloudflare criado ou apagado.
 
-## Implementadas (33)
+## Implementadas (35)
 
-Fundação: P1-T1, P1-T4 a P1-T11. Piloto nacional: P2-T1 a P2-T14, P2-T18. Internacional: P3-T2 a P3-T8, P3-T10, P3-T11.
+Fundação: P1-T1, P1-T4 a P1-T11. Piloto nacional: P2-T1 a P2-T14, P2-T18. Internacional: P3-T1 a P3-T11 (D1/D2, rotina e tradução aprovados por Rogério em 2026-09-24).
 
 Implementadas, mas **só com fixtures** (a validação real do provedor é externa e não foi feita):
 - P2-T3 Casa dos Dados, P2-T5 LocationIQ, P2-T7 Snov.io, P2-T10 SMTP e P2-T11 IMAP da Hostinger — dependem das credenciais e do teste T1.
@@ -15,14 +15,12 @@ Implementadas, mas **só com fixtures** (a validação real do provedor é exter
 - P3-T4 Comtrade — `getDA` e `HS.json` conferidos sem chave; a chamada de dados precisa da chave de Rogério.
 - P3-T5 rotina mensal — precisa do bucket R2 (`FILES`), da fila e do cron liberados.
 
-## Parciais (4) — o que falta
+## Parciais (2) — o que falta
 
 | Tarefa | Falta | Quem |
 | --- | --- | --- |
 | P2-T15 Migração do OpenClaw | Exportação real do OpenClaw e inventário do executor antigo para o corte | Rogério |
 | P2-T16 Triagem de sanções | Política de compliance T11 (fontes exigidas, validade, pessoas físicas, raiz de CNPJ) e rodar `scripts/import-sanctions.mjs` em produção — os leitores de OFAC, CEIS e CNEP já estão prontos e conferidos nos arquivos reais | Rogério |
-| P3-T1 Esquema e parâmetros internacionais | Aprovar D1 (12 meses), D2 (capítulos SH 01–24 sem 03) e os valores da rotina | Rogério |
-| P3-T9 Modelos em inglês | Aprovar a tradução lado a lado em `AMOSTRAS-TEXTOS-EN.md` | Rogério |
 
 ## Externas (5) — portões humanos
 

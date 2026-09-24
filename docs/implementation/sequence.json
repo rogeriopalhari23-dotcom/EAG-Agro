@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T15:20:18.244Z",
+  "updatedAt": "2026-09-24T15:29:47.076Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -563,7 +563,7 @@
     {
       "id": "P3-T1",
       "title": "Migração 0009 e parâmetros",
-      "status": "partial",
+      "status": "implemented",
       "dependsOn": [
         "P1-T5"
       ],
@@ -575,7 +575,7 @@
       "acceptance": "Criar 0009/0011 após conciliar numeração; parâmetros D1/D2 não aprovados ficam pendentes.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Aprovação de Rogério: D1 (período padrão 12 meses), D2 (capítulos SH 01–24 sem 03) e valores da rotina mensal"
+      "blockedBy": null
     },
     {
       "id": "P3-T2",
@@ -703,7 +703,7 @@
     {
       "id": "P3-T9",
       "title": "Modelos em inglês e revisor PV em inglês",
-      "status": "partial",
+      "status": "implemented",
       "dependsOn": [
         "P2-T8",
         "P3-T8"
@@ -716,7 +716,7 @@
       "acceptance": "Templates inglês/português fiéis à skill original, revisor PV e lacunas explícitas.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Aprovação de Rogério da tradução lado a lado (docs/implementation/AMOSTRAS-TEXTOS-EN.md)"
+      "blockedBy": null
     },
     {
       "id": "P3-T10",

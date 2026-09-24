@@ -44,6 +44,8 @@ for (const c of cases) {
   });
 }
 out.push("## Level 0 (sem e-mail do decisor)", "", block("Português", { body: LEVEL0_SCRIPT }), block("English", { body: LEVEL0_SCRIPT_EN }));
-out.push("## Aprovação", "", "- [ ] Rogério aprova a tradução (data, canal e texto da aprovação):", "- [ ] Correções pedidas:", "");
+// Aprovação vale só para a versão aprovada; versão nova dos modelos volta a exigir aprovação.
+const APPROVALS = { "pv-en-1.0.0": 'Aprovada por Rogério Palhari em 2026-09-24, na conversa do Claude Code (resposta "aprovado", opção "Tradução em inglês"). Registro: docs/implementation/EVIDENCIAS.md e parâmetro templates_en_approved (migração 0016).' };
+out.push("## Aprovação", "", APPROVALS[TEMPLATES_EN_VERSION] ? `- [x] ${APPROVALS[TEMPLATES_EN_VERSION]}` : "- [ ] Rogério aprova a tradução (data, canal e texto da aprovação):", "- [ ] Correções pedidas: nenhuma registrada.", "");
 writeFileSync(new URL("../docs/implementation/AMOSTRAS-TEXTOS-EN.md", import.meta.url), out.join("\n"));
 console.log("ok");

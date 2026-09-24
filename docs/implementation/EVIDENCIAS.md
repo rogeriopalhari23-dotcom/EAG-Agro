@@ -342,3 +342,11 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 
 - **Decisão de Rogério (2026-09-24):** publicar sobre `eag-compass-production` e reaproveitar o D1 `eag_compass`. `wrangler.jsonc` (produção) e `db:migrate:remote` atualizados; ambiente local mantido (`eag-compass-local`/`eag-compass-db`) para não perder o D1 local. `wrangler deploy --dry-run` lê o binding `DB → eag_compass`. Nada publicado.
 - **Decisões de Rogério (2026-09-24):** endereço workers.dev atrás do Access; fila nova `eag-compass-async` + DLQ `eag-compass-dlq`. `workers_dev: true`; `scripts/validate-deploy.mjs` virou função testada (`tests/validate-deploy.test.mjs`, 3 casos) — aceita workers.dev ou rota (um só), exige Access e D1 real, segura fila/cron/R2; antes o portão sempre falhava ao ler o `wrangler.jsonc` por causa dos comentários. Blocos de fila/cron/R2 documentados em `docs/OPERACAO.md`, não aplicados.
+
+## Aprovações de Rogério — 2026-09-24
+
+- Canal: conversa no Claude Code. Mensagem "aprovado"; na confirmação pedida em seguida, Rogério marcou: "D1 e D2", "Valores da rotina mensal", "Tradução em inglês" e "Outra coisa" (sem texto — a esclarecer, nada registrado para ela).
+- Registrado em `migrations/0016_parametros_internacional_aprovados.sql` (vigência 2026-09-24, motivo com autor e data): `period_default_months` 12 (D1); `agri_classification` `sh-01-24@2026-09-23`, capítulos 01–24 sem 03 (D2); `trade_list_mdic_years` 2; `trade_list_comtrade_years` 3; `comtrade_calls_per_day` 400; `trade_list_retention_versions` 3; `country_list_refresh_day` 10; `templates_en_approved` no escopo `pv-en-1.0.0` com `evidenceRef` para `docs/implementation/AMOSTRAS-TEXTOS-EN.md#aprovacao` (seção de aprovação preenchida pelo gerador, só para essa versão).
+- Continuam sem valor (não aprovados): `international_enabled` (só depois de T12) e `send_window:international`.
+- Testes ajustados ao novo estado: os cenários "sem aprovação vigente" agora encerram a vigência do parâmetro em vez de depender da ausência. Migração aplicada no D1 local após cópia em `eag-compass-backups/d1-local-20260924-112922`.
+- P3-T1 e P3-T9 passam a `implemented`.

@@ -112,6 +112,8 @@ test("P3-T6: análise não toca empresas, evidências, condições nem scores (A
 test("P3-T6: sem período aprovado exige período explícito; lista ausente não inventa análise", async (t) => {
   const ctx = setup();
   t.after(ctx.close);
+  const { DB } = ctx;
+  DB.raw.exec("UPDATE parameters SET effective_to='2026-09-24T00:00:01Z' WHERE scope_key IN ('international','pv-en-1.0.0')");
   const r = await ctx.api("/api/country-analyses", "POST", { iso3: "DEU" });
   assert.equal(r.data.error.code, "parameter_missing");
   const r2 = await ctx.api("/api/country-analyses", "POST", { iso3: "DEU", periodMonths: 6 });

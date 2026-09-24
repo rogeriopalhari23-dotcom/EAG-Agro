@@ -44,12 +44,20 @@ test("P3-T1: código da Comtrade único e código do MDIC com um só país (Revi
   throwsSql(db, "INSERT INTO country_mdic_codes(mdic_code,iso3,name_pt) VALUES ('023','DEU','Outra')", /UNIQUE|PRIMARY/);
 });
 
-test("P3-T1: parâmetros internacionais sem valor semeado; liberar exige evidência", async (t) => {
+test("P3-T1: valores aprovados por Rogério em 2026-09-24 vigentes; liberação e janela internacional seguem ausentes", async (t) => {
   const ctx = setup();
   t.after(ctx.close);
   const { data } = await ctx.api("/api/parameters");
-  for (const k of ["agri_classification", "trade_list_mdic_years", "trade_list_comtrade_years", "comtrade_calls_per_day", "trade_list_retention_versions", "international_enabled", "period_default_months"])
-    assert.equal(data.parameters[`${k}:international`], undefined, k);
+  const p = (k) => data.parameters[`${k}:international`];
+  assert.equal(p("period_default_months"), 12);
+  assert.equal(p("agri_classification").version, "sh-01-24@2026-09-23");
+  assert.equal(p("agri_classification").chapters.length, 23);
+  assert.ok(!p("agri_classification").chapters.includes("03"));
+  assert.deepEqual([p("trade_list_mdic_years"), p("trade_list_comtrade_years"), p("comtrade_calls_per_day"), p("trade_list_retention_versions"), p("country_list_refresh_day")], [2, 3, 400, 3, 10]);
+  assert.equal(data.parameters["templates_en_approved:pv-en-1.0.0"].enabled, true);
+  for (const k of ["international_enabled", "send_window"]) assert.equal(p(k), undefined, k);
+  const reason = ctx.DB.raw.prepare("SELECT change_reason FROM parameters WHERE parameter_key='agri_classification'").get().change_reason;
+  assert.match(reason, /aprovado por Rogério Palhari em 2026-09-24/);
   const put = (key, value) => ctx.api(`/api/parameters/${key}`, "PUT", { scope: "international", value, reason: "Decisão registrada no teste" });
   assert.equal((await put("international_enabled", { enabled: true })).data.error.code, "evidence_required");
   assert.equal((await put("agri_classification", { version: "sh-01-24@2026-09-23", chapters: ["01", "03"], excluded: ["03"] })).status, 422);

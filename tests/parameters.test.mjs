@@ -19,9 +19,8 @@ check("P1-T8: parâmetros pendentes da Spec continuam ausentes, sem valor invent
     "send_window:national",
     "send_window:international",
     "send_timezone:national",
-    "period_default_months:international",
-    "country_list_refresh_day:international",
     "campaign_review_days:global",
+    "international_enabled:international",
     "volume_min:corn:national",
   ])
     assert.equal(r.data.parameters[k], undefined, k);

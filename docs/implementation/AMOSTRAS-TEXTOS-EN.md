@@ -604,5 +604,5 @@ Never: "Good afternoon, I'm … and I work at … Could I speak with the purchas
 
 ## Aprovação
 
-- [ ] Rogério aprova a tradução (data, canal e texto da aprovação):
-- [ ] Correções pedidas:
+- [x] Aprovada por Rogério Palhari em 2026-09-24, na conversa do Claude Code (resposta "aprovado", opção "Tradução em inglês"). Registro: docs/implementation/EVIDENCIAS.md e parâmetro templates_en_approved (migração 0016).
+- [ ] Correções pedidas: nenhuma registrada.

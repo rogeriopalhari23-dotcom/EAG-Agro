@@ -210,6 +210,8 @@ test("P3-T5: poda guarda o vigente de cada país e o que as análises usam (erra
 test("P3-T5: sem R2 a rotina não começa; sem parâmetros aprovados também não", async (t) => {
   const ctx = setup();
   t.after(ctx.close);
+  const { DB } = ctx;
+  DB.raw.exec("UPDATE parameters SET effective_to='2026-09-24T00:00:01Z' WHERE scope_key IN ('international','pv-en-1.0.0')");
   const d = driver(ctx.env, sources(), { at: OCT });
   await assert.rejects(d.start(), (e) => e.code === "parameter_missing");
   ctx.env.FILES = undefined;
