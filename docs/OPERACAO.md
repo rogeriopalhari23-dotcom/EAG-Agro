@@ -6,7 +6,7 @@ Use os comandos do README na ordem. Dados locais são descartáveis apenas quand
 
 ## Cloudflare
 
-1. Confirmar conta, plano, permissões, nome e UUID do D1. O pacote usa `eag-compass-db`; alinhar uma vez antes de provisionar, sem criar recursos duplicados.
+1. Conta alinhada em 2026-09-24 (decisão de Rogério): produção publica sobre o Worker existente `eag-compass-production` e usa o D1 existente `eag_compass` (`d6a5873b-f768-4516-96b8-1f865db8aaa4`, 0 tabelas na conferência de 2026-09-22). O ambiente local continua `eag-compass-local` / `eag-compass-db` (o estado local fica preso a esse identificador). Antes do primeiro `db:migrate:remote`, conferir que o banco segue vazio: `npx wrangler d1 execute eag_compass --remote --command "SELECT name FROM sqlite_master WHERE type='table'"`.
 2. Definir domínio e aplicação Access que protejam o domínio inteiro. Usar issuer `https://<equipe>.cloudflareaccess.com` e audience exata. `workers_dev` e previews estão desativados. O JWT é verificado dentro do Worker; cabeçalho de e-mail não concede acesso.
 3. Configurar `PII_ENCRYPTION_KEY` e `SUPPRESSION_HMAC_KEY` por `wrangler secret put`. Cada chave deve representar 32 bytes em Base64. Não mudar chave de banco já preenchido sem migração criptográfica.
 4. Exportar backup do D1 e testar restauração em banco separado. Conferir `PRAGMA foreign_key_check`, contagens e documentos vinculados antes/depois das migrações.

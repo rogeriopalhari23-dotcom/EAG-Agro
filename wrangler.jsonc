@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "eag-compass",
+  // Worker e D1 já existentes na conta (decisão de Rogério em 2026-09-24; inventário em EVIDENCIAS P1-T3).
+  "name": "eag-compass-production",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-21",
   "workers_dev": false,
@@ -36,8 +37,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "eag-compass-db",
-      "database_id": "LOCAL_REPLACE_AFTER_CREATE",
+      "database_name": "eag_compass",
+      "database_id": "d6a5873b-f768-4516-96b8-1f865db8aaa4",
       "migrations_dir": "migrations"
     }
   ],

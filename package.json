@@ -11,7 +11,7 @@
     "test": "node scripts/test.mjs",
     "check": "node scripts/check.mjs",
     "db:migrate:local": "wrangler d1 migrations apply eag-compass-db --env local --local",
-    "db:migrate:remote": "node scripts/validate-deploy.mjs && wrangler d1 migrations apply eag-compass-db --remote",
+    "db:migrate:remote": "node scripts/validate-deploy.mjs && wrangler d1 migrations apply eag_compass --remote",
     "predeploy": "npm run check && node scripts/validate-deploy.mjs",
     "deploy": "wrangler deploy",
     "test:worker": "node --test tests/worker.integration.mjs",

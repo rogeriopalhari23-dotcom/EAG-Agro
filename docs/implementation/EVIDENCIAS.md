@@ -339,3 +339,5 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 | Plano | não lido (a assinatura respondeu erro de autenticação ao token) | `limits` não usado | Filas existirem indica Workers Paid; confirmar no painel |
 
 **Estado:** continua `external`. Próximos passos são de Rogério (decisões acima) antes de P1-T12: nome do Worker, banco (reaproveitar `eag_compass` depois de ler/copiar o conteúdo, ou criar novo), fila, habilitar R2 e Access.
+
+- **Decisão de Rogério (2026-09-24):** publicar sobre `eag-compass-production` e reaproveitar o D1 `eag_compass`. `wrangler.jsonc` (produção) e `db:migrate:remote` atualizados; ambiente local mantido (`eag-compass-local`/`eag-compass-db`) para não perder o D1 local. `wrangler deploy --dry-run` lê o binding `DB → eag_compass`. Nada publicado.
