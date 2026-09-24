@@ -203,6 +203,19 @@ async function settle(env, row, token, result, at, sentToday, senderDay, interva
       s(env, `UPDATE send_outbox SET status='accepted',accepted_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE ${fence}`, at, at, row.id, token),
       log(env, row.id, "accepted", null, token),
       s(env, "UPDATE sender_state SET day=?,sent_today=?,next_send_at=?,ramp_started_on=COALESCE(ramp_started_on,?) WHERE tenant_id=? AND sender=?", senderDay, sentToday + 1, next, senderDay, row.tenant_id, sender),
+      // Break enviado sem resposta: sugestão de retorno em 6 meses (ou no ciclo do ICP), sem nova sequência automática (R28.11, R17.7).
+      ...(row.step_no === 4
+        ? [
+            s(
+              env,
+              `INSERT INTO tasks(id,tenant_id,company_id,commodity,contact_id,ficha_id,kind,owner_id,due_date,priority,script)
+               SELECT ?,?,?,?,?,f.id,'return_suggested',f.created_by,date(?, '+' || COALESCE((SELECT buying_cycle_days FROM campaign_icp WHERE campaign_id=f.campaign_id),182) || ' days'),0,
+                      'Sequência encerrada sem resposta. Avalie nova ficha (a /prospeccao-vendas sugere voltar em 6–12 meses).'
+               FROM fichas f WHERE f.id=?`,
+              crypto.randomUUID(), row.tenant_id, row.company_id, row.commodity, row.contact_id, at.slice(0, 10), row.ficha_id,
+            ),
+          ]
+        : []),
     ]);
   if (result.kind === "temporary") {
     const final = row.attempts + 1 >= MAX_TEMP_ATTEMPTS;

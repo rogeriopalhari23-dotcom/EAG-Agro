@@ -165,3 +165,12 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Efeitos: humana, automática (B1 pendente) e ilegível pausam empresa + commodity em todos os passos, canais e contatos, suspendem ligações/LinkedIn e abrem tarefa (AT29, AT30, AT36); outra commodity da mesma empresa só recebe alerta (R20.5); "sair" suprime antes de tudo, sem despedida (AT31); pedido de preço traz a orientação fixa da skill (AT58); bounce 5.x.x suprime e cancela; alerta do provedor para a operação (R19.12). Nenhuma resposta automática é enviada.
 - Testes: `tests/inbound.test.mjs` (11 casos) e helper `tests/helpers/pilot.mjs`. Suíte 208/208 + 2 workerd/D1.
 - **Depende de validação externa:** login e leitura reais em `imap.hostinger.com:993`, formato real dos avisos da Hostinger e dos DSN.
+
+## P2-T14 — Tarefas manuais, reuniões, retorno e linha do tempo
+
+- `src/tasks.js`; rotas `GET /api/tasks`, `POST /api/tasks/:id/complete`, `POST /api/companies/:id/level0`, `POST /api/meetings`, `GET /api/companies/:id/timeline`, `GET /api/dashboard/funnel`.
+- Aprovar o canal de ligação ou LinkedIn da ficha cria as tarefas com o roteiro congelado e as datas da cadência (dias 3, 7, 8 e 11 para ligações; 2 para LinkedIn), com dono. Roteiro com nome do contato gravado cifrado e decifrado só na listagem autenticada.
+- Lista do dia: respostas e confirmações primeiro; ligações dos piores leads para os melhores (skill, R28.8); cada tarefa manual mostra os bloqueios das restrições comuns. Conclusão sempre humana; tarefa suspensa ou bloqueada (pausa, supressão, triagem) não conclui (errata item 6); as 3 perguntas da Level 2 ficam registradas com método e data (R3.1.5); volume em texto é recusado.
+- Resposta suspende as ligações da empresa+commodity (AT65). Break aceito cria "retorno sugerido" no ciclo do ICP ou em 182 dias, sem sequência automática (R28.11, R17.7, AT56). Reunião cria confirmação para a manhã do dia (R28.10). Level 0 com o roteiro da skill quando não há e-mail do decisor (R28.6).
+- Linha do tempo (auditoria, envios, respostas, tarefas, reuniões) e funil prospectadas → reuniões → negócios, sem dado pessoal.
+- Testes: `tests/tasks.test.mjs` (5 casos).

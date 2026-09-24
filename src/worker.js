@@ -23,6 +23,7 @@ import * as sanctions from "./sanctions.js";
 import * as changes from "./changes.js";
 import * as sending from "./sending.js";
 import * as inbound from "./inbound.js";
+import * as tasks from "./tasks.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -182,6 +183,15 @@ async function route(request, env, rid) {
     if (action === "resume" && method === "POST")
       return response(await search.resumeSearch(request, env, actor, rid, id));
   }
+  if (path === "/api/tasks" && method === "GET") return response(await tasks.listTasks(request, env, actor));
+  const tk = path.match(/^\/api\/tasks\/([^/]+)\/complete$/);
+  if (tk && method === "POST") return response(await tasks.completeTask(request, env, actor, rid, tk[1]));
+  const l0 = path.match(/^\/api\/companies\/([^/]+)\/level0$/);
+  if (l0 && method === "POST") return response(await tasks.createLevel0(request, env, actor, rid, l0[1]), 201);
+  if (path === "/api/meetings" && method === "POST") return response(await tasks.recordMeeting(request, env, actor, rid), 201);
+  const tl = path.match(/^\/api\/companies\/([^/]+)\/timeline$/);
+  if (tl && method === "GET") return response(await tasks.timeline(env, actor, tl[1]));
+  if (path === "/api/dashboard/funnel" && method === "GET") return response(await tasks.funnel(env, actor));
   if (path === "/api/sending/today" && method === "GET") return response(await sending.today(env, actor));
   if (path === "/api/inbound" && method === "GET") {
     const { limit, offset } = page(request);

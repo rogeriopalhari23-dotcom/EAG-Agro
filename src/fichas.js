@@ -8,6 +8,7 @@ import { canHaveFicha, contactTargetFlag } from "./profiles.js";
 import { generateSequence, commodityDisplay, SKILL_SHA256, TEMPLATES_VERSION, GENERATOR_VERSION } from "./templates/prospeccao-vendas.js";
 import { reviewSequence } from "./review.js";
 import { unsubUrl } from "./unsub-token.js";
+import { manualTaskStatements } from "./tasks.js";
 
 const ROLES = ["decision_maker", "influencer", "provisional_decision_maker"];
 async function sha256(text) {
@@ -268,6 +269,14 @@ export async function approve(request, env, actor, rid, id) {
           m.step_no, addDays(start, m.day_offset), busy ? "waiting_sequence" : "pending", m.message_sha256,
         ),
       );
+  }
+  if (channel !== "email") {
+    const plain = [];
+    // Roteiro tem o nome do contato: vai cifrado para a tarefa (marcado "enc:"), decifrado só na listagem autenticada.
+    for (const m of list) plain.push({ ...m, body: `enc:${m.body_enc}` });
+    statements.push(
+      ...manualTaskStatements(env, { tenant: actor.tenant_id, ficha: f, contactId, commodity: snap.commodity, owner: f.created_by, start, messages: plain, addDays }),
+    );
   }
   statements.push(
     auditStatement(env, actor, rid, "ficha.approved", "ficha", id, { version: v.version_no, contactId, channel, messagesSha256: agg, start }),
