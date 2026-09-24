@@ -51,5 +51,12 @@ for (const c of cases) {
     out += m.body.split("\n").map((l) => `> ${l}`).join("\n") + "\n";
   }
 }
+// Aprovação vale só para a versão aprovada dos modelos.
+const APPROVALS = { "pv-1.1.0": 'Aprovadas por Rogério Palhari em 2026-09-24, na conversa do Claude Code ("ok", confirmado como "Sim, aprovo os textos"), com as adaptações A-E3, A-D14, A-K6, A-PV4, A-R19 e a nova A-G1 (break sem gênero, escolhida por ele na mesma resposta).' };
+out += `
+## Aprovação
+
+${APPROVALS[TEMPLATES_VERSION] ? `- [x] ${APPROVALS[TEMPLATES_VERSION]}` : "- [ ] Aguardando aprovação de Rogério."}
+`;
 await writeFile("docs/implementation/AMOSTRAS-TEXTOS-PV.md", out);
 console.log("Amostras geradas.");

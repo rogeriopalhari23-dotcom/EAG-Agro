@@ -1,6 +1,6 @@
 # Amostras lado a lado — tradução para o inglês (P3-T9)
 
-Gerado por `scripts/amostras-en.mjs`. Skill `/prospeccao-vendas` SHA-256 `33bd093f…`; modelos `pv-1.0.0` (português) e `pv-en-1.0.0` (inglês).
+Gerado por `scripts/amostras-en.mjs`. Skill `/prospeccao-vendas` SHA-256 `33bd093f…`; modelos `pv-1.1.0` (português) e `pv-en-1.0.0` (inglês).
 
 **Portão humano (Plano 3 T9):** a tradução só vale depois que Rogério aprovar este documento. Até lá toda ficha em inglês sai com PV12 reprovado e não pode ser aprovada. Para liberar, depois da aprovação por escrito, o admin grava o parâmetro `templates_en_approved` no escopo `pv-en-1.0.0` com `{"enabled":true,"evidenceRef":"docs/implementation/AMOSTRAS-TEXTOS-EN.md#aprovacao"}`.
 
@@ -100,7 +100,7 @@ To stop receiving these messages, reply "unsubscribe" or use this link: https://
 
 ```text
 Acho que agora não é o melhor momento, Anna.
-Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou envolvido em projetos mais urgentes, então não quero insistir além do necessário.
+Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou com projetos mais urgentes, então não quero insistir além do necessário.
 A ideia do meu contato era conversarmos sobre fornecimento de café para indústrias e entender se faria sentido apresentar como a EAG Agro trabalha com fornecimento estruturado, regular e previsível.
 Vou encerrar por aqui para não tomar mais seu tempo. Se em algum momento esse tema fizer sentido, é só responder este e-mail.
 Um abraço,
@@ -384,7 +384,7 @@ To stop receiving these messages, reply "unsubscribe" or use this link: https://
 
 ```text
 Acho que agora não é o melhor momento, Anna.
-Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou envolvido em projetos mais urgentes, então não quero insistir além do necessário.
+Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou com projetos mais urgentes, então não quero insistir além do necessário.
 A ideia do meu contato era conversarmos sobre fornecimento de café para indústrias e entender se faria sentido apresentar como a EAG Agro trabalha com fornecimento estruturado, regular e previsível.
 Vou encerrar por aqui para não tomar mais seu tempo. Se em algum momento esse tema fizer sentido, é só responder este e-mail.
 Um abraço,

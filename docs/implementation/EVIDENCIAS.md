@@ -355,3 +355,9 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 
 - Push de `v2-revisao-2` autorizado por Rogério e executado por ele (`git -c http.postBuffer=157286400 push -u origin v2-revisao-2`; a primeira tentativa caiu com HTTP 408). Workflow passou a incluir a branch (`96ccfda`).
 - GitHub Actions, run 36021958011 (https://github.com/rogeriopalhari23-dotcom/EAG-Agro/actions/runs/36021958011), commit `96ccfda`: `npm ci` + `npm run check` — **ubuntu-latest: success** (15:41:04–15:41:34 UTC), **windows-latest: success** (15:41:05–15:42:07 UTC).
+
+## Aprovação dos textos em português (R17.6) — 2026-09-24
+
+- Rogério viu os textos na conversa e respondeu "ok"; na confirmação pedida, marcou "Sim, aprovo os textos" e, sobre o break no masculino, "Tirar o gênero da frase".
+- Nova adaptação **A-G1**: "…outras prioridades no momento ou com projetos mais urgentes…" (antes "ou envolvido em projetos mais urgentes", literal da skill). Modelos passam a `pv-1.1.0`; fichas já geradas guardam a versão e o texto com que foram criadas. A tradução `pv-en-1.0.0` não muda (o inglês já é neutro).
+- Registro em `docs/implementation/AMOSTRAS-TEXTOS-PV.md` (seção Aprovação, gerada só para `pv-1.1.0`) e no item 11 de `docs/eag-compass-t1-validacao.md`. Continua pendente a amostra "sequência interrompida antes do break", que depende do envio real (T1).

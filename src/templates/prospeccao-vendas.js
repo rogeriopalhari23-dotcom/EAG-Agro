@@ -8,8 +8,10 @@
 //  A-D14 Break na segunda da semana 3 (dia 14), não na sexta da semana 2: a tabela da skill põe E-mail 3 e 4 em dias seguidos,
 //        o que contraria a regra da própria skill e o R19.2 item 12. Vale o mais restritivo até decisão de Rogério (T12).
 //  A-R19 Assinatura com endereço físico e forma de saída (R19.13, R21.7).
+//  A-G1  Break sem gênero: "ou com projetos mais urgentes" no lugar de "ou envolvido em projetos mais urgentes"
+//        (decisão de Rogério em 2026-09-24; serve para qualquer contato sem inferir gênero). Versão pv-1.1.0.
 export const SKILL_SHA256 = "33bd093f5dcb87a7d4aa51d31597c6d6ddfc637097693e3830a38f9b219f9dd8";
-export const TEMPLATES_VERSION = "pv-1.0.0";
+export const TEMPLATES_VERSION = "pv-1.1.0";
 export const GENERATOR_VERSION = "tpl-1.0.0";
 
 const COMPANY = "EAG Agro";
@@ -73,7 +75,7 @@ export function generateSequence({ commodity, recipients, declarations = {}, sig
     ].join("\n");
     const e4 = [
       nome ? `Acho que agora não é o melhor momento, ${nome}.` : "Acho que agora não é o melhor momento.",
-      "Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou envolvido em projetos mais urgentes, então não quero insistir além do necessário.",
+      "Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou com projetos mais urgentes, então não quero insistir além do necessário.",
       `A ideia do meu contato era conversarmos sobre fornecimento de ${commodity} para indústrias e entender se faria sentido apresentar como a ${COMPANY} trabalha com fornecimento estruturado, regular e previsível.`,
       "Vou encerrar por aqui para não tomar mais seu tempo. Se em algum momento esse tema fizer sentido, é só responder este e-mail.",
       "Um abraço,",

@@ -1,6 +1,6 @@
 # Amostras de texto — revisão de Rogério (R17.6)
 
-Geradas por `scripts/gen-amostras-pv.mjs` com os modelos que as fichas usam. Skill `33bd093f…`, modelos `pv-1.0.0`, gerador `tpl-1.0.0`. Pessoas, empresa e endereço são fictícios.
+Geradas por `scripts/gen-amostras-pv.mjs` com os modelos que as fichas usam. Skill `33bd093f…`, modelos `pv-1.1.0`, gerador `tpl-1.0.0`. Pessoas, empresa e endereço são fictícios.
 
 **O que precisa da sua revisão:**
 1. **E-mail 3 e mensagem ao influenciador (A-E3):** a skill não traz texto literal; o texto abaixo é adaptação do Compass.
@@ -126,7 +126,7 @@ Revisor PV: sem violações.
 **Assunto:** Fornecedor açúcar
 
 > Acho que agora não é o melhor momento, Maria.
-> Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou envolvido em projetos mais urgentes, então não quero insistir além do necessário.
+> Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou com projetos mais urgentes, então não quero insistir além do necessário.
 > A ideia do meu contato era conversarmos sobre fornecimento de açúcar para indústrias e entender se faria sentido apresentar como a EAG Agro trabalha com fornecimento estruturado, regular e previsível.
 > Vou encerrar por aqui para não tomar mais seu tempo. Se em algum momento esse tema fizer sentido, é só responder este e-mail.
 > Um abraço,
@@ -239,7 +239,7 @@ Revisor PV: sem violações.
 **Assunto:** Fornecedor açúcar
 
 > Acho que agora não é o melhor momento, Carlos.
-> Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou envolvido em projetos mais urgentes, então não quero insistir além do necessário.
+> Tentei entrar em contato com você algumas vezes nas últimas semanas, mas não tive retorno, nem positivo nem negativo. Imagino que você esteja com outras prioridades no momento ou com projetos mais urgentes, então não quero insistir além do necessário.
 > A ideia do meu contato era conversarmos sobre fornecimento de açúcar para indústrias e entender se faria sentido apresentar como a EAG Agro trabalha com fornecimento estruturado, regular e previsível.
 > Vou encerrar por aqui para não tomar mais seu tempo. Se em algum momento esse tema fizer sentido, é só responder este e-mail.
 > Um abraço,
@@ -247,3 +247,7 @@ Revisor PV: sem violações.
 > Rogério Palhari — EAG Agro
 > [ENDEREÇO FÍSICO DA EAG — definir EAG_POSTAL_ADDRESS]
 > Para não receber mais mensagens, responda "sair" ou use este link: https://compass.exemplo/u/token-decisor
+
+## Aprovação
+
+- [x] Aprovadas por Rogério Palhari em 2026-09-24, na conversa do Claude Code ("ok", confirmado como "Sim, aprovo os textos"), com as adaptações A-E3, A-D14, A-K6, A-PV4, A-R19 e a nova A-G1 (break sem gênero, escolhida por ele na mesma resposta).

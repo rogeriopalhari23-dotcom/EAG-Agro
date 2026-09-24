@@ -26,7 +26,7 @@ Estado atual: **não iniciado** (2026-09-24).
 | 8 | Clicar o link de descadastro no Gmail (e o botão de um clique) | Página sem login; supressão registrada | | |
 | 9 | Enviar para endereço inexistente do domínio de teste | DSN classificado como bounce; supressão; resto cancelado | | |
 | 10 | Interromper um envio (derrubar a execução) | Passo `indeterminate`; conferência na pasta Enviados; resolução registrada | | |
-| 11 | Amostras R17.6 (`docs/implementation/AMOSTRAS-TEXTOS-PV.md`) revisadas, inclusive A-E3 e A-D14 | Aprovação ou correções registradas | | |
+| 11 | Amostras R17.6 (`docs/implementation/AMOSTRAS-TEXTOS-PV.md`) revisadas, inclusive A-E3 e A-D14 | Aprovação ou correções registradas | 2026-09-24 | Aprovadas por Rogério (modelos `pv-1.1.0`, com a nova A-G1: break sem gênero); tradução `pv-en-1.0.0` aprovada no mesmo dia |
 | 12 | Busca real de 5 km na Casa dos Dados | Filtro de município aplicado; consumo de saldo por consulta anotado; limite de nomes em `municipio[]` confirmado | | |
 | 13 | Uma semana na rampa de 5/dia só com endereços internos | Hard bounce, spam e avisos da Hostinger zerados | | |
 | 14 | (Internacional, Plano 3 T12 passo 6) Sequência em inglês para contato interno com fuso de outro país | Sai só na janela do fuso do destinatário; texto aprovado lado a lado | | |
