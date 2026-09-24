@@ -1,6 +1,7 @@
 // Fichas de aprovação (P2-T9; R18, R17.1–R17.3, errata): versão imutável e cifrada, hash por mensagem,
 // aprovação por destinatário e canal com o hash visto pelo aprovador; mudança comercial invalida a aprovação.
 import { internationalGate } from "./selections.js";
+import { generateSequenceEn, commodityDisplayEn, TEMPLATES_EN_VERSION, GAP_NOTE } from "./templates/prospeccao-vendas-en.js";
 import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES, APPROVER_ROLES } from "./http.js";
 import { statement as s, commit, auditStatement, now, parameters, product } from "./store.js";
 import { encryptPii, decryptPii } from "./crypto.js";
@@ -78,8 +79,9 @@ async function context(env, actor, companyId, campaignId, contactIds) {
   };
   const others = (
     await s(env, "SELECT DISTINCT group_name,variant_name,commodity FROM products WHERE tenant_id=? AND commodity<>?", actor.tenant_id, p.commodity).all()
-  ).results.map(commodityDisplay);
-  return { campaign: c, product: p, company, profile, gate, timezone, recipients, declarations, declarationIds: decl.map((d) => d.id), others: [...new Set(others)] };
+  ).results.map(c.language === "en" ? commodityDisplayEn : commodityDisplay).filter(Boolean);
+  const translationApproved = params[`templates_en_approved:${TEMPLATES_EN_VERSION}`]?.enabled === true;
+  return { campaign: c, product: p, company, profile, gate, timezone, recipients, declarations, declarationIds: decl.map((d) => d.id), others: [...new Set(others)], language: c.language, translationApproved };
 }
 
 // Monta a versão: gera, revisa, cifra e calcula os hashes. Edições manuais substituem textos antes da revisão.
@@ -87,8 +89,13 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   const versionId = crypto.randomUUID();
   const urls = new Map();
   for (const r of ctx.recipients) urls.set(r.contactId, await unsubUrl(env, versionId, r.contactId));
-  const commodity = commodityDisplay(ctx.product);
-  const msgs = generateSequence({
+  // Idioma da campanha (PV12, R28.15): inglês pelo modelo traduzido; português para o nacional e países lusófonos.
+  const en = ctx.language === "en";
+  const commodity = en ? commodityDisplayEn(ctx.product) : commodityDisplay(ctx.product);
+  if (!commodity) fail(422, "commodity_name_en_missing", "Commodity sem nome em inglês cadastrado nos modelos.");
+  const templatesVersion = en ? TEMPLATES_EN_VERSION : TEMPLATES_VERSION;
+  const gapNote = ctx.campaign.market === "international" ? GAP_NOTE : null;
+  const msgs = (en ? generateSequenceEn : generateSequence)({
     commodity, recipients: ctx.recipients, declarations: ctx.declarations,
     sig: { senderName: env.SENDER_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS },
     unsub: (id) => urls.get(id),
@@ -102,21 +109,22 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   const review = reviewSequence(msgs, {
     market: ctx.campaign.market, commodity, otherCommodities: ctx.others, declarations: ctx.declarations,
     recipients: ctx.recipients, postalAddress: env.EAG_POSTAL_ADDRESS, unsubUrl: (id) => urls.get(id),
+    language: ctx.language, languageGapNote: gapNote, translationApproved: ctx.translationApproved, templatesVersion,
   });
   const snapshot = JSON.stringify({
     companyId: ctx.company.id, campaignId: ctx.campaign.id, campaignVersion: ctx.campaign.version,
     productId: ctx.product.id, commodity: ctx.product.commodity, profileId: ctx.profile?.id ?? null,
-    icpStatus: ctx.profile?.icp_status ?? null, fichaNote: ctx.gate.note ?? null, timezone: ctx.timezone,
+    icpStatus: ctx.profile?.icp_status ?? null, fichaNote: [ctx.gate.note, gapNote].filter(Boolean).join(" ") || null, timezone: ctx.timezone, language: ctx.language,
     declarationIds: ctx.declarationIds,
     recipients: ctx.recipients.map((r) => ({ contactId: r.contactId, role: r.role, emailHash: r.emailHash, timezone: r.timezone, targetFlag: contactTargetFlag(r.jobTitle, r.relationshipNote) })),
-    skill: SKILL_SHA256, templates: TEMPLATES_VERSION, generator: GENERATOR_VERSION, edits: edits.length,
+    skill: SKILL_SHA256, templates: templatesVersion, generator: GENERATOR_VERSION, edits: edits.length,
   });
   const statements = [
     s(
       env,
       "INSERT INTO ficha_versions(id,ficha_id,version_no,snapshot_enc,snapshot_sha256,pv_report_json,review_ok,skill_sha256,templates_version,generator_version,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
       versionId, fichaId, versionNo, await encryptPii(snapshot, env), await sha256(snapshot), JSON.stringify(review.findings),
-      review.ok ? 1 : 0, SKILL_SHA256, TEMPLATES_VERSION, GENERATOR_VERSION, actor.id,
+      review.ok ? 1 : 0, SKILL_SHA256, templatesVersion, GENERATOR_VERSION, actor.id,
     ),
   ];
   for (const m of msgs)

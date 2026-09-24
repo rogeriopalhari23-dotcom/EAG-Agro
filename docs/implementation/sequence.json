@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T14:02:11.621Z",
+  "updatedAt": "2026-09-24T14:08:00.968Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -703,7 +703,7 @@
     {
       "id": "P3-T9",
       "title": "Modelos em inglês e revisor PV em inglês",
-      "status": "pending",
+      "status": "partial",
       "dependsOn": [
         "P2-T8",
         "P3-T8"
@@ -715,8 +715,8 @@
       ],
       "acceptance": "Templates inglês/português fiéis à skill original, revisor PV e lacunas explícitas.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": null
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Aprovação de Rogério da tradução lado a lado (docs/implementation/AMOSTRAS-TEXTOS-EN.md)"
     },
     {
       "id": "P3-T10",

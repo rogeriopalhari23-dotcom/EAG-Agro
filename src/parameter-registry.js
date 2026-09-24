@@ -39,6 +39,7 @@ export const DEFINITIONS = {
   comtrade_calls_per_day: { scopes: /^international$/, type: "integer", min: 1, max: 100000, label: "Chamadas à Comtrade por dia (teto)", requiredBy: "lista internacional" },
   trade_list_retention_versions: { scopes: /^international$/, type: "integer", min: 1, max: 24, label: "Versões da lista guardadas", requiredBy: "lista internacional" },
   international_enabled: { scopes: /^international$/, type: "release", label: "Internacional liberado (T12)", requiredBy: "aprovação de fichas internacionais" },
+  templates_en_approved: { scopes: /^pv-en-\d+\.\d+\.\d+$/, scopeHint: "pv-en-<versão>", type: "release", label: "Tradução em inglês aprovada por Rogério", requiredBy: "fichas em inglês (PV12)" },
 };
 
 function numberIn(v, d, integer = false) {

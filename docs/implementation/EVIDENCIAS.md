@@ -282,3 +282,15 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Fuso do contato validado por `Intl` (já existia no `PATCH /api/contacts/:id`; teste com "Europe/Berlim").
 - Camada 2: links de pesquisa montados (Google, LinkedIn), nunca executados; sem raspagem e sem fonte nominal paga (R13.7).
 - Testes: `tests/foreign-companies.test.mjs` (6 casos).
+
+## P3-T9 — Modelos em inglês e revisor PV em inglês (parcial: aprovação da tradução)
+
+- `src/templates/prospeccao-vendas-en.js` (`pv-en-1.0.0`): tradução frase a frase dos blocos em português (E-mails 1–4, influenciador, LinkedIn, roteiros L1/L2 e Level 0), mesma cadência, passos, canais e objetivos (teste de estrutura idêntica). Assunto `<Commodity> supplier`; assinatura com endereço e `To stop receiving these messages, reply "unsubscribe" or use this link: <URL>`. A skill só diz que o internacional é "o mesmo processo, em inglês" — nada foi inventado além da tradução.
+- A-EN1: prova social declarada (texto em português) não entra no texto em inglês. Nomes das commodities em inglês por termo de mercado; commodity sem nome (CSO) → ficha não é gerada.
+- `src/review.js` bilíngue: regras por idioma, com as do Plano 3 para o inglês (PV1, PV7, PV9 — aceitando sigla como DDGS —, PV10, R19.13 com "unsubscribe"). PV12: ficha internacional exige a lacuna 🔴 de R28.15 registrada e, em inglês, a tradução aprovada.
+- `src/fichas.js`: idioma da campanha escolhe modelo e revisor (Portugal e demais lusófonos em português); versão dos modelos gravada na ficha; nota da lacuna no snapshot.
+- Correção no português: sigla preservada no nome da commodity ("DDGS", antes saía "dDGS").
+- Portão de tradução: parâmetro `templates_en_approved` no escopo `pv-en-1.0.0` (tipo `release`, exige `evidenceRef`); sem ele, PV12 reprova e a ficha em inglês não é aprovada.
+- `scripts/amostras-en.mjs` → `docs/implementation/AMOSTRAS-TEXTOS-EN.md` (português e inglês lado a lado, com as decisões a conferir).
+- Testes: `tests/review-en.test.mjs` (7 casos: sequência padrão passa, estrutura igual à do português, AT24 "competitive price", AT55 "70% of manufacturers", PV10, volume sem declaração, PV12 sem lacuna ou sem aprovação, nomes e siglas).
+- **Portão humano:** Rogério aprova a tradução lado a lado; só então o admin grava `templates_en_approved`.

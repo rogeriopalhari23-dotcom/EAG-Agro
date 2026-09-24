@@ -19,7 +19,8 @@ export function commodityDisplay(product) {
   const g = GROUP_DISPLAY[product.group_name];
   if (g) return g;
   const v = String(product.variant_name).split(/[;(]/)[0].trim();
-  return v.charAt(0).toLowerCase() + v.slice(1);
+  // Sigla (DDGS, CGF, UCO) fica como está; só a inicial de palavra comum vira minúscula.
+  return /^[A-Z]{2,}\b/.test(v) ? v : v.charAt(0).toLowerCase() + v.slice(1);
 }
 
 function firstName(full) {
