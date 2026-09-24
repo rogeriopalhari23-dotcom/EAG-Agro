@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-23T17:35:43.438Z",
+  "updatedAt": "2026-09-24T04:09:09.811Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -405,7 +405,7 @@
     {
       "id": "P2-T11",
       "title": "Leitura de respostas (IMAP) e pausa por resposta",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P2-T10"
       ],
@@ -417,7 +417,7 @@
       ],
       "acceptance": "UIDVALIDITY/UID e Message-ID estáveis, dedup e correlação; resposta ambígua mantém pausa.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "tests/inbound.test.mjs",
       "blockedBy": null
     },
     {

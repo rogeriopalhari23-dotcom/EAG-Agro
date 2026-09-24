@@ -155,3 +155,13 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 
 - `src/restrictions.js` (motivos comuns a envio e tarefas manuais), pausa de commodity pausa as campanhas de todas as variantes (retomar exige reativar cada campanha, R22.3), `src/changes.js`: descarte de empresa (cancela envios, tarefas e fichas, mantém histórico, R23.4) e exclusão de dados pessoais do contato (apaga campos cifrados, mantém o hash para a supressão, auditoria sem PII, aviso sobre a janela de recuperação do D1; R23.5–R23.6). Retomada da operação limpa a parada automática.
 - Testes: casos P2-T13 em `tests/sending.test.mjs`.
+
+## P2-T11 — Respostas por IMAP e pausa por resposta
+
+- **Desvio registrado da Fase 4:** em vez do `imapflow` (8 dependências, compatibilidade Node no Worker inteiro), um cliente IMAP só de leitura sobre `cloudflare:sockets` (`src/adapters/imap.js`: LOGIN, EXAMINE, UID SEARCH, UID FETCH `BODY.PEEK[]<0.262144>`, LOGOUT; RFC 9051) e um leitor MIME mínimo (`src/mime.js`: cabeçalhos com dobra e RFC 2047, text/plain em quoted-printable/base64, relatório RFC 3464). Nenhuma dependência nova. `EXAMINE` e `BODY.PEEK` não marcam mensagens como lidas.
+- `src/inbound.js`, `0013_cursor_caixa.sql`, `GET /api/inbound` (sem corpo), `scheduled` de 5 min lê a caixa antes de enviar.
+- Chave estável caixa + UIDVALIDITY + UID (duplicata não repete efeito); cursor com lease; UIDVALIDITY novo recomeça sem duplicar. `.eml` bruto só é guardado se houver R2 configurado.
+- Classificação: bounce 5.x.x/4.x.x, alerta do provedor (Hostinger), resposta automática (Auto-Submitted, X-Autoreply, assunto de ausência), descadastro nas primeiras linhas escritas (citação ignorada; pt e en), humana, ilegível. Correlação: `In-Reply-To`/`References` com o Message-ID do envio; sem thread, pelo remetente com passo aceito nos últimos 60 dias; mais de uma empresa/commodity → `ambiguous` e todas pausadas com tarefa de revisão (errata item 7).
+- Efeitos: humana, automática (B1 pendente) e ilegível pausam empresa + commodity em todos os passos, canais e contatos, suspendem ligações/LinkedIn e abrem tarefa (AT29, AT30, AT36); outra commodity da mesma empresa só recebe alerta (R20.5); "sair" suprime antes de tudo, sem despedida (AT31); pedido de preço traz a orientação fixa da skill (AT58); bounce 5.x.x suprime e cancela; alerta do provedor para a operação (R19.12). Nenhuma resposta automática é enviada.
+- Testes: `tests/inbound.test.mjs` (11 casos) e helper `tests/helpers/pilot.mjs`. Suíte 208/208 + 2 workerd/D1.
+- **Depende de validação externa:** login e leitura reais em `imap.hostinger.com:993`, formato real dos avisos da Hostinger e dos DSN.

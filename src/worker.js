@@ -22,6 +22,7 @@ import { handleUnsubscribe } from "./unsubscribe.js";
 import * as sanctions from "./sanctions.js";
 import * as changes from "./changes.js";
 import * as sending from "./sending.js";
+import * as inbound from "./inbound.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -182,6 +183,15 @@ async function route(request, env, rid) {
       return response(await search.resumeSearch(request, env, actor, rid, id));
   }
   if (path === "/api/sending/today" && method === "GET") return response(await sending.today(env, actor));
+  if (path === "/api/inbound" && method === "GET") {
+    const { limit, offset } = page(request);
+    const rows = await s(
+      env,
+      "SELECT i.id,i.classification,i.correlation,i.company_id,i.commodity,i.received_at,c.legal_name FROM inbound_messages i LEFT JOIN companies c ON c.id=i.company_id WHERE i.tenant_id=? ORDER BY i.received_at DESC,i.rowid DESC LIMIT ? OFFSET ?",
+      actor.tenant_id, limit + 1, offset,
+    ).all();
+    return response({ items: rows.results.slice(0, limit), nextOffset: rows.results.length > limit ? offset + limit : null });
+  }
   const res = path.match(/^\/api\/sending\/outbox\/([^/]+)\/resolve$/);
   if (res && method === "POST") return response(await sending.resolveIndeterminate(request, env, actor, rid, res[1]));
   if (path === "/api/fichas") {
@@ -404,7 +414,11 @@ export default {
   // Cron só é configurado quando os adaptadores forem liberados (portão humano em scripts/validate-deploy.mjs).
   async scheduled(controller, env) {
     const tenant = env.DEFAULT_TENANT_ID;
-    if (controller.cron === "*/5 * * * *") await sending.tick(env, tenant);
+    if (controller.cron === "*/5 * * * *") {
+      // Respostas primeiro: uma resposta recém-chegada pausa antes do próximo envio.
+      await inbound.poll(env, tenant).catch((e) => console.error("inbound_poll_failed", { kind: e?.kind ?? null }));
+      await sending.tick(env, tenant);
+    }
     else if (controller.cron === "17 2 * * *") await sending.evaluateRamp(env, tenant);
     else console.error("scheduled_unknown_cron", { cron: controller.cron });
   },
