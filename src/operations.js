@@ -1,3 +1,4 @@
+import { internationalGate } from "./selections.js";
 import {
   bodyJson,
   fail,
@@ -390,6 +391,8 @@ export async function changeCampaign(
       id,
     ).first();
     if (!icp) fail(422, "icp_required", "ICP obrigatório.");
+    // Internacional: só a partir da seleção na lista do país e, quando exigida, com validação comercial (R12.8, R12.9).
+    await internationalGate(env, actor.tenant_id, c);
     // Count commodities (not variants), within the same market; decision runs atomically in SQLite.
     await commit(env, [
       s(

@@ -261,3 +261,14 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Aviso literal de R1.4.2 na resposta. Nada é gravado em empresas, evidências, condições ou scores (AT23, teste).
 - Período padrão exige `period_default_months:international` aprovado (D1) ou período explícito (1–60).
 - Testes: `tests/country-analysis.test.mjs` (8 casos).
+
+## P3-T7 — Seleção de commodities e campanhas
+
+- `src/selections.js`; rotas `POST|GET /api/country-analyses/:id/selections` (gestores) e `POST /api/commercial-validations` (admin).
+- Checagem de lista **no serviço** (errata item 12, R12.14, AT75): cada item só entra se **todas** as suas subposições SH6 estiverem na análise com compra identificada; a análise precisa ter ao menos uma fonte `compra identificada` e reproduzir o hash (lista não mudou).
+- Seleção gravada antes das campanhas, no mesmo batch; cada item gera campanha `international` em rascunho com `country_code` = ISO-2 oficial, idioma do país, `analysis_id` e `selection_id` (R12.7, R12.8). País sem ISO-2 não recebe campanha.
+- Item exige produto do catálogo (novo = cadastrar antes com identidade pendente). Validação comercial obrigatória quando o produto não está confirmado ou não corresponde à linha por código confirmado; sem `approved`, a ativação e a geração de ficha recusam com `commercial_validation_pending` (R12.9). Produto com identidade pendente não ativa mesmo validado (errata item 12).
+- Trava comum `internationalGate` na ativação de campanha e na geração/aprovação de ficha: campanha internacional criada fora da seleção não ativa (`selection_required`).
+- Aprovação de ficha internacional exige `international_enabled` com evidência (T12); ausência do parâmetro não libera.
+- Limite de 2 commodities ativas por mercado reaproveitado do Plano 1 (terceira fica `waiting`; nacionais não contam — teste).
+- Testes: `tests/selections.test.mjs` (7 casos).

@@ -28,6 +28,7 @@ import * as openclaw from "./openclaw.js";
 import * as channels from "./channels.js";
 import * as tradeList from "./trade-list.js";
 import * as countryAnalysis from "./country-analysis.js";
+import * as selections from "./selections.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -198,8 +199,11 @@ async function route(request, env, rid) {
   }
   if (path === "/api/openclaw/transfers" && method === "POST") return response(await openclaw.confirmTransfer(request, env, actor, rid));
   if (path === "/api/country-analyses" && method === "POST") return response(await countryAnalysis.createAnalysis(request, env, actor, rid), 201);
-  const can = path.match(/^\/api\/country-analyses\/([^/]+)$/);
-  if (can && method === "GET") return response(await countryAnalysis.getAnalysis(env, actor, can[1]));
+  const can = path.match(/^\/api\/country-analyses\/([^/]+)(?:\/(selections))?$/);
+  if (can && !can[2] && method === "GET") return response(await countryAnalysis.getAnalysis(env, actor, can[1]));
+  if (can && can[2] && method === "POST") return response(await selections.selectCommodities(request, env, actor, rid, can[1]), 201);
+  if (can && can[2] && method === "GET") return response(await selections.listSelections(env, actor, can[1]));
+  if (path === "/api/commercial-validations" && method === "POST") return response(await selections.recordValidation(request, env, actor, rid), 201);
   if (path === "/api/countries" && method === "GET") return response(await tradeList.listCountries(request, env));
   if (path === "/api/trade-list/versions" && method === "GET") return response(await tradeList.listVersions(env));
   if (path === "/api/trade-list/run" && method === "POST") return response(await tradeList.runNow(request, env, actor, rid), 202);

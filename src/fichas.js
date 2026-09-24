@@ -1,5 +1,6 @@
 // Fichas de aprovação (P2-T9; R18, R17.1–R17.3, errata): versão imutável e cifrada, hash por mensagem,
 // aprovação por destinatário e canal com o hash visto pelo aprovador; mudança comercial invalida a aprovação.
+import { internationalGate } from "./selections.js";
 import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES, APPROVER_ROLES } from "./http.js";
 import { statement as s, commit, auditStatement, now, parameters, product } from "./store.js";
 import { encryptPii, decryptPii } from "./crypto.js";
@@ -34,6 +35,7 @@ async function context(env, actor, companyId, campaignId, contactIds) {
   if (["ended", "paused"].includes(c.status)) fail(409, "campaign_not_available", "Campanha pausada ou encerrada.");
   const p = await product(env, actor.tenant_id, c.product_id);
   if (!p.active || p.identity_status !== "confirmed") fail(422, "product_identity_pending", "Identidade de produto pendente bloqueia a ficha (R10.4).");
+  await internationalGate(env, actor.tenant_id, c);
   const company = await s(env, "SELECT * FROM companies WHERE tenant_id=? AND id=?", actor.tenant_id, companyId).first();
   if (!company) fail(404, "company_not_found", "Empresa não encontrada.");
   const openclaw = await s(env, "SELECT retired_in_openclaw FROM openclaw_transfers WHERE tenant_id=? AND company_id=?", actor.tenant_id, companyId).first();
@@ -233,6 +235,12 @@ export async function approve(request, env, actor, rid, id) {
   if (i.messagesSha256 !== agg) fail(409, "content_changed", "O conteúdo aprovado não confere com o atual. Recarregue a ficha.");
   const campaign = await s(env, "SELECT * FROM campaigns WHERE id=?", f.campaign_id).first();
   if (campaign.status !== "active") fail(409, "campaign_not_active", "Ative a campanha antes de aprovar.");
+  if (campaign.market === "international") {
+    // Internacional só aprova depois da liberação registrada por Rogério (Plano 3 T12); a ausência do parâmetro não libera.
+    const release = (await parameters(env, actor.tenant_id))["international_enabled:international"];
+    if (release?.enabled !== true) fail(409, "international_not_enabled", "Fluxo internacional ainda não liberado (validação T12 pendente).");
+    await internationalGate(env, actor.tenant_id, campaign);
+  }
   const snap = JSON.parse(await decryptPii(v.snapshot_enc, env));
   if (snap.campaignVersion !== campaign.version) fail(409, "campaign_changed", "A campanha mudou depois desta versão: gere nova versão (R22.5).");
   if (channel === "email") {
