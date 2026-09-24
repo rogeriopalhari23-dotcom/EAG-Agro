@@ -350,3 +350,8 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 - Continuam sem valor (não aprovados): `international_enabled` (só depois de T12) e `send_window:international`.
 - Testes ajustados ao novo estado: os cenários "sem aprovação vigente" agora encerram a vigência do parâmetro em vez de depender da ausência. Migração aplicada no D1 local após cópia em `eag-compass-backups/d1-local-20260924-112922`.
 - P3-T1 e P3-T9 passam a `implemented`.
+
+## P1-T2 — CI remoto (2026-09-24)
+
+- Push de `v2-revisao-2` autorizado por Rogério e executado por ele (`git -c http.postBuffer=157286400 push -u origin v2-revisao-2`; a primeira tentativa caiu com HTTP 408). Workflow passou a incluir a branch (`96ccfda`).
+- GitHub Actions, run 36021958011 (https://github.com/rogeriopalhari23-dotcom/EAG-Agro/actions/runs/36021958011), commit `96ccfda`: `npm ci` + `npm run check` — **ubuntu-latest: success** (15:41:04–15:41:34 UTC), **windows-latest: success** (15:41:05–15:42:07 UTC).
