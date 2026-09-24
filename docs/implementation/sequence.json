@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T16:08:17.611Z",
+  "updatedAt": "2026-09-24T16:19:43.454Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -494,7 +494,7 @@
       "acceptance": "Importar supressões antes de contatos; relatório de conflitos e corte comprovado do executor antigo.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Dados do OpenClaw não estão nesta máquina (conferido em 2026-09-24); exportação da VPS da Hostinger (ou autorização para leitura por SSH) e inventário do executor antigo para o corte"
+      "blockedBy": "VPS do OpenClaw com chave de host alterada e nome fora do DNS (2026-09-24): Rogério confirma a impressão digital no hPanel e se há backup; depois exportação/leitura só leitura e inventário do executor antigo"
     },
     {
       "id": "P2-T16",
