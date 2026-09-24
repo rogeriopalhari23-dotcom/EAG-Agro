@@ -74,3 +74,23 @@ CF_ACCESS_TOKEN=... node scripts/import-sanctions.mjs --list cnep --base https:/
 ```
 
 No Windows, se o Node recusar certificado de algum portal, rode com `node --use-system-ca`. Depois de importar, refaça a triagem das empresas (lista nova torna a anterior desatualizada).
+
+## Publicação em `eag-compass-production.rogeriopalhari23.workers.dev` (decisões de 2026-09-24)
+
+Endereço workers.dev atrás do Access; fila nova com DLQ. Ordem (cada passo com autorização de Rogério; nada disso foi criado ainda):
+
+1. **Zero Trust / Access:** habilitar no painel (plano gratuito até 50 usuários). Criar a aplicação self-hosted para `eag-compass-production.rogeriopalhari23.workers.dev` com política *Allow* só para os e-mails dos quatro perfis; criar uma segunda aplicação no mesmo hostname, caminho `/u`, com política *Bypass — Everyone* (só o descadastro público). Copiar o *team domain* (`https://<time>.cloudflareaccess.com`) e o *Application Audience (AUD)* para `ACCESS_TEAM_DOMAIN` e `ACCESS_AUD` no `wrangler.jsonc`.
+2. **Banco:** conferir que `eag_compass` segue vazio (`npx wrangler d1 execute eag_compass --remote --command "SELECT name FROM sqlite_master WHERE type='table'"`), depois `npm run db:migrate:remote` (roda o `validate-deploy` antes). Criar o usuário admin de Rogério.
+3. **Publicar:** `node scripts/build-site.mjs && node scripts/validate-deploy.mjs && npx wrangler deploy`. Conferir `/api/health`, login pelo Access e `/u/<token-inválido>` sem login.
+4. **Liberação do envio (após T1):** criar as filas e acrescentar ao `wrangler.jsonc` — só então o `validate-deploy` é ajustado para aceitar estes blocos:
+
+```jsonc
+"queues": {
+  "producers": [{ "binding": "ASYNC_QUEUE", "queue": "eag-compass-async" }],
+  "consumers": [{ "queue": "eag-compass-async", "max_batch_size": 10, "max_retries": 5, "dead_letter_queue": "eag-compass-dlq" }]
+},
+"triggers": { "crons": ["*/5 * * * *", "17 2 * * *"] }
+```
+
+   `npx wrangler queues create eag-compass-async` e `npx wrangler queues create eag-compass-dlq`. As filas da 0.3.1 (`eag-sanctions-queue`, `eag-scores-queue`) ficam intocadas até Rogério decidir apagá-las.
+5. **Lista mensal (após T12):** habilitar R2 no painel, `npx wrangler r2 bucket create eag-compass-files` e acrescentar `"r2_buckets": [{ "binding": "FILES", "bucket_name": "eag-compass-files" }]`.

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T15:12:51.298Z",
+  "updatedAt": "2026-09-24T15:20:18.244Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -53,7 +53,7 @@
       "acceptance": "Conferir conta, plano, IDs, domínio, permissões e custo sem duplicar recursos.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Worker e D1 alinhados (eag-compass-production, eag_compass). Falta: conferir que o D1 segue vazio antes do primeiro migrate remoto; fila; habilitar R2 e Access (Zero Trust); domínio/rota protegida pelo Access"
+      "blockedBy": "Worker/D1/endereço alinhados (eag-compass-production, eag_compass, workers.dev + Access); falta Rogério habilitar Access (Zero Trust) e R2 no painel e conferir que o D1 segue vazio"
     },
     {
       "id": "P1-T4",
