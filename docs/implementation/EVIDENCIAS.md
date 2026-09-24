@@ -180,3 +180,8 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - `src/openclaw.js`, rotas `/api/openclaw/*`, formato normalizado em `docs/OPERACAO.md`. Duas fases obrigatórias: todas as supressões primeiro (contatos antes disso → 409), depois empresas e contatos em lotes; dedup por raiz de CNPJ e hash do e-mail; sem CNPJ com nome existente → pendência, não fusão (R1.1.4). Relatório de conflitos (suprimido marcado ativo, e-mail em outra empresa, descadastrado fora da fase, sem CNPJ). Empresa `ativo` registra transferência pendente, que bloqueia ficha e envio até a retirada ser comprovada com evidência (R25.3, AT34). Reimportação não remove supressão; arquivo repetido (mesmo SHA-256) é recusado.
 - Testes: `tests/openclaw.test.mjs` (3 casos).
 - **Bloqueio:** exportação real do OpenClaw para escrever o conversor e o inventário do executor antigo para comprovar o corte.
+
+## P2-T17 — Canais, teste interno de T1 e liberação (externo)
+
+- `src/channels.js`, rotas `GET /api/channels` e `POST /api/channels/:canal/state` (só admin; `enabled` exige referência ao registro de T1; WhatsApp e LinkedIn não podem sair de `planned`). Testes: `tests/channels.test.mjs` (2 casos).
+- Roteiro humano em `docs/eag-compass-t1-validacao.md` (pré-requisitos, 13 passos, seção de liberação). Estado: não iniciado. Nenhum envio real foi feito nesta sessão.

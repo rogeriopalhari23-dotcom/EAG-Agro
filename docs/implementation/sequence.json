@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T04:14:05.920Z",
+  "updatedAt": "2026-09-24T04:14:59.389Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -517,7 +517,7 @@
     {
       "id": "P2-T17",
       "title": "Canais, teste interno de T1 e liberação (portões humanos)",
-      "status": "pending",
+      "status": "external",
       "dependsOn": [
         "P1-T12",
         "P2-T7",
@@ -536,8 +536,8 @@
       ],
       "acceptance": "Teste interno T1, reputação/limites/retencão, interrupção de emergência; liberação expressa dos canais.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": null
+      "evidence": "docs/eag-compass-t1-validacao.md",
+      "blockedBy": "Teste interno de T1 com a caixa real e liberação por escrito de Rogério (depende de P1-T12: provisionamento, Access, fila e cron)"
     },
     {
       "id": "P2-T18",

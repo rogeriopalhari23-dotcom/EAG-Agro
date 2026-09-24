@@ -25,6 +25,7 @@ import * as sending from "./sending.js";
 import * as inbound from "./inbound.js";
 import * as tasks from "./tasks.js";
 import * as openclaw from "./openclaw.js";
+import * as channels from "./channels.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -194,6 +195,9 @@ async function route(request, env, rid) {
     if (action === "contacts" && method === "POST") return response(await openclaw.importContacts(request, env, actor, rid, id));
   }
   if (path === "/api/openclaw/transfers" && method === "POST") return response(await openclaw.confirmTransfer(request, env, actor, rid));
+  if (path === "/api/channels" && method === "GET") return response(await channels.listChannels(env, actor));
+  const chs = path.match(/^\/api\/channels\/([a-z]+)\/state$/);
+  if (chs && method === "POST") return response(await channels.setChannelState(request, env, actor, rid, chs[1]));
   if (path === "/api/tasks" && method === "GET") return response(await tasks.listTasks(request, env, actor));
   const tk = path.match(/^\/api\/tasks\/([^/]+)\/complete$/);
   if (tk && method === "POST") return response(await tasks.completeTask(request, env, actor, rid, tk[1]));
