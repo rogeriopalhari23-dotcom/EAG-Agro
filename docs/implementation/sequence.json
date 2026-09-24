@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T14:26:15.334Z",
+  "updatedAt": "2026-09-24T14:53:56.410Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -511,8 +511,8 @@
       ],
       "acceptance": "Fontes reais completas e vigentes, matching auditável, falso positivo e bloqueio; política aprovada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": "tests/sanctions.test.mjs",
-      "blockedBy": "Política de compliance T11 (fontes exigidas e validade) e leitores dos arquivos oficiais de cada lista escolhida"
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Política de compliance T11 (fontes exigidas, validade, pessoas físicas, raiz de CNPJ) e importação das listas em produção pelo admin (scripts/import-sanctions.mjs)"
     },
     {
       "id": "P2-T17",

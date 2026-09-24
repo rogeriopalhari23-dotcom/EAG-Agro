@@ -62,3 +62,15 @@ Passos humanos, nesta ordem; nada disso foi criado automaticamente:
 5. **Tradução**: Rogério aprova `docs/implementation/AMOSTRAS-TEXTOS-EN.md`; o admin grava `templates_en_approved` no escopo `pv-en-1.0.0`. Antes disso, ficha em inglês não é aprovada (PV12).
 6. **Liberação**: roteiro em `docs/eag-compass-t6-comexstat.md` seção 9; só com todos os passos registrados o admin grava `international_enabled`. Revogar (`{"enabled":false}`) segura na hora os envios internacionais já aprovados.
 7. **Atualização manual de um país**: tela Lista mensal, 1 por dia por país, com motivo; reaproveita o MDIC do mês quando o arquivo não mudou.
+
+## Listas de sanções (P2-T16)
+
+Depois da política T11 aprovada, o admin importa cada lista ativa (uma versão por arquivo oficial; lista parcial vira `failed`):
+
+```
+CF_ACCESS_TOKEN=$(cloudflared access token -app=https://<compass>) node scripts/import-sanctions.mjs --list ofac --base https://<compass>
+CF_ACCESS_TOKEN=... node scripts/import-sanctions.mjs --list ceis --base https://<compass> --date AAAAMMDD
+CF_ACCESS_TOKEN=... node scripts/import-sanctions.mjs --list cnep --base https://<compass> --date AAAAMMDD
+```
+
+No Windows, se o Node recusar certificado de algum portal, rode com `node --use-system-ca`. Depois de importar, refaça a triagem das empresas (lista nova torna a anterior desatualizada).
