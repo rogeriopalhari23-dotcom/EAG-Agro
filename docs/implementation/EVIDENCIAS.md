@@ -272,3 +272,13 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Aprovação de ficha internacional exige `international_enabled` com evidência (T12); ausência do parâmetro não libera.
 - Limite de 2 commodities ativas por mercado reaproveitado do Plano 1 (terceira fica `waiting`; nacionais não contam — teste).
 - Testes: `tests/selections.test.mjs` (7 casos).
+
+## P3-T8 — Empresas no exterior e condições R12.10
+
+- `src/foreign-companies.js`; rotas `POST /api/foreign-companies`, `PUT /api/companies/:id/conditions/:productId/:condition`, `PATCH /api/companies/:id/size`.
+- Empresa só a partir de campanha internacional com seleção (R12.14); país pelo ISO-2 oficial da campanha. Mesmo registro no país = mesma empresa (só garante as condições da commodity); sem registro, nome normalizado igual (sem acentos e sufixos societários) → 409 `possible_duplicate` com os candidatos, e só cria com `confirmDistinct` — pendência, nunca fusão.
+- Três condições nascem `pending`. `confirmed` exige evidência da mesma empresa, categoria diferente de `market` (dado de país nunca confirma — AT23, R1.4.3), `validation_status='valid'` e `metadata.supports` com o nome da condição (R13.4); `not_found` exige nota. Evidência de uma condição não confirma outra (teste).
+- Porte no exterior por faixa com fonte (gestores): refaz o ICP dos perfis — médio/médio-mais → no ICP; pequena → fora; gigante → fora (relacionamento prévio como no Plano 2).
+- Fuso do contato validado por `Intl` (já existia no `PATCH /api/contacts/:id`; teste com "Europe/Berlim").
+- Camada 2: links de pesquisa montados (Google, LinkedIn), nunca executados; sem raspagem e sem fonte nominal paga (R13.7).
+- Testes: `tests/foreign-companies.test.mjs` (6 casos).

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T13:31:24.682Z",
+  "updatedAt": "2026-09-24T14:02:11.621Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -685,7 +685,7 @@
     {
       "id": "P3-T8",
       "title": "Empresas no exterior e condições R12.10",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P3-T7",
         "P2-T6"
@@ -697,7 +697,7 @@
       ],
       "acceptance": "Três condições R12.10 com evidência nominal validada da mesma empresa; porte e fuso com fonte.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": null
     },
     {
