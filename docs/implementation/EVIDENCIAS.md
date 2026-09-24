@@ -185,3 +185,11 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 
 - `src/channels.js`, rotas `GET /api/channels` e `POST /api/channels/:canal/state` (só admin; `enabled` exige referência ao registro de T1; WhatsApp e LinkedIn não podem sair de `planned`). Testes: `tests/channels.test.mjs` (2 casos).
 - Roteiro humano em `docs/eag-compass-t1-validacao.md` (pré-requisitos, 13 passos, seção de liberação). Estado: não iniciado. Nenhum envio real foi feito nesta sessão.
+
+## P2-T18 — Telas do piloto
+
+- `public/app.js`: telas **Radar** (busca por campanha e raio aprovado, versões, cobertura e nota de parcialidade, candidatos ordenados por ICP ou distância com base da distância explícita — centro do município é estimativa —, "tentar de novo" para parciais, setores → CNAE com cadastro pelo admin), **Fichas** (versões, achados do revisor PV, mensagens por destinatário e canal com nome e papel, aprovação por destinatário+canal enviando o hash das mensagens mostradas, envios da ficha, nova versão, adiar, descartar), **Envios** (estado do canal, degrau da rampa, teto do dia, próximo horário, parada automática, fila com motivo de bloqueio, resolução de indeterminado só pelo admin com evidência, respostas recebidas sem corpo) e **Tarefas** (roteiro, bloqueios das restrições comuns, resultado e as 3 perguntas da Level 2).
+- Tela da empresa: unidades (CNPJ, município, precisão da localização, porte), perfil comprador e ICP por commodity com motivo do bloqueio da ficha, exceção de trader (aprovador), relacionamento com gigante, meta de porte na ligação, registro de perfil, validação de e-mails e geração de ficha (campanha + destinatários). Contato mostra papel, validação do e-mail e sinal de cargo fora do alvo.
+- Nenhuma tela envia ou simula envio: o envio só acontece pelo cron com o canal liberado.
+- Estados de erro e parcial: erro de carga mostra "Tentar novamente"; busca parcial mostra a cobertura; ficha com violação esconde o botão de aprovar.
+- Teste: `tests/ui-smoke.mjs` ampliado com o cenário do piloto (Radar, Fichas, Envios, Tarefas, ficha aberta com aprovação e revisor, `send_log` vazio, 11 telas, 390 px sem rolagem horizontal, sem erro JS). `npm run check`: 218/218 + 2 workerd/D1.

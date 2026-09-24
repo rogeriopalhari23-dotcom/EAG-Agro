@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T04:14:59.389Z",
+  "updatedAt": "2026-09-24T04:22:01.088Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -542,7 +542,7 @@
     {
       "id": "P2-T18",
       "title": "Interface do piloto",
-      "status": "pending",
+      "status": "done",
       "dependsOn": [
         "P2-T4",
         "P2-T5",
@@ -557,7 +557,7 @@
       ],
       "acceptance": "Telas reais Radar/Fichas/Envios/Tarefas, estados de erro/parcial e acessibilidade; nunca simular envio.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
+      "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": null
     },
     {

@@ -831,10 +831,12 @@ async function showCompany(id, offset = 0) {
               [r.jobTitle, r.email, r.phone].filter(Boolean).join(" · "),
             ),
           ),
+          text("span", `${lbl(r.prospectRole)} · e-mail ${lbl(r.emailValidation)}${r.targetFlag ? " · cargo fora do alvo" : ""}`, "tag"),
         ),
       ),
     ),
   );
+  node.append(...(await pilotPanels(id, data)));
   if (writable()) {
     node.append(
       details(
@@ -846,7 +848,8 @@ async function showCompany(id, offset = 0) {
             input("E-mail", "email", "email", "", false),
             input("Telefone", "phone", "text", "", false),
             input("LinkedIn", "linkedinUrl", "url", "", false),
-            input("Fonte do contato", "sourceLabel"),
+            select("Papel na prospecção", "prospectRole", ["decision_maker", "influencer", "provisional_decision_maker", "other"].map((k) => [k, lbl(k)])),
+            input("Fonte do contato (ex.: LinkedIn, site)", "sourceLabel"),
           ],
           async (v) => {
             await api(`/api/companies/${id}/contacts`, "POST", v);
@@ -1731,10 +1734,453 @@ async function pausesView() {
     );
   return node;
 }
+// ---------- Piloto nacional (P2-T18): Radar, Fichas, Envios, Tarefas e painéis da empresa ----------
+const pilotLabels = {
+  in_icp: "No ICP",
+  pending_size: "Porte pendente",
+  out_trader: "Trader/distribuidor",
+  out_giant: "Gigante",
+  out_small: "Pequena/MEI",
+  confirmed: "Dentro do raio",
+  estimated: "Dentro (estimado)",
+  outside: "Fora do raio",
+  unknown: "Sem localização",
+  address: "Endereço",
+  municipality_centroid: "Centro do município",
+  final_consumer_confirmed: "Consumidor final confirmado",
+  possible_final_consumer: "Possível consumidor final",
+  trader_distributor: "Trader/distribuidor",
+  unconfirmed: "Perfil não confirmado",
+  decision_maker: "Decisor",
+  influencer: "Influenciador",
+  provisional_decision_maker: "Decisor provisório",
+  other: "Outro",
+  pending: "Pendente",
+  valid: "Validado",
+  not_valid: "Inválido",
+  catchall: "Não verificável (catch-all)",
+  error: "Erro na validação",
+  in_approval: "Em aprovação",
+  approved: "Aprovada",
+  deferred: "Adiada",
+  discarded: "Descartada",
+  queued: "Na fila",
+  running: "Em andamento",
+  partial: "Parcial",
+  complete: "Completa",
+  failed: "Falhou",
+  leased: "Enviando",
+  accepted: "Enviado",
+  temp_failed: "Nova tentativa",
+  perm_failed: "Recusado",
+  indeterminate: "Indeterminado",
+  blocked: "Bloqueado",
+  waiting_sequence: "Aguardando outra sequência",
+  cancelled: "Cancelado",
+  superseded: "Substituído",
+  planned: "Planejado",
+  internal_test: "Teste interno",
+  enabled: "Liberado",
+};
+const lbl = (v) => pilotLabels[v] || statusLabels[v] || v || "Não informado";
+
+async function campaignsOf(market) {
+  const d = await api("/api/campaigns?limit=100");
+  return d.items.filter((c) => !market || c.market === market);
+}
+
+// Empresa: unidades, perfis, validação de e-mail e criação de ficha.
+async function pilotPanels(id, data) {
+  const nodes = [];
+  nodes.push(
+    panel(
+      "Unidades",
+      rows(data.units || [], (u) =>
+        el(
+          "div",
+          { class: "row" },
+          el("div", {}, text("strong", `CNPJ ${u.cnpj}`), text("small", `${u.municipality_name || "Município não informado"}/${u.uf || "—"} · ${lbl(u.geo_precision)} · porte ${u.size_label || "não informado"}`)),
+          text("span", u.source_label, "tag"),
+        ),
+      ),
+    ),
+  );
+  nodes.push(
+    panel(
+      "Perfil comprador e ICP",
+      rows(data.profiles || [], (p) =>
+        el(
+          "div",
+          { class: "row" },
+          el(
+            "div",
+            {},
+            text("strong", `${state.products.find((x) => x.id === p.product_id)?.variant_name || p.product_id} · ${lbl(p.profile_class)}`),
+            text("small", p.ficha.ok ? p.ficha.note || "Pode receber ficha." : p.ficha.reason),
+          ),
+          text("span", lbl(p.icp_status), "tag"),
+          p.icp_status === "out_trader" && approver() && !p.exception_by
+            ? button("Registrar exceção", async () => {
+                const reason = prompt("Motivo da exceção (trader com consumo próprio comprovado):");
+                if (!reason) return;
+                await api(`/api/profiles/${p.id}`, "PATCH", { exceptionReason: reason, expectedRevision: p.revision });
+                await showCompany(id);
+              })
+            : null,
+          p.icp_status === "out_giant" && writable() && !p.relationship_note
+            ? button("Registrar relacionamento", async () => {
+                const note = prompt("Relacionamento prévio (quem, desde quando, como):");
+                if (!note) return;
+                await api(`/api/profiles/${p.id}`, "PATCH", { relationshipNote: note, expectedRevision: p.revision });
+                await showCompany(id);
+              })
+            : null,
+          p.icp_status === "pending_size" && writable() && !p.size_call_goal
+            ? button("Qualificar porte na ligação", async () => {
+                await api(`/api/profiles/${p.id}`, "PATCH", { sizeCallGoal: true, expectedRevision: p.revision });
+                await showCompany(id);
+              })
+            : null,
+        ),
+      ),
+    ),
+  );
+  if (!writable()) return nodes;
+  nodes.push(
+    details(
+      "Registrar perfil comprador",
+      makeForm(
+        [
+          productSelect(),
+          select("Perfil", "profileClass", ["possible_final_consumer", "final_consumer_confirmed", "trader_distributor", "unconfirmed"].map((k) => [k, lbl(k)])),
+          input("Fundamento (evidência ou pendência)", "basis", "textarea"),
+          select("Evidência que confirma (consumidor final confirmado)", "evidenceId", [["", "Nenhuma"], ...data.evidence.filter((e) => e.category === "business").map((e) => [e.id, `${e.evidence_type} · ${e.reference}`])]),
+          select("Gigante do setor", "isGiant", [["false", "Não"], ["true", "Sim"]]),
+        ],
+        async (v) => {
+          const prev = (data.profiles || []).find((p) => p.product_id === v.productId && p.unit_key === "");
+          await api(`/api/companies/${id}/profiles`, "POST", {
+            productId: v.productId, profileClass: v.profileClass, basis: v.basis, evidenceId: v.evidenceId || undefined,
+            isGiant: v.isGiant === "true", expectedRevision: prev?.revision,
+          });
+          notice("Perfil registrado.");
+          await showCompany(id);
+        },
+        "Registrar perfil",
+      ),
+    ),
+  );
+  const withEmail = data.contacts.filter((c) => c.email);
+  if (withEmail.length)
+    nodes.push(
+      el(
+        "div",
+        { class: "toolbar" },
+        button("Validar e-mails dos contatos", async () => {
+          const r = await api(`/api/companies/${id}/validate-emails`, "POST", {});
+          notice(r.started ? `Validação iniciada para ${r.started} contato(s). O resultado chega em alguns minutos.` : "Nenhum contato precisa de validação agora.");
+        }),
+      ),
+    );
+  const campaigns = (await campaignsOf()).filter((c) => ["active", "waiting"].includes(c.status));
+  const eligible = data.contacts.filter((c) => ["decision_maker", "influencer", "provisional_decision_maker"].includes(c.prospectRole) && c.email);
+  if (campaigns.length && eligible.length) {
+    const boxes = eligible.map((c) => {
+      const control = el("input", { type: "checkbox", name: "recipients", value: c.id });
+      return { node: el("label", { class: "check" }, control, `${c.fullName} — ${lbl(c.prospectRole)}${c.targetFlag ? " (atenção: cargo fora do alvo)" : ""}`), control };
+    });
+    const form = makeForm(
+      [select("Campanha", "campaignId", campaigns.map((c) => [c.id, c.name])), ...boxes],
+      async (v) => {
+        const recipients = boxes.filter((b) => b.control.checked).map((b) => b.control.value);
+        const r = await api("/api/fichas", "POST", { companyId: id, campaignId: v.campaignId, recipients });
+        notice(r.reviewOk ? "Ficha gerada sem violações do revisor." : "Ficha gerada com violações do revisor: corrija antes de aprovar.");
+        await showFicha(r.id);
+      },
+      "Gerar ficha",
+    );
+    nodes.push(details("Gerar ficha de aprovação", form));
+  }
+  return nodes;
+}
+
+// Radar nacional: setores → CNAE, busca por campanha, cobertura e candidatos.
+async function radarView() {
+  const node = section("Radar", "Compradores por raio a partir da cidade do fornecedor. Centro do município é estimativa; fonte parcial nunca vira “nenhuma empresa”.");
+  const [campaigns, params, sectors] = await Promise.all([campaignsOf("national"), api("/api/parameters"), api("/api/sectors")]);
+  const active = campaigns.filter((c) => c.status === "active");
+  if (!active.length) node.append(text("p", "Nenhuma campanha nacional ativa. Ative uma campanha para buscar.", "empty"));
+  const radii = params.parameters["radius_allowed_km:national"] || [];
+  for (const c of active) {
+    const box = panel(`${c.name} · ${c.origin_city}/${c.origin_uf}`);
+    const list = await api(`/api/searches?campaignId=${c.id}`);
+    box.append(
+      rows(list.items, (s) =>
+        el(
+          "div",
+          { class: "row" },
+          el("div", {}, text("strong", `Versão ${s.version} · ${s.radius_km} km`), text("small", `${s.candidates_count} candidatos · ${s.api_calls} consultas${s.coverage_note ? " · " + s.coverage_note : ""}`)),
+          text("span", lbl(s.status), "tag"),
+          button("Ver candidatos", () => showSearch(s.id)),
+        ),
+      ),
+    );
+    if (writable())
+      box.append(
+        makeForm(
+          [select("Raio (km)", "radiusKm", radii.map((r) => [String(r), `${r} km`]), String(c.radius_km))],
+          async (v) => {
+            const r = await api("/api/searches", "POST", { campaignId: c.id, radiusKm: Number(v.radiusKm) });
+            notice(r.reused ? "Busca de hoje já existe para estes parâmetros." : `Busca iniciada em ${r.partitions} consulta(s).`);
+            await navigate("Radar");
+          },
+          "Buscar",
+        ),
+      );
+    node.append(box);
+  }
+  node.append(
+    panel(
+      "Setores usuários → CNAE",
+      text("p", "Setor sem CNAE aprovado bloqueia a busca. Cadastre a subclasse com a fonte da CONCLA/IBGE.", "muted"),
+      rows(sectors.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", `${x.sector_key} · ${x.cnae_code}`), text("small", `${x.label} · ${x.source}`)))),
+    ),
+  );
+  if (admin())
+    node.append(
+      details(
+        "Cadastrar setor → CNAE",
+        makeForm(
+          [input("Setor usuário (como no ICP)", "sector"), input("CNAE (subclasse, 7 dígitos)", "cnaeCode"), input("Descrição da subclasse", "label"), input("Fonte (URL)", "source")],
+          async (v) => {
+            await api("/api/sectors", "POST", v);
+            notice("Associação registrada.");
+            await navigate("Radar");
+          },
+          "Cadastrar",
+        ),
+      ),
+    );
+  return node;
+}
+
+async function showSearch(id, order = "icp", offset = 0) {
+  const [d, c] = await Promise.all([api(`/api/searches/${id}`), api(`/api/searches/${id}/candidates?order=${order}&limit=50&offset=${offset}`)]);
+  const s = d.search;
+  const node = section(`Busca v${s.version} · ${s.radius_km} km`, `${lbl(s.status)} · ${s.candidates_count} candidatos · ${s.api_calls} consultas`);
+  node.append(button("Voltar ao Radar", () => navigate("Radar")));
+  if (s.coverage_note) node.append(text("p", s.coverage_note, "error"));
+  if (["partial", "failed"].includes(s.status) && approver())
+    node.append(button("Tentar de novo", async () => {
+      await api(`/api/searches/${id}/resume`, "POST", {});
+      notice("Consultas com falha voltaram para a fila.");
+      await showSearch(id, order);
+    }));
+  node.append(
+    el(
+      "div",
+      { class: "toolbar" },
+      button("Ordenar por ICP", () => showSearch(id, "icp")),
+      button("Ordenar por distância", () => showSearch(id, "distance")),
+    ),
+    rows(c.items, (x) =>
+      el(
+        "div",
+        { class: "row" },
+        el(
+          "div",
+          {},
+          text("strong", x.trade_name || x.legal_name),
+          text("small", `${x.municipality_name || "—"}/${x.uf || "—"} · ${x.distance_km == null ? "distância desconhecida" : `${x.distance_km.toFixed(1)} km`} (${lbl(x.distance_basis)}) · porte ${x.size_label || "não informado"}`),
+        ),
+        text("span", `${lbl(x.icp_status)}${x.icp_provisional ? " (provisório)" : ""} · ${lbl(x.inside_radius)}`, "tag"),
+        button("Empresa", () => showCompany(x.company_id)),
+      ),
+    ),
+  );
+  if (c.nextOffset != null) node.append(button("Próxima página", () => showSearch(id, order, c.nextOffset)));
+  $("content").replaceChildren(node);
+  $("content").focus({ preventScroll: true });
+}
+
+// Fichas: aprovação por destinatário e canal, com o hash do que está na tela.
+async function fichasView() {
+  const d = await api("/api/fichas?limit=100");
+  const node = section("Fichas", "Textos congelados por versão. Aprovar vale para o destinatário e o canal mostrados; qualquer mudança exige nova versão.");
+  node.append(
+    rows(d.items, (f) =>
+      el("div", { class: "row" }, el("div", {}, text("strong", f.legal_name), text("small", `Versão ${f.current_version} · atualizada em ${f.updated_at}`)), text("span", lbl(f.status), "tag"), button("Abrir", () => showFicha(f.id))),
+    ),
+  );
+  return node;
+}
+
+async function showFicha(id) {
+  const d = await api(`/api/fichas/${id}`);
+  const v = d.version;
+  const company = await api(`/api/companies/${d.ficha.company_id}`);
+  const who = (cid) => {
+    const c = company.contacts.find((x) => x.id === cid);
+    const r = v.snapshot.recipients.find((x) => x.contactId === cid);
+    return `${c?.fullName || cid.slice(0, 8)} (${lbl(r?.role)}${r?.targetFlag ? ", cargo fora do alvo" : ""})`;
+  };
+  const node = section(`Ficha · ${company.company.legal_name} · versão ${v.no}`, `${lbl(d.ficha.status)} · skill ${v.skill.slice(0, 8)}… · modelos ${v.templates}`);
+  node.append(button("Voltar às fichas", () => navigate("Fichas")));
+  const bad = v.findings.filter((x) => !x.ok);
+  node.append(
+    panel(
+      "Revisor PV",
+      bad.length ? rows(bad, (x) => el("div", { class: "row" }, text("strong", x.id), text("span", x.detail, "error"))) : text("p", "Sem violações.", "success"),
+      v.snapshot.fichaNote ? text("p", v.snapshot.fichaNote, "muted") : null,
+    ),
+  );
+  for (const g of d.toApprove) {
+    const msgs = d.messages.filter((m) => m.contactId === g.contactId && m.channel === g.channel);
+    const approved = d.approvals.find((a) => a.contact_id === g.contactId && a.channel === g.channel);
+    const box = panel(`${g.channel === "email" ? "E-mail" : g.channel === "call" ? "Ligações" : "LinkedIn"} · ${who(g.contactId)}`);
+    for (const m of msgs)
+      box.append(details(`Dia ${m.day} · passo ${m.step}${m.subject ? " · " + m.subject : ""}`, el("pre", { class: "message" }, m.body)));
+    if (approved) box.append(text("p", `${approved.status === "approved" ? "Aprovado" : "Aprovação invalidada"} por ${approved.approved_by} em ${approved.approved_at}`, "tag"));
+    else if (approver() && v.reviewOk)
+      box.append(
+        makeForm(
+          [input("Início da cadência (segunda-feira, AAAA-MM-DD)", "startDate", "date", "", false)],
+          async (x) => {
+            await api(`/api/fichas/${id}/approve`, "POST", { versionNo: v.no, contactId: g.contactId, channel: g.channel, messagesSha256: g.messagesSha256, startDate: x.startDate || undefined });
+            notice("Aprovado.");
+            await showFicha(id);
+          },
+          "Aprovar este destinatário neste canal",
+        ),
+      );
+    node.append(box);
+  }
+  if (d.outbox.length)
+    node.append(panel("Envios desta ficha", rows(d.outbox, (o) => el("div", { class: "row" }, text("strong", `Passo ${o.step_no} · ${o.planned_date}`), text("span", `${lbl(o.status)}${o.block_reason ? " · " + o.block_reason : ""}`, "tag")))));
+  if (writable() && !["discarded"].includes(d.ficha.status))
+    node.append(
+      el(
+        "div",
+        { class: "toolbar" },
+        button("Gerar nova versão", async () => {
+          const r = await api(`/api/fichas/${id}/versions`, "POST", { expectedRowVersion: d.ficha.row_version });
+          notice(r.reviewOk ? "Nova versão sem violações." : "Nova versão com violações do revisor.");
+          await showFicha(id);
+        }),
+        button("Adiar", async () => {
+          const reason = prompt("Motivo do adiamento:");
+          if (!reason) return;
+          await api(`/api/fichas/${id}/defer`, "POST", { reason });
+          await showFicha(id);
+        }),
+        approver()
+          ? button("Descartar", async () => {
+              const reason = prompt("Motivo do descarte:");
+              if (!reason) return;
+              await api(`/api/fichas/${id}/discard`, "POST", { reason });
+              await showFicha(id);
+            })
+          : null,
+      ),
+    );
+  $("content").replaceChildren(node);
+  $("content").focus({ preventScroll: true });
+}
+
+// Envios: rampa, teto, próximo horário, fila e bloqueios; respostas recebidas.
+async function enviosView() {
+  const [t, inbound] = await Promise.all([api("/api/sending/today"), api("/api/inbound?limit=30")]);
+  const node = section("Envios", "Um e-mail por vez, no horário comercial do destinatário. Indeterminado só volta com decisão registrada.");
+  node.append(
+    kv([
+      ["Canal de e-mail", lbl(t.channel)],
+      ["Degrau da rampa", `${t.rampStep + 1}`],
+      ["Enviados hoje / teto", `${t.sentToday} / ${t.dailyCap ?? "sem parâmetro"}`],
+      ["Próximo envio a partir de", t.nextSendAt || "agora, dentro da janela"],
+      ["Parada automática", t.stopped ? `${t.stopped.reason} (${t.stopped.at})` : "Não"],
+    ]),
+  );
+  node.append(
+    panel(
+      "Fila",
+      rows(t.queue, (o) =>
+        el(
+          "div",
+          { class: "row" },
+          el("div", {}, text("strong", o.legal_name), text("small", `Passo ${o.step_no} · ${o.planned_date}${o.block_reason ? " · motivo: " + o.block_reason : ""}`)),
+          text("span", lbl(o.status), "tag"),
+          o.status === "indeterminate" && admin()
+            ? button("Resolver", async () => {
+                const outcome = prompt('Resultado conferido na caixa: digite "sent" (saiu), "not_sent" (não saiu) ou "cancel".');
+                if (!["sent", "not_sent", "cancel"].includes(outcome)) return;
+                const reason = prompt("Evidência (ex.: conferido na pasta Enviados):");
+                if (!reason) return;
+                await api(`/api/sending/outbox/${o.id}/resolve`, "POST", { outcome, reason });
+                await navigate("Envios");
+              })
+            : null,
+        ),
+      ),
+    ),
+    panel(
+      "Respostas recebidas",
+      rows(inbound.items, (m) => el("div", { class: "row" }, el("div", {}, text("strong", m.legal_name || "Remetente sem empresa ligada"), text("small", `${m.received_at} · ${m.correlation}`)), text("span", m.classification, "tag"))),
+    ),
+  );
+  return node;
+}
+
+// Tarefas: roteiros da skill, bloqueios e as três perguntas da Level 2.
+async function tarefasView() {
+  const d = await api(`/api/tasks?until=${new Date().toISOString().slice(0, 10)}&limit=100`);
+  const node = section("Tarefas", "Respostas e confirmações primeiro; ligações começam pelos leads mais fracos. Tarefa bloqueada não é concluída.");
+  node.append(
+    rows(d.items, (t) => {
+      const box = el(
+        "div",
+        { class: "row task" },
+        el("div", {}, text("strong", `${t.legal_name} · ${t.kind}`), text("small", `Vence em ${t.due_date}${t.blocked?.length ? " · bloqueada: " + t.blocked.join(", ") : ""}`)),
+      );
+      if (t.script) box.append(details("Roteiro", el("pre", { class: "message" }, t.script)));
+      if (writable() && !t.blocked?.length)
+        box.append(
+          details(
+            "Registrar resultado",
+            makeForm(
+              [
+                select("Resultado", "outcome", [["done", "Feito"], ["no_answer", "Não atendeu"], ["not_reached", "Não falei com a pessoa"], ["wrong_contact", "Contato errado"]]),
+                select("Compra de usina ou trading?", "buyingChannel", [["", "Não perguntado"], ["usina", "Usina"], ["trading", "Trading"], ["ambos", "Ambos"]]),
+                select("Spot ou contrato?", "modality", [["", "Não perguntado"], ["spot", "Spot"], ["contrato", "Contrato"], ["ambos", "Ambos"]]),
+                input("Consumo mensal (t)", "monthlyVolumeT", "number", "", false),
+                input("Nota", "note", "textarea", "", false),
+              ],
+              async (v) => {
+                const answers = {};
+                if (v.buyingChannel) answers.buyingChannel = v.buyingChannel;
+                if (v.modality) answers.modality = v.modality;
+                if (v.monthlyVolumeT) answers.monthlyVolumeT = Number(v.monthlyVolumeT);
+                await api(`/api/tasks/${t.id}/complete`, "POST", { outcome: v.outcome, note: v.note || undefined, answers });
+                notice("Tarefa registrada.");
+                await navigate("Tarefas");
+              },
+              "Registrar",
+            ),
+          ),
+        );
+      return box;
+    }),
+  );
+  return node;
+}
+
 const views = {
   Hoje: home,
   Empresas: companiesView,
   Campanhas: campaignView,
+  Radar: radarView,
+  Fichas: fichasView,
+  Envios: enviosView,
+  Tarefas: tarefasView,
   Catálogo: catalogView,
   Parâmetros: parametersView,
   Supressão: suppressionView,

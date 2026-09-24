@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import { setup } from "./helpers/db.mjs";
+import { pilot } from "./helpers/pilot.mjs";
 import worker from "../src/worker.js";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -198,6 +199,25 @@ try {
     2,
   );
   await page.screenshot({ path: "review-output/campanha-desktop.png", fullPage: true });
+  // P2-T18: telas do piloto com o cenário aprovado (ficha, fila e tarefas); nenhuma tela envia.
+  const p = await pilot(ctx);
+  for (const label of ["Radar", "Fichas", "Envios", "Tarefas"]) {
+    await nav(label);
+    await page.getByRole("heading", { name: label, exact: true }).waitFor();
+    assert.equal(await page.locator("#content .error").filter({ visible: true }).count(), 0, label);
+  }
+  await nav("Envios");
+  await page.getByText("Teste interno", { exact: true }).waitFor();
+  await page.locator(".row").filter({ hasText: "Doces Vale Verde" }).first().waitFor();
+  await nav("Fichas");
+  await page.locator(".row").filter({ hasText: "Doces Vale Verde" }).getByRole("button", { name: "Abrir" }).click();
+  await page.getByRole("heading", { name: "Revisor PV", exact: true }).waitFor();
+  await page.getByText(/^Aprovado por /).first().waitFor();
+  await page.screenshot({ path: "review-output/ficha-desktop.png", fullPage: true });
+  await nav("Radar");
+  await page.getByRole("heading", { name: "Setores usuários → CNAE", exact: true }).waitFor();
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM send_log").get().n, 0);
+  assert.ok(p.fichaId);
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(
     await page.evaluate(
@@ -220,7 +240,7 @@ try {
   });
   assert.deepEqual(errors, []);
   console.log(
-    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, 7 telas e viewport 390 px, sem erros JS.",
+    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar, Fichas, Envios, Tarefas, 11 telas e viewport 390 px, sem erros JS.",
   );
 } finally {
   await browser.close();
