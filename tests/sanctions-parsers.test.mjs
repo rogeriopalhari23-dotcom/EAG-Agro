@@ -117,3 +117,23 @@ test("P2-T16: contagem declarada diferente da importada → versão falha (lista
   await assert.rejects(importList(api, { list: "ofac", entries: r.entries, contentHash: sha256(Buffer.from("x")), sourceVersion: "t", downloadedAt: new Date().toISOString() }), /import_incomplete/);
   assert.equal(ctx.DB.raw.prepare("SELECT import_status FROM sanction_list_versions").get().import_status, "failed");
 });
+
+test("T11: mesma raiz de CNPJ (outra unidade) vai para revisão; só o CNPJ exato bloqueia; validade de 30 dias vigente", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  const { api, DB } = ctx;
+  assert.equal((await api("/api/parameters")).data.parameters["sanctions_max_age_hours:global"], 720);
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM sanction_sources WHERE active=1 AND id IN ('source-ofac-sdn','source-cgu-ceis','source-cgu-cnep')").get().n, 3);
+  const at = new Date().toISOString();
+  const lists = [["ofac", parseOfac(SDN, ALT)], ["ceis", parseCgu(decodeLatin(latin(CEIS)), "CEIS")], ["cnep", parseCgu(decodeLatin(latin(CEIS.replace(/"CEIS";"1";"J"/, '"CNEP";"1";"J"'))), "CNEP")]];
+  for (const [list, r] of lists) await importList(api, { list, entries: r.entries, contentHash: sha256(Buffer.from(list)), sourceVersion: "t", downloadedAt: at });
+  // Filial 0002 da mesma raiz 11222333, com outro nome: nenhum bloqueio automático, duas revisões (CEIS e CNEP).
+  const filial = await api("/api/companies", "POST", { legalName: "Filial Nordeste Comércio Ltda.", countryCode: "BR", registrationId: "11222333000262", registrationIdType: "CNPJ", sourceLabel: "teste" });
+  const s = await api(`/api/companies/${filial.data.id}/screening`, "POST", {});
+  assert.equal(s.data.block ?? 0, 0);
+  assert.equal(s.data.review, 2);
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM screening_matches WHERE match_method='substring' AND recommended_action='review'").get().n, 2);
+  // Outra empresa sem relação de raiz nem de nome: nada.
+  const outra = await api("/api/companies", "POST", { legalName: "Sem Relação Alimentos Ltda.", countryCode: "BR", registrationId: "44555666000177", registrationIdType: "CNPJ", sourceLabel: "teste" });
+  assert.equal((await api(`/api/companies/${outra.data.id}/screening`, "POST", {})).data.matches, 0);
+});

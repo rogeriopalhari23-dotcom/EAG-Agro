@@ -361,3 +361,11 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 - Rogério viu os textos na conversa e respondeu "ok"; na confirmação pedida, marcou "Sim, aprovo os textos" e, sobre o break no masculino, "Tirar o gênero da frase".
 - Nova adaptação **A-G1**: "…outras prioridades no momento ou com projetos mais urgentes…" (antes "ou envolvido em projetos mais urgentes", literal da skill). Modelos passam a `pv-1.1.0`; fichas já geradas guardam a versão e o texto com que foram criadas. A tradução `pv-en-1.0.0` não muda (o inglês já é neutro).
 - Registro em `docs/implementation/AMOSTRAS-TEXTOS-PV.md` (seção Aprovação, gerada só para `pv-1.1.0`) e no item 11 de `docs/eag-compass-t1-validacao.md`. Continua pendente a amostra "sequência interrompida antes do break", que depende do envio real (T1).
+
+## Política de sanções T11 — decidida por Rogério em 2026-09-24
+
+- Canal: conversa no Claude Code (quatro perguntas com as opções; respostas registradas aqui literalmente): listas "OFAC + CEIS + CNEP (Recomendado)"; validade "30 dias"; pessoas físicas "Não, só empresas (Recomendado)"; raiz de CNPJ "Raiz vai para revisão (Recomendado)".
+- Aplicação: `migrations/0017_politica_sancoes.sql` (`sanctions_max_age_hours` = 720, vale para a idade de cada lista importada e da triagem; as três fontes ativas); pessoas físicas já ficam fora no `scripts/import-sanctions.mjs` (padrão); `src/sanctions.js`: outra unidade com a mesma raiz de CNPJ → resultado de revisão (registrado como `match_method='substring'`, o valor existente mais próximo — o CHECK da 0001 não tem valor próprio para raiz); CNPJ exato continua bloqueando.
+- Consequência operacional: com 30 dias, cada lista precisa ser reimportada ao menos uma vez por mês; lista vencida deixa a triagem indisponível e segura o pré-envio (R19.3).
+- Teste: `tests/sanctions-parsers.test.mjs` (filial da mesma raiz → 2 revisões, 0 bloqueio; empresa sem relação → nada; parâmetro 720 e três fontes ativas). Suíte 298 + 2. Migração aplicada no D1 local após cópia em `eag-compass-backups/d1-local-20260924-120332`.
+- P2-T16 passa a `external`: falta só o admin rodar a importação das três listas em produção (`docs/OPERACAO.md`, seção Listas de sanções).

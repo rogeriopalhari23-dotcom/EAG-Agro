@@ -3,7 +3,7 @@
 Fonte da verdade: `docs/implementation/sequence.json` (`npm run next`). Evidência de cada item: `docs/implementation/EVIDENCIAS.md`.
 Branch `v2-revisao-2`, publicada no GitHub em 2026-09-24. `npm run check` no Windows: 294 testes + 2 workerd/D1 passando; UI smoke (Playwright + Chrome) com 13 telas.
 
-**Resumo:** 36 implementadas · 2 parciais · 4 externas (portões humanos). Nenhuma mensagem externa foi enviada, nenhum deploy, nenhuma conta criada, nenhum recurso Cloudflare criado ou apagado.
+**Resumo:** 36 implementadas · 1 parcial · 5 externas (portões humanos). Nenhuma mensagem externa foi enviada, nenhum deploy, nenhuma conta criada, nenhum recurso Cloudflare criado ou apagado.
 
 ## Implementadas (36)
 
@@ -15,18 +15,18 @@ Implementadas, mas **só com fixtures** (a validação real do provedor é exter
 - P3-T4 Comtrade — `getDA` e `HS.json` conferidos sem chave; a chamada de dados precisa da chave de Rogério.
 - P3-T5 rotina mensal — precisa do bucket R2 (`FILES`), da fila e do cron liberados.
 
-## Parciais (2) — o que falta
+## Parciais (1) — o que falta
 
 | Tarefa | Falta | Quem |
 | --- | --- | --- |
 | P2-T15 Migração do OpenClaw | Exportação real do OpenClaw e inventário do executor antigo para o corte | Rogério |
-| P2-T16 Triagem de sanções | Política de compliance T11 (fontes exigidas, validade, pessoas físicas, raiz de CNPJ) e rodar `scripts/import-sanctions.mjs` em produção — os leitores de OFAC, CEIS e CNEP já estão prontos e conferidos nos arquivos reais | Rogério |
 
-## Externas (4) — portões humanos
+## Externas (5) — portões humanos
 
 | Tarefa | Portão | Roteiro |
 | --- | --- | --- |
 | P1-T3 | `wrangler.jsonc` conferido na conta real | `docs/OPERACAO.md` |
+| P2-T16 | Importar OFAC, CEIS e CNEP em produção (política T11 decidida em 2026-09-24: 30 dias, só empresas, raiz de CNPJ → revisão) | `docs/OPERACAO.md` |
 | P1-T12 | Provisionamento, Access, fila, cron, R2 e deploy com autorização | `docs/OPERACAO.md` |
 | P2-T17 | Teste interno de T1 com a caixa real e liberação por escrito do e-mail | `docs/eag-compass-t1-validacao.md` |
 | P3-T12 | Conta e chave da Comtrade, termos, chamada real, teste pelo Worker, rotina medida, amostra em inglês, liberação | `docs/eag-compass-t6-comexstat.md` seção 9 |

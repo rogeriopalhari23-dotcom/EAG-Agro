@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T15:43:49.553Z",
+  "updatedAt": "2026-09-24T16:03:38.715Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -499,7 +499,7 @@
     {
       "id": "P2-T16",
       "title": "Triagem de sanções pré-envio",
-      "status": "partial",
+      "status": "external",
       "dependsOn": [
         "P2-T6"
       ],
@@ -512,7 +512,7 @@
       "acceptance": "Fontes reais completas e vigentes, matching auditável, falso positivo e bloqueio; política aprovada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Política de compliance T11 (fontes exigidas, validade, pessoas físicas, raiz de CNPJ) e importação das listas em produção pelo admin (scripts/import-sanctions.mjs)"
+      "blockedBy": "Política T11 decidida; falta o admin importar OFAC, CEIS e CNEP em produção (scripts/import-sanctions.mjs) depois da publicação, e reimportar ao menos a cada 30 dias"
     },
     {
       "id": "P2-T17",

@@ -135,8 +135,15 @@ export async function screenCompany(request, env, actor, rid, companyId) {
   const byId = regId
     ? (await s(env, `SELECT id,country_code,official_entity_id FROM sanction_entries WHERE list_version_id IN (${ph(vIds)}) AND official_entity_id=?`, ...vIds, regId).all()).results
     : [];
+  // Política T11 (2026-09-24): outra unidade com a mesma raiz de CNPJ vai para revisão humana; só o CNPJ exato bloqueia.
+  // Registrado como match_method "substring" (prefixo do identificador; o CHECK da 0001 não tem valor próprio para raiz).
+  const root = c.country_code === "BR" && /^\d{14}$/.test(regId || "") ? regId.slice(0, 8) : null;
+  const byRoot = root
+    ? (await s(env, `SELECT id,country_code,official_entity_id FROM sanction_entries WHERE list_version_id IN (${ph(vIds)}) AND substr(official_entity_id,1,8)=? AND official_entity_id<>?`, ...vIds, root, regId).all()).results
+    : [];
   const hits = new Map();
   for (const e of byName) hits.set(e.id, { e, name: true });
+  for (const e of byRoot) if (!hits.has(e.id)) hits.set(e.id, { e, root: true });
   for (const e of byId) hits.set(e.id, { e, name: hits.has(e.id), id: true });
   const runId = crypto.randomUUID(),
     at = now();
@@ -149,16 +156,16 @@ export async function screenCompany(request, env, actor, rid, companyId) {
     ),
   ];
   const summary = { block: 0, review: 0 };
-  for (const { e, name, id } of hits.values()) {
+  for (const { e, name, id, root: sameRoot } of hits.values()) {
     const countryCompatible = e.country_code ? e.country_code === c.country_code : null;
     const r = evaluateSanctionMatch({ reliableIdentifierMatch: !!id, countryCompatible: countryCompatible === true, nameMatch: !!name });
-    const action = r.action === "clear" ? "discard" : r.action;
+    const action = sameRoot && !id && !name ? "review" : r.action === "clear" ? "discard" : r.action;
     summary[action] = (summary[action] || 0) + 1;
     statements.push(
       s(
         env,
         "INSERT INTO screening_matches(id,tenant_id,screening_run_id,sanction_entry_id,match_method,similarity,country_compatible,reliable_identifier_match,recommended_action) VALUES (?,?,?,?,?,?,?,?,?)",
-        crypto.randomUUID(), actor.tenant_id, runId, e.id, id ? "official_id_country" : "exact_name", 1,
+        crypto.randomUUID(), actor.tenant_id, runId, e.id, id ? "official_id_country" : sameRoot && !name ? "substring" : "exact_name", 1,
         countryCompatible === null ? null : countryCompatible ? 1 : 0, id ? 1 : 0, action,
       ),
     );
