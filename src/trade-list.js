@@ -349,7 +349,7 @@ async function mdicMerge({ env, at, payload, version: v, done, mine }) {
     }).sort((a, b) => (a.ncm + a.ym).localeCompare(b.ncm + b.ym));
     const state = lines.some((l) => l.fobUsd > 0 || l.netKg > 0) ? "purchase_identified" : "no_record";
     const lastPeriod = lines.reduce((m, l) => (l.ym > m ? l.ym : m), "") || lastYm;
-    const obj = { iso3: iso, versionId: v.id, source: "mdic", state, lastPeriod, basis: "FOB", view: "exportações do Brasil", validators: JSON.parse(v.mdic_validators_json), classification: JSON.parse(v.classification_json).version, lines };
+    const obj = { iso3: iso, versionId: v.id, source: "mdic", state, lastPeriod, fileLastPeriod: lastYm, basis: "FOB", view: "exportações do Brasil", validators: JSON.parse(v.mdic_validators_json), classification: JSON.parse(v.classification_json).version, lines };
     const out = await putJson(env, `trade-src/${v.id}/mdic/${iso}.json`, obj);
     stmts.push(statusStmt(env, v.id, iso, "mdic", state, { lastPeriod, lines: lines.length, at, guard: mine }));
     stmts.push(pointerStmt(env, v.id, iso, "mdic", out.key, out.sha, at, mine));

@@ -249,3 +249,15 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Auditoria: início e fechamento com contagens por estado, chamadas à Comtrade e jobs com falha (R13.5). Staging apagado ao fechar.
 - Testes: `tests/trade-list.test.mjs` (10 casos) com `tests/helpers/trade.mjs` (R2 em memória com cursor estável, fontes simuladas, condutor da fila). Suíte: 253/253 + 2 workerd/D1.
 - **Portões humanos:** bucket R2 e binding `FILES`, fila/DLQ e cron (bloqueados por `validate-deploy` até liberação); `COMTRADE_KEY`; parâmetros D1/D2 e da rotina. Nada disso foi criado nesta sessão.
+
+## P3-T6 — Análise de país a partir da lista
+
+- `src/country-analysis.js`; rotas `POST /api/country-analyses` (`{iso3, periodMonths?}`) e `GET /api/country-analyses/:id`.
+- Lê só os objetos do R2 apontados por `trade_list_current` (teste com `fetch` global que falha se chamado — AT71); grava as versões e as chaves R2 usadas (a poda as protege) e o SHA-256 da parte vinda da lista; `GET` reproduz dos mesmos objetos e informa `reproduced` (R8.2, errata item 10). A correspondência com o catálogo fica fora do hash (muda com o cadastro).
+- Por SH6, lado a lado e sem soma (AT74, R12.13): "Compras declaradas pelo país (CIF, anual)" com todas as origens, Brasil e parte do Brasil do mesmo ano e mesma base; "Exportações do Brasil (FOB, mensal)" na janela de N meses que termina no último mês publicado do arquivo, com as NCM de 8 dígitos como detalhe, última ocorrência e quantidade estatística por unidade (mais de uma unidade = `qtyInconsistent`, nunca somada).
+- Parte do Brasil desconhecida (nula, com motivo) quando falta a linha de todas as origens ou a do Brasil, bases diferentes, ou total zero/ausente — nunca divisão infinita (errata item 8). Brasil declarado 0 → parte 0.
+- Estados R12.6: `compra identificada`, `nenhum registro no período`, `dados indisponíveis`; país que não declara à Comtrade → "sem declaração do país à fonte"; país atrasado → "sem declaração do país desde <ano>" com o último ano e os anos guardados, medido contra o mês da versão (AT73); versão anterior à última rotina → "não atualizado em <mês>" (AT72).
+- Catálogo: código `confirmed` destaca a correspondência; `pending` aparece só como pendente (AT22). Várias variantes na mesma linha não duplicam o agregado.
+- Aviso literal de R1.4.2 na resposta. Nada é gravado em empresas, evidências, condições ou scores (AT23, teste).
+- Período padrão exige `period_default_months:international` aprovado (D1) ou período explícito (1–60).
+- Testes: `tests/country-analysis.test.mjs` (8 casos).

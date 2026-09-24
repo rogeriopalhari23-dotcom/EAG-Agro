@@ -27,6 +27,7 @@ import * as tasks from "./tasks.js";
 import * as openclaw from "./openclaw.js";
 import * as channels from "./channels.js";
 import * as tradeList from "./trade-list.js";
+import * as countryAnalysis from "./country-analysis.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -196,6 +197,9 @@ async function route(request, env, rid) {
     if (action === "contacts" && method === "POST") return response(await openclaw.importContacts(request, env, actor, rid, id));
   }
   if (path === "/api/openclaw/transfers" && method === "POST") return response(await openclaw.confirmTransfer(request, env, actor, rid));
+  if (path === "/api/country-analyses" && method === "POST") return response(await countryAnalysis.createAnalysis(request, env, actor, rid), 201);
+  const can = path.match(/^\/api\/country-analyses\/([^/]+)$/);
+  if (can && method === "GET") return response(await countryAnalysis.getAnalysis(env, actor, can[1]));
   if (path === "/api/countries" && method === "GET") return response(await tradeList.listCountries(request, env));
   if (path === "/api/trade-list/versions" && method === "GET") return response(await tradeList.listVersions(env));
   if (path === "/api/trade-list/run" && method === "POST") return response(await tradeList.runNow(request, env, actor, rid), 202);
