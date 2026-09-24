@@ -221,3 +221,14 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Testes: `tests/mdic-bulk.test.mjs` (9 casos), incluindo a propriedade "soma dos pedaços = arquivo inteiro" para todos os tamanhos de pedaço de 1 byte ao arquivo inteiro, com LF, CRLF e sem LF final.
 - **Leitura real (rede doméstica, 2026-09-24, só leitura):** `EXP_2026.csv` → 75.055.366 bytes, ETag `"4794106-65aac1ebd8ade"`, `Last-Modified: Fri, 04 Sep 2026 18:05:56 GMT`, 9 pedaços de 8 MiB; pedaços 0 e 1 de 128 KB lidos por Range (206) com cabeçalho conferido, 1.949 + 1.963 linhas, sem perda nem duplicação na fronteira. `NCM.csv` lida uma vez completa (açúcar 17011400 → SH6 170114, "Outros açúcares de cana"); nas outras duas tentativas a conexão caiu.
 - **Depende de validação externa (T12):** leitura pelo Worker (certificado incompleto do servidor, ver P3-T2) e o tempo de CPU por pedaço no workerd.
+
+## P3-T4 — Adaptador da Comtrade
+
+- `src/adapters/comtrade.js`: `loadHsBlocks`, `availableYears`, `fetchImports`, `redact`.
+- Chave (`COMTRADE_KEY`) no cabeçalho `Ocp-Apim-Subscription-Key` do gateway, nunca na URL (errata item 11); corpo bruto de falha nunca é registrado; `redact` cobre qualquer URL com `subscription-key`.
+- Filtros de total pedidos explicitamente (`partner2Code=0`, `customsCode=C00`, `motCode=0`) e conferidos linha a linha; linha fora do filtro → `filter_not_applied`; duas linhas na mesma chave SH6×ano×origem → `ambiguous_totals` (nunca soma às cegas).
+- `count` no limite de 100 mil → `truncated`; `count` diferente das linhas → `incomplete` (errata item 7). Zero declarado em `netWgt` é preservado com o indicador de estimativa; ausência fica nula.
+- CIF marcado (`basis: "CIF"`); sem CIF, `primaryValue` com `basis: "primary"` — nunca rotulado FOB.
+- Testes: `tests/comtrade.test.mjs` (7 casos).
+- **Leitura real sem chave (2026-09-24):** `getDA/C/A/HS?reporterCode=276` → `{elapsedTime,count,data,error}`, `period` numérico, Alemanha com anos 1991–2025; China também respondeu. `HS.json` → 894 SH6 nos capítulos 01–24 sem o 03, em 3 blocos de 298 códigos (2.085 caracteres cada), igual a T6 §8.
+- **Hipóteses a confirmar com a chave real (T12 passo 3):** `period` e `partnerCode` com lista; os valores de total de `partner2Code`/`customsCode`/`motCode`; cabeçalho da chave aceito; orçamento de 3 chamadas por país. Até lá é só fixture — não é validação do provedor.
