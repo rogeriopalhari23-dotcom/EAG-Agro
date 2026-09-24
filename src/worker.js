@@ -26,6 +26,7 @@ import * as inbound from "./inbound.js";
 import * as tasks from "./tasks.js";
 import * as openclaw from "./openclaw.js";
 import * as channels from "./channels.js";
+import * as tradeList from "./trade-list.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -195,6 +196,13 @@ async function route(request, env, rid) {
     if (action === "contacts" && method === "POST") return response(await openclaw.importContacts(request, env, actor, rid, id));
   }
   if (path === "/api/openclaw/transfers" && method === "POST") return response(await openclaw.confirmTransfer(request, env, actor, rid));
+  if (path === "/api/countries" && method === "GET") return response(await tradeList.listCountries(request, env));
+  if (path === "/api/trade-list/versions" && method === "GET") return response(await tradeList.listVersions(env));
+  if (path === "/api/trade-list/run" && method === "POST") return response(await tradeList.runNow(request, env, actor, rid), 202);
+  const tlr = path.match(/^\/api\/trade-list\/refresh\/([A-Za-z]{3})$/);
+  if (tlr && method === "POST") return response(await tradeList.manualRefresh(request, env, actor, rid, tlr[1]), 202);
+  const tlv = path.match(/^\/api\/trade-list\/versions\/([A-Za-z0-9-]+)\/resume$/);
+  if (tlv && method === "POST") return response(await tradeList.resumeVersion(request, env, actor, rid, tlv[1]));
   if (path === "/api/channels" && method === "GET") return response(await channels.listChannels(env, actor));
   const chs = path.match(/^\/api\/channels\/([a-z]+)\/state$/);
   if (chs && method === "POST") return response(await channels.setChannelState(request, env, actor, rid, chs[1]));
@@ -444,7 +452,11 @@ export default {
       await inbound.poll(env, tenant).catch((e) => console.error("inbound_poll_failed", { kind: e?.kind ?? null }));
       await sending.tick(env, tenant);
     }
-    else if (controller.cron === "17 2 * * *") await sending.evaluateRamp(env, tenant);
+    else if (controller.cron === "17 2 * * *") {
+      await sending.evaluateRamp(env, tenant);
+      // Lista mensal: começa no dia configurado, retoma a versão em andamento e varre jobs devidos (P3-T5).
+      await tradeList.daily(env, tenant).catch((e) => console.error("trade_list_daily_failed", { code: e?.code ?? e?.details?.code ?? null }));
+    }
     else console.error("scheduled_unknown_cron", { cron: controller.cron });
   },
 };

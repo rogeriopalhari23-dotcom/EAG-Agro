@@ -232,3 +232,20 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Testes: `tests/comtrade.test.mjs` (7 casos).
 - **Leitura real sem chave (2026-09-24):** `getDA/C/A/HS?reporterCode=276` → `{elapsedTime,count,data,error}`, `period` numérico, Alemanha com anos 1991–2025; China também respondeu. `HS.json` → 894 SH6 nos capítulos 01–24 sem o 03, em 3 blocos de 298 códigos (2.085 caracteres cada), igual a T6 §8.
 - **Hipóteses a confirmar com a chave real (T12 passo 3):** `period` e `partnerCode` com lista; os valores de total de `partner2Code`/`customsCode`/`motCode`; cabeçalho da chave aceito; orçamento de 3 chamadas por país. Até lá é só fixture — não é validação do provedor.
+
+## P3-T5 — Rotina mensal, versões e atualização manual
+
+- `src/trade-list.js`; fila `trade_job` em `src/queue.js`; cron diário `17 2 * * *` chama `daily` (começa a versão do mês a partir de `country_list_refresh_day`, retoma a que está rodando e varre jobs) — não foi criado cron novo; rotas `GET /api/countries`, `GET /api/trade-list/versions`, `POST /api/trade-list/run` (admin, motivo; T12 passo 5), `POST /api/trade-list/refresh/:iso3` (admin, 1 por dia por país, R12.15), `POST /api/trade-list/versions/:id/resume` (admin, depois de corrigir a chave).
+- Errata aplicada:
+  - item 4: job adquirido por lease com token; tudo o que o job grava em D1 é condicionado ao próprio token no mesmo batch (fencing); resultados em chaves R2 determinísticas; mensagem duplicada ou lease perdido não altera totais (teste).
+  - item 5: versão existente é retomada (jobs com `INSERT OR IGNORE` por chave única); transições derivadas do estado (`advance`), então queda entre criar a versão e os jobs, ou durante a consolidação, se recupera na próxima varredura (teste).
+  - item 6: orçamento diário persistente (`provider_budget`, reserva atômica antes de cada chamada à Comtrade, inclusive HS.json e getDA); esgotado → `next_attempt_at` no dia seguinte, sem mensagem esperando na fila (teste com teto 5/dia em 4 dias).
+  - item 2: arquivo do MDIC republicado no meio da leitura → geração nova do ano, pedaços antigos `superseded`, no máximo 3 gerações (teste).
+  - item 9: atualização manual reaproveita o agregado MDIC vigente quando tamanho/ETag/Last-Modified não mudaram (nenhum pedaço relido — teste); senão relê o ano só para o país.
+  - item 10: poda guarda as N versões mais novas e, das antigas, tudo o que `trade_list_current` ou `country_analyses` referencia (teste).
+- Ponteiro por CAS monotônico (versão que começou antes nunca sobrescreve a mais nova); só avança para fonte completa (`purchase_identified`, `no_record`, `not_declared`). Falha → `data_unavailable` "não atualizada em <mês>", ponteiro anterior e objeto anterior preservados; `GET /api/countries` marca `*_stale` (teste AT72).
+- MDIC: junção em 4 grupos de países (memória limitada a ~1/4 do agregado); CO_PAIS de um país somados; CO_PAIS sem país no cadastro anotado na versão. País sem código numa fonte → `data_unavailable` "país sem código nesta fonte" (não conta como falha).
+- Comtrade sem chave → rotina da Comtrade bloqueada com motivo `no_key`, MDIC completa, versão `partial`.
+- Auditoria: início e fechamento com contagens por estado, chamadas à Comtrade e jobs com falha (R13.5). Staging apagado ao fechar.
+- Testes: `tests/trade-list.test.mjs` (10 casos) com `tests/helpers/trade.mjs` (R2 em memória com cursor estável, fontes simuladas, condutor da fila). Suíte: 253/253 + 2 workerd/D1.
+- **Portões humanos:** bucket R2 e binding `FILES`, fila/DLQ e cron (bloqueados por `validate-deploy` até liberação); `COMTRADE_KEY`; parâmetros D1/D2 e da rotina. Nada disso foi criado nesta sessão.

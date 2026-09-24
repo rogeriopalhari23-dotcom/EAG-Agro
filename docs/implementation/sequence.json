@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T13:12:48.055Z",
+  "updatedAt": "2026-09-24T13:23:15.601Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -631,7 +631,7 @@
     {
       "id": "P3-T5",
       "title": "Rotina mensal, versões e atualização manual",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [
         "P3-T2",
         "P3-T3",
@@ -644,8 +644,8 @@
       ],
       "acceptance": "Jobs/outbox/lease recuperáveis, quota real persistente, ponteiro CAS por país/fonte; falha conserva versão boa.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": null,
-      "blockedBy": null
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Provisionamento: bucket R2 (FILES), fila e cron liberados; COMTRADE_KEY; parâmetros aprovados"
     },
     {
       "id": "P3-T6",

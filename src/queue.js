@@ -4,6 +4,7 @@ import { runPartition } from "./search.js";
 import { geocodeUnit } from "./geocoding.js";
 import { pollJob } from "./email-validation.js";
 import { AdapterError } from "./adapters/errors.js";
+import { runJob } from "./trade-list.js";
 
 // Erro definitivo de provedor (chave, dado inválido) é registrado e descartado; temporário volta à fila.
 const tolerant = (fn) => async (env, body) => {
@@ -21,6 +22,8 @@ const handlers = {
   search_partition: (env, body) => runPartition(env, body.partitionId),
   geocode_unit: tolerant((env, body) => geocodeUnit(env, body.unitId)),
   email_validation_poll: (env, body) => pollJob(env, body.jobId),
+  // Lista mensal: o job trata os próprios erros (lease, tentativas, falha registrada); a mensagem sempre é confirmada.
+  trade_job: (env, body) => runJob(env, body.jobId),
 };
 
 export async function handleQueue(batch, env, extra = {}) {
