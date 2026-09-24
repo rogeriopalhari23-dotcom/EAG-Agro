@@ -3,11 +3,11 @@
 Fonte da verdade: `docs/implementation/sequence.json` (`npm run next`). Evidência de cada item: `docs/implementation/EVIDENCIAS.md`.
 Branch `v2-revisao-2`, publicada no GitHub em 2026-09-24. `npm run check` no Windows: 294 testes + 2 workerd/D1 passando; UI smoke (Playwright + Chrome) com 13 telas.
 
-**Resumo:** 36 implementadas · 1 parcial · 5 externas (portões humanos). Nenhuma mensagem externa foi enviada, nenhum deploy, nenhuma conta criada, nenhum recurso Cloudflare criado ou apagado.
+**Resumo:** 38 implementadas · 1 parcial · 3 externas (portões humanos). Publicado em https://eag-compass-production.rogeriopalhari23.workers.dev (2026-09-24), atrás do Access; nenhuma mensagem comercial enviada.
 
-## Implementadas (36)
+## Implementadas (38)
 
-Fundação: P1-T1, P1-T2 (CI Ubuntu e Windows verde, run 36021958011), P1-T4 a P1-T11. Piloto nacional: P2-T1 a P2-T14, P2-T18. Internacional: P3-T1 a P3-T11 (D1/D2, rotina e tradução aprovados por Rogério em 2026-09-24).
+Fundação: P1-T1 a P1-T12 (CI verde; conta alinhada; publicado com Access e login de Rogério confirmado). Piloto nacional: P2-T1 a P2-T14, P2-T18. Internacional: P3-T1 a P3-T11 (D1/D2, rotina e tradução aprovados por Rogério em 2026-09-24).
 
 Implementadas, mas **só com fixtures** (a validação real do provedor é externa e não foi feita):
 - P2-T3 Casa dos Dados, P2-T5 LocationIQ, P2-T7 Snov.io, P2-T10 SMTP e P2-T11 IMAP da Hostinger — dependem das credenciais e do teste T1.
@@ -21,13 +21,11 @@ Implementadas, mas **só com fixtures** (a validação real do provedor é exter
 | --- | --- | --- |
 | P2-T15 Migração do OpenClaw | Exportação real do OpenClaw e inventário do executor antigo para o corte | Rogério |
 
-## Externas (5) — portões humanos
+## Externas (3) — portões humanos
 
 | Tarefa | Portão | Roteiro |
 | --- | --- | --- |
-| P1-T3 | `wrangler.jsonc` conferido na conta real | `docs/OPERACAO.md` |
 | P2-T16 | Importar OFAC, CEIS e CNEP em produção (política T11 decidida em 2026-09-24: 30 dias, só empresas, raiz de CNPJ → revisão) | `docs/OPERACAO.md` |
-| P1-T12 | Provisionamento, Access, fila, cron, R2 e deploy com autorização | `docs/OPERACAO.md` |
 | P2-T17 | Teste interno de T1 com a caixa real e liberação por escrito do e-mail | `docs/eag-compass-t1-validacao.md` |
 | P3-T12 | Conta e chave da Comtrade, termos, chamada real, teste pelo Worker, rotina medida, amostra em inglês, liberação | `docs/eag-compass-t6-comexstat.md` seção 9 |
 

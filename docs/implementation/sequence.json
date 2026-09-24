@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T18:38:45.487Z",
+  "updatedAt": "2026-09-24T19:07:18.524Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -42,7 +42,7 @@
     {
       "id": "P1-T3",
       "title": "`wrangler.jsonc` alinhado à conta",
-      "status": "external",
+      "status": "implemented",
       "dependsOn": [],
       "plan": "docs/superpowers/plans/2026-09-22-eag-compass-fundacao.md",
       "section": "Tarefa 3",
@@ -53,7 +53,7 @@
       "acceptance": "Conferir conta, plano, IDs, domínio, permissões e custo sem duplicar recursos.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Worker/D1/endereço alinhados (eag-compass-production, eag_compass, workers.dev + Access); falta Rogério habilitar Access (Zero Trust) e R2 no painel e conferir que o D1 segue vazio"
+      "blockedBy": null
     },
     {
       "id": "P1-T4",
@@ -201,7 +201,7 @@
     {
       "id": "P1-T12",
       "title": "Provisionamento, Access e deploy (com portões humanos)",
-      "status": "external",
+      "status": "implemented",
       "dependsOn": [
         "P1-T2",
         "P1-T3",
@@ -216,7 +216,7 @@
       "acceptance": "Restaurar backup, Access/JWT real e quatro perfis no domínio antes da liberação.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Publicado em 2026-09-24; falta Rogério concluir o login pelo Access (código no e-mail) e confirmar a tela como admin; e-mails dos outros três perfis"
+      "blockedBy": null
     },
     {
       "id": "P2-T1",
