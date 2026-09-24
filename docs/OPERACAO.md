@@ -42,3 +42,11 @@ Backup de dados e chaves é obrigatório antes da migração real. Não executar
 - **Segredos do piloto:** `UNSUB_TOKEN_KEY` (32 bytes em base64; nunca trocar sem estratégia para os links já enviados), `CASADOSDADOS_API_KEY`, `LOCATIONIQ_KEY`, `SNOV_CLIENT_ID`, `SNOV_CLIENT_SECRET`, credenciais da caixa Hostinger. Variáveis não secretas: `PUBLIC_BASE_URL` (https, sem barra final), `EAG_POSTAL_ADDRESS`, `SENDER_NAME`, `LOCATIONIQ_HOST`, `LOCATIONIQ_PLAN`.
 - **Adaptadores (fila e cron):** o código usa a fila `ASYNC_QUEUE` para buscas, geocodificação e validação de e-mail, mas `scripts/validate-deploy.mjs` recusa publicar com `queues` ou `triggers` enquanto os adaptadores não forem liberados. A liberação é um portão humano: criar a fila e a DLQ, adicionar os bindings e ajustar o portão no mesmo commit, com a autorização registrada.
 - **Parâmetros sem valor padrão que o piloto exige:** `send_timezone:national`, `send_window:national`, `email_validation_max_age_days:email`, e a lista setor → CNAE em `/api/sectors`.
+
+## Migração do OpenClaw (P2-T15)
+
+Formato aceito (o arquivo exportado do OpenClaw precisa ser convertido para ele; o mapeamento depende de um arquivo de exemplo real):
+1. `POST /api/openclaw/imports` com o SHA-256 do arquivo exportado.
+2. `POST /api/openclaw/imports/:id/suppressions` com `{"emails": [...]}` — todos os descadastrados, em lotes de até 200. Depois `POST .../close-suppressions`.
+3. `POST /api/openclaw/imports/:id/contacts` com `{"rows": [{"line","company","cnpj","contactName","email","status":"ativo|pausado|respondeu","lastSent","campaign"}]}`.
+4. `GET /api/openclaw/imports/:id` mostra contagens e conflitos. Para cada empresa `ativo`, desligar no OpenClaw e registrar `POST /api/openclaw/transfers` com a evidência; só então a empresa volta a ter ficha e envio.

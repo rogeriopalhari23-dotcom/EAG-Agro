@@ -174,3 +174,9 @@ Ambiente de verificação: Windows 10, Node 24.15.0, npm 11.12.1, wrangler 4.136
 - Resposta suspende as ligações da empresa+commodity (AT65). Break aceito cria "retorno sugerido" no ciclo do ICP ou em 182 dias, sem sequência automática (R28.11, R17.7, AT56). Reunião cria confirmação para a manhã do dia (R28.10). Level 0 com o roteiro da skill quando não há e-mail do decisor (R28.6).
 - Linha do tempo (auditoria, envios, respostas, tarefas, reuniões) e funil prospectadas → reuniões → negócios, sem dado pessoal.
 - Testes: `tests/tasks.test.mjs` (5 casos).
+
+## P2-T15 — Migração do OpenClaw (parcial)
+
+- `src/openclaw.js`, rotas `/api/openclaw/*`, formato normalizado em `docs/OPERACAO.md`. Duas fases obrigatórias: todas as supressões primeiro (contatos antes disso → 409), depois empresas e contatos em lotes; dedup por raiz de CNPJ e hash do e-mail; sem CNPJ com nome existente → pendência, não fusão (R1.1.4). Relatório de conflitos (suprimido marcado ativo, e-mail em outra empresa, descadastrado fora da fase, sem CNPJ). Empresa `ativo` registra transferência pendente, que bloqueia ficha e envio até a retirada ser comprovada com evidência (R25.3, AT34). Reimportação não remove supressão; arquivo repetido (mesmo SHA-256) é recusado.
+- Testes: `tests/openclaw.test.mjs` (3 casos).
+- **Bloqueio:** exportação real do OpenClaw para escrever o conversor e o inventário do executor antigo para comprovar o corte.

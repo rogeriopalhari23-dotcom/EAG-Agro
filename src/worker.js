@@ -24,6 +24,7 @@ import * as changes from "./changes.js";
 import * as sending from "./sending.js";
 import * as inbound from "./inbound.js";
 import * as tasks from "./tasks.js";
+import * as openclaw from "./openclaw.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -183,6 +184,16 @@ async function route(request, env, rid) {
     if (action === "resume" && method === "POST")
       return response(await search.resumeSearch(request, env, actor, rid, id));
   }
+  if (path === "/api/openclaw/imports" && method === "POST") return response(await openclaw.startImport(request, env, actor, rid), 201);
+  const oc = path.match(/^\/api\/openclaw\/imports\/([^/]+)(?:\/(suppressions|close-suppressions|contacts))?$/);
+  if (oc) {
+    const [, id, action] = oc;
+    if (!action && method === "GET") return response(await openclaw.report(env, actor, id));
+    if (action === "suppressions" && method === "POST") return response(await openclaw.importSuppressions(request, env, actor, rid, id));
+    if (action === "close-suppressions" && method === "POST") return response(await openclaw.closeSuppressions(request, env, actor, rid, id));
+    if (action === "contacts" && method === "POST") return response(await openclaw.importContacts(request, env, actor, rid, id));
+  }
+  if (path === "/api/openclaw/transfers" && method === "POST") return response(await openclaw.confirmTransfer(request, env, actor, rid));
   if (path === "/api/tasks" && method === "GET") return response(await tasks.listTasks(request, env, actor));
   const tk = path.match(/^\/api\/tasks\/([^/]+)\/complete$/);
   if (tk && method === "POST") return response(await tasks.completeTask(request, env, actor, rid, tk[1]));
