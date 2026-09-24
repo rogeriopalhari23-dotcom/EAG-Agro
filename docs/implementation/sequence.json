@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T19:07:18.524Z",
+  "updatedAt": "2026-09-24T20:07:33.167Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -201,7 +201,7 @@
     {
       "id": "P1-T12",
       "title": "Provisionamento, Access e deploy (com portões humanos)",
-      "status": "implemented",
+      "status": "partial",
       "dependsOn": [
         "P1-T2",
         "P1-T3",
@@ -216,7 +216,7 @@
       "acceptance": "Restaurar backup, Access/JWT real e quatro perfis no domínio antes da liberação.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": null
+      "blockedBy": "Publicado com Access, fila, DLQ e cron; faltam os e-mails de gerente, vendedor e leitor e a troca dos DNS de eagcompass.com no hPanel para concluir o domínio próprio"
     },
     {
       "id": "P2-T1",
@@ -499,7 +499,7 @@
     {
       "id": "P2-T16",
       "title": "Triagem de sanções pré-envio",
-      "status": "external",
+      "status": "implemented",
       "dependsOn": [
         "P2-T6"
       ],
@@ -512,7 +512,7 @@
       "acceptance": "Fontes reais completas e vigentes, matching auditável, falso positivo e bloqueio; política aprovada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Política T11 decidida; falta o admin importar OFAC, CEIS e CNEP em produção (scripts/import-sanctions.mjs) depois da publicação, e reimportar ao menos a cada 30 dias"
+      "blockedBy": null
     },
     {
       "id": "P2-T17",
@@ -536,8 +536,8 @@
       ],
       "acceptance": "Teste interno T1, reputação/limites/retencão, interrupção de emergência; liberação expressa dos canais.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": "docs/eag-compass-t1-validacao.md",
-      "blockedBy": "Teste interno de T1 com a caixa real e liberação por escrito de Rogério (depende de P1-T12: provisionamento, Access, fila e cron)"
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "T1 não executado: MAILBOX_PASSWORD (por wrangler secret put), chaves Snov e aprovação da janela e do fuso de envio nacional"
     },
     {
       "id": "P2-T18",
@@ -774,7 +774,7 @@
       "acceptance": "Chave/termos Comtrade, fontes pelo Worker, primeira rotina medida e amostra interna; liberação documentada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/eag-compass-t6-comexstat.md",
-      "blockedBy": "Portões humanos: conta e chave da Comtrade de Rogério, termos de uso, chamada real, teste pelo Worker (certificado do MDIC), rotina completa medida, amostra em inglês e autorização por escrito"
+      "blockedBy": "R2 desabilitado na conta (habilitar no painel) e chave COMTRADE_KEY de Rogério; depois o roteiro da seção 9"
     }
   ]
 }

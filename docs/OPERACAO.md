@@ -94,3 +94,10 @@ Endereço workers.dev atrás do Access; fila nova com DLQ. Ordem (cada passo com
 
    `npx wrangler queues create eag-compass-async` e `npx wrangler queues create eag-compass-dlq`. As filas da 0.3.1 (`eag-sanctions-queue`, `eag-scores-queue`) ficam intocadas até Rogério decidir apagá-las.
 5. **Lista mensal (após T12):** habilitar R2 no painel, `npx wrangler r2 bucket create eag-compass-files` e acrescentar `"r2_buckets": [{ "binding": "FILES", "bucket_name": "eag-compass-files" }]`.
+
+## Estado em produção (2026-09-24, fim do dia)
+
+- Publicado em `https://eag-compass-production.rogeriopalhari23.workers.dev` atrás do Access; fila `eag-compass-async` + DLQ `eag-compass-dlq` e crons ativos; canal de e-mail `planned` (nenhum envio possível).
+- Sanções importadas (OFAC, CEIS, CNEP) em 2026-09-24 — **reimportar até 2026-10-24** (validade de 30 dias). Sessão: `cloudflared access login https://eag-compass-production.rogeriopalhari23.workers.dev` (código no e-mail), depois os comandos da seção "Listas de sanções" com `node --use-system-ca`.
+- Domínio `eagcompass.com`: zona no Cloudflare aguardando a troca dos DNS no hPanel (Domínios → eagcompass.com → DNS/Nameservers → personalizados: `joyce.ns.cloudflare.com` e `yoxall.ns.cloudflare.com`). Depois da ativação: domínio personalizado no Worker, Access incluindo `eagcompass.com` e `eagcompass.com/u`, `PUBLIC_BASE_URL` = `https://eagcompass.com` e `workers_dev` desligado.
+- DLQ: 2 mensagens de verificação de 2026-09-24 (tipo `verificacao-dlq`) ficam como registro; não reprocessar.

@@ -22,6 +22,8 @@ const handlers = {
   search_partition: (env, body) => runPartition(env, body.partitionId),
   geocode_unit: tolerant((env, body) => geocodeUnit(env, body.unitId)),
   email_validation_poll: (env, body) => pollJob(env, body.jobId),
+  // Verificação operacional do consumidor (sem efeito em dados).
+  ping: async (env, body) => console.log("queue_ping", { id: String(body.id ?? "").slice(0, 60) }),
   // Lista mensal: o job trata os próprios erros (lease, tentativas, falha registrada); a mensagem sempre é confirmada.
   trade_job: (env, body) => runJob(env, body.jobId),
 };

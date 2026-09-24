@@ -16,7 +16,14 @@
     "ALLOW_LOCAL_AUTH": "false",
     "DEFAULT_TENANT_ID": "eag-internal",
     "ACCESS_TEAM_DOMAIN": "https://quiet-bird-4d88.cloudflareaccess.com",
-    "ACCESS_AUD": "dceee9f35553eef827d15e9ec6d0ac59747283b83e15340db966c4657f4a080f"
+    "ACCESS_AUD": "dceee9f35553eef827d15e9ec6d0ac59747283b83e15340db966c4657f4a080f",
+    // E-mail (P2-T17): remetente fixado na Spec R19.13; endereço físico da EAG em docs/eag-compass-perfil.md (eagagro.com/contato).
+    // Teste interno só para o endereço autorizado por Rogério em 2026-09-24. A senha da caixa é segredo (MAILBOX_PASSWORD).
+    "PUBLIC_BASE_URL": "https://eag-compass-production.rogeriopalhari23.workers.dev",
+    "SENDER_NAME": "Rogério Palhari",
+    "MAILBOX_USER": "rogeriopalhari@eagagro.com",
+    "EAG_POSTAL_ADDRESS": "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil",
+    "INTERNAL_TEST_RECIPIENTS": "rogeriopalhari23@gmail.com"
   },
   "assets": {
     "directory": "./dist",
@@ -28,6 +35,12 @@
     "not_found_handling": "none"
   },
   // Descadastro público (/u/*): limite por token. namespace_id único na conta; período 10 ou 60 s (doc Rate Limiting).
+  // Fila e cron liberados por Rogério em 2026-09-24 (disparo comercial segue bloqueado: canal de e-mail "planned").
+  "queues": {
+    "producers": [{ "binding": "ASYNC_QUEUE", "queue": "eag-compass-async" }],
+    "consumers": [{ "queue": "eag-compass-async", "max_batch_size": 10, "max_retries": 5, "dead_letter_queue": "eag-compass-dlq" }]
+  },
+  "triggers": { "crons": ["*/5 * * * *", "17 2 * * *"] },
   "ratelimits": [
     {
       "name": "UNSUB_LIMITER",

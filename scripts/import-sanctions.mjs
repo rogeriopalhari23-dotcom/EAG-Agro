@@ -6,7 +6,7 @@
 //   node scripts/import-sanctions.mjs --list ofac|ceis|cnep --base https://<compass> [--date AAAAMMDD] [--dir pasta-com-arquivos]
 //   Produção: CF_ACCESS_TOKEN=$(cloudflared access token -app=https://<compass>) node scripts/import-sanctions.mjs ...
 //   Local:    --base http://127.0.0.1:8787 (autenticação local do wrangler dev)
-// Sem --dir, baixa das URLs oficiais. Pessoas físicas ficam de fora (política T11 pendente).
+// Sem --dir, baixa das URLs oficiais. Pessoas físicas ficam de fora (política T11 de 2026-09-24: só empresas).
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
@@ -44,7 +44,18 @@ export async function load(list, read, date) {
     const r = parseOfac(sdn.toString("latin1"), alt.toString("latin1"));
     return { ...r, contentHash: sha256(Buffer.concat([sdn, alt])), sourceVersion: `SDN.CSV+ALT.CSV sha256:${sha256(sdn).slice(0, 12)}` };
   }
-  const zip = await read(`https://portaldatransparencia.gov.br/download-de-dados/${SOURCES[list].portal}/${date}`);
+  // O Portal mantém só o arquivo do último dia publicado (o anterior passa a 403): sem data explícita, tenta hoje e ontem.
+  let zip, used = date;
+  for (const d of Array.isArray(date) ? date : [date]) {
+    try {
+      zip = await read(`https://portaldatransparencia.gov.br/download-de-dados/${SOURCES[list].portal}/${d}`);
+      used = d;
+      break;
+    } catch (e) {
+      if (d === [].concat(date).at(-1)) throw e;
+    }
+  }
+  date = used;
   const csv = unzipSingle(zip);
   const r = parseCgu(decodeLatin(csv), list.toUpperCase());
   return { ...r, contentHash: sha256(zip), sourceVersion: `${date}_${list.toUpperCase()}` };
@@ -75,7 +86,8 @@ if (process.argv[1]?.endsWith("import-sanctions.mjs")) {
     console.error("Uso: --list ofac|ceis|cnep --base URL [--date AAAAMMDD] [--dir pasta]");
     process.exit(2);
   }
-  const date = arg("--date") || new Date(Date.now() - 86400000).toISOString().slice(0, 10).replace(/-/g, "");
+  const day = (ms) => new Date(ms - 3 * 3600000).toISOString().slice(0, 10).replace(/-/g, ""); // dia em Brasília
+  const date = arg("--date") || [day(Date.now()), day(Date.now() - 86400000)];
   const dir = arg("--dir");
   const read = async (u) => {
     if (dir) return readFileSync(`${dir}/${u.split("/").pop().replace(/^(\d{8})$/, `$1_${list.toUpperCase()}.zip`)}`);

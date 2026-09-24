@@ -396,3 +396,32 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 - **Verificações sem login:** `/`, `/api/health`, `/api/session`, `/api/companies`, `/app.js`, `/uxyz`, `/api/u/x` → 302 para `quiet-bird-4d88.cloudflareaccess.com` (Access). `/u/<token inválido>` GET e POST de um clique → 404 com a página "Link inválido ou expirado." servida pelo Worker, sem login; `/u` e `/u/` → 404 vazio. Tentativas de travessia (`/u/../api/session`, `/u/%2e%2e/api/session`, `/u/x/../../api/health`) → Access; `/u/..%2fapi%2fsession` e `/u//api/session` → tratados como token de descadastro (404), nunca chegam à API. Cabeçalhos da página pública: `Cache-Control: no-store`, `x-robots-tag: noindex`, CSP `default-src 'none'`, `frame-ancestors 'none'`, `referrer-policy: no-referrer`, HSTS, `nosniff`.
 - **Pendente de Rogério:** entrar pelo Access (código enviado ao e-mail) e confirmar que a tela abre como administrador. Nenhum e-mail comercial foi enviado; o canal de e-mail segue `planned`.
 - **Login confirmado (2026-09-24):** log do Access mostra `rogeriopalhari23@gmail.com` com `login` permitido às 18:43 e 18:48 UTC no app do Compass; Rogério respondeu "feito" à instrução de entrar e confirmar a tela como administrador.
+
+## Execução autorizada de 2026-09-24 (tarde) — sanções, fila/cron, e-mail, perfis, domínio
+
+**GitHub:** varredura antes do push — nenhum padrão de segredo nos 8 commits e os valores de `PII_ENCRYPTION_KEY`/`UNSUB_TOKEN_KEY` com 0 ocorrências no histórico e nos arquivos; push `96ccfda..cef9772` sem força; CI verde (run 36046577955).
+
+**P2-T16 — importação em produção:** sessão do Access obtida com `cloudflared access login` (Rogério digitou o código do e-mail); `/api/session` → admin, `production`. `scripts/import-sanctions.mjs` (token lido do cache, nunca exibido):
+
+| Fonte | Arquivo | Registros no arquivo | Importados (empresas) | Versão | Hash |
+| --- | --- | --- | --- | --- | --- |
+| OFAC SDN | SDN.CSV+ALT.CSV de 2026-09-24 | 19.391 | 11.857 (23.317 aliases) | `00e702fc…` | `37a0f224cbd4…` |
+| CGU CEIS | `20260924_CEIS` | 23.684 | 14.503 (32.150 aliases; 9.572 CNPJs distintos) | `279f05dc…` | `65e2623702ba…` |
+| CGU CNEP | `20260924_CNEP` | 1.811 | 1.783 (3.866 aliases; 1.007 CNPJs distintos) | `9b743870…` | `986cb26eb9f4…` |
+
+- Persistência conferida no D1 (`record_count` = entradas; `import_status='imported'`). Duplicatas: a mesma empresa pode ter várias sanções — cada uma fica como registro próprio; a triagem agrupa por empresa.
+- Falha: o Portal mantém só o arquivo do último dia (o de 23/09 passou a 403); o script agora tenta o dia de hoje e o de ontem em Brasília. Lista incompleta vira versão `failed` (teste).
+- Triagem controlada com as consultas do próprio código, só leitura, sem criar empresas em produção: CNPJ exato `00000113000197` → 2 sanções CEIS (**bloqueio**); outra unidade da raiz `00000113` → 2 (**revisão**); CNPJ sem relação → 0; nome repetido em 5 CNPJs diferentes ("TRANSCOPS") → casamento só por nome (**revisão**, nunca bloqueio). Listas vencidas (> 720 h) ou ausentes → triagem indisponível e pré-envio segurado (testes).
+- Próxima importação obrigatória: até 2026-10-24.
+
+**Fila e cron:** filas `eag-compass-async` e `eag-compass-dlq` criadas (a DLQ pelo wrangler, a principal pela API depois de o wrangler parar numa pergunta interativa; nenhum arquivo alterado por ele). `wrangler.jsonc` com produtor/consumidor (5 tentativas, lote 10, DLQ) e crons `*/5 * * * *` e `17 2 * * *`; `validate-deploy` agora exige DLQ, limite de tentativas e só os crons aprovados (R2 continua barrado). Antes de publicar: produção sem outbox, fichas nem campanhas ativas; canal `planned`; teste novo do cron sem credenciais (não envia, não quebra, sem R2 não cria versão). Publicado (versão `edbee7ad…`); consumidor = Worker, DLQ `eag-compass-dlq`, 5 tentativas. Verificação: `ping` processado e confirmado uma vez; tipo desconhecido reprocessado até esgotar e **2 mensagens na DLQ** (métrica da fila); fila principal com 0; cron `*/5` executado às 19:45:47 UTC com `ok` (leitura de respostas registrou `auth`, esperado sem senha).
+
+**E-mail (P2-T17):** encontrado nas fontes do projeto — remetente `rogeriopalhari@eagagro.com` (Spec R19.13), endereço físico "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP" (`docs/eag-compass-perfil.md`, de eagagro.com/contato), servidores Hostinger SMTP 465 / IMAP 993 (`docs/eag-compass-pesquisa-tecnica.md`). Publicado como variáveis (versão `264820c3…`), com `INTERNAL_TEST_RECIPIENTS` só `rogeriopalhari23@gmail.com`. **Senha da caixa não existe em fonte autorizada** — T1 não executado; nenhum e-mail enviado.
+
+**Perfis:** `tests/roles.test.mjs` (3 casos): matriz leitura/escrita/aprovação/admin para admin, gerente, vendedor e leitor; ativar campanha só admin/gerente; usuário inativo e e-mail desconhecido recusados. Usuários de teste só no banco de teste. Em produção, só o admin de Rogério.
+
+**Recuperação:** Time Travel do D1 disponível (bookmark `0000000e-…-ba4b16395eb650dfad342f0f93930248`); não restaurado.
+
+**Domínio `eagcompass.com`:** RDAP — registrador Hostinger, registrado e alterado em 2026-09-24, expira 2027-09-24, `client transfer prohibited`; DNS em `horizon/orbit.dns-parking.com`; só `www` → `2.57.91.91` (estacionamento), sem MX/TXT. Zona criada no Cloudflare (`5879e506…`, Free, `pending`, sem importar registros) com DNS `joyce.ns.cloudflare.com` e `yoxall.ns.cloudflare.com`. O Access recusou o novo domínio enquanto a zona não estiver ativa ("domain does not belong to zone"). Falta Rogério trocar os DNS no hPanel.
+
+**Reconciliação:** P1-T12 volta a `partial` (quatro perfis e domínio próprio); P2-T16 → `implemented`. `ESTADO-DAS-42-TAREFAS.md` reescrito com implementação, publicação e validação operacional separadas.

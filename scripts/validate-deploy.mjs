@@ -16,7 +16,19 @@ export function validateConfig(config) {
   );
   const onWorkersDev = config.workers_dev === true;
   assert.ok(onWorkersDev !== Boolean(config.routes?.length), "Use workers.dev ou rota em domínio próprio, não os dois");
-  assert.ok(!config.queues && !config.triggers, "Adaptadores ainda não liberados");
+  // Fila e cron liberados em 2026-09-24: só a fila da v2 com DLQ e limite de tentativas, e só os dois crons aprovados.
+  if (config.queues) {
+    const p = config.queues.producers || [], c = config.queues.consumers || [];
+    assert.deepEqual(p.map((x) => [x.binding, x.queue]), [["ASYNC_QUEUE", "eag-compass-async"]], "Produtor da fila fora do aprovado");
+    assert.equal(c.length, 1, "Um consumidor só");
+    assert.equal(c[0].queue, "eag-compass-async");
+    assert.equal(c[0].dead_letter_queue, "eag-compass-dlq", "Fila sem DLQ");
+    assert.ok(Number.isInteger(c[0].max_retries) && c[0].max_retries >= 1 && c[0].max_retries <= 10, "Retentativas sem limite");
+  }
+  if (config.triggers) {
+    const allowed = new Set(["*/5 * * * *", "17 2 * * *"]);
+    assert.ok((config.triggers.crons || []).every((x) => allowed.has(x)), "Cron fora do aprovado");
+  }
   assert.ok(!config.r2_buckets, "R2 só na liberação da lista mensal");
   return { address: onWorkersDev ? "workers.dev" : "route" };
 }
