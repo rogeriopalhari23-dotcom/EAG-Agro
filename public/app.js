@@ -291,9 +291,9 @@ async function home() {
         "Operação assistida",
         text(
           "p",
-          "Buscas automáticas, fichas comerciais e envio de mensagens aguardam implementação e validação.",
+          "Radar, fichas, envios, tarefas e a lista internacional estão prontos; o envio externo só começa depois do teste interno (T1) e da liberação por escrito de Rogério.",
         ),
-        text("p", "Nenhuma mensagem é enviada por esta versão.", "muted"),
+        text("p", "Nenhuma mensagem sai com o canal em planejamento ou teste interno para quem não está na lista interna.", "muted"),
       ),
     ),
   );
@@ -836,7 +836,7 @@ async function showCompany(id, offset = 0) {
       ),
     ),
   );
-  node.append(...(await pilotPanels(id, data)));
+  node.append(...(await pilotPanels(id, data)), ...internationalPanels(id, data));
   if (writable()) {
     node.append(
       details(
@@ -2173,6 +2173,336 @@ async function tarefasView() {
   return node;
 }
 
+// ---------- Internacional (P3-T11): lista mensal por país, análise, seleção e empresas no exterior ----------
+const NOTICE_R142 = "O dado confirma exportação do Brasil para o país; não comprova compra por nenhuma empresa específica.";
+const tradeLabels = {
+  purchase_identified: "compra identificada",
+  no_record: "nenhum registro no período",
+  data_unavailable: "dados indisponíveis",
+  not_declared: "sem declaração do país à fonte",
+  pending: "em atualização",
+};
+const tl = (v) => tradeLabels[v] || (v ? v : "lista ainda não gerada");
+const usd = (v) => (v == null ? "—" : `US$ ${Math.round(v).toLocaleString("pt-BR")}`);
+const kg = (v) => (v == null ? "—" : `${Math.round(v).toLocaleString("pt-BR")} kg`);
+const conditionLabels = { imports_from_brazil: "Importa do Brasil", buys_commodity: "Compra a commodity", consumes_as_input: "Consome como insumo" };
+
+async function internacionalView(query = "") {
+  const node = section("Internacional", "País primeiro: a lista mensal guardada mostra o que cada país compra. Nenhuma consulta externa ao abrir um país.");
+  node.setAttribute("data-screen", "internacional");
+  node.append(text("p", NOTICE_R142, "notice-fixed"));
+  const d = await api(`/api/countries${query ? `?q=${encodeURIComponent(query)}` : ""}`);
+  const search = el("input", { type: "search", name: "q", "aria-label": "Buscar país", placeholder: "Buscar país (ex.: Alemanha)", value: query });
+  const form = el("form", { class: "toolbar", role: "search" }, search, el("button", { type: "submit" }, "Buscar"));
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    safe(async () => $("content").replaceChildren(await internacionalView(search.value.trim())));
+  });
+  node.append(
+    form,
+    text("p", d.latest ? `Última rotina mensal fechada: ${d.latest.reference_month} (${d.latest.status === "complete" ? "completa" : "parcial"}).` : "A lista mensal ainda não foi gerada.", "muted"),
+  );
+  const shown = d.items.slice(0, 60);
+  node.append(
+    rows(shown, (c) =>
+      el(
+        "div",
+        { class: "row" },
+        el(
+          "div",
+          {},
+          text("strong", `${c.name_pt} (${c.iso3})`),
+          text(
+            "small",
+            `Compras declaradas pelo país: ${tl(c.comtrade_state)}${c.comtrade_last_period ? ` · último ano ${c.comtrade_last_period}` : ""}${c.comtrade_stale ? ` · não atualizado em ${c.comtrade_stale}` : ""} — Exportações do Brasil: ${tl(c.mdic_state)}${c.mdic_stale ? ` · não atualizado em ${c.mdic_stale}` : ""}`,
+          ),
+        ),
+        c.comtrade_version || c.mdic_version
+          ? button("Analisar", async () => {
+              const a = await api("/api/country-analyses", "POST", { iso3: c.iso3 });
+              await showAnalysis(a.id, a);
+            })
+          : text("span", "sem lista", "tag"),
+      ),
+    ),
+  );
+  if (d.items.length > shown.length) node.append(text("p", `Mostrando ${shown.length} de ${d.items.length}. Refine a busca.`, "muted"));
+  if (writable()) {
+    const intl = (await campaignsOf("international")).filter((c) => c.selection_id && ["draft", "active", "waiting"].includes(c.status));
+    if (intl.length) {
+      const links = el("div");
+      const f = makeForm(
+        [
+          select("Campanha internacional", "campaignId", intl.map((c) => [c.id, c.name])),
+          input("Razão social", "legalName"),
+          input("Registro (número)", "registrationId", "text", "", false),
+          input("Tipo de registro (ex.: HRB, CRN, EIN)", "registrationIdType", "text", "", false),
+          input("Fonte (onde a empresa foi encontrada)", "sourceLabel"),
+          input("URL da fonte", "sourceUrl", "url", "", false),
+          select("Nome parecido com outra empresa do país", "confirmDistinct", [["false", "Conferir antes"], ["true", "Já conferi: é outra empresa"]]),
+        ],
+        async (v) => {
+          const r = await api("/api/foreign-companies", "POST", {
+            campaignId: v.campaignId, legalName: v.legalName, registrationId: v.registrationId || undefined, registrationIdType: v.registrationIdType || undefined,
+            sourceLabel: v.sourceLabel, sourceUrl: v.sourceUrl || undefined, confirmDistinct: v.confirmDistinct === "true",
+          });
+          // Links de pesquisa montados (Camada 2): abertos só pela pessoa, nunca pelo sistema.
+          links.replaceChildren(
+            text("p", r.created ? "Empresa cadastrada com as três condições pendentes." : "Mesmo registro: a empresa já existia; condições garantidas.", "success"),
+            ...r.researchLinks.map((l) => el("p", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))),
+            button("Abrir empresa", () => showCompany(r.id)),
+          );
+        },
+        "Cadastrar importador",
+      );
+      node.append(details("Cadastrar importador de uma campanha internacional", el("div", {}, f, links)));
+    }
+  }
+  const hist = await api("/api/country-analyses");
+  node.append(
+    panel(
+      "Análises, seleções e campanhas",
+      rows(hist.items, (a) =>
+        el(
+          "div",
+          { class: "row" },
+          el("div", {}, text("strong", `${a.name_pt} · ${a.period_months} meses`), text("small", `${a.created_at.slice(0, 10)} · ${a.selections} seleção(ões) · ${a.campaigns} campanha(s), ${a.active_campaigns} ativa(s)`)),
+          button("Abrir", () => showAnalysis(a.id)),
+        ),
+      ),
+    ),
+  );
+  return node;
+}
+
+function sourceCard(src, extra) {
+  return el(
+    "div",
+    { class: "stat source" },
+    text("strong", src.title),
+    text("span", src.lagging || src.label, src.state === "purchase_identified" ? "tag" : "tag warn"),
+    src.note ? text("small", src.note) : null,
+    text("small", `Versão ${src.versionId || "—"}${extra ? ` · ${extra}` : ""}`),
+  );
+}
+
+async function showAnalysis(id, preloaded) {
+  const a = preloaded || (await api(`/api/country-analyses/${id}`));
+  const node = section(`${a.country.name_pt} · análise`, `Período de ${a.periodMonths} meses · criada em ${a.createdAt.slice(0, 16).replace("T", " ")}${a.reproduced ? "" : " · a lista usada não confere mais: gere nova análise"}`);
+  node.setAttribute("data-screen", "internacional");
+  node.append(text("p", a.notice, "notice-fixed"), button("Voltar aos países", () => navigate("Internacional")));
+  node.append(
+    el(
+      "div",
+      { class: "stats" },
+      sourceCard(a.sources.comtrade, a.sources.comtrade.years.length ? `anos guardados: ${a.sources.comtrade.years.join(", ")}` : null),
+      sourceCard(a.sources.mdic, a.sources.mdic.window ? `de ${a.sources.mdic.window.from} a ${a.sources.mdic.window.to}` : null),
+    ),
+  );
+  const chosen = new Map();
+  const table = el("table", { class: "trade" });
+  table.append(
+    el(
+      "thead",
+      {},
+      el(
+        "tr",
+        {},
+        ...["", "SH6", "Produto", "Compras declaradas pelo país (CIF, anual)", "Exportações do Brasil (FOB, mensal)", "Catálogo EAG"].map((h) => el("th", { scope: "col" }, h)),
+      ),
+    ),
+  );
+  const body = el("tbody");
+  for (const r of a.rows) {
+    const ct = r.comtrade?.latest;
+    const md = r.mdic;
+    const box = r.purchaseIdentified && approver() ? el("input", { type: "checkbox", "aria-label": `Selecionar ${r.hs6}` }) : null;
+    box?.addEventListener("change", () => (box.checked ? chosen.set(r.hs6, r) : chosen.delete(r.hs6)));
+    body.append(
+      el(
+        "tr",
+        {},
+        el("td", {}, box),
+        el("td", {}, r.hs6),
+        el("td", {}, r.name || "—"),
+        el(
+          "td",
+          {},
+          ct
+            ? `${ct.year}: todas as origens ${usd(ct.worldUsd)}; Brasil ${usd(ct.brazilUsd)}; parte do Brasil ${ct.brazilShare == null ? `desconhecida (${ct.shareNote})` : `${(ct.brazilShare * 100).toFixed(1)}%`}${ct.basis === "CIF" ? "" : " (base declarada, não CIF)"}`
+            : "—",
+        ),
+        el(
+          "td",
+          {},
+          md
+            ? `${usd(md.fobUsd)} · ${kg(md.netKg)} · última ocorrência ${md.lastOccurrence}${md.qtyInconsistent ? " · quantidade estatística inconsistente na fonte" : ""}`
+            : "—",
+        ),
+        el(
+          "td",
+          {},
+          r.catalog.confirmed.length ? `No catálogo EAG: ${r.catalog.confirmed.map((c) => c.variant).join(", ")}` : r.catalog.pending.length ? "código pendente" : "—",
+        ),
+      ),
+    );
+  }
+  table.append(body);
+  node.append(el("div", { class: "table-wrap" }, table));
+  if (approver()) {
+    const choose = button("Escolher commodities", async () => {
+      if (!chosen.size) return notice("Marque ao menos uma linha com compra identificada.", true);
+      const form = el("form");
+      const fields = [];
+      for (const r of chosen.values()) {
+        const guess = r.catalog.confirmed[0]?.productId;
+        const p = select(`Produto para ${r.hs6} (${r.name || "sem nome"})`, `product-${r.hs6}`, state.products.map((x) => [x.id, x.variant_name]), guess);
+        const l = input(`Nome da commodity (${r.hs6})`, `label-${r.hs6}`, "text", r.name || "");
+        fields.push({ r, p, l });
+      }
+      const f = makeForm(
+        fields.flatMap((x) => [x.p, x.l]),
+        async () => {
+          // Linhas com o mesmo produto viram um item só (uma campanha por commodity).
+          const items = new Map();
+          for (const x of fields) {
+            const productId = x.p.control.value;
+            const it = items.get(productId) || items.set(productId, { productId, label: x.l.control.value, hs6: [] }).get(productId);
+            it.hs6.push(x.r.hs6);
+          }
+          const r = await api(`/api/country-analyses/${a.id}/selections`, "POST", { items: [...items.values()] });
+          notice(
+            `Seleção registrada: ${r.campaigns.length} campanha(s) em rascunho${r.campaigns.some((c) => c.needsCommercialValidation) ? "; há commodity aguardando validação comercial" : ""}. Complete o ICP e ative; a 3ª commodity ativa no mercado fica em espera.`,
+          );
+          await navigate("Campanhas");
+        },
+        "Registrar seleção e criar campanhas",
+      );
+      void form;
+      node.append(panel("Seleção", f));
+      f.scrollIntoView({ block: "nearest" });
+    }, true);
+    node.append(el("div", { class: "toolbar" }, choose));
+  }
+  $("content").replaceChildren(node);
+  $("content").focus({ preventScroll: true });
+}
+
+async function listaMensalView() {
+  const d = await api("/api/trade-list/versions");
+  const node = section("Lista mensal", "Rotina mensal das compras por país (Comtrade) e das exportações do Brasil (MDIC). País que falha mantém a versão anterior.");
+  node.append(
+    kv([
+      ["Chamadas à Comtrade no último dia registrado", d.comtradeBudget ? `${d.comtradeBudget.used} em ${d.comtradeBudget.day}` : "nenhuma"],
+    ]),
+    rows(d.items, (v) => {
+      const count = (source, state) => v.states.filter((x) => x.source === source && x.state === state).reduce((t, x) => t + x.n, 0);
+      return el(
+        "div",
+        { class: "row" },
+        el(
+          "div",
+          {},
+          text("strong", `${v.id}${v.kind === "manual" ? ` (manual, ${v.iso3})` : ""}`),
+          text(
+            "small",
+            `Comtrade: ${count("comtrade", "purchase_identified")} com compra, ${count("comtrade", "not_declared")} sem declaração, ${count("comtrade", "data_unavailable")} indisponíveis · MDIC: ${count("mdic", "purchase_identified")} com compra, ${count("mdic", "no_record")} sem registro, ${count("mdic", "data_unavailable")} indisponíveis · jobs ${Object.entries(v.jobs).map(([k, n]) => `${k} ${n}`).join(", ")}`,
+          ),
+          v.comtrade_blocked ? text("small", `Comtrade parada: ${v.comtrade_blocked === "no_key" ? "chave não configurada" : "chave recusada"}.`, "error") : null,
+          v.note ? text("small", v.note) : null,
+        ),
+        text("span", v.status === "running" ? "Em andamento" : v.status === "complete" ? "Completa" : v.status === "partial" ? "Parcial" : "Falhou", "tag"),
+        admin() && v.status === "running" && v.comtrade_blocked
+          ? button("Retomar Comtrade", async () => {
+              await api(`/api/trade-list/versions/${v.id}/resume`, "POST", {});
+              await navigate("Lista mensal");
+            })
+          : null,
+      );
+    }),
+  );
+  if (admin())
+    node.append(
+      details(
+        "Rodar a rotina do mês agora",
+        makeForm([input("Motivo (mínimo 10 caracteres)", "reason", "textarea")], async (x) => {
+          const r = await api("/api/trade-list/run", "POST", { reason: x.reason });
+          notice(`Rotina ${r.versionId}: ${r.resumed ? "retomada" : r.status === "running" ? "iniciada" : r.status}.`);
+          await navigate("Lista mensal");
+        }, "Rodar"),
+      ),
+      details(
+        "Atualizar um país (1 por dia)",
+        makeForm([input("País (ISO-3, ex.: DEU)", "iso3"), input("Motivo (mínimo 10 caracteres)", "reason", "textarea")], async (x) => {
+          const r = await api(`/api/trade-list/refresh/${encodeURIComponent(x.iso3.trim().toUpperCase())}`, "POST", { reason: x.reason });
+          notice(`Atualização ${r.versionId} iniciada.`);
+          await navigate("Lista mensal");
+        }, "Atualizar país"),
+      ),
+    );
+  return node;
+}
+
+// Empresa no exterior: condições R12.10 com evidência e porte com fonte.
+function internationalPanels(id, data) {
+  if (data.company.country_code === "BR") return [];
+  const nodes = [];
+  const byProduct = new Map();
+  for (const c of data.conditions || []) (byProduct.get(c.product_id) || byProduct.set(c.product_id, []).get(c.product_id)).push(c);
+  for (const [productId, list] of byProduct) {
+    const pname = state.products.find((p) => p.id === productId)?.variant_name || productId;
+    nodes.push(
+      panel(
+        `Condições R12.10 · ${pname}`,
+        text("p", "Cada condição só é confirmada por evidência da própria empresa que diga o que sustenta. Dado do país nunca confirma.", "muted"),
+        rows(list, (c) =>
+          el("div", { class: "row" }, el("div", {}, text("strong", conditionLabels[c.condition]), text("small", c.evidence_id ? `Evidência ${c.evidence_id.slice(0, 8)}` : c.note || "Sem evidência")), text("span", c.status === "confirmed" ? "Confirmada" : c.status === "not_found" ? "Não encontrada" : "Pendente", "tag")),
+        ),
+        writable()
+          ? details(
+              "Registrar condição",
+              makeForm(
+                [
+                  select("Condição", "condition", Object.entries(conditionLabels)),
+                  select("Estado", "status", [["confirmed", "Confirmada"], ["not_found", "Não encontrada"], ["pending", "Pendente"]]),
+                  select("Evidência (da empresa, validada)", "evidenceId", [["", "Nenhuma"], ...data.evidence.filter((e) => e.category !== "market").map((e) => [e.id, `${e.evidence_type} · ${e.reference}`])]),
+                  input("Nota (onde procurou, se não encontrada)", "note", "textarea", "", false),
+                ],
+                async (v) => {
+                  await api(`/api/companies/${id}/conditions/${productId}/${v.condition}`, "PUT", { status: v.status, evidenceId: v.evidenceId || undefined, note: v.note || undefined });
+                  notice("Condição registrada.");
+                  await showCompany(id);
+                },
+                "Registrar",
+              ),
+            )
+          : null,
+      ),
+    );
+  }
+  nodes.push(
+    panel(
+      "Porte no exterior",
+      kv([["Faixa", { small: "Pequena", medium: "Média", medium_plus: "Média-mais", giant: "Gigante" }[data.company.size_band] || "Não informado"], ["Fonte", data.company.size_source], ["Conferido em", data.company.size_checked_at]]),
+      approver()
+        ? details(
+            "Registrar porte",
+            makeForm(
+              [select("Faixa", "sizeBand", [["small", "Pequena"], ["medium", "Média"], ["medium_plus", "Média-mais"], ["giant", "Gigante"]]), input("Fonte do porte", "source")],
+              async (v) => {
+                await api(`/api/companies/${id}/size`, "PATCH", v);
+                notice("Porte registrado; ICP refeito.");
+                await showCompany(id);
+              },
+              "Registrar porte",
+            ),
+          )
+        : null,
+    ),
+  );
+  return nodes;
+}
+
 const views = {
   Hoje: home,
   Empresas: companiesView,
@@ -2181,6 +2511,8 @@ const views = {
   Fichas: fichasView,
   Envios: enviosView,
   Tarefas: tarefasView,
+  Internacional: () => internacionalView(),
+  "Lista mensal": listaMensalView,
   Catálogo: catalogView,
   Parâmetros: parametersView,
   Supressão: suppressionView,

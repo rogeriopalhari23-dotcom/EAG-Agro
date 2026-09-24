@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import { setup } from "./helpers/db.mjs";
 import { pilot } from "./helpers/pilot.mjs";
+import { sources, keepCountries, tradeParams, driver } from "./helpers/trade.mjs";
 import worker from "../src/worker.js";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -218,12 +219,41 @@ try {
   await page.getByRole("heading", { name: "Setores usuários → CNAE", exact: true }).waitFor();
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM send_log").get().n, 0);
   assert.ok(p.fichaId);
+  // P3-T11: lista mensal gerada com fontes simuladas; análise da Alemanha e seleção pela tela.
+  keepCountries(ctx.DB, ["DEU", "USA", "CHN"]);
+  await tradeParams(ctx.api, { period_default_months: 12 });
+  const d = driver(ctx.env, sources(), { at: "2026-10-10T12:00:00.000Z" });
+  await d.start();
+  await d.drain();
+  await nav("Internacional");
+  await page.getByRole("heading", { name: "Internacional", exact: true }).waitFor();
+  await page.getByRole("searchbox", { name: "Buscar país" }).fill("Alemanha");
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
+  await page.locator(".row").filter({ hasText: "Alemanha (DEU)" }).getByRole("button", { name: "Analisar" }).click();
+  await page.getByRole("heading", { name: "Alemanha · análise", exact: true }).waitFor();
+  await page.getByText("O dado confirma exportação do Brasil para o país; não comprova compra por nenhuma empresa específica.").first().waitFor();
+  await page.getByText(/parte do Brasil 30\.0%/).waitFor();
+  await page.screenshot({ path: "review-output/analise-desktop.png", fullPage: true });
+  await page.getByRole("checkbox", { name: "Selecionar 090111" }).check();
+  await page.getByRole("button", { name: "Escolher commodities" }).click();
+  await page.getByLabel(/Produto para 090111/).selectOption("product-05");
+  await page.getByRole("button", { name: "Registrar seleção e criar campanhas" }).click();
+  await page.getByRole("heading", { name: "Campanhas", exact: true }).waitFor();
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM campaigns WHERE market='international' AND selection_id IS NOT NULL AND country_code='DE'").get().n, 1);
+  await page.screenshot({ path: "review-output/internacional-desktop.png", fullPage: true });
+  await nav("Lista mensal");
+  await page.getByRole("heading", { name: "Lista mensal", exact: true }).waitFor();
+  await page.getByText("2026-10", { exact: true }).waitFor();
+  assert.equal(await page.locator("#content .error").filter({ visible: true }).count(), 0);
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   );
+  await nav("Internacional");
+  await page.getByRole("heading", { name: "Internacional", exact: true }).waitFor();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Internacional sem rolagem horizontal em 390 px");
   await page
     .getByRole("navigation")
     .getByRole("button", { name: "Hoje", exact: true })
@@ -240,7 +270,7 @@ try {
   });
   assert.deepEqual(errors, []);
   console.log(
-    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar, Fichas, Envios, Tarefas, 11 telas e viewport 390 px, sem erros JS.",
+    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar, Fichas, Envios, Tarefas, Internacional (análise e seleção), Lista mensal, 13 telas e viewport 390 px, sem erros JS.",
   );
 } finally {
   await browser.close();

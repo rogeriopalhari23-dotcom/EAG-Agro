@@ -128,6 +128,7 @@ export async function buildAnalysis(env, tenant, iso3, periodMonths, objs) {
       });
       const r = row(hs6);
       r.comtrade = { latest: perYear.at(-1), years: perYear };
+      r.name ||= comtradeObj.names?.[hs6] ?? null;
     }
   }
   const index = await catalogIndex(env, tenant);
@@ -214,4 +215,20 @@ export async function getAnalysis(env, actor, id) {
     snapshotSha256: a.snapshot_sha256,
     reproduced,
   };
+}
+
+// Painel do mercado internacional (R24.1, R24.3): análises, seleções e campanhas que cada uma originou.
+export async function listAnalyses(env, actor) {
+  const rows = (
+    await s(
+      env,
+      `SELECT a.id,a.iso3,c.name_pt,a.period_months,a.created_at,a.created_by,a.comtrade_version_id,a.mdic_version_id,
+        (SELECT COUNT(*) FROM commodity_selections x WHERE x.analysis_id=a.id) selections,
+        (SELECT COUNT(*) FROM campaigns p WHERE p.analysis_id=a.id) campaigns,
+        (SELECT COUNT(*) FROM campaigns p WHERE p.analysis_id=a.id AND p.status='active') active_campaigns
+       FROM country_analyses a JOIN countries c ON c.iso3=a.iso3 WHERE a.tenant_id=? ORDER BY a.created_at DESC LIMIT 50`,
+      actor.tenant_id,
+    ).all()
+  ).results;
+  return { items: rows };
 }

@@ -536,3 +536,58 @@ footer {
       border-color 0.15s;
   }
 }
+
+/* P2-T18 e P3-T11: textos congelados, aviso fixo de R1.4.2, tabela das duas fontes lado a lado. */
+pre.message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 14px/1.5 "IBM Plex Mono", ui-monospace, monospace;
+  background: var(--surface-2);
+  padding: 12px 16px;
+  margin: 0;
+}
+label.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.notice-fixed {
+  border-left: 3px solid var(--accent);
+  padding: 12px 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+.tag.warn {
+  border-color: var(--accent);
+}
+.stat.source {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+}
+table.trade {
+  border-collapse: collapse;
+  min-width: 880px;
+  width: 100%;
+  font-size: 14px;
+}
+table.trade th,
+table.trade td {
+  text-align: left;
+  vertical-align: top;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+table.trade th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.stat.source strong {
+  font-size: 18px;
+  line-height: 1.3;
+}

@@ -22,6 +22,10 @@ const worker = await import(pathToFileURL(resolve(root, "src/worker.js")).href);
 assert.equal(typeof worker.default.fetch, "function");
 const html = await readFile(resolve(root, "dist/index.html"), "utf8");
 assert.ok(html.includes("/app.js") && html.includes("/app.css"));
+// Plano 3 T11: tela Internacional ligada às rotas da lista mensal, da análise e das empresas no exterior.
+const app = await readFile(resolve(root, "dist/app.js"), "utf8");
+for (const needle of ['"data-screen", "internacional"', "/api/country-analyses", "/api/trade-list/versions", "/api/foreign-companies"])
+  assert.ok(app.includes(needle), `app.js sem ${needle}`);
 assert.ok(
   !/<script(?![^>]*src=)[^>]*>/i.test(html),
   "Script inline proibido pelo CSP",

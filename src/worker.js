@@ -199,6 +199,7 @@ async function route(request, env, rid) {
     if (action === "contacts" && method === "POST") return response(await openclaw.importContacts(request, env, actor, rid, id));
   }
   if (path === "/api/openclaw/transfers" && method === "POST") return response(await openclaw.confirmTransfer(request, env, actor, rid));
+  if (path === "/api/country-analyses" && method === "GET") return response(await countryAnalysis.listAnalyses(env, actor));
   if (path === "/api/country-analyses" && method === "POST") return response(await countryAnalysis.createAnalysis(request, env, actor, rid), 201);
   const can = path.match(/^\/api\/country-analyses\/([^/]+)(?:\/(selections))?$/);
   if (can && !can[2] && method === "GET") return response(await countryAnalysis.getAnalysis(env, actor, can[1]));

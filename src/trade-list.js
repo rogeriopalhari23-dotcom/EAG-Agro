@@ -401,7 +401,10 @@ async function consolidateComtrade({ env, at, payload, version: v, done, mine })
   lines.sort((a, b) => (a.hs6 + a.year + a.origin).localeCompare(b.hs6 + b.year + b.origin));
   const state = lines.some((l) => (l.valueUsd ?? 0) > 0) ? "purchase_identified" : "no_record";
   const lastPeriod = years.length ? String(Math.max(...years)) : null;
-  const obj = { iso3: payload.iso3, versionId: v.id, source: "comtrade", state, lastPeriod, years, basis: "CIF", view: "importações declaradas pelo país", classification: JSON.parse(v.classification_json).version, lines };
+  // Descrição oficial das subposições (HS.json da Comtrade) só para as que aparecem na lista do país.
+  const ref = await getJson(env, `trade-ref/${v.id}/hs6-blocks.json`).catch(() => ({ names: {} }));
+  const names = Object.fromEntries([...new Set(lines.map((l) => l.hs6))].filter((h) => ref.names?.[h]).map((h) => [h, ref.names[h]]));
+  const obj = { iso3: payload.iso3, versionId: v.id, source: "comtrade", state, lastPeriod, years, basis: "CIF", view: "importações declaradas pelo país", classification: JSON.parse(v.classification_json).version, names, lines };
   const out = await putJson(env, `trade-src/${v.id}/comtrade/${payload.iso3}.json`, obj);
   return [done(out.key, out.sha), statusStmt(env, v.id, payload.iso3, "comtrade", state, { lastPeriod, lines: lines.length, at, guard: mine }), pointerStmt(env, v.id, payload.iso3, "comtrade", out.key, out.sha, at, mine)];
 }

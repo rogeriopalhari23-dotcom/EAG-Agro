@@ -125,6 +125,10 @@ export async function getCompany(request, env, actor, id) {
     await s(env, "SELECT * FROM company_units WHERE tenant_id=? AND company_id=? ORDER BY cnpj", actor.tenant_id, id).all()
   ).results;
   out.profiles = await listProfiles(env, actor, id);
+  // Condições R12.10 (empresas no exterior): estado e evidência por commodity.
+  out.conditions = (
+    await s(env, "SELECT product_id,condition,status,evidence_id,note,updated_by,updated_at FROM company_conditions WHERE tenant_id=? AND company_id=? ORDER BY product_id,condition", actor.tenant_id, id).all()
+  ).results;
   out.demandFields = {};
   if (out.demands.length) {
     const fields = await s(
