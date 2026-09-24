@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-24T16:03:38.715Z",
+  "updatedAt": "2026-09-24T16:08:17.611Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -493,8 +493,8 @@
       ],
       "acceptance": "Importar supressões antes de contatos; relatório de conflitos e corte comprovado do executor antigo.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": "tests/openclaw.test.mjs",
-      "blockedBy": "Arquivo de exportação real do OpenClaw (formato e mapeamento) e inventário do executor antigo para o corte"
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Dados do OpenClaw não estão nesta máquina (conferido em 2026-09-24); exportação da VPS da Hostinger (ou autorização para leitura por SSH) e inventário do executor antigo para o corte"
     },
     {
       "id": "P2-T16",

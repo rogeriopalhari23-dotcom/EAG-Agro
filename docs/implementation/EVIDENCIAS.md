@@ -369,3 +369,11 @@ Inventário lido pela integração Cloudflare (apenas GET; nada criado, alterado
 - Consequência operacional: com 30 dias, cada lista precisa ser reimportada ao menos uma vez por mês; lista vencida deixa a triagem indisponível e segura o pré-envio (R19.3).
 - Teste: `tests/sanctions-parsers.test.mjs` (filial da mesma raiz → 2 revisões, 0 bloqueio; empresa sem relação → nada; parâmetro 720 e três fontes ativas). Suíte 298 + 2. Migração aplicada no D1 local após cópia em `eag-compass-backups/d1-local-20260924-120332`.
 - P2-T16 passa a `external`: falta só o admin rodar a importação das três listas em produção (`docs/OPERACAO.md`, seção Listas de sanções).
+
+## P2-T15 — Busca dos dados do OpenClaw nesta máquina (2026-09-24)
+
+- Autorizado por Rogério a ler `~/.openclaw` e `AppData/Local/EAG-OpenClaw-*` só para descobrir formato e local dos dados; lida apenas a estrutura (nomes, tamanhos e nomes de campos), nenhum conteúdo copiado.
+- `~/.openclaw`: configuração da tela Claw3D (`claw3d/settings.json`), skills e o quadro de tarefas dos agentes (`claw3d/task-manager/tasks.json`, 128 tarefas com `title, status, source, channel, externalThreadId, history…`). **Não há empresas, contatos nem supressões.**
+- `AppData/Local/EAG-OpenClaw-{AuthClean,Clean,DirectClean,Stable}`: perfis do navegador Edge usados para abrir a tela (cache, uso, estatísticas). **Sem dados de prospecção.**
+- Indícios de que o OpenClaw em uso roda na VPS da Hostinger: chave `~/.ssh/eag_openclaw` e o guia de instalação na VPS em Downloads. A base de contatos e descadastros deve estar lá.
+- **Bloqueio atualizado:** exportação feita na VPS (ou autorização de Rogério para leitura por SSH, só leitura) e inventário do que ainda roda no executor antigo para comprovar o corte.
