@@ -75,8 +75,10 @@ export async function preSendCheck(env, row, ctx) {
   if (ctx.market === "international") {
     // Internacional (P3-T10): só com a liberação vigente e com o fuso do destinatário registrado (R18.6).
     if (ctx.internationalEnabled !== true) return { skip: "international_not_enabled" };
-    if (!contact.timezone) return { skip: "timezone_pending" };
   }
+  // Regra de horário aprovada por Rogério em 2026-09-25: janela no fuso CONFIRMADO do destinatário, nos dois
+  // mercados; sem fuso confirmado, o envio fica em espera (nunca cai no fuso do mercado).
+  if (!contact.timezone) return { skip: "timezone_pending" };
   if (contact.email_validation !== "valid") return { skip: "email_not_validated" }; // 11
   if (contact.email_validation_expires_at && contact.email_validation_expires_at <= ctx.at) return { skip: "email_validation_expired" };
   const email = await decryptPii(contact.email_encrypted, env);
@@ -88,7 +90,7 @@ export async function preSendCheck(env, row, ctx) {
     if (!allowed.includes(email.toLowerCase())) return { skip: "channel_internal_test_only" };
   }
   // 12: nenhum outro e-mail da sequência ao mesmo endereço no mesmo dia ou no dia civil anterior, no fuso dele.
-  const tz = contact.timezone || ctx.nationalTz;
+  const tz = contact.timezone;
   const today = localDate(ctx.at, tz);
   const recent = (
     await s(env, "SELECT accepted_at FROM send_outbox WHERE tenant_id=? AND email_hash=? AND status='accepted' AND accepted_at>=?", row.tenant_id, row.email_hash, new Date(Date.parse(ctx.at) - 3 * 86400000).toISOString()).all()
@@ -123,8 +125,8 @@ export async function tick(env, tenant, deps = {}) {
     const p = await parameters(env, tenant);
     const ramp = p["send_daily_ramp:email"],
       interval = p["send_interval_minutes:email"],
-      nationalTz = p["send_timezone:national"];
-    if (!Array.isArray(ramp) || !interval || !p["send_window:national"] || !nationalTz) return { ...out, reason: "parameters_missing" }; // R7.1.1
+      nationalTz = null; // não há mais fuso de mercado no envio (regra de 2026-09-25)
+    if (!Array.isArray(ramp) || !interval) return { ...out, reason: "parameters_missing" }; // R7.1.1 (janela conferida por mercado em cada passo)
     const internationalEnabled = p["international_enabled:international"]?.enabled === true;
     const senderDay = localDate(at, SENDER_TZ);
     const sentToday = state.day === senderDay ? state.sent_today : 0;

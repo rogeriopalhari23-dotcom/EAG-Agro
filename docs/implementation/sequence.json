@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-25T12:17:21.848Z",
+  "updatedAt": "2026-09-25T12:42:19.523Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -537,7 +537,7 @@
       "acceptance": "Teste interno T1, reputação/limites/retencão, interrupção de emergência; liberação expressa dos canais.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "T1 não executado. Rogério: MAILBOX_PASSWORD por wrangler secret put (confirmado por POST /api/integrations/mailbox/check); aprovar janela e fuso nacional; Snov só para validar o e-mail do contato de teste"
+      "blockedBy": "T1 não executado: MAILBOX_PASSWORD (senha da própria caixa Hostinger, por wrangler secret put; confirmada por POST /api/integrations/mailbox/check) e Snov para validar o e-mail de teste. Janela aprovada em 2026-09-25."
     },
     {
       "id": "P2-T18",

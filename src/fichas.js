@@ -49,8 +49,8 @@ async function context(env, actor, companyId, campaignId, contactIds) {
   const gate = canHaveFicha(profile);
   if (!gate.ok) fail(422, "ficha_not_allowed", gate.reason);
   const params = await parameters(env, actor.tenant_id);
-  const timezone = c.market === "national" ? params["send_timezone:national"] : null;
-  if (c.market === "national" && !timezone) fail(422, "timezone_pending", "Fuso do mercado nacional sem valor aprovado (R18.6).");
+  // Fuso é do destinatário (regra de 2026-09-25); o do mercado só fica no retrato da ficha como referência.
+  const timezone = c.market === "national" ? params["send_timezone:national"] ?? null : null;
   if (!env.EAG_POSTAL_ADDRESS) fail(422, "postal_address_missing", "Configure EAG_POSTAL_ADDRESS: o endereço físico vai em todo e-mail (R19.13).");
   if (!Array.isArray(contactIds) || !contactIds.length || contactIds.length > 5) fail(422, "invalid_recipients", "Informe de 1 a 5 destinatários.");
   const recipients = [];
@@ -66,7 +66,7 @@ async function context(env, actor, companyId, campaignId, contactIds) {
     if (c.market === "international" && !ct.timezone) fail(422, "timezone_pending", "Fuso do destinatário pendente (R18.6).");
     recipients.push({
       contactId: ct.id, role: ct.prospect_role, fullName, jobTitle, sourceLabel: ct.source_label, linkedin: !!linkedin,
-      relationshipNote: ct.relationship_note, emailHash: ct.email_hash, timezone: ct.timezone || timezone,
+      relationshipNote: ct.relationship_note, emailHash: ct.email_hash, timezone: ct.timezone || null,
     });
   }
   if (!recipients.some((r) => r.role !== "influencer")) fail(422, "decision_maker_required", "A ficha precisa de um decisor (PV8).");
@@ -239,6 +239,9 @@ export async function approve(request, env, actor, rid, id) {
     await s(env, "SELECT * FROM ficha_messages WHERE version_id=? AND contact_id=? AND channel=? ORDER BY step_no", v.id, contactId, channel).all()
   ).results;
   if (!list.length) fail(422, "nothing_to_approve", "Nada a aprovar para este destinatário neste canal.");
+  // R18.6: destinatário sem fuso confirmado não é aprovado (e o pré-envio também segura, se o fuso for apagado depois).
+  const recipient = await s(env, "SELECT timezone FROM contacts WHERE tenant_id=? AND id=?", actor.tenant_id, contactId).first();
+  if (!recipient?.timezone) fail(409, "timezone_pending", "Confirme o fuso do destinatário antes de aprovar (R18.6).");
   const agg = await approvalHash(list.map((m) => m.message_sha256));
   if (i.messagesSha256 !== agg) fail(409, "content_changed", "O conteúdo aprovado não confere com o atual. Recarregue a ficha.");
   const campaign = await s(env, "SELECT * FROM campaigns WHERE id=?", f.campaign_id).first();

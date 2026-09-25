@@ -309,6 +309,9 @@ export async function addContact(request, env, actor, rid, id) {
   if (values[2] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values[2]))
     fail(422, "invalid_email", "E-mail inválido.");
   const role = oneOf(i.prospectRole ?? "other", ["decision_maker", "influencer", "provisional_decision_maker", "other"], "papel na prospecção");
+  // Fuso confirmado do destinatário (regra de horário de 2026-09-25): opcional no cadastro; sem ele o envio espera.
+  const timezone = typeof i.timezone === "string" && i.timezone.trim() ? i.timezone.trim() : null; // vazio = pendente
+  if (timezone && !validTimezone(timezone)) fail(422, "timezone_invalid", "Fuso IANA inválido, ex.: America/Sao_Paulo.");
   const emailHash = values[2] ? await identifierHash(env, actor.tenant_id, "email", values[2]) : null;
   // R2.1.2: contato suprimido nunca fica selecionável; o cadastro registra, a ficha recusa.
   const suppressed = values[2] ? await isSuppressed(env, actor.tenant_id, "email", values[2]) : false;
@@ -317,7 +320,7 @@ export async function addContact(request, env, actor, rid, id) {
     companyLock(env, actor, c),
     s(
       env,
-      `INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,job_title_encrypted,email_encrypted,phone_encrypted,linkedin_url_encrypted,source_label,source_url,created_by,prospect_role,email_hash,email_validation) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,job_title_encrypted,email_encrypted,phone_encrypted,linkedin_url_encrypted,source_label,source_url,created_by,prospect_role,email_hash,email_validation,timezone) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       cid,
       actor.tenant_id,
       id,
@@ -328,6 +331,7 @@ export async function addContact(request, env, actor, rid, id) {
       role,
       emailHash,
       values[2] ? "pending" : null,
+      timezone,
     ),
     auditStatement(env, actor, rid, "contact.created", "contact", cid, {
       companyId: id,

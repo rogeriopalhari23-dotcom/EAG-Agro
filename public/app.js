@@ -831,7 +831,16 @@ async function showCompany(id, offset = 0) {
               [r.jobTitle, r.email, r.phone].filter(Boolean).join(" · "),
             ),
           ),
-          text("span", `${lbl(r.prospectRole)} · e-mail ${lbl(r.emailValidation)}${r.targetFlag ? " · cargo fora do alvo" : ""}`, "tag"),
+          text("span", `${lbl(r.prospectRole)} · e-mail ${lbl(r.emailValidation)} · ${r.timezone ? `fuso ${r.timezone}` : "fuso pendente"}${r.targetFlag ? " · cargo fora do alvo" : ""}`, "tag"),
+          writable()
+            ? button(r.timezone ? "Alterar fuso" : "Confirmar fuso", async () => {
+                const tz = prompt("Fuso horário confirmado do contato (IANA), ex.: America/Sao_Paulo, America/Manaus, Europe/Berlin:", r.timezone || "America/Sao_Paulo");
+                if (!tz) return;
+                await api(`/api/contacts/${r.id}`, "PATCH", { timezone: tz.trim() });
+                notice("Fuso registrado.");
+                await showCompany(id);
+              })
+            : null,
         ),
       ),
     ),
@@ -849,6 +858,7 @@ async function showCompany(id, offset = 0) {
             input("Telefone", "phone", "text", "", false),
             input("LinkedIn", "linkedinUrl", "url", "", false),
             select("Papel na prospecção", "prospectRole", ["decision_maker", "influencer", "provisional_decision_maker", "other"].map((k) => [k, lbl(k)])),
+            input("Fuso confirmado do contato (ex.: America/Sao_Paulo) — sem ele o envio espera", "timezone", "text", "", false),
             input("Fonte do contato (ex.: LinkedIn, site)", "sourceLabel"),
           ],
           async (v) => {

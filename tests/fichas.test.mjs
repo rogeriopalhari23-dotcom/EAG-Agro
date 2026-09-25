@@ -19,8 +19,9 @@ async function ready(ctx, { profileClass = "possible_final_consumer", channel = 
   const co = await api("/api/companies", "POST", { legalName: "Doces Vale Verde Ltda.", countryCode: "BR", registrationId: "11222333000181", registrationIdType: "CNPJ", sourceLabel: "teste" });
   DB.raw.prepare("INSERT INTO company_units(id,tenant_id,company_id,cnpj,size_code,source_label,consulted_at) VALUES ('u1','eag-internal',?,'11222333000181','05','teste','2026-09-23')").run(co.data.id);
   await api(`/api/companies/${co.data.id}/profiles`, "POST", { productId: "product-06", profileClass, basis: "CNAE e site" });
+  // Fuso confirmado do destinatário (regra de horário de 2026-09-25); `timezone: false` deixa o contato sem fuso.
   const add = async (fullName, email, role, jobTitle, sourceLabel = "Site da empresa") =>
-    (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName, email, jobTitle, prospectRole: role, sourceLabel })).data.id;
+    (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName, email, jobTitle, prospectRole: role, sourceLabel, ...(timezone ? { timezone: "America/Sao_Paulo" } : {}) })).data.id;
   const dm = await add("Maria Souza", "compras@valeverde.com.br", "decision_maker", "Gerente de Compras");
   const inf = await add("João Lima", "suprimentos@valeverde.com.br", "influencer", "Coordenador de Suprimentos", "LinkedIn");
   return { campaignId: camp.data.id, companyId: co.data.id, dm, inf };
@@ -139,12 +140,17 @@ check("P2-T9: trader sem exceção, destinatário suprimido, fuso ou endereço a
   assert.equal((await ctx.api("/api/fichas", "POST", { companyId: r.companyId, campaignId: r.campaignId, recipients: [r.inf] })).data.error.code, "postal_address_missing");
 });
 
-check("P2-T9: sem fuso aprovado não há ficha (R18.6); vendedor não aprova", async (ctx) => {
+check("P2-T9: destinatário sem fuso confirmado não é aprovado (R18.6, regra de 2026-09-25); vendedor não aprova", async (ctx) => {
   const r = await ready(ctx, { timezone: false });
-  assert.equal((await ctx.api("/api/fichas", "POST", { companyId: r.companyId, campaignId: r.campaignId, recipients: [r.dm] })).data.error.code, "timezone_pending");
-  await ctx.api("/api/parameters/send_timezone", "PUT", { scope: "national", value: "America/Sao_Paulo", reason: "Fuso do piloto" });
+  // A ficha nacional é gerada (o fuso do mercado não substitui o do destinatário), mas a aprovação espera o fuso.
   const { id } = (await ctx.api("/api/fichas", "POST", { companyId: r.companyId, campaignId: r.campaignId, recipients: [r.dm] })).data;
-  const f = (await ctx.api(`/api/fichas/${id}`)).data;
+  let f = (await ctx.api(`/api/fichas/${id}`)).data;
+  const x = f.toApprove.find((a) => a.channel === "email");
+  const tryApprove = () => ctx.api(`/api/fichas/${id}/approve`, "POST", { versionNo: 1, contactId: r.dm, channel: "email", messagesSha256: x.messagesSha256 });
+  assert.equal((await tryApprove()).data.error.code, "timezone_pending");
+  assert.equal((await ctx.api(`/api/contacts/${r.dm}`, "PATCH", { timezone: "America/Manaus" })).status, 200);
+  assert.equal((await tryApprove()).status, 200);
+  f = (await ctx.api(`/api/fichas/${id}`)).data;
   ctx.DB.raw.exec("INSERT INTO users(id,tenant_id,email,display_name,role) VALUES ('seller','eag-internal','seller@example.test','Vendedor','seller_analyst')");
   ctx.env.LOCAL_USER_EMAIL = "seller@example.test";
   assert.equal((await approveAll(ctx.api, id, f)).status, 403);

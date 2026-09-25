@@ -16,16 +16,15 @@ const put = (api, key, scope, value) =>
 check("P1-T8: parâmetros pendentes da Spec continuam ausentes, sem valor inventado", async ({ api }) => {
   const r = await api("/api/parameters");
   for (const k of [
-    "send_window:national",
-    "send_window:international",
     "send_timezone:national",
     "campaign_review_days:global",
     "international_enabled:international",
     "volume_min:corn:national",
   ])
     assert.equal(r.data.parameters[k], undefined, k);
+  // Janela aprovada por Rogério em 2026-09-25 (migração 0018) para os dois mercados.
   const def = r.data.definitions.find((d) => d.key === "send_window");
-  assert.deepEqual(def.configuredScopes, []);
+  assert.deepEqual(def.configuredScopes.sort(), ["international", "national"]);
   assert.equal(r.data.definitions.length, Object.keys(DEFINITIONS).length);
 });
 

@@ -1,7 +1,7 @@
 # Estado das 42 tarefas — 2026-09-24 (reconciliado)
 
 Fonte da verdade da fila: `docs/implementation/sequence.json` (`npm run next`). Evidências: `docs/implementation/EVIDENCIAS.md`.
-Branch `v2-revisao-2`, sincronizada com o GitHub; CI (Ubuntu e Windows) verde. `npm run check`: 306 testes + 2 workerd/D1; UI smoke com 13 telas.
+Branch `v2-revisao-2`, sincronizada com o GitHub; CI (Ubuntu e Windows) verde. `npm run check`: 311 testes + 2 workerd/D1; UI smoke com 13 telas.
 Produção: **https://eag-compass-production.rogeriopalhari23.workers.dev** atrás do Access. O domínio `eagcompass.com` **não** está ligado ao Compass: zona `pending` no Cloudflare, DNS ainda na Hostinger (conferido em 2026-09-25). Estado das integrações: `GET /api/integrations` (admin).
 
 Três dimensões, avaliadas separadamente:
@@ -20,7 +20,7 @@ Três dimensões, avaliadas separadamente:
 | P1-T5 Migração 0003 | ok | ok (0001–0017 no remoto) | ok |
 | P1-T6 Scores e gate | ok | ok | testes |
 | P1-T7 Catálogo | ok | ok | testes |
-| P1-T8 Parâmetros | ok | ok | testes; valores pendentes na Spec continuam ausentes (janela e fuso nacional de envio) |
+| P1-T8 Parâmetros | ok | ok | testes; janela de envio aprovada em 2026-09-25 (09–17, seg–sex, no fuso confirmado do destinatário); `campaign_review_days` segue pendente |
 | P1-T9 Campanhas | ok | ok | testes |
 | P1-T10 Supressão e pausas | ok | ok | testes |
 | P1-T11 Interface Talhão | ok | ok | UI smoke local |
@@ -41,7 +41,7 @@ Três dimensões, avaliadas separadamente:
 | P2-T14 Tarefas | ok | ok | testes |
 | **P2-T15 OpenClaw** | parcial (importador pronto) | — | **não** — VPS com chave de host alterada; dados não estão na máquina local |
 | P2-T16 Sanções | ok | ok — OFAC, CEIS, CNEP importadas em 2026-09-24 | ok — contagens conferidas no D1; triagem controlada (exato → bloqueio, raiz → revisão, nome → revisão, sem relação → nada); reimportar até 2026-10-24 |
-| **P2-T17 Canais e T1** | ok (canais, roteiro) | ok — canal `planned`; remetente, endereço físico, base pública e lista interna configurados | **não** — T1 não executado: faltam senha da caixa, Snov e janela/fuso de envio |
+| **P2-T17 Canais e T1** | ok (canais, roteiro) | ok — canal `planned`; remetente, endereço físico, base pública, lista interna e janela aprovada | **não** — T1 não executado: falta a senha da caixa (Hostinger, usuário+senha, SMTP 465/IMAP 993) e Snov para validar o e-mail de teste |
 | P2-T18 Interface do piloto | ok | ok | UI smoke local |
 | P3-T1 a P3-T11 Internacional | ok | ok (código e parâmetros aprovados) | **não** — R2 desabilitado, sem chave Comtrade; lista mensal nunca gerada em produção |
 | **P3-T12 Validação internacional** | — (só roteiro) | — | **não** — depende de R2, Comtrade e do T1 |

@@ -101,3 +101,7 @@ Endereço workers.dev atrás do Access; fila nova com DLQ. Ordem (cada passo com
 - Sanções importadas (OFAC, CEIS, CNEP) em 2026-09-24 — **reimportar até 2026-10-24** (validade de 30 dias). Sessão: `cloudflared access login https://eag-compass-production.rogeriopalhari23.workers.dev` (código no e-mail), depois os comandos da seção "Listas de sanções" com `node --use-system-ca`.
 - Domínio `eagcompass.com`: zona no Cloudflare aguardando a troca dos DNS no hPanel (Domínios → eagcompass.com → DNS/Nameservers → personalizados: `joyce.ns.cloudflare.com` e `yoxall.ns.cloudflare.com`). Depois da ativação: domínio personalizado no Worker, Access incluindo `eagcompass.com` e `eagcompass.com/u`, `PUBLIC_BASE_URL` = `https://eagcompass.com` e `workers_dev` desligado.
 - DLQ: 2 mensagens de verificação de 2026-09-24 (tipo `verificacao-dlq`) ficam como registro; não reprocessar.
+
+## Regra de horário (aprovada em 2026-09-25)
+
+Envio só das 09:00 às 17:00, de segunda a sexta, **no fuso confirmado de cada contato** (nacional ou internacional). Contato sem fuso: a ficha pode ser gerada, mas não é aprovada e o envio fica em espera (`timezone_pending`). Confirme o fuso no cadastro do contato ou no botão "Confirmar fuso" da tela da empresa (ex.: `America/Sao_Paulo`, `America/Manaus`, `Europe/Berlin`).

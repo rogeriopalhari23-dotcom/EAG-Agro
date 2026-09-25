@@ -38,7 +38,7 @@ async function ready(ctx, { email = "compras@valeverde.com.br", internal = true,
   DB.raw.prepare("INSERT INTO company_units(id,tenant_id,company_id,cnpj,size_code,source_label,consulted_at) VALUES ('u1','eag-internal',?,'11222333000181','05','t','2026-09-23')").run(co.data.id);
   await api(`/api/companies/${co.data.id}/profiles`, "POST", { productId: "product-06", profileClass: "possible_final_consumer", basis: "CNAE" });
   await api(`/api/companies/${co.data.id}/screening`, "POST", {});
-  const dm = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Maria Souza", email, prospectRole: "decision_maker", sourceLabel: "site" })).data.id;
+  const dm = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Maria Souza", email, prospectRole: "decision_maker", sourceLabel: "site", timezone: "America/Sao_Paulo" })).data.id;
   if (validated) DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(dm);
   const { id } = (await api("/api/fichas", "POST", { companyId: co.data.id, campaignId: camp.data.id, recipients: [dm] })).data;
   const f = (await api(`/api/fichas/${id}`)).data;

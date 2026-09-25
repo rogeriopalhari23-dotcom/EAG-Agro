@@ -44,7 +44,7 @@ test("P3-T1: código da Comtrade único e código do MDIC com um só país (Revi
   throwsSql(db, "INSERT INTO country_mdic_codes(mdic_code,iso3,name_pt) VALUES ('023','DEU','Outra')", /UNIQUE|PRIMARY/);
 });
 
-test("P3-T1: valores aprovados por Rogério em 2026-09-24 vigentes; liberação e janela internacional seguem ausentes", async (t) => {
+test("P3-T1: valores aprovados por Rogério em 2026-09-24 vigentes; liberação do internacional segue ausente", async (t) => {
   const ctx = setup();
   t.after(ctx.close);
   const { data } = await ctx.api("/api/parameters");
@@ -55,7 +55,8 @@ test("P3-T1: valores aprovados por Rogério em 2026-09-24 vigentes; liberação 
   assert.ok(!p("agri_classification").chapters.includes("03"));
   assert.deepEqual([p("trade_list_mdic_years"), p("trade_list_comtrade_years"), p("comtrade_calls_per_day"), p("trade_list_retention_versions"), p("country_list_refresh_day")], [2, 3, 400, 3, 10]);
   assert.equal(data.parameters["templates_en_approved:pv-en-1.0.0"].enabled, true);
-  for (const k of ["international_enabled", "send_window"]) assert.equal(p(k), undefined, k);
+  assert.equal(p("international_enabled"), undefined, "liberação do internacional segue ausente");
+  assert.deepEqual(p("send_window"), { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] }, "janela aprovada em 2026-09-25");
   const reason = ctx.DB.raw.prepare("SELECT change_reason FROM parameters WHERE parameter_key='agri_classification'").get().change_reason;
   assert.match(reason, /aprovado por Rogério Palhari em 2026-09-24/);
   const put = (key, value) => ctx.api(`/api/parameters/${key}`, "PUT", { scope: "international", value, reason: "Decisão registrada no teste" });

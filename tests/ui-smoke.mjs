@@ -165,11 +165,11 @@ try {
   await codeForm.getByLabel("Motivo", { exact: true }).fill("Código em apuração no teste de interface");
   await codeForm.getByRole("button", { name: "Registrar código" }).click();
   await page.getByText("NCM 17011400", { exact: true }).waitFor();
-  // P1-T8: parâmetros mostram pendências sem valor inventado.
+  // P1-T8: parâmetros mostram pendências sem valor inventado (a janela de envio foi aprovada em 2026-09-25).
   await nav("Parâmetros");
   await page
     .locator(".row")
-    .filter({ hasText: "Janela de envio no fuso do destinatário" })
+    .filter({ hasText: "Revisão de campanha (dias)" })
     .getByText("Pendente", { exact: true })
     .waitFor();
   // P1-T9: campanha com edição de ICP versionada.
