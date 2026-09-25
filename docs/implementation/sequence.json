@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-25T21:24:21.231Z",
+  "updatedAt": "2026-09-25T21:31:05.500Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -774,7 +774,7 @@
       "acceptance": "Chave/termos Comtrade, fontes pelo Worker, primeira rotina medida e amostra interna; liberação documentada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Comtrade: chave gravada recusada com 401 em chamada real — Rogério regrava COMTRADE_KEY e a versão 2026-09-manual-DEU-608914c6 é retomada; MDIC: job do GitHub pronto (teste real local em andamento), falta Rogério cadastrar CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID nos segredos do repositório"
+      "blockedBy": "Comtrade: chave gravada recusada com 401 em chamada real — Rogério regrava COMTRADE_KEY e a versão 2026-09-manual-DEU-608914c6 é retomada; MDIC: job validado de verdade para DEU (versão 2026-09-mdic-DEU-1790371550056), falta Rogério cadastrar CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID nos segredos do repositório para a rotina mensal automática"
     }
   ]
 }
