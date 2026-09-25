@@ -32,7 +32,9 @@ export function validateConfig(config) {
     const allowed = new Set(["*/5 * * * *", "17 2 * * *"]);
     assert.ok((config.triggers.crons || []).every((x) => allowed.has(x)), "Cron fora do aprovado");
   }
-  assert.ok(!config.r2_buckets, "R2 só na liberação da lista mensal");
+  // R2 liberado em 2026-09-25 só para a lista mensal: um bucket, binding FILES.
+  if (config.r2_buckets)
+    assert.deepEqual(config.r2_buckets.map((b) => [b.binding, b.bucket_name]), [["FILES", "eag-compass-files"]], "R2 fora do aprovado");
   return { address: onWorkersDev ? "workers.dev" : "route" };
 }
 

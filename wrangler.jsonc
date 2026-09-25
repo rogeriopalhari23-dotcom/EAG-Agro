@@ -44,6 +44,8 @@
     "consumers": [{ "queue": "eag-compass-async", "max_batch_size": 10, "max_retries": 5, "dead_letter_queue": "eag-compass-dlq" }]
   },
   "triggers": { "crons": ["*/5 * * * *", "17 2 * * *"] },
+  // R2 habilitado por Rogério em 2026-09-25: lista mensal de compras por país (P3-T5). Bucket privado.
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "eag-compass-files" }],
   "ratelimits": [
     {
       "name": "UNSUB_LIMITER",

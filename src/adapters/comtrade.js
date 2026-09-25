@@ -69,7 +69,9 @@ const TOTAL = { partner2Code: 0, customsCode: "C00", motCode: 0 };
 const num = (v) => (v === null || v === undefined || v === "" ? null : Number(v));
 
 // Importações do país (todas as origens e Brasil) para os anos e o bloco de SH6 pedidos.
-export async function fetchImports(base, key, { comtradeCode, years, hs6Block }, fetchImpl = fetch) {
+export async function fetchImports(base, rawKey, { comtradeCode, years, hs6Block }, fetchImpl = fetch) {
+  // Espaço ou quebra de linha colados junto com a chave fazem o gateway recusar (401): usa a chave sem bordas.
+  const key = typeof rawKey === "string" ? rawKey.trim() : rawKey;
   if (!key) throw new AdapterError("auth", `${SOURCE}: chave não configurada.`, { code: "no_key" });
   const q = new URLSearchParams({
     reporterCode: String(comtradeCode), period: years.join(","), partnerCode: `${WORLD},${BRAZIL}`, flowCode: "M",

@@ -81,3 +81,10 @@ test("P3-T4: blocos de SH6 agrícolas em ordem, só nível 6 e capítulos da cla
   assert.deepEqual(r.blocks, [["010121", "090111"], ["170114"]]);
   assert.equal(r.names["090111"], "Coffee; not roasted");
 });
+
+test("P3-T4: chave com espaço ou quebra de linha nas bordas é usada sem as bordas", async () => {
+  let seen;
+  const f = async (url, init) => ((seen = init.headers["Ocp-Apim-Subscription-Key"]), new Response(JSON.stringify({ count: 0, data: [], error: "" }), { status: 200 }));
+  await fetchImports(BASE, "  abc123\r\n", { comtradeCode: 276, years: [2025], hs6Block: ["090111"] }, f);
+  assert.equal(seen, "abc123");
+});

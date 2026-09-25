@@ -37,6 +37,8 @@ export async function status(env, actor) {
       casadosdados: has(env.CASADOSDADOS_API_KEY),
       locationiq: has(env.LOCATIONIQ_KEY),
       comtrade: has(env.COMTRADE_KEY),
+      // Diagnóstico sem expor valor: tamanho, bordas e formato (chaves da Comtrade são hexadecimais).
+      comtradeKeyShape: has(env.COMTRADE_KEY) ? { length: env.COMTRADE_KEY.length, edgesWhitespace: env.COMTRADE_KEY !== env.COMTRADE_KEY.trim(), hex: /^[0-9a-f]+$/i.test(env.COMTRADE_KEY.trim()) } : null,
     },
     infrastructure: { queue: !!env.ASYNC_QUEUE, r2: !!env.FILES },
     sanctions: {

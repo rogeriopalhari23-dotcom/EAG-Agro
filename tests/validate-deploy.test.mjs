@@ -34,7 +34,8 @@ test("P1-T12: fila só com DLQ e limite, crons aprovados, R2 segurado e um ender
   assert.throws(() => validateConfig(ready({ queues: { ...q, consumers: [{ ...q.consumers[0], max_retries: undefined }] } })), /Retentativas/);
   assert.throws(() => validateConfig(ready({ queues: { ...q, producers: [{ binding: "ASYNC_QUEUE", queue: "eag-scores-queue" }] } })), /Produtor/);
   assert.throws(() => validateConfig(ready({ triggers: { crons: ["* * * * *"] } })), /Cron fora/);
-  assert.throws(() => validateConfig(ready({ r2_buckets: [{ binding: "FILES" }] })), /R2/);
+  assert.throws(() => validateConfig(ready({ r2_buckets: [{ binding: "FILES", bucket_name: "outro-bucket" }] })), /R2 fora/);
+  assert.deepEqual(real().r2_buckets, [{ binding: "FILES", bucket_name: "eag-compass-files" }]);
   assert.throws(() => validateConfig(ready({ routes: [{ pattern: "eagcompass.com/*", zone_name: "eagcompass.com" }] })), /personalizado/);
   assert.throws(() => validateConfig(ready({ workers_dev: false, routes: [] })), /Configure um endereço/);
   assert.deepEqual(validateConfig(ready({ workers_dev: false, routes: [{ pattern: "compass.exemplo.com", custom_domain: true }] })), { address: "route" });

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-25T19:59:21.816Z",
+  "updatedAt": "2026-09-25T21:03:17.281Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -774,7 +774,7 @@
       "acceptance": "Chave/termos Comtrade, fontes pelo Worker, primeira rotina medida e amostra interna; liberação documentada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/eag-compass-t6-comexstat.md",
-      "blockedBy": "R2 desabilitado na conta (habilitar no painel) e chave COMTRADE_KEY de Rogério; depois o roteiro da seção 9"
+      "blockedBy": "Comtrade: COMTRADE_KEY gravada não é a chave primária (53 caracteres, não hex; esperado 32 hex) — regravar e retomar a versão; MDIC: servidor com cadeia incompleta dá 526 no Worker — decidir coleta fora do Worker (GitHub Actions ou execução local mensal)"
     }
   ]
 }
