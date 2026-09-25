@@ -105,3 +105,23 @@ Endereço workers.dev atrás do Access; fila nova com DLQ. Ordem (cada passo com
 ## Regra de horário (aprovada em 2026-09-25)
 
 Envio só das 09:00 às 17:00, de segunda a sexta, **no fuso confirmado de cada contato** (nacional ou internacional). Contato sem fuso: a ficha pode ser gerada, mas não é aprovada e o envio fica em espera (`timezone_pending`). Confirme o fuso no cadastro do contato ou no botão "Confirmar fuso" da tela da empresa (ex.: `America/Sao_Paulo`, `America/Manaus`, `Europe/Berlin`).
+
+## E-mail pela Hostinger — bloqueio da plataforma (2026-09-25)
+
+O Worker **não consegue** abrir conexão com `smtp.hostinger.com`/`imap.hostinger.com`: esses servidores estão atrás da Cloudflare, e Workers bloqueiam sockets TCP para IPs da própria Cloudflare (documentação oficial). Opções para decisão de Rogério (nenhuma aplicada):
+
+1. **Ponte na VPS da Hostinger (recomendada):** um serviço pequeno na VPS (fora da faixa da Cloudflare) recebe do Worker por HTTPS autenticado e fala SMTP/IMAP com a Hostinger. Mantém o remetente `rogeriopalhari@eagagro.com`, o risco do §12 já assumido e o custo atual. A senha da caixa fica na VPS, não no Worker. Depende de confirmar a identidade da VPS (OpenClaw) e de manter a VPS.
+2. **Provedor de envio por API HTTP** (ex.: Amazon SES): exige verificar o domínio `eagagro.com` (DNS em outra conta Cloudflare), tem custo por volume e regras próprias para prospecção; respostas continuariam precisando de leitura da caixa.
+3. **Mudar a hospedagem de e-mail** para um provedor fora da Cloudflare: mudança maior, afeta a caixa em uso.
+
+Até a decisão: canal de e-mail segue `planned`; não grave `MAILBOX_PASSWORD` no Worker (não teria efeito).
+
+## Domínio eagcompass.com — transição
+
+Pré-configurado: domínio personalizado no Worker, `www` → apex (301). Falta só a troca dos nameservers no hPanel. Depois da ativação: incluir `eagcompass.com` e `eagcompass.com/u` nas aplicações do Access (mesmo AUD), testar login e descadastro, então `PUBLIC_BASE_URL=https://eagcompass.com` e `workers_dev: false`.
+
+## Backup dos segredos de produção
+
+1. Abrir `C:\Users\Roger\eag-compass-backups\segredos-producao-2026-09-24.txt` no Bloco de Notas e criar no gerenciador de senhas o item "EAG Compass — Worker eag-compass-production" com os campos `PII_ENCRYPTION_KEY` e `UNSUB_TOKEN_KEY` (copiar e colar; não digitar).
+2. Conferir sem exibir: `powershell -ExecutionPolicy Bypass -File scripts\conferir-backup-segredos.ps1` (cole cada valor do gerenciador; deve dizer "confere" nas duas).
+3. Só então: `Remove-Item -LiteralPath 'C:\Users\Roger\eag-compass-backups\segredos-producao-2026-09-24.txt'` (não vai para a Lixeira). Em SSD a sobrescrita não é garantida; com o BitLocker ativo o disco já é cifrado.

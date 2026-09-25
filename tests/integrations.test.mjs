@@ -45,3 +45,20 @@ test("Integrações: conferência da caixa devolve ok ou o tipo do erro, audita 
   assert.ok(!JSON.stringify(bad).includes("senha-secreta"));
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='integration.mailbox_checked'").get().n, 2);
 });
+
+test("Integrações: alcance da caixa lê só a saudação, sem login, e audita", async (t) => {
+  const { reachMailbox } = await import("../src/integrations.js");
+  const ctx = setup();
+  t.after(ctx.close);
+  const written = [];
+  const fake = (greeting) => ({
+    readable: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(greeting + "\r\n")); } }),
+    writable: new WritableStream({ write(chunk) { written.push(new TextDecoder().decode(chunk)); } }),
+    close: async () => {},
+  });
+  const sockets = { connect: ({ port }) => fake(port === 993 ? "* OK [CAPABILITY IMAP4rev1] Server ready." : "220 ESMTP smtp.hostinger.com") };
+  const r = await reachMailbox(req(), ctx.env, admin, "rid", { sockets });
+  assert.deepEqual([r.imap.ok, r.smtp.ok], [true, true]);
+  assert.ok(written.every((w) => !/LOGIN|AUTH|MAIL FROM|RCPT/.test(w)), "nenhum login nem envio: " + written.join("|"));
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='integration.mailbox_reached'").get().n, 1);
+});

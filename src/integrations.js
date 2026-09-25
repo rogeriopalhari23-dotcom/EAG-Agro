@@ -61,3 +61,37 @@ export async function checkMailbox(request, env, actor, rid, deps = {}) {
   await commit(env, [auditStatement(env, actor, rid, "integration.mailbox_checked", "integration", "mailbox", { ok: result.ok, error: result.error ?? null })]);
   return result;
 }
+
+// Alcance a partir do Worker (rede da Cloudflare), sem login: abre TLS, lê só a saudação e fecha.
+async function greet(host, port, bye, deps) {
+  const { connect } = deps.sockets ?? (await import("cloudflare:sockets"));
+  const socket = connect({ hostname: host, port }, { secureTransport: "on", allowHalfOpen: false });
+  let stage = "open";
+  const reader = socket.readable.getReader();
+  try {
+    // Etapa 1: conexão TCP + TLS (erros de rede/bloqueio aparecem aqui); etapa 2: saudação do servidor.
+    const opened = await Promise.race([socket.opened, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout ao abrir")), 10000))]);
+    stage = "greeting";
+    const first = await Promise.race([reader.read(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout na saudação")), 10000))]);
+    if (first.done) return { ok: false, stage, error: "conexão fechada sem saudação", remote: opened?.remoteAddress ?? null };
+    const line = new TextDecoder().decode(first.value || new Uint8Array()).split("\r\n")[0].slice(0, 80);
+    const w = socket.writable.getWriter();
+    await w.write(new TextEncoder().encode(bye)).catch(() => {});
+    return { ok: /^(\* OK|220)/.test(line), greeting: line, remote: opened?.remoteAddress ?? null };
+  } catch (e) {
+    return { ok: false, stage, error: String(e?.message || e).slice(0, 120) };
+  } finally {
+    try {
+      await socket.close();
+    } catch {}
+  }
+}
+
+export async function reachMailbox(request, env, actor, rid, deps = {}) {
+  requireRole(actor, ADMIN);
+  await bodyJson(request);
+  const imap = await greet(env.IMAP_HOST || "imap.hostinger.com", Number(env.IMAP_PORT || 993), "a1 LOGOUT\r\n", deps);
+  const smtp = await greet(env.SMTP_HOST || "smtp.hostinger.com", Number(env.SMTP_PORT || 465), "QUIT\r\n", deps);
+  await commit(env, [auditStatement(env, actor, rid, "integration.mailbox_reached", "integration", "mailbox", { imap: imap.ok, smtp: smtp.ok })]);
+  return { imap, smtp };
+}

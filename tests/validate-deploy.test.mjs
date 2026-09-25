@@ -15,6 +15,7 @@ test("P1-T12: config real aponta para o Worker e o D1 existentes e usa workers.d
   assert.equal(c.name, "eag-compass-production");
   assert.equal(c.d1_databases[0].database_name, "eag_compass");
   assert.equal(c.workers_dev, true);
+  assert.deepEqual(c.routes, [{ pattern: "eagcompass.com", custom_domain: true }]);
   assert.equal(c.preview_urls, false);
   assert.equal(c.env.local.d1_databases[0].database_name, "eag-compass-db", "ambiente local preservado");
 });
@@ -34,7 +35,8 @@ test("P1-T12: fila só com DLQ e limite, crons aprovados, R2 segurado e um ender
   assert.throws(() => validateConfig(ready({ queues: { ...q, producers: [{ binding: "ASYNC_QUEUE", queue: "eag-scores-queue" }] } })), /Produtor/);
   assert.throws(() => validateConfig(ready({ triggers: { crons: ["* * * * *"] } })), /Cron fora/);
   assert.throws(() => validateConfig(ready({ r2_buckets: [{ binding: "FILES" }] })), /R2/);
-  assert.throws(() => validateConfig(ready({ routes: [{ pattern: "compass.exemplo.com", custom_domain: true }] })), /não os dois/);
+  assert.throws(() => validateConfig(ready({ routes: [{ pattern: "eagcompass.com/*", zone_name: "eagcompass.com" }] })), /personalizado/);
+  assert.throws(() => validateConfig(ready({ workers_dev: false, routes: [] })), /Configure um endereço/);
   assert.deepEqual(validateConfig(ready({ workers_dev: false, routes: [{ pattern: "compass.exemplo.com", custom_domain: true }] })), { address: "route" });
   assert.throws(() => validateConfig(ready({ preview_urls: true })), /prévia/);
 });

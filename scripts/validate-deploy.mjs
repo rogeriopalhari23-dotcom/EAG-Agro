@@ -15,7 +15,10 @@ export function validateConfig(config) {
     "Configure o identificador real do D1",
   );
   const onWorkersDev = config.workers_dev === true;
-  assert.ok(onWorkersDev !== Boolean(config.routes?.length), "Use workers.dev ou rota em domínio próprio, não os dois");
+  // Transição para o domínio próprio: workers.dev pode coexistir só com domínios personalizados (nunca rotas soltas).
+  const routes = config.routes || [];
+  assert.ok(onWorkersDev || routes.length, "Configure um endereço (workers.dev ou domínio próprio)");
+  assert.ok(routes.every((r) => r.custom_domain === true && /^[a-z0-9.-]+$/.test(r.pattern)), "Só domínio personalizado, sem curinga");
   // Fila e cron liberados em 2026-09-24: só a fila da v2 com DLQ e limite de tentativas, e só os dois crons aprovados.
   if (config.queues) {
     const p = config.queues.producers || [], c = config.queues.consumers || [];

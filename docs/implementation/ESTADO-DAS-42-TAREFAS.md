@@ -1,7 +1,7 @@
 # Estado das 42 tarefas — 2026-09-24 (reconciliado)
 
 Fonte da verdade da fila: `docs/implementation/sequence.json` (`npm run next`). Evidências: `docs/implementation/EVIDENCIAS.md`.
-Branch `v2-revisao-2`, sincronizada com o GitHub; CI (Ubuntu e Windows) verde. `npm run check`: 311 testes + 2 workerd/D1; UI smoke com 13 telas.
+Branch `v2-revisao-2`, sincronizada com o GitHub; CI (Ubuntu e Windows) verde. `npm run check`: 313 testes + 2 workerd/D1; UI smoke com 13 telas.
 Produção: **https://eag-compass-production.rogeriopalhari23.workers.dev** atrás do Access. O domínio `eagcompass.com` **não** está ligado ao Compass: zona `pending` no Cloudflare, DNS ainda na Hostinger (conferido em 2026-09-25). Estado das integrações: `GET /api/integrations` (admin).
 
 Três dimensões, avaliadas separadamente:
@@ -34,8 +34,8 @@ Três dimensões, avaliadas separadamente:
 | P2-T7 Snov.io | ok | ok (sem chave) | **não** — falta `SNOV_CLIENT_ID/SECRET` |
 | P2-T8 Modelos e revisor PV | ok | ok | textos aprovados por Rogério (pv-1.1.0) |
 | P2-T9 Fichas | ok | ok | testes |
-| P2-T10 Envio SMTP | ok | ok (sem senha da caixa) | **não** — falta `MAILBOX_PASSWORD` e o T1 |
-| P2-T11 Respostas IMAP | ok | ok; cron `*/5` roda e registra `auth` (sem senha) | **não** — idem |
+| P2-T10 Envio SMTP | ok | ok | **bloqueado** — o Worker não alcança `smtp.hostinger.com` (IP da Cloudflare, bloqueio da plataforma); decisão de arquitetura pendente |
+| P2-T11 Respostas IMAP | ok | ok; cron `*/5` roda | **bloqueado** — mesmo motivo para `imap.hostinger.com` |
 | P2-T12 Descadastro | ok | ok | ok — `/u/*` sem login em produção, só descadastro; token inválido recusado |
 | P2-T13 Pausas e mudanças | ok | ok | testes |
 | P2-T14 Tarefas | ok | ok | testes |

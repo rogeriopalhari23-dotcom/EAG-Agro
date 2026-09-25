@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-25T12:42:19.523Z",
+  "updatedAt": "2026-09-25T19:59:21.816Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -493,8 +493,8 @@
       ],
       "acceptance": "Importar supressões antes de contatos; relatório de conflitos e corte comprovado do executor antigo.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
-      "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "VPS do OpenClaw com chave de host alterada e nome fora do DNS (2026-09-24): Rogério confirma a impressão digital no hPanel e se há backup; depois exportação/leitura só leitura e inventário do executor antigo"
+      "evidence": "docs/implementation/OPENCLAW-RECONCILIACAO.md",
+      "blockedBy": "Confirmar no hPanel a impressão ED25519 SHA256:zA4NvA5n8KMmxOVbyKdsgYdRn1I4LQjFREnM6y/1JX8 (as três chaves mudaram: provável reinstalação) e se há backup; depois inventário só leitura na VPS"
     },
     {
       "id": "P2-T16",
@@ -537,7 +537,7 @@
       "acceptance": "Teste interno T1, reputação/limites/retencão, interrupção de emergência; liberação expressa dos canais.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "T1 não executado: MAILBOX_PASSWORD (senha da própria caixa Hostinger, por wrangler secret put; confirmada por POST /api/integrations/mailbox/check) e Snov para validar o e-mail de teste. Janela aprovada em 2026-09-25."
+      "blockedBy": "BLOQUEIO DE PLATAFORMA: Workers não conectam a smtp/imap.hostinger.com (IPs da Cloudflare); decisão de Rogério entre ponte na VPS, provedor por API ou outra hospedagem (docs/OPERACAO.md). Depois: credencial no lugar escolhido e T1."
     },
     {
       "id": "P2-T18",

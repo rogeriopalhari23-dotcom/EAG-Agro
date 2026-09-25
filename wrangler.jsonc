@@ -6,6 +6,9 @@
   "compatibility_date": "2026-09-21",
   // Endereço: workers.dev da conta atrás do Access (decisão de 2026-09-24); sem Access a API responde 401.
   "workers_dev": true,
+  // Domínio próprio ligado em 2026-09-25 (zona eagcompass.com). Transição: workers.dev segue ativo até a zona ativar e o
+  // Access cobrir eagcompass.com; depois `workers_dev: false` e PUBLIC_BASE_URL = https://eagcompass.com.
+  "routes": [{ "pattern": "eagcompass.com", "custom_domain": true }],
   "preview_urls": false,
   "observability": {
     "enabled": true,

@@ -207,6 +207,7 @@ async function route(request, env, rid) {
   if (can && can[2] && method === "POST") return response(await selections.selectCommodities(request, env, actor, rid, can[1]), 201);
   if (can && can[2] && method === "GET") return response(await selections.listSelections(env, actor, can[1]));
   if (path === "/api/integrations" && method === "GET") return response(await integrations.status(env, actor));
+  if (path === "/api/integrations/mailbox/reach" && method === "POST") return response(await integrations.reachMailbox(request, env, actor, rid));
   if (path === "/api/integrations/mailbox/check" && method === "POST") return response(await integrations.checkMailbox(request, env, actor, rid));
   if (path === "/api/foreign-companies" && method === "POST") return response(await foreign.createForeignCompany(request, env, actor, rid), 201);
   const fcc = path.match(/^\/api\/companies\/([^/]+)\/conditions\/([^/]+)\/([a-z_]+)$/);
