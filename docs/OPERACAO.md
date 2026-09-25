@@ -63,6 +63,17 @@ Passos humanos, nesta ordem; nada disso foi criado automaticamente:
 6. **Liberação**: roteiro em `docs/eag-compass-t6-comexstat.md` seção 9; só com todos os passos registrados o admin grava `international_enabled`. Revogar (`{"enabled":false}`) segura na hora os envios internacionais já aprovados.
 7. **Atualização manual de um país**: tela Lista mensal, 1 por dia por país, com motivo; reaproveita o MDIC do mês quando o arquivo não mudou.
 
+## MDIC mensal pelo GitHub (decisão de 2026-09-25, opção "a")
+
+O Worker não lê o MDIC (`MDIC_SOURCE=github` no `wrangler.jsonc`): o servidor `balanca.economia.gov.br` não envia o certificado intermediário e o `fetch` do Worker responde 526 (evidência em `docs/implementation/EVIDENCIAS.md`, 2026-09-25). O workflow `.github/workflows/mdic-mensal.yml` roda `scripts/mdic-job.mjs` nos dias 10, 11 e 12 às 12:00 UTC; o Worker continua cuidando da Comtrade.
+
+- **Confiança TLS:** raízes públicas do Node + intermediário `certs/sectigo-public-server-authentication-ca-ov-r36.pem`, conferido a cada execução (impressão SHA-256 fixada, validade, assinatura pela raiz Sectigo R46 da loja do Node). Verificação nunca é desligada. Se o intermediário vencer (21/03/2036) ou o MDIC trocar de emissora, o job para antes de baixar qualquer coisa; atualizar o PEM **só** a partir do endereço AIA do certificado do servidor e conferir a assinatura por uma raiz pública.
+- **Credencial (criada por Rogério, nunca colada na conversa):** token de API da Cloudflare (dash.cloudflare.com → My Profile → API Tokens → Create Custom Token) com **só** duas permissões de conta — *Account → D1 → Edit* e *Account → Workers R2 Storage → Edit* — restrito à conta `5d16c8ef26d280c96898835b4a71b7ea` (Account Resources → Include → essa conta), com validade definida. Cadastrar no GitHub em **Settings → Secrets and variables → Actions → New repository secret**: `CLOUDFLARE_API_TOKEN` (o token) e `CLOUDFLARE_ACCOUNT_ID` (`5d16c8ef26d280c96898835b4a71b7ea`). O workflow tem `permissions: contents: read` e não publica o Worker.
+- **Ordem de publicação:** lê os anos inteiros → grava um JSON por país no R2 sob `trade-src/<versão>/mdic/` → confere amostra pelo hash → um único SQL no D1: versão `running`, estados, ponteiros (só avançam) e por último `complete` + auditoria.
+- **Retomar após falha:** GitHub → Actions → **MDIC mensal** → *Run workflow* com os mesmos parâmetros (mês vazio = mês atual; `force` só para refazer um mês já completo). Falha antes do SQL: nada visível mudou; os objetos já gravados ficam no R2 sem ponteiro (inofensivos — a rotina mensal reexecutada grava por cima nas mesmas chaves; uma execução de país único usa prefixo novo e o anterior pode ser apagado à mão). Falha no meio do SQL: cada ponteiro já trocado aponta para um objeto inteiro conferido por hash; a versão fica `running` e a reexecução completa (SQL idempotente). O mês só é dado como feito quando a versão está `complete`.
+- **Um país só:** *Run workflow* com `iso3` (ex.: `DEU`) cria a versão `AAAA-MM-mdic-DEU-<execução>`. Localmente, com `wrangler login`: `node scripts/mdic-job.mjs --iso3 DEU` (`--dry-run --out pasta` gera os arquivos sem publicar).
+- A "Atualização manual" da tela Lista mensal passa a atualizar só a Comtrade; o MDIC de um país vem do workflow acima.
+
 ## Listas de sanções (P2-T16)
 
 Depois da política T11 aprovada, o admin importa cada lista ativa (uma versão por arquivo oficial; lista parcial vira `failed`):

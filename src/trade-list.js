@@ -9,6 +9,7 @@
 import { AdapterError } from "./adapters/errors.js";
 import * as mdic from "./adapters/mdic-bulk.js";
 import * as comtrade from "./adapters/comtrade.js";
+import { createAccumulator } from "./mdic-aggregate.js";
 import { bodyJson, fail, requireRole, str } from "./http.js";
 import { statement as s, commit, parameters, requireParameter, auditStatement, now as clock } from "./store.js";
 
@@ -102,7 +103,8 @@ export async function startMonthlyRun(env, tenant, deps = {}) {
   stmts.push(...baseJobs(env, month, params, at).map((j) => insertJob(env, j)));
   const countries = (await s(env, "SELECT iso3,comtrade_code,EXISTS(SELECT 1 FROM country_mdic_codes m WHERE m.iso3=countries.iso3) has_mdic FROM countries").all()).results;
   for (const c of countries) {
-    stmts.push(
+    if (!mdicExternal(env))
+      stmts.push(
       c.has_mdic
         ? s(env, "INSERT OR IGNORE INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'mdic','pending',?)", month, c.iso3, at)
         : s(env, "INSERT OR IGNORE INTO trade_list_status(version_id,iso3,source,state,error,updated_at) VALUES (?,?,'mdic','data_unavailable','país sem código nesta fonte',?)", month, c.iso3, at),
@@ -120,11 +122,17 @@ export async function startMonthlyRun(env, tenant, deps = {}) {
   return { versionId: month, status: "running", resumed: !!existing };
 }
 
+// MDIC_SOURCE=github: o arquivo do MDIC é lido fora do Worker (scripts/mdic-job.mjs, workflow mensal) porque o servidor
+// do MDIC envia a cadeia de certificados incompleta e o fetch do Worker responde 526. O Worker cuida só da Comtrade.
+export const mdicExternal = (env) => env.MDIC_SOURCE === "github";
+
 function baseJobs(env, vid, params, at, only) {
   const years = [];
   const { year } = spMonthDay(at);
   for (let i = 0; i < params.mdicYears; i++) years.push(year - i);
-  return [job(vid, "mdic_ref", "mdic_ref", { years, only: only ?? null }), job(vid, "comtrade_ref", "comtrade_ref", {})];
+  const jobs = [job(vid, "comtrade_ref", "comtrade_ref", {})];
+  if (!mdicExternal(env)) jobs.unshift(job(vid, "mdic_ref", "mdic_ref", { years, only: only ?? null }));
+  return jobs;
 }
 
 // Cron diário: começa a versão do mês a partir do dia configurado (ou retoma a que está rodando) e varre jobs.
@@ -318,43 +326,18 @@ async function mdicMerge({ env, at, payload, version: v, done, mine }) {
   const members = payload.only
     ? [payload.only]
     : (await s(env, "SELECT DISTINCT iso3 FROM country_mdic_codes").all()).results.map((r) => r.iso3).filter((iso) => bucketOf(iso) === payload.bucket);
-  const want = new Set(members);
   const ncm = await getJson(env, `trade-ref/${payload.ncmVersion ?? v.id}/ncm.json`);
-  const acc = new Map(members.map((iso) => [iso, new Map()]));
-  let unknownCodes = 0, lastYm = null;
-  for (const key of payload.chunks) {
-    const part = await getJson(env, key);
-    for (const [k, [fob, kg, qt]] of Object.entries(part.rows)) {
-      const [pais, n, ym] = k.split("|");
-      if (!lastYm || ym > lastYm) lastYm = ym;
-      const iso = codes[pais];
-      if (!iso) {
-        unknownCodes++;
-        continue;
-      }
-      if (!want.has(iso)) continue;
-      const m = acc.get(iso);
-      const kk = `${n}|${ym}`;
-      const c = m.get(kk) || m.set(kk, [0, 0, null]).get(kk);
-      c[0] += fob;
-      c[1] += kg;
-      if (qt !== null) c[2] = (c[2] ?? 0) + qt;
-    }
-  }
+  const acc = createAccumulator(codes, members);
+  for (const key of payload.chunks) acc.add((await getJson(env, key)).rows);
   const stmts = [done()];
+  const meta = { versionId: v.id, ncm, validators: JSON.parse(v.mdic_validators_json), classificationVersion: JSON.parse(v.classification_json).version };
   for (const iso of members) {
-    const lines = [...acc.get(iso)].map(([kk, [fob, kg, qt]]) => {
-      const [n, ym] = kk.split("|");
-      return { ncm: n, hs6: ncm[n]?.sh6 ?? n.slice(0, 6), ym, fobUsd: fob, netKg: kg, qt, unit: ncm[n]?.unit ?? null, namePt: ncm[n]?.namePt ?? null, nameEn: ncm[n]?.nameEn ?? null };
-    }).sort((a, b) => (a.ncm + a.ym).localeCompare(b.ncm + b.ym));
-    const state = lines.some((l) => l.fobUsd > 0 || l.netKg > 0) ? "purchase_identified" : "no_record";
-    const lastPeriod = lines.reduce((m, l) => (l.ym > m ? l.ym : m), "") || lastYm;
-    const obj = { iso3: iso, versionId: v.id, source: "mdic", state, lastPeriod, fileLastPeriod: lastYm, basis: "FOB", view: "exportações do Brasil", validators: JSON.parse(v.mdic_validators_json), classification: JSON.parse(v.classification_json).version, lines };
+    const obj = acc.countryObject(iso, meta);
     const out = await putJson(env, `trade-src/${v.id}/mdic/${iso}.json`, obj);
-    stmts.push(statusStmt(env, v.id, iso, "mdic", state, { lastPeriod, lines: lines.length, at, guard: mine }));
+    stmts.push(statusStmt(env, v.id, iso, "mdic", obj.state, { lastPeriod: obj.lastPeriod, lines: obj.lines.length, at, guard: mine }));
     stmts.push(pointerStmt(env, v.id, iso, "mdic", out.key, out.sha, at, mine));
   }
-  if (unknownCodes) stmts.push(s(env, `UPDATE trade_list_versions SET note=COALESCE(note||' ','')||? WHERE id=? AND ${mine.sql}`, `MDIC: ${unknownCodes} agregados com CO_PAIS sem país no cadastro (bloco ${payload.bucket ?? payload.only}).`, v.id, ...mine.args));
+  if (acc.unknownCodes) stmts.push(s(env, `UPDATE trade_list_versions SET note=COALESCE(note||' ','')||? WHERE id=? AND ${mine.sql}`, `MDIC: ${acc.unknownCodes} agregados com CO_PAIS sem país no cadastro (bloco ${payload.bucket ?? payload.only}).`, v.id, ...mine.args));
   return stmts;
 }
 
@@ -603,7 +586,7 @@ export async function manualRefresh(request, env, actor, rid, iso3, deps = {}) {
   const stmts = [
     s(env, "INSERT INTO trade_list_versions(id,kind,iso3,reference_month,classification_json,params_json,started_at) VALUES (?,'manual',?,?,?,?,?)", vid, country.iso3, month, JSON.stringify(params.classification), JSON.stringify(params), at),
     s(env, "INSERT INTO trade_list_manual_refresh(iso3,day,version_id,requested_by,reason) VALUES (?,?,?,?,?)", country.iso3, utcDay(at), vid, actor.id, reason),
-    s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'mdic','pending',?)", vid, country.iso3, at),
+    ...(mdicExternal(env) ? [] : [s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'mdic','pending',?)", vid, country.iso3, at)]),
     country.comtrade_code == null
       ? s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,error,updated_at) VALUES (?,?,'comtrade','data_unavailable','país sem código nesta fonte',?)", vid, country.iso3, at)
       : s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'comtrade','pending',?)", vid, country.iso3, at),

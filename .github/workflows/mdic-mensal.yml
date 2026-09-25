@@ -1,0 +1,65 @@
+name: MDIC mensal
+# Lê as exportações brasileiras (MDIC/Comex Stat, FOB) e publica no R2 + D1 de produção (scripts/mdic-job.mjs).
+# Roda fora do Worker porque o servidor do MDIC não envia o certificado intermediário (fetch do Worker → 526).
+# A verificação TLS continua ligada: raízes públicas do Node + intermediário Sectigo fixado por impressão SHA-256.
+#
+# Agenda: dias 10, 11 e 12, 12:00 UTC (09:00 em Brasília). O dia 10 é o da rotina mensal aprovada; 11 e 12 são
+# repescagens: se o mês já estiver "complete" o job sai sem mexer em nada.
+# Retomar após falha: Actions → "MDIC mensal" → Run workflow (mesmos parâmetros). Nada parcial fica visível.
+on:
+  schedule:
+    - cron: '0 12 10-12 * *'
+  workflow_dispatch:
+    inputs:
+      iso3:
+        description: 'País (ISO-3, ex.: DEU). Vazio = todos os países da rotina mensal.'
+        required: false
+        default: ''
+      month:
+        description: 'Mês de referência AAAA-MM. Vazio = mês atual em Brasília.'
+        required: false
+        default: ''
+      force:
+        description: 'Refazer o mês mesmo se já publicado'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: mdic-mensal
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Testes do job (sem rede)
+        run: node --test tests/mdic-job.test.mjs
+      - name: Importar MDIC
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          IN_ISO3: ${{ inputs.iso3 }}
+          IN_MONTH: ${{ inputs.month }}
+          IN_FORCE: ${{ inputs.force }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Segredos CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID ausentes nos segredos do repositório."; exit 1
+          fi
+          args=()
+          if [ -n "$IN_ISO3" ]; then
+            [[ "$IN_ISO3" =~ ^[A-Za-z]{3}$ ]] || { echo "::error::ISO-3 inválido"; exit 1; }
+            args+=(--iso3 "$IN_ISO3")
+          fi
+          if [ -n "$IN_MONTH" ]; then
+            [[ "$IN_MONTH" =~ ^20[0-9]{2}-(0[1-9]|1[0-2])$ ]] || { echo "::error::Mês inválido"; exit 1; }
+            args+=(--month "$IN_MONTH")
+          fi
+          [ "$IN_FORCE" = "true" ] && args+=(--force)
+          node scripts/mdic-job.mjs "${args[@]}"

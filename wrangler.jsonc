@@ -26,7 +26,10 @@
     "SENDER_NAME": "Rogério Palhari",
     "MAILBOX_USER": "rogeriopalhari@eagagro.com",
     "EAG_POSTAL_ADDRESS": "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil",
-    "INTERNAL_TEST_RECIPIENTS": "rogeriopalhari23@gmail.com"
+    "INTERNAL_TEST_RECIPIENTS": "rogeriopalhari23@gmail.com",
+    // MDIC lido pelo workflow mensal do GitHub (scripts/mdic-job.mjs): o fetch do Worker responde 526 porque o
+    // servidor do MDIC não envia o certificado intermediário (EVIDENCIAS, 2026-09-25). O Worker cuida só da Comtrade.
+    "MDIC_SOURCE": "github"
   },
   "assets": {
     "directory": "./dist",
