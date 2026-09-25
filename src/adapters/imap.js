@@ -78,38 +78,54 @@ export function parseFetch(items) {
   return out;
 }
 
+// Sessão IMAP com TLS implícito: LOGIN, os comandos de `fn` e LOGOUT. A senha nunca entra em mensagem de erro.
+async function session(env, fn) {
+  if (!env.MAILBOX_USER || !env.MAILBOX_PASSWORD) throw new AdapterError("auth", "IMAP: credenciais da caixa não configuradas.");
+  const { connect } = await import("cloudflare:sockets");
+  const socket = connect({ hostname: env.IMAP_HOST || "imap.hostinger.com", port: Number(env.IMAP_PORT || 993) }, { secureTransport: "on", allowHalfOpen: false });
+  const writer = socket.writable.getWriter();
+  const enc = new TextEncoder();
+  const reader = responseReader(socket.readable);
+  let n = 0;
+  const cmd = async (text) => {
+    const tag = `A${++n}`;
+    await writer.write(enc.encode(`${tag} ${text}\r\n`));
+    return reader.until(tag);
+  };
+  try {
+    await reader.line(); // saudação
+    await cmd(`LOGIN ${quote(env.MAILBOX_USER)} ${quote(env.MAILBOX_PASSWORD)}`);
+    const out = await fn(cmd);
+    await cmd("LOGOUT").catch(() => {});
+    return out;
+  } catch (e) {
+    if (e instanceof AdapterError) throw e;
+    throw new AdapterError("temporary", "IMAP: falha de conexão ou leitura.");
+  } finally {
+    try {
+      await socket.close();
+    } catch {}
+  }
+}
+
 export function imapClient(env) {
   return {
     async fetchNew(mailbox, lastUid, max = 20) {
-      if (!env.MAILBOX_USER || !env.MAILBOX_PASSWORD) throw new AdapterError("auth", "IMAP: credenciais da caixa não configuradas.");
-      const { connect } = await import("cloudflare:sockets");
-      const socket = connect({ hostname: env.IMAP_HOST || "imap.hostinger.com", port: Number(env.IMAP_PORT || 993) }, { secureTransport: "on", allowHalfOpen: false });
-      const writer = socket.writable.getWriter();
-      const enc = new TextEncoder();
-      const reader = responseReader(socket.readable);
-      let n = 0;
-      const cmd = async (text) => {
-        const tag = `A${++n}`;
-        await writer.write(enc.encode(`${tag} ${text}\r\n`));
-        return reader.until(tag);
-      };
-      try {
-        await reader.line(); // saudação
-        await cmd(`LOGIN ${quote(env.MAILBOX_USER)} ${quote(env.MAILBOX_PASSWORD)}`);
+      return session(env, async (cmd) => {
         const uidValidity = parseUidValidity(await cmd(`EXAMINE ${quote(mailbox)}`)); // somente leitura
         const uids = parseSearch(await cmd(`UID SEARCH UID ${lastUid + 1}:*`), lastUid + 1).slice(0, max);
         const messages = [];
         for (const uid of uids) messages.push(...parseFetch(await cmd(`UID FETCH ${uid} (UID BODY.PEEK[]<0.${PARTIAL_BYTES}>)`)));
-        await cmd("LOGOUT").catch(() => {});
         return { uidValidity, messages };
-      } catch (e) {
-        if (e instanceof AdapterError) throw e;
-        throw new AdapterError("temporary", "IMAP: falha de conexão ou leitura.");
-      } finally {
-        try {
-          await socket.close();
-        } catch {}
-      }
+      });
+    },
+    // Conferência da credencial sem ler nem alterar mensagens: LOGIN, EXAMINE (só leitura) e LOGOUT.
+    async check(mailbox = "INBOX") {
+      return session(env, async (cmd) => {
+        const items = await cmd(`EXAMINE ${quote(mailbox)}`);
+        const exists = items.map(({ line }) => /^\* (\d+) EXISTS/.exec(line)).find(Boolean);
+        return { uidValidity: parseUidValidity(items), messages: exists ? Number(exists[1]) : null };
+      });
     },
   };
 }

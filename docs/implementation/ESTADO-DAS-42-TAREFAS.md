@@ -1,8 +1,8 @@
 # Estado das 42 tarefas — 2026-09-24 (reconciliado)
 
 Fonte da verdade da fila: `docs/implementation/sequence.json` (`npm run next`). Evidências: `docs/implementation/EVIDENCIAS.md`.
-Branch `v2-revisao-2`, sincronizada com o GitHub; CI (Ubuntu e Windows) verde. `npm run check`: 303 testes + 2 workerd/D1; UI smoke com 13 telas.
-Produção: **https://eag-compass-production.rogeriopalhari23.workers.dev** atrás do Access (domínio `eagcompass.com` em ativação — ver abaixo).
+Branch `v2-revisao-2`, sincronizada com o GitHub; CI (Ubuntu e Windows) verde. `npm run check`: 306 testes + 2 workerd/D1; UI smoke com 13 telas.
+Produção: **https://eag-compass-production.rogeriopalhari23.workers.dev** atrás do Access. O domínio `eagcompass.com` **não** está ligado ao Compass: zona `pending` no Cloudflare, DNS ainda na Hostinger (conferido em 2026-09-25). Estado das integrações: `GET /api/integrations` (admin).
 
 Três dimensões, avaliadas separadamente:
 - **Implementação** — código e testes automatizados no repositório.

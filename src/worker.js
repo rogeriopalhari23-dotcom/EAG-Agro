@@ -30,6 +30,7 @@ import * as tradeList from "./trade-list.js";
 import * as countryAnalysis from "./country-analysis.js";
 import * as selections from "./selections.js";
 import * as foreign from "./foreign-companies.js";
+import * as integrations from "./integrations.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
@@ -205,6 +206,8 @@ async function route(request, env, rid) {
   if (can && !can[2] && method === "GET") return response(await countryAnalysis.getAnalysis(env, actor, can[1]));
   if (can && can[2] && method === "POST") return response(await selections.selectCommodities(request, env, actor, rid, can[1]), 201);
   if (can && can[2] && method === "GET") return response(await selections.listSelections(env, actor, can[1]));
+  if (path === "/api/integrations" && method === "GET") return response(await integrations.status(env, actor));
+  if (path === "/api/integrations/mailbox/check" && method === "POST") return response(await integrations.checkMailbox(request, env, actor, rid));
   if (path === "/api/foreign-companies" && method === "POST") return response(await foreign.createForeignCompany(request, env, actor, rid), 201);
   const fcc = path.match(/^\/api\/companies\/([^/]+)\/conditions\/([^/]+)\/([a-z_]+)$/);
   if (fcc && method === "PUT") return response(await foreign.setCondition(request, env, actor, rid, fcc[1], fcc[2], fcc[3]));
