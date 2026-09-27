@@ -5,6 +5,8 @@
 import { bodyJson, fail, str, WRITE_ROLES, requireRole } from "./http.js";
 import { statement as s, commit, parameters, requireParameter, auditStatement } from "./store.js";
 import { sha256 } from "./trade-list.js";
+import { summarizeMdic, summarizeComtrade } from "./trade-summary.js";
+import { STATE_LABEL as SUMMARY_LABEL, SOURCE_LABEL } from "./importers.js";
 
 export const NOTICE = "O dado confirma exportação do Brasil para o país; não comprova compra por nenhuma empresa específica.";
 const STATE_LABEL = {
@@ -163,6 +165,16 @@ export async function createAnalysis(request, env, actor, rid) {
   if (!Number.isInteger(periodMonths) || periodMonths < 1 || periodMonths > 60) fail(422, "invalid_period", "Período de 1 a 60 meses.");
   const ptr = await pointers(env, iso3);
   if (!ptr.mdic && !ptr.comtrade) fail(409, "trade_list_missing", "A lista mensal deste país ainda não foi gerada.");
+  // Mesma lista e mesmo período já analisados → reaproveita a análise registrada (não repete a pesquisa).
+  const same = await s(
+    env,
+    "SELECT id FROM country_analyses WHERE tenant_id=? AND iso3=? AND period_months=? AND COALESCE(comtrade_r2_key,'')=? AND COALESCE(mdic_r2_key,'')=? ORDER BY created_at DESC LIMIT 1",
+    actor.tenant_id, iso3, periodMonths, ptr.comtrade?.r2_key ?? "", ptr.mdic?.r2_key ?? "",
+  ).first();
+  if (same) {
+    const prev = await getAnalysis(env, actor, same.id);
+    if (prev.reproduced) return { ...prev, reused: true };
+  }
   const mdicObj = ptr.mdic ? await readObject(env, ptr.mdic.r2_key) : null;
   const comtradeObj = ptr.comtrade ? await readObject(env, ptr.comtrade.r2_key) : null;
   const analysis = await buildAnalysis(env, actor.tenant_id, iso3, periodMonths, { mdicObj, comtradeObj });
@@ -188,6 +200,18 @@ export async function getAnalysis(env, actor, id) {
   const comtradeObj = a.comtrade_r2_key ? await readObject(env, a.comtrade_r2_key) : null;
   const analysis = await buildAnalysis(env, actor.tenant_id, a.iso3, a.period_months, { mdicObj, comtradeObj });
   const reproduced = (await sha256(listPart(analysis))) === a.snapshot_sha256;
+  // Resumo curto (Radar): por fonte, se há compra do Brasil, as commodities de maior valor, período e fonte.
+  const short = (sum, prefix) => ({
+    state: sum.state, label: SUMMARY_LABEL[sum.state], source: SOURCE_LABEL[prefix], basis: sum.basis,
+    period: sum.periodFrom || sum.periodTo ? { from: sum.periodFrom, to: sum.periodTo } : null,
+    brazilUsd: sum.brazilUsd, hs6Count: sum.hs6Count, commodities: sum.top,
+  });
+  const mdicShort = mdicObj ? short(summarizeMdic(mdicObj, a.period_months), "mdic") : null;
+  const comtradeShort = comtradeObj ? short(summarizeComtrade(comtradeObj), "comtrade") : null;
+  if (comtradeShort && mdicShort) {
+    const pt = new Map(mdicShort.commodities.map((c) => [c.hs6, c.name]));
+    comtradeShort.commodities = comtradeShort.commodities.map((c) => ({ ...c, name: pt.get(c.hs6) ?? c.name }));
+  }
   return {
     id: a.id,
     country,
@@ -211,6 +235,12 @@ export async function getAnalysis(env, actor, id) {
       },
     },
     periodMonths: a.period_months,
+    summary: {
+      purchaseIdentified: [mdicShort?.state, comtradeShort?.state].includes("purchase_identified"),
+      mdic: mdicShort,
+      comtrade: comtradeShort,
+    },
+    reused: false,
     rows: analysis.rows,
     snapshotSha256: a.snapshot_sha256,
     reproduced,

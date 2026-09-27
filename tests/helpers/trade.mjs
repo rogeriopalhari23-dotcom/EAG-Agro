@@ -62,7 +62,8 @@ export function sources(opts = {}) {
     const u = new URL(url);
     calls.log.push(u.pathname);
     if (u.host === "mdic.test") {
-      if (u.pathname.endsWith("/tabelas/NCM.csv")) return new Response(NCM_CSV, { status: 200, headers: { "content-type": "text/csv" } });
+      // Como a fonte real: NCM.csv em windows-1252 (os acentos do fixture cabem em latin1).
+      if (u.pathname.endsWith("/tabelas/NCM.csv")) return new Response(Buffer.from(NCM_CSV, "latin1"), { status: 200, headers: { "content-type": "text/csv" } });
       const y = Number(/EXP_(\d{4})\.csv$/.exec(u.pathname)?.[1]);
       if (!MDIC_ROWS[y] || opts.mdicDown) return new Response(null, { status: opts.mdicDown ? 503 : 404 });
       const bytes = file(y);

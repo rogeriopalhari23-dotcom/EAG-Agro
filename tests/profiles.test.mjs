@@ -29,7 +29,12 @@ async function companyWithUnit(ctx, sizeCode = "05") {
 test("P2-T6: regra do ICP (K1/K3) é determinística", () => {
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeCode: "05" }), "in_icp");
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeCode: "01" }), "out_small");
-  assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeCode: "03" }), "out_small");
+  // Revisão de 2026-09-27 (exceção P16/P17): pequeno porte entra no ICP; micro/MEI continua fora, nos dois mercados.
+  assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeCode: "03" }), "in_icp");
+  assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeBand: "small" }), "in_icp");
+  assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeBand: "micro" }), "out_small");
+  assert.equal(icpStatus({ profileClass: "trader_distributor", sizeBand: "small" }), "out_trader", "trader segue fora mesmo pequeno");
+  assert.match(canHaveFicha({ icp_status: "out_small" }).reason, /microempresa ou MEI/);
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeCode: null }), "pending_size");
   assert.equal(icpStatus({ profileClass: "trader_distributor", sizeCode: "05" }), "out_trader");
   assert.equal(icpStatus({ profileClass: "final_consumer_confirmed", sizeCode: "05", isGiant: true }), "out_giant");

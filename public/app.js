@@ -1443,6 +1443,7 @@ async function campaignView() {
             ),
             input("Setores usuários, separados por vírgula", "userSectors"),
             select("Porte alvo", "sizeTarget", [
+              ["small_plus", "Pequeno ou maior"],
               ["medium", "Médio"],
               ["medium_plus", "Médio ou maior"],
             ]),
@@ -1495,7 +1496,7 @@ async function showCampaign(id) {
       icp
         ? kv([
             ["Setores usuários", sectors.join(", ")],
-            ["Porte alvo", icp.size_target === "medium_plus" ? "Médio ou maior" : "Médio"],
+            ["Porte alvo", { small_plus: "Pequeno ou maior", medium: "Médio", medium_plus: "Médio ou maior" }[icp.size_target] || icp.size_target],
             ["Região", icp.region],
             ["Decisor", icp.decision_role],
             ["Influenciador", icp.influencer_role],
@@ -1559,6 +1560,7 @@ async function showCampaign(id) {
               "Porte alvo",
               "sizeTarget",
               [
+                ["small_plus", "Pequeno ou maior"],
                 ["medium", "Médio"],
                 ["medium_plus", "Médio ou maior"],
               ],
@@ -1750,7 +1752,7 @@ const pilotLabels = {
   pending_size: "Porte pendente",
   out_trader: "Trader/distribuidor",
   out_giant: "Gigante",
-  out_small: "Pequena/MEI",
+  out_small: "Micro/MEI",
   confirmed: "Dentro do raio",
   estimated: "Dentro (estimado)",
   outside: "Fora do raio",
@@ -2197,22 +2199,51 @@ const usd = (v) => (v == null ? "—" : `US$ ${Math.round(v).toLocaleString("pt-
 const kg = (v) => (v == null ? "—" : `${Math.round(v).toLocaleString("pt-BR")} kg`);
 const conditionLabels = { imports_from_brazil: "Importa do Brasil", buys_commodity: "Compra a commodity", consumes_as_input: "Consome como insumo" };
 
-async function internacionalView(query = "") {
-  const node = section("Internacional", "País primeiro: a lista mensal guardada mostra o que cada país compra. Nenhuma consulta externa ao abrir um país.");
+// Radar Internacional: lista básica de países importadores → resumo curto do país → commodity → busca de empresas.
+const commodityNames = (list) => (list?.length ? list.map((c) => c.name || c.hs6).join(" · ") : "—");
+const periodText = (p) => (!p ? "período indisponível" : p.from === p.to ? p.to : `${p.from} a ${p.to}`);
+function importerSource(src, title) {
+  if (src.state !== "purchase_identified")
+    return text("small", `${title}: ${src.label}${src.period ? ` (${periodText(src.period)})` : ""}${src.staleSince ? ` · não atualizado em ${src.staleSince}` : ""}`);
+  return text("small", `${title} · ${periodText(src.period)} · ${commodityNames(src.commodities)}${src.hs6Count > src.commodities.length ? ` e mais ${src.hs6Count - src.commodities.length}` : ""}${src.staleSince ? ` · não atualizado em ${src.staleSince}` : ""}`);
+}
+
+async function internacionalView(query = "", all = false) {
+  const node = section("Radar Internacional", "Lista básica de países importadores de commodities agrícolas do Brasil, lida da lista mensal já guardada. Nenhuma consulta externa ao abrir.");
   node.setAttribute("data-screen", "internacional");
-  node.append(text("p", NOTICE_R142, "notice-fixed"));
-  const d = await api(`/api/countries${query ? `?q=${encodeURIComponent(query)}` : ""}`);
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  if (!all) params.set("purchase", "1");
+  const d = await api(`/api/radar/importers?${params}`);
+  node.append(text("p", d.notice, "notice-fixed"));
   const search = el("input", { type: "search", name: "q", "aria-label": "Buscar país", placeholder: "Buscar país (ex.: Alemanha)", value: query });
-  const form = el("form", { class: "toolbar", role: "search" }, search, el("button", { type: "submit" }, "Buscar"));
+  const showAll = el("input", { type: "checkbox", name: "all", "aria-label": "Mostrar também países sem compra identificada" });
+  showAll.checked = all;
+  const form = el("form", { class: "toolbar", role: "search" }, search, el("label", {}, showAll, " incluir países sem compra identificada"), el("button", { type: "submit" }, "Buscar"));
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    safe(async () => $("content").replaceChildren(await internacionalView(search.value.trim())));
+    safe(async () => $("content").replaceChildren(await internacionalView(search.value.trim(), showAll.checked)));
   });
   node.append(
     form,
-    text("p", d.latest ? `Última rotina mensal fechada: ${d.latest.reference_month} (${d.latest.status === "complete" ? "completa" : "parcial"}).` : "A lista mensal ainda não foi gerada.", "muted"),
+    text("p", `Fontes: MDIC/Comex Stat (exportações do Brasil, FOB, janela de ${d.periodMonths} meses) e UN Comtrade (importações declaradas pelo país, origem Brasil, último ano declarado) — lado a lado, nunca somadas.${d.latestMonthly ? ` Última rotina mensal: ${d.latestMonthly}.` : ""}`, "muted"),
   );
-  const shown = d.items.slice(0, 60);
+  if (d.pendingSummaries)
+    node.append(
+      el(
+        "p",
+        { class: "muted" },
+        `${d.pendingSummaries} resumo(s) em preparação (a lista já está publicada; o cron diário completa). `,
+        admin()
+          ? button("Preparar agora", async () => {
+              const r = await api("/api/radar/importers/summaries/rebuild", "POST", {});
+              notice(`${r.built} resumo(s) preparados; faltam ${r.remaining}.`);
+              $("content").replaceChildren(await internacionalView(query, all));
+            })
+          : null,
+      ),
+    );
+  const shown = d.items.slice(0, 80);
   node.append(
     rows(shown, (c) =>
       el(
@@ -2221,57 +2252,37 @@ async function internacionalView(query = "") {
         el(
           "div",
           {},
-          text("strong", `${c.name_pt} (${c.iso3})`),
-          text(
-            "small",
-            `Compras declaradas pelo país: ${tl(c.comtrade_state)}${c.comtrade_last_period ? ` · último ano ${c.comtrade_last_period}` : ""}${c.comtrade_stale ? ` · não atualizado em ${c.comtrade_stale}` : ""} — Exportações do Brasil: ${tl(c.mdic_state)}${c.mdic_stale ? ` · não atualizado em ${c.mdic_stale}` : ""}`,
-          ),
+          text("strong", `${c.name} (${c.iso3})`),
+          importerSource(c.sources.mdic, "MDIC — exportações do Brasil (FOB)"),
+          importerSource(c.sources.comtrade, "Comtrade — importações declaradas, origem Brasil (CIF)"),
         ),
-        c.comtrade_version || c.mdic_version
-          ? button("Analisar", async () => {
-              const a = await api("/api/country-analyses", "POST", { iso3: c.iso3 });
-              await showAnalysis(a.id, a);
-            })
-          : text("span", "sem lista", "tag"),
+        button("Escolher", async () => {
+          const a = await api("/api/country-analyses", "POST", { iso3: c.iso3 });
+          await showAnalysis(a.id, a);
+        }),
       ),
     ),
   );
   if (d.items.length > shown.length) node.append(text("p", `Mostrando ${shown.length} de ${d.items.length}. Refine a busca.`, "muted"));
-  if (writable()) {
-    const intl = (await campaignsOf("international")).filter((c) => c.selection_id && ["draft", "active", "waiting"].includes(c.status));
-    if (intl.length) {
-      const links = el("div");
-      const f = makeForm(
-        [
-          select("Campanha internacional", "campaignId", intl.map((c) => [c.id, c.name])),
-          input("Razão social", "legalName"),
-          input("Registro (número)", "registrationId", "text", "", false),
-          input("Tipo de registro (ex.: HRB, CRN, EIN)", "registrationIdType", "text", "", false),
-          input("Fonte (onde a empresa foi encontrada)", "sourceLabel"),
-          input("URL da fonte", "sourceUrl", "url", "", false),
-          select("Nome parecido com outra empresa do país", "confirmDistinct", [["false", "Conferir antes"], ["true", "Já conferi: é outra empresa"]]),
-        ],
-        async (v) => {
-          const r = await api("/api/foreign-companies", "POST", {
-            campaignId: v.campaignId, legalName: v.legalName, registrationId: v.registrationId || undefined, registrationIdType: v.registrationIdType || undefined,
-            sourceLabel: v.sourceLabel, sourceUrl: v.sourceUrl || undefined, confirmDistinct: v.confirmDistinct === "true",
-          });
-          // Links de pesquisa montados (Camada 2): abertos só pela pessoa, nunca pelo sistema.
-          links.replaceChildren(
-            text("p", r.created ? "Empresa cadastrada com as três condições pendentes." : "Mesmo registro: a empresa já existia; condições garantidas.", "success"),
-            ...r.researchLinks.map((l) => el("p", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))),
-            button("Abrir empresa", () => showCompany(r.id)),
-          );
-        },
-        "Cadastrar importador",
-      );
-      node.append(details("Cadastrar importador de uma campanha internacional", el("div", {}, f, links)));
-    }
-  }
+  const searches = await api("/api/foreign-searches");
+  if (searches.items.length)
+    node.append(
+      panel(
+        "Buscas de empresas",
+        rows(searches.items, (x) =>
+          el(
+            "div",
+            { class: "row" },
+            el("div", {}, text("strong", `${x.country} · ${x.commodity}`), text("small", `${x.status === "open" ? "Aberta" : "Encerrada"} · autorizada em ${x.authorized_at.slice(0, 10)} · ${x.candidates} empresa(s) · ${x.sources} fonte(s) consultada(s)`)),
+            button("Abrir", () => showForeignSearch(x.id)),
+          ),
+        ),
+      ),
+    );
   const hist = await api("/api/country-analyses");
   node.append(
-    panel(
-      "Análises, seleções e campanhas",
+    details(
+      "Análises, seleções e campanhas registradas",
       rows(hist.items, (a) =>
         el(
           "div",
@@ -2296,80 +2307,109 @@ function sourceCard(src, extra) {
   );
 }
 
+function summaryCard(s, title) {
+  if (!s) return el("div", { class: "stat source" }, text("strong", title), text("span", "lista ainda não gerada", "tag warn"));
+  return el(
+    "div",
+    { class: "stat source" },
+    text("strong", title),
+    text("span", s.label, s.state === "purchase_identified" ? "tag" : "tag warn"),
+    text("small", `${periodText(s.period)}${s.brazilUsd != null && s.state === "purchase_identified" ? ` · origem Brasil ${usd(s.brazilUsd)}` : ""}`),
+    s.commodities.length ? text("small", commodityNames(s.commodities)) : null,
+    text("small", s.source),
+  );
+}
+
 async function showAnalysis(id, preloaded) {
   const a = preloaded || (await api(`/api/country-analyses/${id}`));
-  const node = section(`${a.country.name_pt} · análise`, `Período de ${a.periodMonths} meses · criada em ${a.createdAt.slice(0, 16).replace("T", " ")}${a.reproduced ? "" : " · a lista usada não confere mais: gere nova análise"}`);
+  const node = section(
+    `${a.country.name_pt} · resumo`,
+    `${a.summary.purchaseIdentified ? "Há importações de commodities agrícolas do Brasil identificadas." : "Nenhuma importação agrícola do Brasil identificada nas fontes."} Período de ${a.periodMonths} meses${a.reused ? " · análise já registrada, reaproveitada (mesma lista)" : ""}${a.reproduced ? "" : " · a lista usada não confere mais: gere nova análise"}`,
+  );
   node.setAttribute("data-screen", "internacional");
   node.append(text("p", a.notice, "notice-fixed"), button("Voltar aos países", () => navigate("Internacional")));
   node.append(
     el(
       "div",
       { class: "stats" },
-      sourceCard(a.sources.comtrade, a.sources.comtrade.years.length ? `anos guardados: ${a.sources.comtrade.years.join(", ")}` : null),
-      sourceCard(a.sources.mdic, a.sources.mdic.window ? `de ${a.sources.mdic.window.from} a ${a.sources.mdic.window.to}` : null),
+      summaryCard(a.summary.mdic, "MDIC — exportações do Brasil para o país (FOB)"),
+      summaryCard(a.summary.comtrade, "Comtrade — importações declaradas pelo país, origem Brasil (CIF)"),
     ),
   );
   const chosen = new Map();
-  const table = el("table", { class: "trade" });
-  table.append(
-    el(
-      "thead",
-      {},
-      el(
-        "tr",
-        {},
-        ...["", "SH6", "Produto", "Compras declaradas pelo país (CIF, anual)", "Exportações do Brasil (FOB, mensal)", "Catálogo EAG"].map((h) => el("th", { scope: "col" }, h)),
-      ),
+  const pick = (r) => {
+    if (!(r.purchaseIdentified && approver())) return null;
+    const box = el("input", { type: "checkbox", "aria-label": `Selecionar ${r.hs6}` });
+    box.checked = chosen.has(r.hs6);
+    box.addEventListener("change", () => (box.checked ? chosen.set(r.hs6, r) : chosen.delete(r.hs6)));
+    return box;
+  };
+  // Commodities com compra identificada, da maior para a menor (MDIC, depois Comtrade origem Brasil).
+  const value = (r) => r.mdic?.fobUsd ?? 0;
+  const ctValue = (r) => r.comtrade?.latest?.brazilUsd ?? 0;
+  const bought = a.rows.filter((r) => r.purchaseIdentified && (value(r) > 0 || ctValue(r) > 0)).sort((x, y) => value(y) - value(x) || ctValue(y) - ctValue(x));
+  const top = bought.slice(0, 15);
+  node.append(
+    panel(
+      "Commodities com compra do Brasil identificada",
+      top.length
+        ? el(
+            "div",
+            { class: "rows" },
+            ...top.map((r) =>
+              el(
+                "div",
+                { class: "row" },
+                pick(r),
+                el(
+                  "div",
+                  {},
+                  text("strong", `${r.hs6} · ${r.name || "sem nome"}`),
+                  text(
+                    "small",
+                    `MDIC: ${r.mdic ? `${usd(r.mdic.fobUsd)} FOB, última ocorrência ${r.mdic.lastOccurrence}` : "—"} · Comtrade: ${r.comtrade?.latest ? `${r.comtrade.latest.year}, Brasil ${usd(r.comtrade.latest.brazilUsd)}` : "—"}${r.catalog.confirmed.length ? ` · catálogo EAG: ${r.catalog.confirmed.map((c) => c.variant).join(", ")}` : ""}`,
+                  ),
+                ),
+              ),
+            ),
+          )
+        : text("p", "Nenhuma commodity com valor de origem Brasil no período.", "empty"),
+      bought.length > top.length ? text("p", `Mostrando as ${top.length} de maior valor entre ${bought.length}. As demais estão na tabela completa.`, "muted") : null,
     ),
   );
+  // Tabela completa só sob demanda (sem relatório extenso por padrão).
+  const table = el("table", { class: "trade" });
+  table.append(el("thead", {}, el("tr", {}, ...["", "SH6", "Produto", "Compras declaradas pelo país (CIF, anual)", "Exportações do Brasil (FOB, mensal)", "Catálogo EAG"].map((h) => el("th", { scope: "col" }, h)))));
   const body = el("tbody");
   for (const r of a.rows) {
     const ct = r.comtrade?.latest;
     const md = r.mdic;
-    const box = r.purchaseIdentified && approver() ? el("input", { type: "checkbox", "aria-label": `Selecionar ${r.hs6}` }) : null;
-    box?.addEventListener("change", () => (box.checked ? chosen.set(r.hs6, r) : chosen.delete(r.hs6)));
     body.append(
       el(
         "tr",
         {},
-        el("td", {}, box),
+        el("td", {}, pick(r)),
         el("td", {}, r.hs6),
         el("td", {}, r.name || "—"),
-        el(
-          "td",
-          {},
-          ct
-            ? `${ct.year}: todas as origens ${usd(ct.worldUsd)}; Brasil ${usd(ct.brazilUsd)}; parte do Brasil ${ct.brazilShare == null ? `desconhecida (${ct.shareNote})` : `${(ct.brazilShare * 100).toFixed(1)}%`}${ct.basis === "CIF" ? "" : " (base declarada, não CIF)"}`
-            : "—",
-        ),
-        el(
-          "td",
-          {},
-          md
-            ? `${usd(md.fobUsd)} · ${kg(md.netKg)} · última ocorrência ${md.lastOccurrence}${md.qtyInconsistent ? " · quantidade estatística inconsistente na fonte" : ""}`
-            : "—",
-        ),
-        el(
-          "td",
-          {},
-          r.catalog.confirmed.length ? `No catálogo EAG: ${r.catalog.confirmed.map((c) => c.variant).join(", ")}` : r.catalog.pending.length ? "código pendente" : "—",
-        ),
+        el("td", {}, ct ? `${ct.year}: todas as origens ${usd(ct.worldUsd)}; Brasil ${usd(ct.brazilUsd)}; parte do Brasil ${ct.brazilShare == null ? `desconhecida (${ct.shareNote})` : `${(ct.brazilShare * 100).toFixed(1)}%`}${ct.basis === "CIF" ? "" : " (base declarada, não CIF)"}` : "—"),
+        el("td", {}, md ? `${usd(md.fobUsd)} · ${kg(md.netKg)} · última ocorrência ${md.lastOccurrence}${md.qtyInconsistent ? " · quantidade estatística inconsistente na fonte" : ""}` : "—"),
+        el("td", {}, r.catalog.confirmed.length ? `No catálogo EAG: ${r.catalog.confirmed.map((c) => c.variant).join(", ")}` : r.catalog.pending.length ? "código pendente" : "—"),
       ),
     );
   }
   table.append(body);
-  node.append(el("div", { class: "table-wrap" }, table));
+  node.append(
+    details(`Tabela completa (${a.rows.length} subposições; fontes: versões ${a.sources.mdic.versionId || "—"} e ${a.sources.comtrade.versionId || "—"})`, el("div", {}, el("div", { class: "stats" }, sourceCard(a.sources.comtrade, a.sources.comtrade.years.length ? `anos guardados: ${a.sources.comtrade.years.join(", ")}` : null), sourceCard(a.sources.mdic, a.sources.mdic.window ? `de ${a.sources.mdic.window.from} a ${a.sources.mdic.window.to}` : null)), el("div", { class: "table-wrap" }, table))),
+  );
   if (approver()) {
-    const choose = button("Escolher commodities", async () => {
-      if (!chosen.size) return notice("Marque ao menos uma linha com compra identificada.", true);
-      const form = el("form");
+    const choose = button("Escolher commodity", async () => {
+      if (!chosen.size) return notice("Marque ao menos uma commodity com compra identificada.", true);
       const fields = [];
       for (const r of chosen.values()) {
         const guess = r.catalog.confirmed[0]?.productId;
-        const p = select(`Produto para ${r.hs6} (${r.name || "sem nome"})`, `product-${r.hs6}`, state.products.map((x) => [x.id, x.variant_name]), guess);
-        const l = input(`Nome da commodity (${r.hs6})`, `label-${r.hs6}`, "text", r.name || "");
-        fields.push({ r, p, l });
+        fields.push({ r, p: select(`Produto para ${r.hs6} (${r.name || "sem nome"})`, `product-${r.hs6}`, state.products.map((x) => [x.id, x.variant_name]), guess), l: input(`Nome da commodity (${r.hs6})`, `label-${r.hs6}`, "text", r.name || "") });
       }
+      const out = el("div");
       const f = makeForm(
         fields.flatMap((x) => [x.p, x.l]),
         async () => {
@@ -2381,19 +2421,156 @@ async function showAnalysis(id, preloaded) {
             it.hs6.push(x.r.hs6);
           }
           const r = await api(`/api/country-analyses/${a.id}/selections`, "POST", { items: [...items.values()] });
-          notice(
-            `Seleção registrada: ${r.campaigns.length} campanha(s) em rascunho${r.campaigns.some((c) => c.needsCommercialValidation) ? "; há commodity aguardando validação comercial" : ""}. Complete o ICP e ative; a 3ª commodity ativa no mercado fica em espera.`,
+          notice(`Seleção registrada: ${r.campaigns.length} campanha(s) em rascunho${r.campaigns.some((c) => c.needsCommercialValidation) ? "; há commodity aguardando validação comercial" : ""}.`);
+          // Próximo passo: autorizar a busca de empresas (pequenas e médias; consumidoras e processadoras primeiro).
+          out.replaceChildren(
+            ...r.campaigns.map((c) =>
+              el(
+                "div",
+                { class: "row" },
+                el("div", {}, text("strong", c.label), text("small", "Busca de pequenas e médias empresas importadoras; consumidoras finais, fábricas e processadoras primeiro; traders à parte.")),
+                button("Autorizar busca de empresas", async () => {
+                  const x = await api(`/api/campaigns/${c.id}/foreign-search`, "POST", { confirm: true });
+                  await showForeignSearch(x.id, x);
+                }, true),
+              ),
+            ),
           );
-          await navigate("Campanhas");
         },
-        "Registrar seleção e criar campanhas",
+        "Registrar seleção",
       );
-      void form;
-      node.append(panel("Seleção", f));
+      node.append(panel("Commodity escolhida", f, out));
       f.scrollIntoView({ block: "nearest" });
     }, true);
     node.append(el("div", { class: "toolbar" }, choose));
   }
+  $("content").replaceChildren(node);
+  $("content").focus({ preventScroll: true });
+}
+
+const BUYER_TAG = { confirmed_importer: "tag", confirmed_buyer: "tag", potential: "tag warn" };
+function evidenceLine(e) {
+  return el(
+    "li",
+    {},
+    `${e.type} — ${e.reference}`,
+    e.factDate ? ` · fato em ${e.factDate.slice(0, 10)}` : " · data do fato não informada",
+    ` · consultado em ${e.consultedAt.slice(0, 10)}`,
+    e.validation !== "valid" ? ` · ${e.validation === "pending" ? "não validada" : e.validation}` : "",
+    e.sourceUrl ? el("span", {}, " · ", el("a", { href: e.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte")) : "",
+  );
+}
+function companyResult(c) {
+  const contacts = c.contacts.filter((k) => k.verified);
+  return el(
+    "div",
+    { class: "row" },
+    el(
+      "div",
+      {},
+      text("strong", c.name),
+      text("span", c.buyerStatusLabel, BUYER_TAG[c.buyerStatus]),
+      text("small", `Porte: ${c.size ? `${c.size.label} (fonte: ${c.size.source || "sem fonte"})` : "não informado"} · Atividade: ${c.activity ? `${c.activity.text} (fonte: ${c.activity.source})` : "não registrada"} · Perfil: ${c.profile ? `${c.profile.label}, ${c.profile.icpLabel}` : "não registrado"}`),
+      c.website ? el("small", {}, "Site: ", el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, c.website)) : text("small", "Site: não registrado"),
+      c.importEvidence.length
+        ? el("div", {}, text("small", "Evidência de importação/compra (da própria empresa):"), el("ul", {}, ...c.importEvidence.map(evidenceLine)))
+        : c.indications.length
+          ? el("div", {}, text("small", "Indícios (não confirmam — potencial compradora a validar):"), el("ul", {}, ...c.indications.map(evidenceLine)))
+          : text("small", "Sem evidência nem indício de compra registrado."),
+      text("small", contacts.length ? `Decisores/contatos com fonte: ${contacts.map((k) => `${k.name}${k.jobTitle ? ` (${k.jobTitle})` : ""} — ${k.source}${k.emailValidation === "valid" ? ", e-mail validado" : ", e-mail não validado"}`).join("; ")}` : "Decisores/contatos com fonte: nenhum"),
+      c.pending.length ? el("div", {}, text("small", "Pendências:"), el("ul", {}, ...c.pending.map((p) => el("li", {}, p)))) : null,
+      text("small", `Encontrada em: ${c.foundBy.source}${c.foundBy.at ? ` (${c.foundBy.at.slice(0, 10)})` : ""} · Ficha: ${c.ficha.ok ? "pode ser preparada; envio só após aprovação individual" : c.ficha.reason}`),
+    ),
+    button("Abrir empresa", () => showCompany(c.id)),
+  );
+}
+
+async function showForeignSearch(id, preloaded) {
+  const x = preloaded || (await api(`/api/foreign-searches/${id}`));
+  const node = section(`${x.country.name_pt} · ${x.commodity.label || x.commodity.name}`, `Busca de empresas compradoras (SH6 ${x.commodity.hs6.join(", ")}) · porte-alvo: ${x.target.sizesLabel.join(" e ")} · ${x.status === "open" ? "aberta" : `encerrada em ${x.closedAt.slice(0, 10)}`}`);
+  node.setAttribute("data-screen", "internacional");
+  node.append(text("p", x.notice, "notice-fixed"), button("Voltar ao Radar", () => navigate("Internacional")));
+  const m = x.metrics;
+  node.append(
+    el(
+      "div",
+      { class: "stats" },
+      el("div", { class: "stat" }, text("strong", "Cobertura"), text("p", `${m.coverage.sourcesConsulted} fonte(s) consultada(s), ${m.coverage.sourcesWithResults} com resultado`), text("p", m.coverage.note)),
+      el("div", { class: "stat" }, text("strong", "Custo"), text("p", `${m.cost.apiCalls} chamada(s) · ${usd(m.cost.costUsd)} · ${m.cost.minutes} min registrados · ${m.cost.elapsedHours} h desde a autorização`)),
+      el(
+        "div",
+        { class: "stat" },
+        text("strong", "Rendimento"),
+        text("p", `${m.yield.candidates} empresa(s): ${m.yield.consumers} consumidora(s)/processadora(s), ${m.yield.traders} trader(s) · ${m.yield.inTargetSize} no porte-alvo`),
+        text("p", `${m.yield.confirmedImporters} importadora(s) confirmada(s) · ${m.yield.confirmedBuyers} compradora(s) confirmada(s) · ${m.yield.potentialBuyers} potencial(is) a validar · ${m.yield.withVerifiedDecisionMaker} com decisor com fonte · ${m.yield.eligibleForFicha} apta(s) a ficha`),
+      ),
+    ),
+  );
+  const groups = [
+    ["Consumidoras finais, fábricas e processadoras", x.groups.consumers],
+    ["Perfil a confirmar", x.groups.toConfirm],
+    ["Traders e distribuidores (prioridade secundária)", x.groups.traders],
+  ];
+  for (const [title, list] of groups) node.append(panel(`${title} (${list.length})`, rows(list, companyResult)));
+  const byGroup = new Map();
+  for (const l of x.researchPlan.links) (byGroup.get(l.group) || byGroup.set(l.group, []).get(l.group)).push(l);
+  node.append(
+    details(
+      "Roteiro de pesquisa (links montados, abertos só por você)",
+      el("div", {}, text("p", x.researchPlan.note, "muted"), ...[...byGroup].map(([g, ls]) => el("div", {}, text("strong", g), el("ul", {}, ...ls.map((l) => el("li", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))))))),
+    ),
+    details(
+      `Fontes consultadas (${x.sources.length})`,
+      rows(x.sources, (s) => el("div", { class: "row" }, el("div", {}, text("strong", s.label), text("small", `${s.kind} · ${s.results} resultado(s) · ${s.minutes ?? 0} min · ${s.apiCalls} chamada(s) · ${usd(s.costUsd)}${s.query ? ` · consulta: ${s.query}` : ""}${s.note ? ` · ${s.note}` : ""}`)))),
+    ),
+  );
+  if (x.status === "open" && writable()) {
+    const kinds = [["web_research", "Pesquisa na web"], ["public_directory", "Diretório público"], ["official_registry", "Registro oficial de empresas"], ["company_website", "Site da empresa"], ["trade_fair", "Feira/associação"], ["paid_database", "Base paga (exige decisão)"], ["adapter", "Adaptador automático"]];
+    node.append(
+      details(
+        "Registrar fonte consultada (mesmo sem resultado)",
+        makeForm(
+          [input("Fonte", "sourceLabel"), select("Tipo", "sourceKind", kinds), input("Consulta usada", "queryText", "text", "", false), input("Resultados úteis", "resultCount", "number", "0", false), input("Minutos gastos", "minutes", "number", "", false), input("Chamadas de API", "apiCalls", "number", "0", false), input("Custo (US$)", "costUsd", "number", "0", false), input("Referência da decisão (base paga)", "decisionRef", "text", "", false), input("Observação", "note", "text", "", false)],
+          async (v) => {
+            await api(`/api/foreign-searches/${x.id}/sources`, "POST", {
+              sourceLabel: v.sourceLabel, sourceKind: v.sourceKind, queryText: v.queryText || undefined, resultCount: v.resultCount || 0, minutes: v.minutes || undefined,
+              apiCalls: v.apiCalls || 0, costUsd: v.costUsd || 0, decisionRef: v.decisionRef || undefined, note: v.note || undefined,
+            });
+            await showForeignSearch(x.id);
+          },
+          "Registrar fonte",
+        ),
+      ),
+      details(
+        "Registrar empresa encontrada",
+        makeForm(
+          [
+            input("Razão social", "legalName"),
+            input("Registro (número)", "registrationId", "text", "", false),
+            input("Tipo de registro (ex.: HRB, CRN, EIN)", "registrationIdType", "text", "", false),
+            input("Onde foi encontrada (fonte)", "sourceLabel"),
+            input("URL da fonte", "sourceUrl", "url", "", false),
+            select("Fonte registrada nesta busca", "sourceId", [["", "—"], ...x.sources.map((s) => [s.id, s.label])]),
+            input("Site da empresa", "website", "url", "", false),
+            input("Atividade (o que a empresa faz)", "activityText", "text", "", false),
+            input("Fonte da atividade", "activitySource", "text", "", false),
+            select("Nome parecido com outra empresa do país", "confirmDistinct", [["false", "Conferir antes"], ["true", "Já conferi: é outra empresa"]]),
+          ],
+          async (v) => {
+            await api(`/api/foreign-searches/${x.id}/candidates`, "POST", {
+              legalName: v.legalName, registrationId: v.registrationId || undefined, registrationIdType: v.registrationIdType || undefined, sourceLabel: v.sourceLabel, sourceUrl: v.sourceUrl || undefined,
+              sourceId: v.sourceId || undefined, website: v.website || undefined, activityText: v.activityText || undefined, activitySource: v.activitySource || undefined, confirmDistinct: v.confirmDistinct === "true",
+            });
+            notice("Empresa registrada como potencial compradora a validar. Porte, perfil, evidências e decisores ficam na página da empresa.");
+            await showForeignSearch(x.id);
+          },
+          "Registrar empresa",
+        ),
+      ),
+    );
+  }
+  if (x.status === "open" && approver())
+    node.append(details("Encerrar a busca", makeForm([input("Observação de encerramento", "note", "textarea")], async (v) => showForeignSearch((await api(`/api/foreign-searches/${x.id}/close`, "POST", { note: v.note })).id), "Encerrar")));
   $("content").replaceChildren(node);
   $("content").focus({ preventScroll: true });
 }
@@ -2493,12 +2670,12 @@ function internationalPanels(id, data) {
   nodes.push(
     panel(
       "Porte no exterior",
-      kv([["Faixa", { small: "Pequena", medium: "Média", medium_plus: "Média-mais", giant: "Gigante" }[data.company.size_band] || "Não informado"], ["Fonte", data.company.size_source], ["Conferido em", data.company.size_checked_at]]),
+      kv([["Faixa", { micro: "Micro/MEI", small: "Pequena", medium: "Média", medium_plus: "Média-mais", giant: "Gigante" }[data.company.size_class ?? data.company.size_band] || "Não informado"], ["Fonte", data.company.size_source], ["Conferido em", data.company.size_checked_at]]),
       approver()
         ? details(
             "Registrar porte",
             makeForm(
-              [select("Faixa", "sizeBand", [["small", "Pequena"], ["medium", "Média"], ["medium_plus", "Média-mais"], ["giant", "Gigante"]]), input("Fonte do porte", "source")],
+              [select("Faixa", "sizeBand", [["micro", "Micro/MEI (< 10 pessoas)"], ["small", "Pequena (10–49)"], ["medium", "Média (50–249)"], ["medium_plus", "Média-mais (250+)"], ["giant", "Gigante do setor"]]), input("Fonte do porte", "source")],
               async (v) => {
                 await api(`/api/companies/${id}/size`, "PATCH", v);
                 notice("Porte registrado; ICP refeito.");

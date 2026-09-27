@@ -256,7 +256,7 @@ function icpValues(icp) {
     fail(422, "icp_required", "Preencha o perfil de cliente da campanha.");
   return [
     JSON.stringify(icp.userSectors.map((v) => str(v, "setor usuário", 100))),
-    oneOf(icp.sizeTarget, ["medium", "medium_plus"], "porte"),
+    oneOf(icp.sizeTarget, ["small_plus", "medium", "medium_plus"], "porte"),
     str(icp.region, "região", 200),
     str(icp.decisionRole, "decisor", 200),
     str(icp.influencerRole, "influenciador", 200),

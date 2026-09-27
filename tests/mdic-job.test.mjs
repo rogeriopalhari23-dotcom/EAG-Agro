@@ -42,6 +42,7 @@ function fakeDb({ tamper = false, versionStatus = null } = {}) {
     query(sql) {
       if (sql.includes("agri_classification")) return [{ value_json: JSON.stringify(AGRI) }];
       if (sql.includes("trade_list_mdic_years")) return [{ value_json: "2" }];
+      if (sql.includes("period_default_months")) return [{ value_json: "12" }];
       if (sql.includes("FROM country_mdic_codes")) return [{ mdic_code: "023", iso3: "DEU" }, { mdic_code: "025", iso3: "DEU" }, { mdic_code: "249", iso3: "USA" }, { mdic_code: "607", iso3: "PRT" }];
       if (sql.includes("SELECT status FROM trade_list_versions")) return published ? [{ status: "complete" }] : versionStatus ? [{ status: versionStatus }] : [];
       throw new Error("consulta inesperada: " + sql);
@@ -75,6 +76,12 @@ test("MDIC/job: Alemanha soma 023+025, grava no R2, confere hash e publica com '
   assert.ok(sql.indexOf("'running'") < sql.indexOf("trade_list_current") && sql.indexOf("trade_list_current") < sql.indexOf("SET status='complete'"), "ordem: versão, ponteiros, complete");
   assert.match(sql, /'manual','DEU'/);
   assert.match(sql, new RegExp(sha(db.r2.get("trade-src/2026-10-mdic-DEU-teste/mdic/DEU.json"))));
+  // Resumo da lista de países importadores no mesmo SQL, com a chave do objeto e a janela de 12 meses.
+  const sum = sql.split("\n").find((l) => l.startsWith("INSERT OR IGNORE INTO trade_country_summary"));
+  assert.ok(sum, "resumo publicado junto");
+  assert.match(sum, /'DEU','mdic','2026-10-mdic-DEU-teste','purchase_identified','2025-04','2026-03','FOB'/);
+  assert.match(sum, /090111/);
+  assert.ok(sql.indexOf("trade_country_summary") < sql.indexOf("SET status='complete'"));
 });
 
 test("MDIC/job: objeto adulterado no R2 cancela antes de publicar (nada no D1)", async () => {

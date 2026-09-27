@@ -22,6 +22,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import * as mdic from "../src/adapters/mdic-bulk.js";
 import { createAccumulator } from "../src/mdic-aggregate.js";
+import { summarizeMdic, summaryRow, SUMMARY_COLUMNS } from "../src/trade-summary.js";
 import { loadTrust, trustedFetch } from "./lib/mdic-tls.mjs";
 
 export const DB = "eag_compass";
@@ -60,10 +61,12 @@ export function readSetup(db, iso3) {
   const cls = db.query(PARAM_SQL("agri_classification"))[0];
   const years = db.query(PARAM_SQL("trade_list_mdic_years"))[0];
   if (!cls || !years) throw new Error("Parâmetros agri_classification/trade_list_mdic_years sem valor aprovado no D1.");
+  // Janela do resumo da lista de países (mesma da análise); sem valor aprovado o resumo fica para o cron do Worker.
+  const period = db.query(PARAM_SQL("period_default_months"))[0];
   const codes = Object.fromEntries(db.query("SELECT mdic_code,iso3 FROM country_mdic_codes").map((r) => [r.mdic_code, r.iso3]));
   const members = iso3 ? [iso3] : [...new Set(Object.values(codes))].sort();
   if (iso3 && !Object.values(codes).includes(iso3)) throw new Error(`País ${iso3} sem código MDIC no cadastro.`);
-  return { classification: JSON.parse(cls.value_json), mdicYears: JSON.parse(years.value_json), codes, members };
+  return { classification: JSON.parse(cls.value_json), mdicYears: JSON.parse(years.value_json), periodMonths: period ? JSON.parse(period.value_json) : null, codes, members };
 }
 
 // Lê um ano inteiro por pedaços; arquivo republicado no meio → recomeça o ano (até 3 vezes); erro temporário → até 8 tentativas
@@ -111,6 +114,8 @@ export function publishSql({ versionId, kind, iso3, month, classification, param
       `INSERT INTO trade_list_status(version_id,iso3,source,state,last_period,lines,error,updated_at) VALUES (${[versionId, o.iso3, "mdic", o.state, o.lastPeriod, o.lines, null, at].map(q).join(",")}) ON CONFLICT(version_id,iso3,source) DO UPDATE SET state=excluded.state,last_period=excluded.last_period,lines=excluded.lines,error=NULL,updated_at=excluded.updated_at;`,
       `INSERT INTO trade_list_current(iso3,source,version_id,r2_key,content_sha256,revision,updated_at) VALUES (${[o.iso3, "mdic", versionId, o.key, o.sha, 1, at].map(q).join(",")}) ON CONFLICT(iso3,source) DO UPDATE SET version_id=excluded.version_id,r2_key=excluded.r2_key,content_sha256=excluded.content_sha256,revision=trade_list_current.revision+1,updated_at=excluded.updated_at WHERE (SELECT started_at FROM trade_list_versions WHERE id=trade_list_current.version_id) <= (SELECT started_at FROM trade_list_versions WHERE id=excluded.version_id);`,
     );
+    // Resumo da lista de países importadores (chave = hash do objeto; inofensivo se o ponteiro não avançar).
+    if (o.summary) out.push(`INSERT OR IGNORE INTO trade_country_summary(${SUMMARY_COLUMNS.join(",")}) VALUES (${SUMMARY_COLUMNS.map((c) => q(o.summary[c])).join(",")});`);
   }
   out.push(
     `UPDATE trade_list_versions SET status='complete',finished_at=${q(at)} WHERE id=${q(versionId)};`,
@@ -159,7 +164,9 @@ export async function run({ iso3 = null, month = spMonth(), force = false, dryRu
     const text = JSON.stringify(obj);
     const path = join(dir, `${iso}.json`);
     writeFileSync(path, text);
-    return { iso3: iso, key: `trade-src/${versionId}/mdic/${iso}.json`, sha: sha256(text), path, state: obj.state, lastPeriod: obj.lastPeriod, lines: obj.lines.length };
+    const sha = sha256(text);
+    const row = Number.isInteger(setup.periodMonths) ? summaryRow({ iso3: iso, versionId, sha, periodMonths: setup.periodMonths, summary: summarizeMdic(obj, setup.periodMonths) }) : null;
+    return { iso3: iso, key: `trade-src/${versionId}/mdic/${iso}.json`, sha, path, state: obj.state, lastPeriod: obj.lastPeriod, lines: obj.lines.length, summary: row };
   });
   const summary = { versionId, countries: objects.length, withPurchase: objects.filter((o) => o.state === "purchase_identified").length, fileLastPeriod: acc.lastYm, unknownCodes: acc.unknownCodes };
   log(`Agregado: ${JSON.stringify(summary)}`);

@@ -3,14 +3,16 @@ import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES, APPROVER_ROLES } 
 import { statement as s, company, commit, auditStatement, now, product } from "./store.js";
 
 export const PROFILE_CLASSES = ["final_consumer_confirmed", "possible_final_consumer", "trader_distributor", "unconfirmed"];
-const SMALL_SIZE_CODES = new Set(["01", "03"]); // Receita: 01 Micro, 03 Pequeno porte (K1: médias e média-mais)
+// Receita: 01 Micro (inclui MEI) fica fora; 03 Pequeno porte e 05 Demais entram (K1 revisado em 2026-09-27:
+// exceção P16/P17 na Constituição — pequenas no ICP nos dois mercados; muito pequenas/MEI continuam fora).
+const MICRO_SIZE_CODES = new Set(["01"]);
 
 // Regra K1/K3 pura. sizeCode vem da fonte (Receita via Casa dos Dados); sizeBand é o porte manual com fonte (exterior).
 export function icpStatus({ profileClass, sizeCode = null, sizeBand = null, isGiant = false }) {
   if (profileClass === "trader_distributor") return "out_trader";
   if (isGiant || sizeBand === "giant") return "out_giant";
-  if (SMALL_SIZE_CODES.has(sizeCode) || sizeBand === "small") return "out_small";
-  if (sizeCode === "05" || sizeBand === "medium" || sizeBand === "medium_plus") return "in_icp";
+  if (MICRO_SIZE_CODES.has(sizeCode) || sizeBand === "micro") return "out_small";
+  if (sizeCode === "03" || sizeCode === "05" || ["small", "medium", "medium_plus"].includes(sizeBand)) return "in_icp";
   return "pending_size";
 }
 
@@ -33,7 +35,7 @@ export function canHaveFicha(p) {
         ? { ok: true, note: "Porte desconhecido: qualificar o porte é objetivo da ligação (R14.8)." }
         : { ok: false, reason: "Porte desconhecido: resolva o porte ou registre a qualificação do porte como objetivo da ligação (R14.8)." };
     default:
-      return { ok: false, reason: "Fora do ICP — porte (R14.6)." };
+      return { ok: false, reason: "Fora do ICP — porte: microempresa ou MEI (R14.6)." };
   }
 }
 
@@ -107,7 +109,7 @@ export async function upsertProfile(request, env, actor, rid, companyId) {
     isGiant = i.isGiant ? 1 : 0;
   }
   const sizeCode = await sizeFor(env, actor.tenant_id, companyId, unitId);
-  const status = icpStatus({ profileClass, sizeCode, sizeBand: c.size_band ?? null, isGiant: !!isGiant });
+  const status = icpStatus({ profileClass, sizeCode, sizeBand: c.size_class ?? c.size_band ?? null, isGiant: !!isGiant });
   const id = prev?.id ?? crypto.randomUUID();
   await commit(env, [
     prev

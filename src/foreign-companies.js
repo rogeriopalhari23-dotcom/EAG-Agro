@@ -29,6 +29,12 @@ function researchLinks(name, country, commodity) {
 export async function createForeignCompany(request, env, actor, rid) {
   requireRole(actor, WRITE_ROLES);
   const i = await bodyJson(request);
+  return ensureForeignCompany(env, actor, rid, i);
+}
+
+// Cria (ou reaproveita pelo registro) a empresa no país da campanha e garante as condições R12.10 pendentes.
+// Usada pelo cadastro avulso e pela busca internacional (src/foreign-search.js).
+export async function ensureForeignCompany(env, actor, rid, i) {
   const campaign = await s(env, "SELECT * FROM campaigns WHERE tenant_id=? AND id=?", actor.tenant_id, str(i.campaignId, "campanha", 80)).first();
   if (!campaign) fail(404, "campaign_not_found", "Campanha não encontrada.");
   if (campaign.market !== "international") fail(422, "campaign_not_international", "Use uma campanha internacional.");
@@ -58,12 +64,16 @@ export async function createForeignCompany(request, env, actor, rid) {
   id ||= crypto.randomUUID();
   const at = now();
   const stmts = [];
+  const website = url(i.website);
+  const activityText = str(i.activityText, "atividade", 500, true);
+  const activitySource = str(i.activitySource, "fonte da atividade", 500, true);
+  if (activityText && !activitySource) fail(422, "activity_source_required", "Informe a fonte da atividade.");
   if (created)
     stmts.push(
       s(
         env,
-        "INSERT INTO companies(id,tenant_id,legal_name,trade_name,country_code,registration_id,registration_id_type,buyer_type,owner_user_id,source_label,source_url,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'unconfirmed',?,?,?,?,?,?)",
-        id, actor.tenant_id, name, str(i.tradeName, "nome fantasia", 250, true), country.iso2, registration, registrationType, actor.id, source, url(i.sourceUrl), actor.id, at, at,
+        "INSERT INTO companies(id,tenant_id,legal_name,trade_name,country_code,registration_id,registration_id_type,buyer_type,owner_user_id,source_label,source_url,website,activity_text,activity_source,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'unconfirmed',?,?,?,?,?,?,?,?,?)",
+        id, actor.tenant_id, name, str(i.tradeName, "nome fantasia", 250, true), country.iso2, registration, registrationType, actor.id, source, url(i.sourceUrl), website, activityText, activitySource, actor.id, at, at,
       ),
       auditStatement(env, actor, rid, "company.created", "company", id, { market: "international", country: country.iso3, campaignId: campaign.id }),
     );
@@ -75,7 +85,7 @@ export async function createForeignCompany(request, env, actor, rid) {
     if (/UNIQUE/.test(String(e?.message))) fail(409, "company_duplicate", "Já existe empresa com essa razão social neste país.");
     throw e;
   }
-  return { id, created, conditions: await conditionsOf(env, actor.tenant_id, id, p.id), researchLinks: researchLinks(name, country, p.commodity) };
+  return { id, created, productId: p.id, conditions: await conditionsOf(env, actor.tenant_id, id, p.id), researchLinks: researchLinks(name, country, p.commodity) };
 }
 
 export async function conditionsOf(env, tenant, companyId, productId) {
@@ -98,6 +108,8 @@ export async function setCondition(request, env, actor, rid, companyId, productI
     if (!e) fail(404, "evidence_not_found", "Evidência não encontrada.");
     if (e.company_id !== c.id) fail(422, "evidence_other_company", "A evidência é de outra empresa.");
     if (e.category === "market") fail(422, "market_evidence_not_company", "Dado de mercado ou do país não confirma condição de empresa (R1.4.3).");
+    // Indício comercial não confirma: só evidência empresarial (P1, R14.2); o indício deixa a empresa "a validar".
+    if (e.category !== "business") fail(422, "signal_not_proof", "Indício comercial não confirma condição; registre evidência empresarial (documento, registro aduaneiro).");
     if (e.validation_status !== "valid") fail(422, "evidence_not_valid", "Valide a evidência antes de usá-la.");
     let supports = [];
     try {
@@ -130,11 +142,12 @@ export async function setSize(request, env, actor, rid, companyId) {
   requireRole(actor, APPROVER_ROLES);
   const c = await company(env, actor, companyId);
   const i = await bodyJson(request);
-  const band = oneOf(i.sizeBand, ["small", "medium", "medium_plus", "giant"], "porte");
+  // Faixas (referência: Recomendação UE 2003/361 — micro < 10, pequena < 50, média < 250 pessoas); a faixa vem de fonte citada.
+  const band = oneOf(i.sizeBand, ["micro", "small", "medium", "medium_plus", "giant"], "porte");
   const source = str(i.source, "fonte do porte", 500);
   const at = now();
   const profiles = (await s(env, "SELECT * FROM buyer_profiles WHERE tenant_id=? AND company_id=?", actor.tenant_id, c.id).all()).results;
-  const stmts = [s(env, "UPDATE companies SET size_band=?,size_source=?,size_checked_at=?,updated_at=? WHERE tenant_id=? AND id=?", band, source, at, at, actor.tenant_id, c.id)];
+  const stmts = [s(env, "UPDATE companies SET size_class=?,size_source=?,size_checked_at=?,updated_at=? WHERE tenant_id=? AND id=?", band, source, at, at, actor.tenant_id, c.id)];
   for (const p of profiles) {
     const status = icpStatus({ profileClass: p.profile_class, sizeCode: null, sizeBand: band, isGiant: !!p.is_giant });
     if (status !== p.icp_status) stmts.push(s(env, "UPDATE buyer_profiles SET icp_status=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=?", status, actor.id, at, p.id));
@@ -151,4 +164,20 @@ export async function countryLine(env, actor, campaignId) {
   const sel = await s(env, "SELECT items_json,analysis_id FROM commodity_selections WHERE id=?", campaign.selection_id).first();
   const item = JSON.parse(sel.items_json).find((x) => x.campaignId === campaign.id);
   return { analysisId: sel.analysis_id, hs6: item?.hs6 ?? [], label: "dado do país, não da empresa" };
+}
+
+// Site e atividade da empresa (com fonte), usados no resultado da busca internacional.
+export async function setBasics(request, env, actor, rid, companyId) {
+  requireRole(actor, WRITE_ROLES);
+  const c = await company(env, actor, companyId);
+  const i = await bodyJson(request);
+  const website = i.website === undefined ? c.website : url(i.website);
+  const activityText = i.activityText === undefined ? c.activity_text : str(i.activityText, "atividade", 500, true);
+  const activitySource = i.activitySource === undefined ? c.activity_source : str(i.activitySource, "fonte da atividade", 500, true);
+  if (activityText && !activitySource) fail(422, "activity_source_required", "Informe a fonte da atividade.");
+  await commit(env, [
+    s(env, "UPDATE companies SET website=?,activity_text=?,activity_source=?,updated_at=? WHERE tenant_id=? AND id=?", website, activityText, activitySource, now(), actor.tenant_id, c.id),
+    auditStatement(env, actor, rid, "company.basics_set", "company", c.id, { website: !!website, activity: !!activityText }),
+  ]);
+  return { id: c.id, website, activityText, activitySource };
 }

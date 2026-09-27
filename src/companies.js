@@ -255,6 +255,13 @@ export async function addEvidence(request, env, actor, rid, id) {
     productId = p.id;
     market = oneOf(i.market, ["national", "international"], "mercado");
   }
+  // Condições R12.10 que a evidência sustenta (Internacional): importa do Brasil, compra a commodity, consome como insumo.
+  let supports = [];
+  if (i.supports !== undefined) {
+    if (!Array.isArray(i.supports) || i.supports.length > 3) fail(422, "invalid_supports", "Informe as condições sustentadas como lista.");
+    supports = [...new Set(i.supports.map((x) => oneOf(x, ["imports_from_brazil", "buys_commodity", "consumes_as_input"], "condição sustentada")))];
+    if (supports.length && category === "market") fail(422, "market_evidence_not_company", "Dado de mercado ou do país não sustenta condição de empresa (R12.10).");
+  }
   await commit(env, [
     companyLock(env, actor, c),
     s(
@@ -272,7 +279,7 @@ export async function addEvidence(request, env, actor, rid, id) {
       status,
       status === "valid" ? actor.id : null,
       status === "valid" ? at : null,
-      "{}",
+      JSON.stringify(supports.length ? { supports } : {}),
       actor.id,
       productId,
       market,

@@ -225,21 +225,40 @@ try {
   const d = driver(ctx.env, sources(), { at: "2026-10-10T12:00:00.000Z" });
   await d.start();
   await d.drain();
+  // Radar Internacional: lista básica de países importadores → resumo curto → commodity → busca de empresas.
   await nav("Internacional");
-  await page.getByRole("heading", { name: "Internacional", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Radar Internacional", exact: true }).waitFor();
+  // Resumo do MDIC publicado pelo Worker nesta rotina: o admin prepara na hora (o cron diário também faria).
+  await page.getByRole("button", { name: "Preparar agora" }).click();
+  await page.getByText(/resumo\(s\) preparados/).waitFor();
   await page.getByRole("searchbox", { name: "Buscar país" }).fill("Alemanha");
   await page.getByRole("button", { name: "Buscar", exact: true }).click();
-  await page.locator(".row").filter({ hasText: "Alemanha (DEU)" }).getByRole("button", { name: "Analisar" }).click();
-  await page.getByRole("heading", { name: "Alemanha · análise", exact: true }).waitFor();
+  const deuRow = page.locator(".row").filter({ hasText: "Alemanha (DEU)" });
+  await deuRow.getByText(/MDIC — exportações do Brasil \(FOB\) · 2025-04 a 2026-03 · Café não torrado/).waitFor();
+  await deuRow.getByRole("button", { name: "Escolher" }).click();
+  await page.getByRole("heading", { name: "Alemanha · resumo", exact: true }).waitFor();
+  await page.getByText("Há importações de commodities agrícolas do Brasil identificadas.", { exact: false }).waitFor();
   await page.getByText("O dado confirma exportação do Brasil para o país; não comprova compra por nenhuma empresa específica.").first().waitFor();
+  await page.getByText(/^Tabela completa/).click();
   await page.getByText(/parte do Brasil 30\.0%/).waitFor();
   await page.screenshot({ path: "review-output/analise-desktop.png", fullPage: true });
-  await page.getByRole("checkbox", { name: "Selecionar 090111" }).check();
-  await page.getByRole("button", { name: "Escolher commodities" }).click();
+  await page.getByRole("checkbox", { name: "Selecionar 090111" }).first().check();
+  await page.getByRole("button", { name: "Escolher commodity" }).click();
   await page.getByLabel(/Produto para 090111/).selectOption("product-05");
-  await page.getByRole("button", { name: "Registrar seleção e criar campanhas" }).click();
-  await page.getByRole("heading", { name: "Campanhas", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Registrar seleção" }).click();
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM campaigns WHERE market='international' AND selection_id IS NOT NULL AND country_code='DE'").get().n, 1);
+  await page.getByRole("button", { name: "Autorizar busca de empresas" }).click();
+  await page.getByRole("heading", { name: /^Alemanha · / }).waitFor();
+  await page.getByText(/porte-alvo: Pequena e Média/).waitFor();
+  await page.getByRole("heading", { name: "Traders e distribuidores (prioridade secundária) (0)" }).waitFor();
+  await page.getByText("Registrar empresa encontrada").click();
+  await page.getByLabel("Razão social").fill("Kleine Rösterei GmbH");
+  await page.getByLabel("Onde foi encontrada (fonte)").fill("Europages — torrefações");
+  await page.getByRole("button", { name: "Registrar empresa" }).click();
+  await page.getByRole("heading", { name: "Perfil a confirmar (1)" }).waitFor();
+  await page.getByText("potencial compradora a validar").first().waitFor();
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM foreign_search_candidates").get().n, 1);
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM company_conditions WHERE status='confirmed'").get().n, 0, "nenhuma condição preenchida pelo dado do país");
   await page.screenshot({ path: "review-output/internacional-desktop.png", fullPage: true });
   await nav("Lista mensal");
   await page.getByRole("heading", { name: "Lista mensal", exact: true }).waitFor();
@@ -252,8 +271,8 @@ try {
     ),
   );
   await nav("Internacional");
-  await page.getByRole("heading", { name: "Internacional", exact: true }).waitFor();
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Internacional sem rolagem horizontal em 390 px");
+  await page.getByRole("heading", { name: "Radar Internacional", exact: true }).waitFor();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Radar Internacional sem rolagem horizontal em 390 px");
   await page
     .getByRole("navigation")
     .getByRole("button", { name: "Hoje", exact: true })
@@ -270,7 +289,7 @@ try {
   });
   assert.deepEqual(errors, []);
   console.log(
-    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar, Fichas, Envios, Tarefas, Internacional (análise e seleção), Lista mensal, 13 telas e viewport 390 px, sem erros JS.",
+    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar, Fichas, Envios, Tarefas, Radar Internacional (lista de países, resumo, seleção e busca de empresas), Lista mensal, 13 telas e viewport 390 px, sem erros JS.",
   );
 } finally {
   await browser.close();

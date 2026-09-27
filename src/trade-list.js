@@ -10,6 +10,8 @@ import { AdapterError } from "./adapters/errors.js";
 import * as mdic from "./adapters/mdic-bulk.js";
 import * as comtrade from "./adapters/comtrade.js";
 import { createAccumulator } from "./mdic-aggregate.js";
+import { summarizeComtrade, summaryRow } from "./trade-summary.js";
+import { summaryStmt, rebuildSummaries } from "./importers.js";
 import { bodyJson, fail, requireRole, str } from "./http.js";
 import { statement as s, commit, parameters, requireParameter, auditStatement, now as clock } from "./store.js";
 
@@ -145,6 +147,8 @@ export async function daily(env, tenant, deps = {}) {
   const refreshDay = p["country_list_refresh_day:international"];
   if (current?.status === "running" || (!current && refreshDay != null && day >= refreshDay)) return startMonthlyRun(env, tenant, deps);
   await sweep(env, deps);
+  // Resumos da lista de países que faltarem (só R2; limitado por execução).
+  await rebuildSummaries(env, tenant, { limit: 60 }).catch((e) => console.error("trade_summary_rebuild_failed", { code: e?.code ?? null }));
   return { versionId: current?.id ?? null, status: current?.status ?? "not_started" };
 }
 
@@ -364,6 +368,7 @@ async function comtradeDa({ env, at, payload, version: v, params, done, mine, fe
     const out = await putJson(env, `trade-src/${v.id}/comtrade/${payload.iso3}.json`, obj);
     stmts.push(statusStmt(env, v.id, payload.iso3, "comtrade", "not_declared", { at, guard: mine }));
     stmts.push(pointerStmt(env, v.id, payload.iso3, "comtrade", out.key, out.sha, at, mine));
+    stmts.push(summaryStmt(env, summaryRow({ iso3: payload.iso3, versionId: v.id, sha: out.sha, periodMonths: 0, summary: summarizeComtrade(obj) })));
     return stmts;
   }
   const recent = years.slice(-params.comtradeYears);
@@ -397,7 +402,13 @@ async function consolidateComtrade({ env, at, payload, version: v, done, mine })
   const names = Object.fromEntries([...new Set(lines.map((l) => l.hs6))].filter((h) => ref.names?.[h]).map((h) => [h, ref.names[h]]));
   const obj = { iso3: payload.iso3, versionId: v.id, source: "comtrade", state, lastPeriod, years, basis: "CIF", view: "importações declaradas pelo país", classification: JSON.parse(v.classification_json).version, names, lines };
   const out = await putJson(env, `trade-src/${v.id}/comtrade/${payload.iso3}.json`, obj);
-  return [done(out.key, out.sha), statusStmt(env, v.id, payload.iso3, "comtrade", state, { lastPeriod, lines: lines.length, at, guard: mine }), pointerStmt(env, v.id, payload.iso3, "comtrade", out.key, out.sha, at, mine)];
+  return [
+    done(out.key, out.sha),
+    statusStmt(env, v.id, payload.iso3, "comtrade", state, { lastPeriod, lines: lines.length, at, guard: mine }),
+    pointerStmt(env, v.id, payload.iso3, "comtrade", out.key, out.sha, at, mine),
+    // Resumo para a lista de países importadores (chave = hash do objeto; inofensivo se o ponteiro não avançar).
+    summaryStmt(env, summaryRow({ iso3: payload.iso3, versionId: v.id, sha: out.sha, periodMonths: 0, summary: summarizeComtrade(obj) })),
+  ];
 }
 
 // ---------- transições derivadas do estado ----------
