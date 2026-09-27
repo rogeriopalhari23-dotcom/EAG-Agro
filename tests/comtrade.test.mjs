@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { availableYears, fetchImports, loadHsBlocks, redact } from "../src/adapters/comtrade.js";
+import { availableYears, fetchImports, loadHsBlocks, redact, MAX_URL } from "../src/adapters/comtrade.js";
 
 const BASE = "https://comtrade.exemplo";
 const KEY = "segredo-da-chave-123";
@@ -87,4 +87,25 @@ test("P3-T4: chave com espaço ou quebra de linha nas bordas é usada sem as bor
   const f = async (url, init) => ((seen = init.headers["Ocp-Apim-Subscription-Key"]), new Response(JSON.stringify({ count: 0, data: [], error: "" }), { status: 200 }));
   await fetchImports(BASE, "  abc123\r\n", { comtradeCode: 276, years: [2025], hs6Block: ["090111"] }, f);
   assert.equal(seen, "abc123");
+});
+
+test("P3-T12: blocos cabem no limite de 2000 caracteres do gateway (414 real com 298 códigos); URL maior é recusada antes da chamada", async () => {
+  // Volume real: 894 subposições dos capítulos 01–24 sem 03.
+  const results = [];
+  for (let c = 1; c <= 24; c++) if (c !== 3) for (let i = 0; i < 39 && results.length < 894; i++) results.push({ id: `${String(c).padStart(2, "0")}${String(i).padStart(4, "0")}`, aggrLevel: 6, text: "x" });
+  const chapters = [...Array(24).keys()].map((i) => String(i + 1).padStart(2, "0")).filter((c) => c !== "03");
+  const r = await loadHsBlocks("https://comtradeapi.un.org", chapters, async () => new Response(JSON.stringify({ results }), { status: 200 }));
+  assert.equal(r.codes.length, 894);
+  assert.equal(r.blocks.length, 5, "5 blocos de ~179 em vez de 3 de 298");
+  assert.deepEqual(r.blocks.flat(), r.codes, "todos os códigos, em ordem, sem repetir");
+  let longest = 0;
+  const f = async (url) => ((longest = Math.max(longest, url.length)), new Response(JSON.stringify({ count: 0, data: [], error: "" }), { status: 200 }));
+  for (const b of r.blocks) await fetchImports("https://comtradeapi.un.org", "k", { comtradeCode: 276, years: [2023, 2024, 2025], hs6Block: b }, f);
+  assert.ok(longest > 1500 && longest <= MAX_URL, `maior URL ${longest}`);
+  let called = false;
+  await assert.rejects(
+    fetchImports("https://comtradeapi.un.org", "k", { comtradeCode: 276, years: [2023, 2024, 2025], hs6Block: r.codes.slice(0, 298) }, async () => ((called = true), new Response("{}"))),
+    (e) => e.details.code === "url_too_long" && /2865 caracteres/.test(e.message),
+  );
+  assert.equal(called, false, "não gasta chamada da cota");
 });

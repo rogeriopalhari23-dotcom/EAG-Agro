@@ -37,14 +37,22 @@ async function getJson(url, headers, fetchImpl) {
   }
 }
 
-// Subposições SH6 agrícolas da tabela de referência, divididas em blocos de tamanho parecido, em ordem.
+// Limite do gateway medido com a chave real em 2026-09-27: 414 "Request URL exceeds maximum allowed length of 2000
+// characters" (298 códigos = 2.865 caracteres); 150 códigos = 1.533 caracteres → 200.
+export const MAX_URL = 2000;
+// Orçamento do valor de cmdCode já codificado (cada código custa 9: 6 dígitos + "%2C"), com folga para o resto da URL.
+export const CMD_BUDGET = 1650;
+
+// Subposições SH6 agrícolas da tabela de referência, em blocos de tamanho parecido e em ordem; o número de blocos
+// é o maior entre blockCount e o necessário para cada consulta caber no limite de URL do gateway.
 export async function loadHsBlocks(base, agriChapters, fetchImpl = fetch, blockCount = 3) {
   const d = await getJson(`${base}/files/v1/app/reference/HS.json`, {}, fetchImpl);
   if (!Array.isArray(d?.results)) throw new AdapterError("schema", `${SOURCE}: HS.json sem results.`);
   const chapters = new Set(agriChapters);
   const codes = [...new Set(d.results.filter((x) => Number(x.aggrLevel) === 6 && /^\d{6}$/.test(String(x.id)) && chapters.has(String(x.id).slice(0, 2))).map((x) => String(x.id)))].sort();
   if (!codes.length) throw new AdapterError("schema", `${SOURCE}: nenhuma subposição agrícola em HS.json.`);
-  const size = Math.ceil(codes.length / blockCount);
+  const perBlock = Math.floor((CMD_BUDGET + 3) / 9);
+  const size = Math.ceil(codes.length / Math.max(blockCount, Math.ceil(codes.length / perBlock)));
   const blocks = [];
   for (let i = 0; i < codes.length; i += size) blocks.push(codes.slice(i, i + size));
   const names = Object.fromEntries(d.results.filter((x) => codes.includes(String(x.id))).map((x) => [String(x.id), String(x.text || "").replace(/^\d{6}\s*-\s*/, "")]));
@@ -77,7 +85,9 @@ export async function fetchImports(base, rawKey, { comtradeCode, years, hs6Block
     reporterCode: String(comtradeCode), period: years.join(","), partnerCode: `${WORLD},${BRAZIL}`, flowCode: "M",
     cmdCode: hs6Block.join(","), partner2Code: "0", customsCode: "C00", motCode: "0", includeDesc: "false",
   });
-  const d = await getJson(`${base}/data/v1/get/C/A/HS?${q}`, { "Ocp-Apim-Subscription-Key": key }, fetchImpl);
+  const url = `${base}/data/v1/get/C/A/HS?${q}`;
+  if (url.length > MAX_URL) throw new AdapterError("invalid_request", `${SOURCE}: consulta com ${url.length} caracteres excede o limite de ${MAX_URL} do gateway.`, { code: "url_too_long" });
+  const d = await getJson(url, { "Ocp-Apim-Subscription-Key": key }, fetchImpl);
   if (d?.error) throw new AdapterError("invalid_request", `${SOURCE}: a API recusou a consulta.`);
   if (!Array.isArray(d?.data) || typeof d.count !== "number") throw new AdapterError("schema", `${SOURCE}: resposta sem data/count.`);
   // count no limite = suspeita de corte; count diferente das linhas = resposta incompleta (errata item 7).

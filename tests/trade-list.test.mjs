@@ -218,3 +218,17 @@ test("P3-T5: sem R2 a rotina não começa; sem parâmetros aprovados também nã
   await tradeParams(ctx.api);
   await assert.rejects(d.start(), (e) => e.details?.code === "r2_missing");
 });
+
+test("P3-T12: versão criada antes de MDIC_SOURCE=github não tenta mais o MDIC pelo Worker e fecha sem mexer no ponteiro do MDIC", async (t) => {
+  const { DB, env, d, src } = await world(t);
+  await d.start(); // versão com jobs e estados do MDIC (configuração antiga)
+  env.MDIC_SOURCE = "github";
+  await d.drain();
+  const v = q(DB, "SELECT * FROM trade_list_versions WHERE id='2026-10'");
+  assert.equal(v.status, "partial");
+  assert.equal(src.calls.log.filter((p) => /EXP_/.test(p)).length, 0, "nenhum acesso ao arquivo do MDIC");
+  assert.equal(q(DB, "SELECT error_kind e FROM trade_list_jobs WHERE version_id='2026-10' AND kind='mdic_ref'").e, "superseded");
+  assert.equal(q(DB, "SELECT COUNT(*) n FROM trade_list_current WHERE source='mdic'").n, 0, "ponteiro do MDIC intocado");
+  assert.equal(q(DB, "SELECT COUNT(*) n FROM trade_list_current WHERE source='comtrade'").n, 4, "Comtrade publicada normalmente (3 com dados + China sem declaração)");
+  assert.equal(q(DB, "SELECT state FROM trade_list_status WHERE version_id='2026-10' AND iso3='DEU' AND source='mdic'").state, "data_unavailable");
+});

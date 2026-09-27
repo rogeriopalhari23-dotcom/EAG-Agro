@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-27T21:48:35.578Z",
+  "updatedAt": "2026-09-27T22:52:02.188Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -774,7 +774,7 @@
       "acceptance": "Chave/termos Comtrade, fontes pelo Worker, primeira rotina medida e amostra interna; liberação documentada.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Comtrade: chave gravada recusada com 401 em chamada real — Rogério regrava COMTRADE_KEY e a versão 2026-09-manual-DEU-608914c6 é retomada (MDIC mensal pelo GitHub validado em produção: run 36351899211, versão 2026-09-mdic)"
+      "blockedBy": "Chave e termos da Comtrade validados por chamada real (2026-09-27) e fontes pelo Worker/GitHub validadas para a Alemanha; falta a primeira rotina mensal completa da Comtrade medida (5 chamadas por país declarante, teto de 400/dia) com amostra interna e a liberação documentada por Rogério"
     }
   ]
 }

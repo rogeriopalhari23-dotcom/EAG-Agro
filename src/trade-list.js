@@ -22,6 +22,7 @@ const MAX_MDIC_GENERATIONS = 3;
 const LEASE_MS = 10 * 60 * 1000;
 const REENQUEUE_MS = 15 * 60 * 1000;
 const COMTRADE_KINDS = new Set(["comtrade_ref", "comtrade_da", "comtrade_call"]);
+const MDIC_KINDS = new Set(["mdic_ref", "mdic_chunk", "mdic_merge"]);
 const SYSTEM = (tenant) => ({ tenant_id: tenant, id: "system-trade-list", role: "system" });
 
 const addMs = (iso, ms) => new Date(Date.parse(iso) + ms).toISOString();
@@ -231,6 +232,13 @@ export async function runJob(env, jobId, deps = {}) {
     // Orçamento esgotado: volta para amanhã sem ocupar a fila (errata item 6).
     await s(env, "UPDATE trade_list_jobs SET status='pending',lease_token=NULL,lease_until=NULL,enqueued_at=NULL,attempts=attempts-1,next_attempt_at=? WHERE id=? AND lease_token=?", nextUtcDay(at), jobId, token).run();
     return { deferred: "budget" };
+  }
+  // Versão criada antes de MDIC_SOURCE=github ainda tem jobs do MDIC: não tenta mais pelo Worker (526); falha
+  // definitiva só na versão — o ponteiro do MDIC em uso (publicado pelo GitHub) não muda.
+  if (MDIC_KINDS.has(j.kind) && mdicExternal(env)) {
+    await s(env, "UPDATE trade_list_jobs SET status='failed',lease_token=NULL,lease_until=NULL,error_kind='superseded',error=? WHERE id=? AND lease_token=?", "MDIC lido pelo workflow do GitHub (MDIC_SOURCE=github).", jobId, token).run();
+    await advance(env, j.version_id, deps);
+    return { superseded: "mdic_external" };
   }
   const ctx = { env, deps, at, job: j, payload: JSON.parse(j.payload_json), version: v, params, done, mine, fetch: deps.fetch ?? fetch };
   try {

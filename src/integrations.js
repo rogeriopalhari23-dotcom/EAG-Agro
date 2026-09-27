@@ -4,6 +4,7 @@ import { bodyJson, fail, requireRole } from "./http.js";
 import { statement as s, commit, auditStatement, parameters } from "./store.js";
 import { imapClient } from "./adapters/imap.js";
 import { AdapterError } from "./adapters/errors.js";
+import * as comtrade from "./adapters/comtrade.js";
 
 const ADMIN = new Set(["admin"]);
 const has = (v) => typeof v === "string" && v.length > 0;
@@ -37,7 +38,7 @@ export async function status(env, actor) {
       casadosdados: has(env.CASADOSDADOS_API_KEY),
       locationiq: has(env.LOCATIONIQ_KEY),
       comtrade: has(env.COMTRADE_KEY),
-      // Diagnóstico sem expor valor: tamanho, bordas e formato (chaves da Comtrade são hexadecimais).
+      // Diagnóstico sem expor valor: tamanho, bordas e formato (sem regra oficial de formato; validação só por chamada real).
       comtradeKeyShape: has(env.COMTRADE_KEY) ? { length: env.COMTRADE_KEY.length, edgesWhitespace: env.COMTRADE_KEY !== env.COMTRADE_KEY.trim(), hex: /^[0-9a-f]+$/i.test(env.COMTRADE_KEY.trim()) } : null,
     },
     infrastructure: { queue: !!env.ASYNC_QUEUE, r2: !!env.FILES },
@@ -105,8 +106,9 @@ const COMTRADE_PROBE = { reporterCode: "276", period: "2024", partnerCode: "76",
 
 export async function checkComtrade(request, env, actor, rid, deps = {}) {
   requireRole(actor, ADMIN);
-  await bodyJson(request);
+  const input = (await bodyJson(request)) || {};
   const f = deps.fetch || fetch;
+  if (input.cmdCount !== undefined) return probeComtradeSize(env, actor, rid, f, input.cmdCount);
   const base = env.COMTRADE_BASE || "https://comtradeapi.un.org";
   const raw = env.COMTRADE_KEY || "";
   const key = raw.trim();
@@ -162,4 +164,38 @@ export async function checkComtrade(request, env, actor, rid, deps = {}) {
   }
   await commit(env, [auditStatement(env, actor, rid, "integration.comtrade_checked", "integration", "comtrade", { statuses: calls.map((c) => c.status) })]);
   return { configured: true, base, shape, query, calls };
+}
+
+// Mede o limite de tamanho da consulta: a mesma forma de fetchImports (Alemanha, mundo + Brasil, 3 últimos anos
+// declarados) com os n primeiros códigos SH6 aprovados. Uma chamada com chave; devolve só código e tamanho da URL.
+async function probeComtradeSize(env, actor, rid, f, cmdCount) {
+  const n = Number(cmdCount);
+  if (!Number.isInteger(n) || n < 1 || n > 1000) fail(422, "invalid_cmd_count", "cmdCount deve ser inteiro entre 1 e 1000.");
+  const key = (env.COMTRADE_KEY || "").trim();
+  if (!key) fail(422, "comtrade_not_configured", "COMTRADE_KEY não configurada.");
+  const base = env.COMTRADE_BASE || "https://comtradeapi.un.org";
+  const p = await parameters(env, actor.tenant_id);
+  const cls = p["agri_classification:international"];
+  if (!cls?.chapters) fail(409, "classification_missing", "Classificação agrícola (D2) não aprovada.");
+  const { codes } = await comtrade.loadHsBlocks(base, cls.chapters, f, 1);
+  const years = (await comtrade.availableYears(base, 276, f)).slice(-3);
+  const q = new URLSearchParams({ reporterCode: "276", period: years.join(","), partnerCode: "0,76", flowCode: "M", cmdCode: codes.slice(0, n).join(","), partner2Code: "0", customsCode: "C00", motCode: "0", includeDesc: "false" });
+  const url = `${base}/data/v1/get/C/A/HS?${q}`;
+  let status = null, count = null, message = null;
+  try {
+    const r = await f(url, { headers: { "Ocp-Apim-Subscription-Key": key }, signal: AbortSignal.timeout(60000) });
+    status = r.status;
+    const text = await r.text();
+    try {
+      const b = JSON.parse(text);
+      count = Array.isArray(b?.data) ? b.data.length : null;
+      message = count === null ? String(b?.message ?? b?.error ?? "").split(key).join("***").slice(0, 200) : null;
+    } catch {
+      message = text.split(key).join("***").slice(0, 200);
+    }
+  } catch (e) {
+    message = String(e?.message || e).slice(0, 200);
+  }
+  await commit(env, [auditStatement(env, actor, rid, "integration.comtrade_size_probed", "integration", "comtrade", { cmdCount: n, urlLength: url.length, status })]);
+  return { cmdCount: Math.min(n, codes.length), totalCodes: codes.length, years, urlLength: url.length, status, count, message };
 }
