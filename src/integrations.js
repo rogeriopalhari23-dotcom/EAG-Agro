@@ -97,3 +97,69 @@ export async function reachMailbox(request, env, actor, rid, deps = {}) {
   await commit(env, [auditStatement(env, actor, rid, "integration.mailbox_reached", "integration", "mailbox", { imap: imap.ok, smtp: smtp.ok })]);
   return { imap, smtp };
 }
+
+// Chamada real mínima à Comtrade com a configuração de produção (T12). Nunca devolve nem registra a chave:
+// só códigos HTTP, mensagem do gateway (com a chave mascarada), metadados da consulta e o formato do valor.
+// Em 401 compara formas de envio e endpoints para separar autenticação de endpoint/parâmetros/produto.
+const COMTRADE_PROBE = { reporterCode: "276", period: "2024", partnerCode: "76", flowCode: "M", cmdCode: "090111", partner2Code: "0", customsCode: "C00", motCode: "0", includeDesc: "true" };
+
+export async function checkComtrade(request, env, actor, rid, deps = {}) {
+  requireRole(actor, ADMIN);
+  await bodyJson(request);
+  const f = deps.fetch || fetch;
+  const base = env.COMTRADE_BASE || "https://comtradeapi.un.org";
+  const raw = env.COMTRADE_KEY || "";
+  const key = raw.trim();
+  // Mascara o valor inteiro e qualquer trecho testado (o gateway pode ecoar o que recebeu).
+  const secrets = [key, ...key.split(/[\s,;:"'=]+/).filter((p) => p.length >= 16)].filter(Boolean).sort((a, b) => b.length - a.length);
+  const mask = (t) => secrets.reduce((acc, x) => acc.split(x).join("***"), String(t));
+  const qs = new URLSearchParams(COMTRADE_PROBE).toString();
+  async function call(label, path, { header, query } = {}) {
+    const url = `${base}${path}?${qs}${query ? `&subscription-key=${encodeURIComponent(query)}` : ""}`;
+    try {
+      const r = await f(url, { headers: header ? { "Ocp-Apim-Subscription-Key": header } : {}, signal: AbortSignal.timeout(30000) });
+      const text = await r.text();
+      let body = null;
+      try {
+        body = JSON.parse(text);
+      } catch {}
+      const out = { label, endpoint: path, status: r.status };
+      if (r.ok && body && Array.isArray(body.data)) {
+        out.count = body.data.length;
+        out.records = body.data.slice(0, 3).map((x) => ({
+          refYear: x.refYear, period: x.period, reporter: `${x.reporterCode} ${x.reporterDesc ?? ""}`.trim(), partner: `${x.partnerCode} ${x.partnerDesc ?? ""}`.trim(),
+          flow: `${x.flowCode} ${x.flowDesc ?? ""}`.trim(), cmd: `${x.cmdCode} ${x.cmdDesc ?? ""}`.trim().slice(0, 80), cifvalue: x.cifvalue ?? null, primaryValue: x.primaryValue ?? null, netWgt: x.netWgt ?? null,
+        }));
+        if (body.error) out.apiError = mask(body.error).slice(0, 200);
+      } else out.message = mask(body?.message ?? body?.error ?? text).slice(0, 300);
+      return out;
+    } catch (e) {
+      return { label, endpoint: path, status: null, message: mask(e?.message || e).slice(0, 200) };
+    }
+  }
+  const nonAlnum = [...new Set(raw.replace(/[A-Za-z0-9]/g, ""))];
+  const shape = {
+    length: raw.length, trimmedLength: key.length, edgesWhitespace: raw !== key, internalWhitespace: /\s/.test(key),
+    lowerHex: (key.match(/[0-9a-f]/g) || []).length, upper: (key.match(/[A-Z]/g) || []).length, otherLower: (key.match(/[g-z]/g) || []).length,
+    symbols: nonAlnum.map((c) => (/\s/.test(c) ? `espaço(${c.charCodeAt(0)})` : c)),
+  };
+  const query = { endpoint: "/data/v1/get/C/A/HS", ...COMTRADE_PROBE, meaning: "Alemanha (276) importando do Brasil (76), café não torrado (090111), 2024, anual, HS" };
+  const calls = [];
+  if (!key) return { configured: false, shape, query, calls };
+  calls.push(await call("chave no cabeçalho (forma usada pelo Compass)", "/data/v1/get/C/A/HS", { header: key }));
+  if (calls[0].status === 401 || calls[0].status === 403) {
+    calls.push(await call("chave na query subscription-key", "/data/v1/get/C/A/HS", { query: key }));
+    calls.push(await call("sem chave (mensagem de referência do gateway)", "/data/v1/get/C/A/HS"));
+    calls.push(await call("endpoint público sem chave (confere parâmetros)", "/public/v1/preview/C/A/HS"));
+    // Valor com separadores (ex.: rótulo colado junto): testa só o maior trecho alfanumérico, sem devolvê-lo.
+    const parts = key.split(/[\s,;:"'=]+/).filter((p) => p.length >= 16);
+    if (parts.length > 1 || (parts.length === 1 && parts[0] !== key)) {
+      const longest = parts.sort((a, b) => b.length - a.length)[0];
+      const r = await call("maior trecho alfanumérico do valor, no cabeçalho", "/data/v1/get/C/A/HS", { header: longest });
+      r.segmentLength = longest.length;
+      calls.push(r);
+    }
+  }
+  await commit(env, [auditStatement(env, actor, rid, "integration.comtrade_checked", "integration", "comtrade", { statuses: calls.map((c) => c.status) })]);
+  return { configured: true, base, shape, query, calls };
+}

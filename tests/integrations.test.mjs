@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
-import { checkMailbox } from "../src/integrations.js";
+import { checkMailbox, checkComtrade } from "../src/integrations.js";
 import { AdapterError } from "../src/adapters/errors.js";
 
 const admin = { tenant_id: "eag-internal", id: "system-admin", role: "admin" };
@@ -61,4 +61,37 @@ test("Integrações: alcance da caixa lê só a saudação, sem login, e audita"
   assert.deepEqual([r.imap.ok, r.smtp.ok], [true, true]);
   assert.ok(written.every((w) => !/LOGIN|AUTH|MAIL FROM|RCPT/.test(w)), "nenhum login nem envio: " + written.join("|"));
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='integration.mailbox_reached'").get().n, 1);
+});
+
+test("Integrações: chamada real da Comtrade devolve código e metadados, nunca a chave; 401 compara formas e endpoints", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  const KEY = "rotulo: abcdef0123456789abcdef0123456789 segredo";
+  ctx.env.COMTRADE_KEY = KEY;
+  const seen = [];
+  const fetch401 = async (url, init) => {
+    seen.push({ path: new URL(url).pathname, header: !!init.headers["Ocp-Apim-Subscription-Key"], query: new URL(url).searchParams.has("subscription-key") });
+    if (new URL(url).pathname.startsWith("/public/")) return Response.json({ count: 1, data: [{ refYear: 2024, reporterCode: 276, partnerCode: 76, flowCode: "M", cmdCode: "090111" }] });
+    const sent = init.headers["Ocp-Apim-Subscription-Key"] || new URL(url).searchParams.get("subscription-key");
+    return Response.json({ statusCode: 401, message: sent ? `Access denied due to invalid subscription key ${sent}` : "Access denied due to missing subscription key." }, { status: 401 });
+  };
+  const r = await checkComtrade(req(), ctx.env, admin, "rid", { fetch: fetch401 });
+  const text = JSON.stringify(r);
+  assert.ok(!text.includes(KEY.trim()) && !text.includes("abcdef0123456789abcdef0123456789"), "chave e trechos nunca aparecem: " + (text.match(/.{0,60}abcdef.{0,20}/g) || []).join(" | "));
+  assert.deepEqual(r.calls.map((c) => c.status), [401, 401, 401, 200, 401]);
+  assert.match(r.calls[2].message, /missing subscription key/);
+  assert.equal(r.calls[3].count, 1, "endpoint público confirma parâmetros");
+  assert.equal(r.calls[4].segmentLength, 32);
+  assert.deepEqual(seen.slice(0, 2).map((x) => [x.header, x.query]), [[true, false], [false, true]]);
+  assert.equal(r.shape.internalWhitespace, true);
+  assert.equal(r.query.reporterCode, "276");
+  assert.equal(ctx.DB.raw.prepare("SELECT count(*) n FROM audit_log WHERE action='integration.comtrade_checked'").get().n, 1);
+
+  // Sucesso: uma chamada só, com registros resumidos.
+  const ok = await checkComtrade(req(), ctx.env, admin, "rid", { fetch: async () => Response.json({ count: 1, data: [{ refYear: 2024, period: "2024", reporterCode: 276, reporterDesc: "Germany", partnerCode: 76, partnerDesc: "Brazil", flowCode: "M", flowDesc: "Import", cmdCode: "090111", cmdDesc: "Coffee", cifvalue: 10, primaryValue: 10, netWgt: 5 }], error: "" }) });
+  assert.equal(ok.calls.length, 1);
+  assert.equal(ok.calls[0].status, 200);
+  assert.equal(ok.calls[0].records[0].partner, "76 Brazil");
+  // Sem perfil admin → recusado.
+  await assert.rejects(checkComtrade(req(), ctx.env, { ...admin, role: "commercial_manager" }, "rid", { fetch: fetch401 }));
 });
