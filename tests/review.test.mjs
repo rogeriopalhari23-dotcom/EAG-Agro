@@ -25,6 +25,20 @@ const ctx = (over = {}) => ({
 });
 const gen = (over = {}) => generateSequence({ commodity: "açúcar", recipients, declarations: {}, sig, unsub, ...over });
 
+test("P2-T8: token aleatório do descadastro com sigla de commodity ou palavra vetada não reprova a ficha", () => {
+  // Token real é base64url aleatório; "…7-CGM-…", "…_UCO9…" e "…preco…" aparecem por acaso (~1 em 4.000 sequências).
+  const tricky = (id) => `https://compass.example/u/Ab7-CGM-x9_UCO9preco.${id}lote-Kq`;
+  const others = ["milho", "soja", "CGM", "UCO"];
+  const r = reviewSequence(gen({ unsub: tricky }), ctx({ unsubUrl: tricky, otherCommodities: others }));
+  assert.equal(r.ok, true, JSON.stringify(r.findings.filter((x) => !x.ok)));
+  // A mesma sigla fora do link continua reprovando (PV2) e o link continua exigido (R19.13).
+  const msgs = gen({ unsub: tricky });
+  msgs[0] = { ...msgs[0], body: msgs[0].body.replace("Olá", "Olá — temos CGM —") };
+  assert.ok(reviewSequence(msgs, ctx({ unsubUrl: tricky, otherCommodities: others })).findings.some((x) => x.id === "PV2" && !x.ok && /CGM/.test(x.detail)));
+  const semLink = gen({ unsub: tricky }).map((m) => ({ ...m, body: m.body.split(tricky(m.contactId)).join("") }));
+  assert.ok(reviewSequence(semLink, ctx({ unsubUrl: tricky, otherCommodities: others })).findings.some((x) => x.id === "R19.13" && !x.ok));
+});
+
 test("P2-T8: sequência padrão gerada da skill passa no revisor", () => {
   const msgs = gen();
   const r = reviewSequence(msgs, ctx());

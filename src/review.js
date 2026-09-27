@@ -30,8 +30,13 @@ function finding(list, id, ok, detail, extra = {}) {
 
 // ctx: { market, commodity, otherCommodities: [nomes], declarations: {volumeAvailable, socialProof},
 //        recipients: [{contactId, role, jobTitle, relationshipNote, sourceLabel}], postalAddress, unsubUrl: (contactId)=>URL }
-export function reviewSequence(messages, ctx) {
+export function reviewSequence(raw, ctx) {
   const f = [];
+  // As regras de conteúdo leem o texto sem o link de descadastro da própria ficha: o token é aleatório (base64url) e pode
+  // conter, entre dígitos ou "-", siglas como "CGM"/"UCO" ou palavras vetadas, o que reprovaria uma ficha correta.
+  // Só PV2 (links: cada destinatário só pode ter o próprio) e R19.13 (presença do link e do endereço) olham o texto original.
+  const ownLinks = [...new Set(raw.map((m) => ctx.unsubUrl(m.contactId)))];
+  const messages = raw.map((m) => ({ ...m, body: ownLinks.reduce((b, u) => b.split(u).join(" "), m.body) }));
   const L = LANG[ctx.language || "pt-BR"] || LANG["pt-BR"];
   const emails = messages.filter((m) => m.kind === "auto_email");
   const byContact = new Map();
@@ -46,8 +51,8 @@ export function reviewSequence(messages, ctx) {
     finding(f, "PV1", ok, ok ? "E-mail 1 com saudação, objetivo de conversa e pedido de 20 minutos." : "E-mail 1 sem a estrutura da skill.", { contactId: r.contactId });
   }
   // PV2: uma commodity, sem anexo, sem link além do descadastro.
-  for (const m of messages) {
-    const links = (m.body.match(URL_RE) || []).filter((u) => u !== ctx.unsubUrl(m.contactId));
+  for (const [i, m] of messages.entries()) {
+    const links = (raw[i].body.match(URL_RE) || []).filter((u) => u !== ctx.unsubUrl(m.contactId));
     const other = (ctx.otherCommodities || []).filter((c) =>
       new RegExp(`(?<!\\p{L})${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\p{L})`, "iu").test(m.body),
     );
@@ -142,7 +147,7 @@ export function reviewSequence(messages, ctx) {
     );
   }
   // R19.13 / R21.7: endereço físico e saída em todo e-mail.
-  for (const m of emails) {
+  for (const m of raw.filter((x) => x.kind === "auto_email")) {
     const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
     if (!ok) finding(f, "R19.13", false, `E-mail passo ${m.step} sem endereço físico ou forma de saída.`, { step: m.step, contactId: m.contactId });
   }
