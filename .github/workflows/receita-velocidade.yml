@@ -1,0 +1,17 @@
+name: Receita CNPJ — teste de velocidade
+# Diagnóstico (2026-09-28): mede a velocidade de download dos dados abertos do CNPJ (share público SERPRO/Nextcloud)
+# a partir do GitHub, para decidir se um job mensal regional é viável. Só baixa 300 MB de um arquivo e descarta.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Baixar 300 MB de Estabelecimentos0.zip
+        run: |
+          curl -s -m 600 -u "gn672Ad4CF8N6TK:" -r 0-314572799 -o /dev/null \
+            -w "300 MB em %{time_total}s — %{speed_download} B/s — HTTP %{http_code}\n" \
+            "https://arquivos.receitafederal.gov.br/public.php/webdav/Dados/Cadastros/CNPJ/2026-09/Estabelecimentos0.zip"
