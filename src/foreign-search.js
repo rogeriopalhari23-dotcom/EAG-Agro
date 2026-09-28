@@ -12,6 +12,7 @@ import { statement as s, commit, product, auditStatement, now } from "./store.js
 import { decryptPii } from "./crypto.js";
 import { ensureForeignCompany } from "./foreign-companies.js";
 import { canHaveFicha, contactTargetFlag } from "./profiles.js";
+import { validationLinks } from "./discovery.js";
 
 const SIZE_LABEL = { micro: "Micro/MEI", small: "Pequena", medium: "Média", medium_plus: "Média-mais", giant: "Gigante do setor" };
 // Pequenas e médias primeiro (pedido de Rogério em 2026-09-27); média-mais depois; porte desconhecido, micro e gigante no fim.
@@ -23,10 +24,12 @@ const PROFILE_LABEL = {
   unconfirmed: "perfil não confirmado",
 };
 const ICP_LABEL = { in_icp: "no ICP", out_small: "fora do ICP — micro/MEI", out_giant: "fora do ICP — gigante", out_trader: "trader — só com exceção", pending_size: "porte a confirmar" };
+// Três níveis (mais o intermediário "compradora confirmada"): só evidência da própria empresa sobe de nível.
 const BUYER = {
   confirmed_importer: { rank: 0, label: "importadora confirmada (importa do Brasil)" },
-  confirmed_buyer: { rank: 1, label: "compradora confirmada da commodity (origem a confirmar)" },
-  potential: { rank: 2, label: "potencial compradora a validar" },
+  confirmed_buyer: { rank: 1, label: "compradora confirmada da commodity (origem Brasil a confirmar)" },
+  potential: { rank: 2, label: "potencial importadora (sinal próprio de importação ou compra, a validar)" },
+  found: { rank: 3, label: "empresa encontrada — importação não verificada" },
 };
 const SOURCE_KINDS = ["web_research", "public_directory", "official_registry", "company_website", "trade_fair", "paid_database", "adapter"];
 
@@ -59,6 +62,11 @@ async function researchPlan(env, ctx, p) {
   const g = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
   const c = ctx.country.name_en;
   const links = [
+    // Importadores primeiro: fontes que apontam empresas que importam (consulta manual; nada é raspado).
+    ...(ctx.country.iso2 === "US" ? [{ group: "Fontes de importadores (consulta manual)", label: "ImportYeti — registros de embarque dos EUA (gratuito)", url: `https://www.importyeti.com/search?q=${encodeURIComponent(term)}` }] : []),
+    { group: "Fontes de importadores (consulta manual)", label: `Importadores de ${term} em ${c}`, url: g(`"${term}" importer ${c} -supplier`) },
+    { group: "Fontes de importadores (consulta manual)", label: "Associação de importadores do setor (lista de membros)", url: g(`${term} importers association members ${c}`) },
+    { group: "Fontes de importadores (consulta manual)", label: `Compradores por SH ${ctx.item.hs6[0]} (listas públicas de bases de comércio)`, url: g(`${c} buyers importers "${ctx.item.hs6[0]}"`) },
     ...["manufacturer", "processor", "factory"].map((w) => ({ group: "Consumidoras, fábricas e processadoras", label: `${term} — ${w} (${c})`, url: g(`"${term}" ${w} ${c}`) })),
     ...sectors.slice(0, 5).map((x) => ({ group: "Setores usuários do ICP da campanha", label: `${x} (${c})`, url: g(`${x} ${c} "${term}"`) })),
     { group: "Diretórios públicos (consulta manual)", label: "Europages", url: g(`site:europages.com "${term}" ${c}`) },
@@ -209,7 +217,7 @@ async function companyCard(env, actor, x, row, productId) {
   // Indícios: evidências da empresa que ainda não confirmam (indício comercial ou documento não validado).
   const used = new Set(proof.map((p) => p.id));
   const indications = evidences.filter((e) => !used.has(e.id) && (e.category === "commercial_signal" || e.validation_status !== "valid" || supportsOf(e).length)).map((e) => evidenceView(e, supportsOf(e)[0] ?? null));
-  const buyer = confirmed("imports_from_brazil") ? "confirmed_importer" : confirmed("buys_commodity") ? "confirmed_buyer" : "potential";
+  const buyer = confirmed("imports_from_brazil") ? "confirmed_importer" : confirmed("buys_commodity") ? "confirmed_buyer" : indications.length ? "potential" : "found";
   const profile = await s(env, "SELECT * FROM buyer_profiles WHERE tenant_id=? AND company_id=? AND unit_key='' AND product_id=?", actor.tenant_id, row.id, productId).first();
   const contactsRaw = (await s(env, "SELECT * FROM contacts WHERE tenant_id=? AND company_id=? ORDER BY created_at", actor.tenant_id, row.id).all()).results;
   const contacts = [];
@@ -227,7 +235,8 @@ async function companyCard(env, actor, x, row, productId) {
   else if (!row.size_source) pending.push("Porte sem fonte.");
   if (!row.activity_text) pending.push("Atividade da empresa não registrada.");
   if (!row.website) pending.push("Site não registrado.");
-  if (buyer === "potential") pending.push(indications.length ? "Validar o indício de compra com evidência da empresa (documento, registro aduaneiro)." : "Nenhuma evidência de compra ou importação registrada.");
+  if (buyer === "potential") pending.push("Validar o indício de compra com evidência da empresa (documento, registro aduaneiro).");
+  if (buyer === "found") pending.push("Nenhuma evidência própria de compra ou importação registrada (use a validação assistida).");
   if (buyer !== "confirmed_importer") pending.push("Origem Brasil não comprovada para esta empresa (o dado do país não serve de prova).");
   if (!profile) pending.push("Perfil comprador desta commodity não registrado.");
   if (!deciders.length) pending.push("Nenhum decisor ou comprador com fonte registrada.");
@@ -243,12 +252,15 @@ async function companyCard(env, actor, x, row, productId) {
     profile: profile ? { class: profile.profile_class, label: PROFILE_LABEL[profile.profile_class], icpStatus: profile.icp_status, icpLabel: ICP_LABEL[profile.icp_status] } : null,
     contacts, ficha: { ok: ficha.ok, reason: ficha.reason ?? ficha.note ?? null, needsIndividualApproval: true },
     pending,
+    ownEvidence: proof.length + indications.length,
+    validationLinks: validationLinks({ name: row.legal_name, website: row.website }, x.commodityTerm ?? "", x.countryRef ?? { iso2: "" }),
     foundBy: { source: row.cand_source, url: row.cand_url, at: row.cand_at },
   };
 }
 
+// Candidatas são importadoras: sem sinal próprio de importação/compra a empresa fica no grupo "importação não verificada".
 const groupOf = (card) =>
-  card.profile?.class === "trader_distributor" ? "traders" : ["final_consumer_confirmed", "possible_final_consumer"].includes(card.profile?.class) ? "consumers" : "toConfirm";
+  card.buyerStatus === "found" ? "unverified" : card.profile?.class === "trader_distributor" ? "traders" : ["final_consumer_confirmed", "possible_final_consumer"].includes(card.profile?.class) ? "consumers" : "toConfirm";
 const order = (a, b) =>
   (a.profile?.icpStatus === "in_icp" ? 0 : 1) - (b.profile?.icpStatus === "in_icp" ? 0 : 1) ||
   (SIZE_RANK[a.size?.class] ?? 2) - (SIZE_RANK[b.size?.class] ?? 2) ||
@@ -273,9 +285,12 @@ export async function getSearch(env, actor, id) {
       x.id, actor.tenant_id,
     ).all()
   ).results;
+  const plan = await researchPlan(env, { campaign, item, country }, p);
   const cards = [];
-  for (const r of rows) cards.push(await companyCard(env, actor, x, r, x.product_id));
-  const groups = { consumers: [], toConfirm: [], traders: [] };
+  for (const r of rows) cards.push(await companyCard(env, actor, { ...x, commodityTerm: plan.term, countryRef: country }, r, x.product_id));
+  const disc = (await s(env, "SELECT status,role,COUNT(*) n FROM discovery_candidates WHERE search_id=? GROUP BY status,role", x.id).all()).results;
+  const dsum = (f) => disc.filter(f).reduce((a, r) => a + r.n, 0);
+  const groups = { consumers: [], toConfirm: [], traders: [], unverified: [] };
   for (const c of cards) groups[groupOf(c)].push(c);
   for (const g of Object.values(groups)) g.sort(order);
   const target = JSON.parse(x.target_json);
@@ -287,8 +302,8 @@ export async function getSearch(env, actor, id) {
       sourcesConsulted: sources.length,
       sourcesWithResults: sources.filter((s) => s.result_count > 0).length,
       byKind: Object.fromEntries(SOURCE_KINDS.map((k) => [k, sources.filter((s) => s.source_kind === k).length]).filter(([, n]) => n)),
-      automaticCompanySource: false,
-      note: "Sem fonte automática de empresas no exterior configurada: a cobertura é a das fontes consultadas e registradas nesta busca; nunca é integral.",
+      automaticSources: sources.filter((s) => s.source_kind === "adapter").length,
+      note: "Cobertura = fontes consultadas nesta busca (gratuitas: OpenStreetMap e registros oficiais onde existem; pesquisa manual registrada). Nunca é integral: o OSM só tem o que foi mapeado e registros oficiais abertos existem em poucos países.",
     },
     cost: {
       apiCalls: sources.reduce((a, s) => a + s.api_calls, 0),
@@ -297,7 +312,13 @@ export async function getSearch(env, actor, id) {
       elapsedHours: Math.round(((Date.parse(lastActivity) - Date.parse(x.authorized_at)) / 3600000) * 10) / 10,
     },
     yield: {
+      found: dsum(() => true),
+      foundPending: dsum((r) => r.status === "new"),
+      foundDismissed: dsum((r) => r.status === "dismissed"),
       candidates: cards.length,
+      withOwnEvidence: count((c) => c.ownEvidence > 0),
+      withImportSignal: count((c) => c.buyerStatus !== "found"),
+      unverified: groups.unverified.length,
       consumers: groups.consumers.length,
       traders: groups.traders.length,
       inTargetSize: count(inTarget),
@@ -308,13 +329,25 @@ export async function getSearch(env, actor, id) {
       eligibleForFicha: count((c) => c.ficha.ok),
     },
   };
+  // Etapas que ainda dependem de pessoa (nada disso é automático nem presumido).
+  const y = metrics.yield;
+  const humanSteps = [
+    y.foundPending ? `Aceitar ou descartar ${y.foundPending} empresa(s) encontrada(s) pelas fontes gratuitas.` : null,
+    count((c) => c.buyerStatus === "found") ? `Procurar sinal próprio de importação para ${count((c) => c.buyerStatus === "found")} empresa(s) sem sinal (validação assistida: site, associação de importadores, registros de embarque); sem sinal, ela não é candidata importadora.` : null,
+    y.potentialBuyers ? `Validar o indício de ${y.potentialBuyers} potencial(is) compradora(s) com documento da empresa.` : null,
+    count((c) => !c.size) ? `Confirmar o porte (com fonte) de ${count((c) => !c.size)} empresa(s).` : null,
+    count((c) => !c.contacts.some((k) => k.verified && ["decision_maker", "provisional_decision_maker"].includes(k.role))) ? `Identificar decisor com fonte em ${count((c) => !c.contacts.some((k) => k.verified && ["decision_maker", "provisional_decision_maker"].includes(k.role)))} empresa(s).` : null,
+    "Decidir se contrata base paga de registros aduaneiros para comprovar importação por empresa (comparação em docs/implementation/FONTES-EMPRESAS-EXTERIOR.md; R13.7).",
+    y.eligibleForFicha ? `Aprovar individualmente a ficha de cada empresa antes de qualquer contato (${y.eligibleForFicha} apta(s)).` : "Aprovar individualmente cada ficha antes de qualquer contato (P11).",
+  ].filter(Boolean);
   return {
     id: x.id, status: x.status, authorizedBy: x.authorized_by, authorizedAt: x.authorized_at, closedAt: x.closed_at, closeNote: x.close_note,
     campaign: { id: campaign.id, name: campaign.name, status: campaign.status },
     country, commodity: { productId: p.id, name: p.commodity, label: item.label, variant: p.variant_name, hs6: item.hs6 },
     target: { ...target, sizesLabel: target.sizes.map((z) => SIZE_LABEL[z]) },
     notice: "O dado do país mostra comércio com o Brasil; não prova que nenhuma empresa desta lista importe. Toda prospecção exige ficha aprovada individualmente (P11).",
-    researchPlan: await researchPlan(env, { campaign, item, country }, p),
+    researchPlan: plan,
+    humanSteps,
     sources: sources.map((s) => ({ id: s.id, label: s.source_label, kind: s.source_kind, query: s.query_text, results: s.result_count, apiCalls: s.api_calls, costUsd: s.cost_usd, minutes: s.minutes, note: s.note, at: s.recorded_at })),
     metrics,
     groups,

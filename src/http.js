@@ -8,7 +8,7 @@ export const securityHeaders = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "same-origin",
   "content-security-policy":
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://overpass-api.de; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   "permissions-policy": "camera=(), microphone=(), geolocation=()",
 };
 export const response = (data, status = 200) =>

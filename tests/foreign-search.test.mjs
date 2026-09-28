@@ -92,6 +92,10 @@ test("Radar: resultado por empresa — consumidoras/fábricas antes, traders à 
   const C = await company(api, s.id, "Kaffee Handel Import AG");
   await size(api, C, "medium");
   await profile(api, C, "trader_distributor");
+  // Sinal próprio de importação (qualquer origem): membro de associação de importadores — só sinal, nunca condição.
+  const assoc = await api(`/api/companies/${C}/evidence`, "POST", { category: "commercial_signal", evidenceType: "association_membership", reference: "Membro da associação de importadores de café verde", sourceUrl: "https://assoc.example/membros", consultedAt: "2026-09-27", supports: ["imports"] });
+  assert.equal(assoc.status, 201);
+  assert.equal((await api(`/api/companies/${C}/conditions/product-05/imports_from_brazil`, "PUT", { status: "confirmed", evidenceId: assoc.data.id })).data.error.code, "signal_not_proof");
   const D = await company(api, s.id, "Grosse Lebensmittel AG");
   await size(api, D, "medium_plus");
   await profile(api, D, "possible_final_consumer");
@@ -103,9 +107,11 @@ test("Radar: resultado por empresa — consumidoras/fábricas antes, traders à 
 
   const r = (await api(`/api/foreign-searches/${s.id}`)).data;
   assert.match(r.notice, /não prova que nenhuma empresa/);
-  // Consumidoras: no ICP e pequenas/médias primeiro; importadora comprovada antes do indício; micro no fim.
-  assert.deepEqual(r.groups.consumers.map((c) => c.name), ["Kleine Rösterei GmbH", "Mittel Verarbeitung GmbH", "Grosse Lebensmittel AG", "Mini Café Einzelunternehmen"]);
+  // Candidatas são importadoras: só quem tem evidência ou sinal próprio fica nos grupos principais.
+  assert.deepEqual(r.groups.consumers.map((c) => c.name), ["Kleine Rösterei GmbH", "Mittel Verarbeitung GmbH"]);
   assert.deepEqual(r.groups.traders.map((c) => c.name), ["Kaffee Handel Import AG"]);
+  assert.deepEqual(r.groups.unverified.map((c) => c.name).sort(), ["Grosse Lebensmittel AG", "Mini Café Einzelunternehmen"]);
+  assert.match(r.groups.unverified[0].buyerStatusLabel, /importação não verificada/);
   const a = r.groups.consumers[0];
   assert.equal(a.buyerStatus, "confirmed_importer");
   assert.deepEqual([a.importEvidence[0].sourceUrl, a.importEvidence[0].factDate.slice(0, 10), a.importEvidence[0].type], ["https://registro.example/123", "2026-05-12", "customs_record"]);
@@ -117,23 +123,23 @@ test("Radar: resultado por empresa — consumidoras/fábricas antes, traders à 
   assert.ok(a.pending.includes("E-mail do decisor não validado."));
   const b = r.groups.consumers[1];
   assert.equal(b.buyerStatus, "potential");
-  assert.equal(b.buyerStatusLabel, "potencial compradora a validar");
+  assert.match(b.buyerStatusLabel, /potencial importadora/);
   assert.deepEqual([b.indications[0].sourceUrl, b.indications[0].factDate.slice(0, 10), b.indications[0].condition], ["https://jobs.example/9", "2026-08-01", "buys_commodity"]);
   assert.ok(b.pending.some((p) => /Validar o indício/.test(p)));
   assert.ok(b.pending.includes("Nenhum decisor ou comprador com fonte registrada."));
-  const e = r.groups.consumers[3];
+  const e = r.groups.unverified.find((c) => c.name === "Mini Café Einzelunternehmen");
   assert.equal(e.ficha.ok, false);
   assert.match(e.ficha.reason, /microempresa ou MEI/);
   assert.equal(r.groups.traders[0].ficha.ok, false, "trader só com exceção registrada");
   // Cobertura, custo e rendimento.
   assert.equal(r.metrics.coverage.sourcesConsulted, 2);
   assert.equal(r.metrics.coverage.sourcesWithResults, 1);
-  assert.equal(r.metrics.coverage.automaticCompanySource, false);
-  assert.match(r.metrics.coverage.note, /nunca é integral/);
+  assert.equal(r.metrics.coverage.automaticSources, 0);
+  assert.match(r.metrics.coverage.note, /Nunca é integral/);
   assert.deepEqual([r.metrics.cost.minutes, r.metrics.cost.costUsd, r.metrics.cost.apiCalls], [35, 0, 0]);
   assert.deepEqual(
     [r.metrics.yield.candidates, r.metrics.yield.consumers, r.metrics.yield.traders, r.metrics.yield.inTargetSize, r.metrics.yield.confirmedImporters, r.metrics.yield.potentialBuyers, r.metrics.yield.withVerifiedDecisionMaker],
-    [5, 4, 1, 3, 1, 4, 1],
+    [5, 2, 1, 3, 1, 2, 1],
   );
   // Nenhuma empresa ganhou condição pelo dado do país.
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM company_conditions WHERE status='confirmed'").get().n, 1);

@@ -32,6 +32,7 @@ import * as countryAnalysis from "./country-analysis.js";
 import * as selections from "./selections.js";
 import * as foreign from "./foreign-companies.js";
 import * as foreignSearch from "./foreign-search.js";
+import * as discovery from "./discovery.js";
 import * as integrations from "./integrations.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
@@ -210,6 +211,7 @@ async function route(request, env, rid) {
   if (can && can[2] && method === "GET") return response(await selections.listSelections(env, actor, can[1]));
   if (path === "/api/integrations" && method === "GET") return response(await integrations.status(env, actor));
   if (path === "/api/integrations/mailbox/reach" && method === "POST") return response(await integrations.reachMailbox(request, env, actor, rid));
+  if (path === "/api/integrations/discovery/reach" && method === "POST") return response(await integrations.reachDiscovery(request, env, actor, rid));
   if (path === "/api/integrations/comtrade/check" && method === "POST") return response(await integrations.checkComtrade(request, env, actor, rid));
   if (path === "/api/integrations/mailbox/check" && method === "POST") return response(await integrations.checkMailbox(request, env, actor, rid));
   if (path === "/api/foreign-companies" && method === "POST") return response(await foreign.createForeignCompany(request, env, actor, rid), 201);
@@ -224,6 +226,14 @@ async function route(request, env, rid) {
   if (fsa && !fsa[2] && method === "POST") return response(await foreignSearch.authorizeSearch(request, env, actor, rid, fsa[1]), 201);
   if (fsa && fsa[2] && method === "GET") return response(await foreignSearch.listSearches(env, actor, fsa[1]));
   if (path === "/api/foreign-searches" && method === "GET") return response(await foreignSearch.listAllSearches(env, actor));
+  // Descoberta por fontes gratuitas e validação assistida (Radar Internacional).
+  const fsd = path.match(/^\/api\/foreign-searches\/([^/]+)\/(discovery|discover|discovery\/accept|discovery\/dismiss)$/);
+  if (fsd && fsd[2] === "discovery" && method === "GET") return response(await discovery.getDiscovery(env, actor, fsd[1]));
+  if (fsd && fsd[2] === "discover" && method === "POST") return response(await discovery.discover(request, env, actor, rid, fsd[1]), 201);
+  if (fsd && fsd[2] === "discovery/accept" && method === "POST") return response(await discovery.accept(request, env, actor, rid, fsd[1]));
+  if (fsd && fsd[2] === "discovery/dismiss" && method === "POST") return response(await discovery.dismiss(request, env, actor, rid, fsd[1]));
+  const cgl = path.match(/^\/api\/companies\/([^/]+)\/gleif$/);
+  if (cgl && method === "GET") return response(await discovery.companyGleif(env, actor, cgl[1]));
   const fsx = path.match(/^\/api\/foreign-searches\/([^/]+)(?:\/(sources|candidates|close))?$/);
   if (fsx && !fsx[2] && method === "GET") return response(await foreignSearch.getSearch(env, actor, fsx[1]));
   if (fsx && fsx[2] === "sources" && method === "POST") return response(await foreignSearch.recordSource(request, env, actor, rid, fsx[1]), 201);

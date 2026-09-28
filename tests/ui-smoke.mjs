@@ -250,13 +250,22 @@ try {
   await page.getByRole("button", { name: "Autorizar busca de empresas" }).click();
   await page.getByRole("heading", { name: /^Alemanha · / }).waitFor();
   await page.getByText(/porte-alvo: Pequena e Média/).waitFor();
-  await page.getByRole("heading", { name: "Traders e distribuidores (prioridade secundária) (0)" }).waitFor();
+  await page.getByRole("heading", { name: "Importadoras — traders e distribuidores (prioridade secundária) (0)" }).waitFor();
+  await page.getByRole("heading", { name: "Descobrir empresas (fontes gratuitas)" }).waitFor();
   await page.getByText("Registrar empresa encontrada").click();
   await page.getByLabel("Razão social").fill("Kleine Rösterei GmbH");
   await page.getByLabel("Onde foi encontrada (fonte)").fill("Europages — torrefações");
   await page.getByRole("button", { name: "Registrar empresa" }).click();
-  await page.getByRole("heading", { name: "Perfil a confirmar (1)" }).waitFor();
-  await page.getByText("potencial compradora a validar").first().waitFor();
+  // Cadastro manual sem sinal próprio de importação: não é candidata importadora até ser validada.
+  await page.getByText(/^Importação não verificada — usam a commodity, sem sinal próprio de importação \(1\)/).click();
+  await page.getByText("empresa encontrada — importação não verificada").first().waitFor();
+  // Validação assistida: sinal próprio de importação registrado no cartão → sobe para "Importadoras".
+  await page.getByText("Registrar sinal ou prova de importação").click();
+  await page.getByLabel("O que diz (referência)").fill("Site da empresa: 'importamos café verde de Santos'");
+  await page.getByRole("button", { name: "Registrar", exact: true }).click();
+  await page.getByRole("heading", { name: "Importadoras — perfil a confirmar (1)" }).waitFor();
+  await page.getByText(/potencial importadora/).first().waitFor();
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM company_conditions WHERE status='confirmed'").get().n, 0, "indício não confirma");
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM foreign_search_candidates").get().n, 1);
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM company_conditions WHERE status='confirmed'").get().n, 0, "nenhuma condição preenchida pelo dado do país");
   await page.screenshot({ path: "review-output/internacional-desktop.png", fullPage: true });

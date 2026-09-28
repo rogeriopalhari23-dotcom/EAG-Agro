@@ -199,3 +199,48 @@ async function probeComtradeSize(env, actor, rid, f, cmdCount) {
   await commit(env, [auditStatement(env, actor, rid, "integration.comtrade_size_probed", "integration", "comtrade", { cmdCount: n, urlLength: url.length, status })]);
   return { cmdCount: Math.min(n, codes.length), totalCodes: codes.length, years, urlLength: url.length, status, count, message };
 }
+
+// Alcance das fontes gratuitas de descoberta a partir do Worker (IPs da Cloudflare): uma consulta mínima em cada,
+// sem gravar candidatos. Só código HTTP, tempo e quantidade de itens.
+export async function reachDiscovery(request, env, actor, rid, deps = {}) {
+  requireRole(actor, ADMIN);
+  await bodyJson(request);
+  const f = deps.fetch || fetch;
+  const probe = async (name, fn) => {
+    const t = Date.now();
+    try {
+      const r = await fn();
+      return { name, ok: r.status === 200, ms: Date.now() - t, ...r };
+    } catch (e) {
+      return { name, ok: false, ms: Date.now() - t, error: String(e?.message || e).slice(0, 160) };
+    }
+  };
+  const results = [
+    await probe("OpenStreetMap (Overpass)", async () => {
+      const r = await f("https://overpass-api.de/api/interpreter", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "User-Agent": "EAG-Compass/0.3" }, body: `data=${encodeURIComponent('[out:json][timeout:25];area["ISO3166-1"="DE"][admin_level=2]->.a;nwr["craft"="coffee_roaster"](area.a);out ids 5;')}`, signal: AbortSignal.timeout(60000) });
+      const d = r.ok ? await r.json() : null;
+      return { status: r.status, items: d?.elements?.length ?? null };
+    }),
+    await probe("Registro da França", async () => {
+      const r = await f("https://recherche-entreprises.api.gouv.fr/search?activite_principale=10.83Z&etat_administratif=A&per_page=1", { headers: { "User-Agent": "EAG-Compass/0.3" }, signal: AbortSignal.timeout(30000) });
+      const d = r.ok ? await r.json() : null;
+      return { status: r.status, items: d?.total_results ?? null };
+    }),
+    await probe("EORI (Comissão Europeia)", async () => {
+      const r = await f("https://ec.europa.eu/taxation_customs/dds2/eos/validation/services/validation", { method: "POST", headers: { "content-type": "text/xml; charset=utf-8", SOAPAction: "" }, body: '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ev="http://eori.ws.eos.dds.s/"><soapenv:Header/><soapenv:Body><ev:validateEORI><ev:eori>FR31847482200208</ev:eori></ev:validateEORI></soapenv:Body></soapenv:Envelope>', signal: AbortSignal.timeout(30000) });
+      return { status: r.status, items: (await r.text()).includes("<status>0</status>") ? 1 : 0 };
+    }),
+    await probe("Registro da Noruega", async () => {
+      const r = await f("https://data.brreg.no/enhetsregisteret/api/enheter?naeringskode=10.830&size=1", { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30000) });
+      const d = r.ok ? await r.json() : null;
+      return { status: r.status, items: d?.page?.totalElements ?? null };
+    }),
+    await probe("GLEIF", async () => {
+      const r = await f("https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Rösterei&filter[entity.legalAddress.country]=DE&page[size]=1", { headers: { Accept: "application/vnd.api+json" }, signal: AbortSignal.timeout(30000) });
+      const d = r.ok ? await r.json() : null;
+      return { status: r.status, items: d?.meta?.pagination?.total ?? null };
+    }),
+  ];
+  await commit(env, [auditStatement(env, actor, rid, "integration.discovery_reached", "integration", "discovery", { ok: results.map((r) => r.ok) })]);
+  return { results };
+}

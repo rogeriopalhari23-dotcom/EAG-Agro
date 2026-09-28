@@ -2481,12 +2481,181 @@ function companyResult(c) {
       c.pending.length ? el("div", {}, text("small", "Pendências:"), el("ul", {}, ...c.pending.map((p) => el("li", {}, p)))) : null,
       text("small", `Encontrada em: ${c.foundBy.source}${c.foundBy.at ? ` (${c.foundBy.at.slice(0, 10)})` : ""} · Ficha: ${c.ficha.ok ? "pode ser preparada; envio só após aprovação individual" : c.ficha.reason}`),
     ),
-    button("Abrir empresa", () => showCompany(c.id)),
+    el(
+      "div",
+      { class: "toolbar" },
+      button("Abrir empresa", () => showCompany(c.id)),
+      writable()
+        ? button("Conferir identidade (GLEIF)", async () => {
+            // Identidade jurídica (nome legal, registro, LEI): não é evidência de compra.
+            const r = await api(`/api/companies/${c.id}/gleif`);
+            notice(r.matches.length ? `GLEIF — ${c.name}: ${r.matches.map((g) => `${g.legalName} · ${g.registeredAs || "registro não informado"} · ${g.city || "—"} · LEI ${g.lei} (${g.status})`).join(" | ")}` : `GLEIF — ${c.name}: nenhum registro. ${r.note}`);
+          })
+        : null,
+    ),
+    details("Validação assistida (links para você abrir)", el("ul", {}, ...c.validationLinks.map((l) => el("li", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))))),
+    writable() ? details("Registrar sinal ou prova de importação", importEvidenceForm(c)) : null,
+  );
+}
+
+// Descoberta por fontes gratuitas (OpenStreetMap, registros oficiais) e decisão da pessoa sobre cada candidato.
+const DISC_SIZE = { micro: "Micro/MEI", small: "Pequena", medium: "Média", medium_plus: "Média-mais" };
+function candidateRow(c, chosen) {
+  const box = c.status === "new" && writable() ? el("input", { type: "checkbox", "aria-label": `Selecionar ${c.name}` }) : null;
+  box?.addEventListener("change", () => (box.checked ? chosen.add(c.id) : chosen.delete(c.id)));
+  return el(
+    "div",
+    { class: "row" },
+    box,
+    el(
+      "div",
+      {},
+      text("strong", `${c.name}${c.city ? ` · ${c.city}` : ""}`),
+      text("span", c.status === "new" ? "empresa encontrada" : c.status === "accepted" ? "aceita na busca" : "descartada", c.status === "dismissed" ? "tag warn" : "tag"),
+      c.possibleDuplicate ? text("span", "possível duplicata — confira", "tag warn") : null,
+      c.importSignal ? text("span", c.importSignal.status === "valid" ? `EORI ${c.importSignal.eori} ativo — sinal de importação` : c.importSignal.status === "not_valid" ? "EORI não encontrado com o SIRET da sede" : "EORI não conferido", c.importSignal.status === "valid" ? "tag" : "tag warn") : text("span", "importação não verificada", "tag warn"),
+      text("small", `Fonte: ${c.sourceLabel} · atividade: ${c.activity ? c.activity.label : "—"} · porte: ${c.size ? `${DISC_SIZE[c.size.band]} (${c.size.source})` : "não informado na fonte"}${c.registry ? ` · ${c.registry.type} ${c.registry.id}` : ""}`),
+      el("small", {}, c.website ? el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, "site") : "sem site na fonte", " · ", el("a", { href: c.recordUrl, target: "_blank", rel: "noopener noreferrer" }, "registro na fonte")),
+      c.dismissReason ? text("small", `Descartada: ${c.dismissReason}`) : null,
+    ),
+  );
+}
+
+async function discoveryPanel(x) {
+  const d = await api(`/api/foreign-searches/${x.id}/discovery`);
+  const wrap = el("div");
+  const nace = input("Atividades NACE das consumidoras/processadoras (NN.NN, separadas por vírgula)", "nace", "text", d.proposal ? d.proposal.processors.nace.join(", ") : "", false);
+  const naceT = input("Atividades NACE dos traders/atacadistas", "naceTraders", "text", d.proposal ? d.proposal.traders.nace.join(", ") : "", false);
+  const parse = (v) => v.split(/[,\s]+/).map((z) => z.trim()).filter(Boolean);
+  // OpenStreetMap: o servidor público recusa conexões da Cloudflare, então a consulta montada pelo Compass roda no
+  // navegador e só os campos necessários voltam para o servidor (tratados pelo mesmo código).
+  const KEEP = ["name", "operator", "brand", "craft", "industrial", "product", "man_made", "amenity", "shop", "addr:city", "website", "contact:website"];
+  async function overpassInBrowser() {
+    if (!d.osmQuery) throw new Error("Sem consulta do OpenStreetMap para esta commodity.");
+    let r;
+    try {
+      r = await fetch("https://overpass-api.de/api/interpreter", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: `data=${encodeURIComponent(d.osmQuery)}` });
+    } catch {
+      throw new Error("OpenStreetMap sem resposta a partir do navegador; tente de novo em alguns minutos.");
+    }
+    if (!r.ok) throw new Error(`OpenStreetMap respondeu ${r.status} (servidor público sobrecarregado); tente de novo em alguns minutos.`);
+    const j = await r.json();
+    // Só o que pode virar candidato (com nome; ponto de venda sem produção fica fora), no máximo 300 por vez (limite de 64 KB).
+    const useful = (j.elements || []).filter((e) => {
+      const t = e.tags || {};
+      return (t.name || t.operator || t.brand) && !((t.amenity === "cafe" || t.shop) && !t.craft && !t.industrial && t.man_made !== "works");
+    });
+    const elements = useful.slice(0, 300).map((e) => ({ type: e.type, id: e.id, tags: Object.fromEntries(Object.entries(e.tags || {}).filter(([k]) => KEEP.includes(k)).map(([k, v]) => [k, String(v).slice(0, 160)])) }));
+    return { elements, totalElements: useful.length };
+  }
+  const runBtn = (label, body) =>
+    button(label, async () => {
+      if (body.source === "osm") body = { ...body, overpass: await overpassInBrowser() };
+      const r = await api(`/api/foreign-searches/${x.id}/discover`, "POST", body);
+      notice(`${r.found} empresa(s) encontrada(s)${r.truncated ? ` (lidas ${r.found} de ${r.totalInSource} na fonte)` : ""}. Nada entrou no cadastro: aceite ou descarte cada uma.`);
+      await showForeignSearch(x.id);
+    }, true);
+  const avail = d.sources.filter((s) => s.available);
+  const unavailable = d.sources.filter((s) => !s.available);
+  if (x.status === "open" && writable())
+    wrap.append(
+      text("p", d.proposal ? `Proposta para ${d.proposal.commodity} (${d.mapVersion}): ${d.proposal.processors.label}; traders: ${d.proposal.traders.label}. Confira e ajuste antes de rodar.` : "Sem proposta de atividades para esta commodity: informe os códigos NACE.", "muted"),
+      el("div", { class: "form-grid" }, nace.node, naceT.node),
+      el(
+        "div",
+        { class: "toolbar" },
+        ...avail.map((s) => runBtn(`Gerar candidatos: ${s.label}`, { source: s.key, role: "processor", nace: parse(nace.control.value).length ? parse(nace.control.value) : undefined })),
+        ...avail.filter((s) => s.key !== "osm").map((s) => runBtn(`Gerar traders: ${s.label}`, { source: s.key, role: "trader", nace: parse(naceT.control.value).length ? parse(naceT.control.value) : undefined })),
+      ),
+      unavailable.length ? text("small", `Fora da cobertura deste país: ${unavailable.map((s) => s.label).join("; ")}.`) : null,
+    );
+  wrap.append(
+    text("p", d.notice, "muted"),
+    text("p", `Encontradas: ${d.counts.found} (${d.counts.processors} consumidoras/processadoras, ${d.counts.traders} traders) · com sinal de importação (EORI ativo): ${d.counts.withEori} · aguardando decisão: ${d.counts.new} · aceitas: ${d.counts.accepted} · descartadas: ${d.counts.dismissed}`),
+  );
+  for (const [title, list] of [["Consumidoras finais, fábricas e processadoras encontradas", d.processors], ["Traders e distribuidores encontrados (prioridade secundária)", d.traders]]) {
+    if (!list.length) continue;
+    const chosen = new Set();
+    const reason = input("Motivo do descarte", "reason", "text", "", false);
+    const actions =
+      x.status === "open" && writable() && list.some((c) => c.status === "new")
+        ? el(
+            "div",
+            {},
+            el(
+              "div",
+              { class: "toolbar" },
+              button("Aceitar selecionadas", async () => {
+                if (!chosen.size) return notice("Marque ao menos uma empresa.", true);
+                const r = await api(`/api/foreign-searches/${x.id}/discovery/accept`, "POST", { ids: [...chosen] });
+                const bad = r.results.filter((z) => !z.ok);
+                notice(`${r.accepted} aceita(s) como empresa encontrada.${bad.length ? ` ${bad.length} não aceita(s): ${bad.map((z) => z.reason).join(" | ")}` : ""}`, bad.length > 0);
+                await showForeignSearch(x.id);
+              }, true),
+              button("Descartar selecionadas", async () => {
+                if (!chosen.size) return notice("Marque ao menos uma empresa.", true);
+                if (!reason.control.value.trim()) return notice("Informe o motivo do descarte.", true);
+                await api(`/api/foreign-searches/${x.id}/discovery/dismiss`, "POST", { ids: [...chosen], reason: reason.control.value.trim() });
+                await showForeignSearch(x.id);
+              }),
+            ),
+            reason.node,
+          )
+        : null;
+    const pending = list.filter((c) => c.status === "new");
+    const decided = list.filter((c) => c.status !== "new");
+    wrap.append(
+      el(
+        "div",
+        {},
+        text("h3", `${title} (${list.length})`),
+        actions,
+        rows(pending.slice(0, 150), (c) => candidateRow(c, chosen)),
+        pending.length > 150 ? text("p", `Mostrando 150 de ${pending.length} aguardando decisão.`, "muted") : null,
+        decided.length ? details(`Já decididas (${decided.length})`, rows(decided, (c) => candidateRow(c, chosen))) : null,
+      ),
+    );
+  }
+  return panel("Descobrir empresas (fontes gratuitas)", wrap);
+}
+
+
+// Validação assistida: o que a pessoa achou vira evidência da própria empresa. Indício → "potencial importadora";
+// documento conferido de importação do Brasil → "importadora confirmada". Dado do país nunca entra aqui.
+function importEvidenceForm(c) {
+  const today = new Date().toISOString().slice(0, 10);
+  return makeForm(
+    [
+      select("Tipo", "kind", [["signal", "Indício (site da empresa, associação de importadores, notícia, registro de embarque visto)"], ["proof", "Documento da empresa conferido (fatura, registro aduaneiro, conhecimento de embarque)"]]),
+      select("O que mostra", "supports", [["imports", "Importa (origem ou produto não informados)"], ["imports_from_brazil", "Importa a commodity do Brasil"], ["buys_commodity", "Compra a commodity (origem a confirmar)"]]),
+      select("Tipo de documento (só para prova)", "docType", [["customs_record", "Registro aduaneiro"], ["bill_of_lading", "Conhecimento de embarque"], ["commercial_document", "Documento comercial (fatura, contrato)"], ["company_document", "Documento publicado pela empresa"]]),
+      input("O que diz (referência)", "reference", "textarea"),
+      input("URL da fonte", "sourceUrl", "url", "", false),
+      input("Data do fato (AAAA-MM-DD)", "factDate", "text", "", false),
+    ],
+    async (v) => {
+      const proof = v.kind === "proof";
+      const ev = await api(`/api/companies/${c.id}/evidence`, "POST", {
+        category: proof ? "business" : "commercial_signal",
+        evidenceType: proof ? v.docType : "import_signal",
+        reference: v.reference, sourceUrl: v.sourceUrl || undefined, factDate: v.factDate || undefined, consultedAt: today,
+        validationStatus: proof ? "valid" : "pending",
+        productId: proof ? state.searchProductId : undefined, market: proof ? "international" : undefined,
+        supports: [v.supports],
+      });
+      // Prova conferida de importação do Brasil ou de compra confirma a condição da empresa (R12.10); "importa" genérico nunca confirma.
+      if (proof && v.supports !== "imports") await api(`/api/companies/${c.id}/conditions/${state.searchProductId}/${v.supports}`, "PUT", { status: "confirmed", evidenceId: ev.id });
+      notice(proof && v.supports === "imports_from_brazil" ? "Importação do Brasil confirmada por documento da empresa." : "Sinal registrado: a empresa passa a potencial importadora, a validar.");
+      await showForeignSearch(state.searchId);
+    },
+    "Registrar",
   );
 }
 
 async function showForeignSearch(id, preloaded) {
   const x = preloaded || (await api(`/api/foreign-searches/${id}`));
+  state.searchId = x.id;
+  state.searchProductId = x.commodity.productId;
   const node = section(`${x.country.name_pt} · ${x.commodity.label || x.commodity.name}`, `Busca de empresas compradoras (SH6 ${x.commodity.hs6.join(", ")}) · porte-alvo: ${x.target.sizesLabel.join(" e ")} · ${x.status === "open" ? "aberta" : `encerrada em ${x.closedAt.slice(0, 10)}`}`);
   node.setAttribute("data-screen", "internacional");
   node.append(text("p", x.notice, "notice-fixed"), button("Voltar ao Radar", () => navigate("Internacional")));
@@ -2501,17 +2670,22 @@ async function showForeignSearch(id, preloaded) {
         "div",
         { class: "stat" },
         text("strong", "Rendimento"),
-        text("p", `${m.yield.candidates} empresa(s): ${m.yield.consumers} consumidora(s)/processadora(s), ${m.yield.traders} trader(s) · ${m.yield.inTargetSize} no porte-alvo`),
+        text("p", `${m.yield.found} encontrada(s) pelas fontes gratuitas (${m.yield.foundPending} aguardando decisão, ${m.yield.foundDismissed} descartada(s)) · ${m.yield.candidates} na busca: ${m.yield.consumers} consumidora(s)/processadora(s), ${m.yield.traders} trader(s) · ${m.yield.inTargetSize} no porte-alvo`),
+        text("p", `${m.yield.withImportSignal} candidata(s) importadora(s) (evidência ou sinal próprio) · ${m.yield.unverified} com importação não verificada · ${m.yield.withOwnEvidence} com evidência própria`),
         text("p", `${m.yield.confirmedImporters} importadora(s) confirmada(s) · ${m.yield.confirmedBuyers} compradora(s) confirmada(s) · ${m.yield.potentialBuyers} potencial(is) a validar · ${m.yield.withVerifiedDecisionMaker} com decisor com fonte · ${m.yield.eligibleForFicha} apta(s) a ficha`),
       ),
     ),
   );
+  node.append(await discoveryPanel(x));
+  node.append(panel("O que ainda depende de você", el("ul", {}, ...x.humanSteps.map((h) => el("li", {}, h)))));
   const groups = [
-    ["Consumidoras finais, fábricas e processadoras", x.groups.consumers],
-    ["Perfil a confirmar", x.groups.toConfirm],
-    ["Traders e distribuidores (prioridade secundária)", x.groups.traders],
+    ["Importadoras — consumidoras finais, fábricas e processadoras", x.groups.consumers],
+    ["Importadoras — perfil a confirmar", x.groups.toConfirm],
+    ["Importadoras — traders e distribuidores (prioridade secundária)", x.groups.traders],
   ];
   for (const [title, list] of groups) node.append(panel(`${title} (${list.length})`, rows(list, companyResult)));
+  // Sem sinal próprio de importação a empresa não é candidata importadora: fica recolhida, aguardando validação.
+  node.append(details(`Importação não verificada — usam a commodity, sem sinal próprio de importação (${x.groups.unverified.length})`, rows(x.groups.unverified, companyResult)));
   const byGroup = new Map();
   for (const l of x.researchPlan.links) (byGroup.get(l.group) || byGroup.set(l.group, []).get(l.group)).push(l);
   node.append(
