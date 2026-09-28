@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-27T22:52:02.188Z",
+  "updatedAt": "2026-09-28T04:05:17.305Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -775,6 +775,25 @@
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": "Chave e termos da Comtrade validados por chamada real (2026-09-27) e fontes pelo Worker/GitHub validadas para a Alemanha; falta a primeira rotina mensal completa da Comtrade medida (5 chamadas por país declarante, teto de 400/dia) com amostra interna e a liberação documentada por Rogério"
+    },
+    {
+      "id": "RADAR-PESSOAS",
+      "title": "Pessoas de compras nos dois radares (Impressum, QSA, pesquisa assistida, registro manual com fonte)",
+      "status": "partial",
+      "dependsOn": [
+        "P3-T11"
+      ],
+      "plan": "docs/implementation/FONTES-EMPRESAS-EXTERIOR.md",
+      "section": "7",
+      "read": [
+        "src/people.js",
+        "src/adapters/people.js",
+        "migrations/0024_pessoas_de_compras.sql"
+      ],
+      "acceptance": "Até 3 pessoas por empresa aderente, com fonte, data e motivo; estados a validar / cargo verificado / decisor confirmado; e-mail e telefone separados; sem LinkedIn automatizado; reaproveitamento por prazo.",
+      "validation": "npm run check (tests/people.test.mjs); teste real 48 empresas DE + 3 CNPJs de Franca/SP",
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Uso em produção depende de Rogério aceitar candidatas na busca (produção sem empresas em 2026-09-28); descoberta nacional bloqueada (chave Casa dos Dados ausente; dados abertos da Receita lentos/bloqueados fora do Brasil); validação de e-mail depende da chave Snov. Próxima ação: aceitar as candidatas da Alemanha e rodar o lote de pessoas."
     }
   ]
 }

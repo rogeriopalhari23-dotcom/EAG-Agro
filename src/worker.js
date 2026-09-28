@@ -33,6 +33,7 @@ import * as selections from "./selections.js";
 import * as foreign from "./foreign-companies.js";
 import * as foreignSearch from "./foreign-search.js";
 import * as discovery from "./discovery.js";
+import * as people from "./people.js";
 import * as integrations from "./integrations.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
@@ -233,6 +234,15 @@ async function route(request, env, rid) {
   if (fsd && fsd[2] === "discovery/accept" && method === "POST") return response(await discovery.accept(request, env, actor, rid, fsd[1]));
   if (fsd && fsd[2] === "discovery/dismiss" && method === "POST") return response(await discovery.dismiss(request, env, actor, rid, fsd[1]));
   if (fsd && fsd[2] === "discovery/validate" && method === "POST") return response(await discovery.validateCandidates(request, env, actor, rid, fsd[1]));
+  // Pessoas de compras (dois radares): pesquisa em fontes permitidas, aceite, descarte e registro manual.
+  const ppl = path.match(/^\/api\/companies\/([^/]+)\/people(?:\/(research)|\/([^/]+)\/(accept|dismiss))?$/);
+  if (ppl && !ppl[2] && !ppl[3] && method === "GET") return response(await people.listPeople(env, actor, ppl[1]));
+  if (ppl && !ppl[2] && !ppl[3] && method === "POST") return response(await people.addPerson(request, env, actor, rid, ppl[1]), 201);
+  if (ppl && ppl[2] === "research" && method === "POST") return response(await people.researchCompany(request, env, actor, rid, ppl[1]));
+  if (ppl && ppl[4] === "accept" && method === "POST") return response(await people.acceptPerson(request, env, actor, rid, ppl[1], ppl[3]), 201);
+  if (ppl && ppl[4] === "dismiss" && method === "POST") return response(await people.dismissPerson(request, env, actor, rid, ppl[1], ppl[3]));
+  const fsp = path.match(/^\/api\/foreign-searches\/([^/]+)\/people\/research$/);
+  if (fsp && method === "POST") return response(await people.researchSearchBatch(request, env, actor, rid, fsp[1]));
   const cgl = path.match(/^\/api\/companies\/([^/]+)\/gleif$/);
   if (cgl && method === "GET") return response(await discovery.companyGleif(env, actor, cgl[1]));
   const fsx = path.match(/^\/api\/foreign-searches\/([^/]+)(?:\/(sources|candidates|close))?$/);

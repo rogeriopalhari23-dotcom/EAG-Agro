@@ -99,3 +99,21 @@ Registro aduaneiro/conhecimento de embarque com nome do importador é a única f
 | Custo e tempo | US$ 0; 71 consultas; ~100 s no total; ~14–17 s por candidata válida |
 
 As regras de classificação foram definidas antes da consulta e corrigidas no mesmo dia com os textos reais guardados em cache (sem nova coleta): importador que abastece torrefações é trader; rodapé do site não conta; declaração de importação só em primeira pessoa ("Kooperationen mit Importeuren" não conta); descarte automático só para prestador; o resto fica para revisão humana com papel sugerido.
+
+## 7. Pessoas de compras — fontes, estados e teste real (2026-09-28)
+
+**Fluxo** (referência Harpor: empresa-alvo → cargo-alvo → contato → ficha → acompanhamento): só empresas que passam na triagem (perfil no ICP ou porte a confirmar; nunca trader, gigante ou micro) → até 3 pessoas por empresa → "contato de compras a validar" → aceito como contato → "cargo verificado" (verificação `job_title`) → "decisor de compras confirmado" (`decision_authority`). E-mail e telefone são avaliados separadamente; nenhum autoriza envio.
+
+| Fonte | Uso | Limites e regras |
+|---|---|---|
+| Impressum (DE/AT/CH/LI) | Representante legal (Geschäftsführer, Inhaber, "vertreten durch", Vorstand), telefone e e-mail publicados | Aviso legal obrigatório (DDG §5); respeita robots.txt (RFC 9309, com curingas); até 5 requisições por empresa; cache de 180 dias |
+| QSA da Receita via BrasilAPI | Sócios-administradores, matriz/filial, município, CNAE, situação | Grátis; o e-mail do cadastro costuma ser do contador (marcado "cadastro", nunca da pessoa); cache de 90 dias; aviso quando só há o endereço da sede |
+| Site da empresa, diretório, LinkedIn | Registro manual pela pessoa, com URL da fonte | LinkedIn proíbe bots, extensões e automação de visitas, convites, mensagens e extração (User Agreement §8.2): só links de busca para consulta manual |
+
+Regras: e-mail só se publicado numa fonte com URL (nunca deduzido do padrão do domínio); é "pessoal" apenas quando a caixa contém o nome da pessoa, caso contrário é caixa geral da empresa e não vai para o contato; telefone publicado é da empresa e não autoriza WhatsApp; nome duplicado (inclusive invertido) não entra duas vezes; vínculo vencido aparece como "fonte vencida — reconferir".
+
+**Harpor** (harpor.com.br, conferido em 2026-09-28): SPA; os termos descrevem automação de prospecção B2B **pelo LinkedIn** ("cadências de visita → conexão → mensagens"); teste de 14 dias exige cartão; planos mensal/trimestral/semestral sem preço público; sem documentação pública de API ou exportação. Por depender de automação que o LinkedIn proíbe, não foi integrado; o Compass copia só o fluxo (alvo → cargo → contato → ficha → acompanhamento) com fontes permitidas.
+
+**Teste real — Alemanha + café verde (48 empresas relevantes do diretório do Kaffeeverband, com site):** Impressum localizado em 37; representantes identificados em 21 empresas (24 pessoas, precisão conferida manualmente após correções: 24/24 nomes plausíveis); e-mail pessoal publicado: 0 (35 empresas só com caixa geral); telefone da empresa: 31; 130 requisições, 253 s (≈12 s por empresa com pessoa), custo US$ 0. Nenhum cargo de compras (Einkauf) publicado nos avisos legais: são representantes legais, portanto "a validar".
+
+**Teste real — Brasil (café, Franca/SP, 3 torrefações com CNPJ público):** BrasilAPI respondeu 3/3 (0,8–3,3 s); 5 sócios-administradores; todas matriz ativa, CNAE 1081-3/02; nenhum e-mail no cadastro; telefone em 3. A descoberta nacional de empresas continua bloqueada (chave da Casa dos Dados não configurada; dados abertos da Receita a ~220 KB/s daqui e conexão recusada a partir do GitHub).

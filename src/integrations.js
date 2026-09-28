@@ -240,6 +240,17 @@ export async function reachDiscovery(request, env, actor, rid, deps = {}) {
       const h = r.ok ? await r.text() : "";
       return { status: r.status, items: (h.match(/<li data-zip=/g) || []).length };
     }),
+    // Pessoas de compras: QSA pela BrasilAPI (torrefação real em Franca/SP) e um Impressum real de torrefação alemã.
+    await probe("BrasilAPI CNPJ (QSA)", async () => {
+      const r = await f("https://brasilapi.com.br/api/cnpj/v1/20975738000181", { headers: { Accept: "application/json", "User-Agent": "EAG-Compass/0.3 (+uso interno EAG Agro)" }, signal: AbortSignal.timeout(30000) });
+      const d = r.ok ? await r.json() : null;
+      return { status: r.status, items: d?.qsa?.length ?? null };
+    }),
+    await probe("Impressum (site de empresa alemã)", async () => {
+      const r = await f("https://www.24grad.net/impressum/", { headers: { "User-Agent": "EAG-Compass/0.3 (+uso interno EAG Agro)", Accept: "text/html" }, signal: AbortSignal.timeout(30000) });
+      const h = r.ok ? await r.text() : "";
+      return { status: r.status, items: /vertreten durch/i.test(h) ? 1 : 0 };
+    }),
     await probe("GLEIF", async () => {
       const r = await f("https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Rösterei&filter[entity.legalAddress.country]=DE&page[size]=1", { headers: { Accept: "application/vnd.api+json" }, signal: AbortSignal.timeout(30000) });
       const d = r.ok ? await r.json() : null;

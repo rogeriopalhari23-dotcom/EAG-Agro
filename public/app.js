@@ -670,6 +670,7 @@ async function showCompany(id, offset = 0) {
       `${c.country_code} · ${statusLabels[c.pipeline_status]} · Fonte: ${c.source_label}`,
     );
   node.append(button("Voltar às empresas", () => navigate("Empresas")));
+  node.append(details("Pessoas de compras", peoplePanel(id)));
   for (const d of data.demands) {
     const scoreBox = el("div", {});
     const box = panel(
@@ -2495,7 +2496,93 @@ function companyResult(c) {
     ),
     details("Validação assistida (links para você abrir)", el("ul", {}, ...c.validationLinks.map((l) => el("li", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))))),
     writable() ? details("Registrar sinal ou prova de importação", importEvidenceForm(c)) : null,
+    details("Pessoas de compras", peoplePanel(c.id)),
   );
+}
+
+// Pessoas de compras (dois radares): fontes permitidas (Impressum, QSA), pesquisa assistida e registro manual com fonte.
+// Carrega sob demanda; a pesquisa só consulta fontes quando a pessoa pede e reaproveita o que ainda está no prazo.
+function peoplePanel(companyId) {
+  const box = el("div", {}, text("small", "Carregando…"));
+  const load = async () => {
+    const v = await api(`/api/companies/${companyId}/people`);
+    const r = v.research;
+    box.replaceChildren(
+      text("small", v.notice),
+      text("small", `Identificadas: ${v.counts.identified} · cargo verificado: ${v.counts.titleVerified} · decisor confirmado: ${v.counts.decidersConfirmed} · e-mails validados: ${v.counts.emailsValidated}`),
+      !v.adherence.ok ? text("small", v.adherence.reason) : null,
+      r ? text("small", `Última pesquisa: ${r.at.slice(0, 10)} (${r.requests} consultas) · ${r.sources.map((s) => `${s.kind}: ${s.status}${s.note ? ` — ${s.note}` : ""}`).join(" · ")}${r.stale ? " · prazo vencido, pode pesquisar de novo" : ` · nova pesquisa após ${r.refreshAfter.slice(0, 10)}`}`) : text("small", "Ainda não pesquisada."),
+      writable() && v.adherence.ok && (!r || r.stale)
+        ? button("Pesquisar pessoas nas fontes permitidas", async () => {
+            const x = await api(`/api/companies/${companyId}/people/research`, "POST", {});
+            notice(x.skipped ? x.reason : `${x.added} pessoa(s) nova(s) — a validar.`);
+            await load();
+          })
+        : null,
+      ...v.people.map((p) =>
+        el(
+          "div",
+          { class: "row" },
+          el(
+            "div",
+            {},
+            text("strong", `${p.name}${p.title ? ` — ${p.title}` : ""}`),
+            text("span", p.state, p.state === "decisor de compras confirmado" ? "tag" : "tag warn"),
+            p.stale ? text("span", "fonte vencida — reconferir", "tag warn") : null,
+            text("small", `Por que: ${p.relevance}`),
+            el("small", {}, `Fonte: ${p.source.label} (verificado em ${p.source.verifiedAt.slice(0, 10)}) · `, el("a", { href: p.source.url, target: "_blank", rel: "noopener noreferrer" }, "abrir fonte")),
+            p.email ? text("small", `E-mail: ${p.email.value} — ${p.email.note} Validação: ${p.email.validation === "valid" ? "validado" : "não validado"}.`) : text("small", "E-mail: não encontrado na fonte (não deduzir do domínio)."),
+            p.phone ? text("small", `Telefone: ${p.phone.value} — ${p.phone.note}`) : null,
+            p.dismissReason ? text("small", `Descartada: ${p.dismissReason}`) : null,
+          ),
+          writable() && p.status === "to_validate"
+            ? el(
+                "div",
+                { class: "toolbar" },
+                button("Aceitar como contato", async () => {
+                  const x = await api(`/api/companies/${companyId}/people/${p.id}/accept`, "POST", {});
+                  notice(`Contato criado${x.emailCopied ? " com o e-mail pessoal publicado (validação pendente)" : " sem e-mail"}. Verifique cargo e poder de compra antes da ficha.`);
+                  await load();
+                }),
+                button("Descartar", async () => {
+                  const reason = prompt("Motivo do descarte (ex.: não atua em compras, saiu da empresa):");
+                  if (!reason) return;
+                  await api(`/api/companies/${companyId}/people/${p.id}/dismiss`, "POST", { reason });
+                  await load();
+                }),
+              )
+            : null,
+        ),
+      ),
+      details("Pesquisa assistida (você abre e registra o que confirmar)", el("ul", {}, ...v.assisted.map((l) => el("li", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))))),
+      writable() ? details("Registrar pessoa encontrada (com fonte)", personForm(companyId, load)) : null,
+    );
+  };
+  load().catch((e) => box.replaceChildren(text("small", e.message)));
+  return box;
+}
+function personForm(companyId, done) {
+  const f = (name, label, type = "text") => el("label", {}, label, el("input", { name, type }));
+  const form = el(
+    "form",
+    {},
+    f("name", "Nome"),
+    f("title", "Cargo (como aparece na fonte)"),
+    el("label", {}, "Fonte", el("select", { name: "sourceKind" }, el("option", { value: "company_site" }, "Site da empresa"), el("option", { value: "linkedin_manual" }, "LinkedIn (consulta manual)"), el("option", { value: "directory" }, "Diretório profissional"), el("option", { value: "manual" }, "Outra fonte"))),
+    f("sourceUrl", "URL da fonte", "url"),
+    f("email", "E-mail publicado (opcional)", "email"),
+    f("emailSourceUrl", "URL onde o e-mail aparece", "url"),
+    el("button", { type: "submit" }, "Registrar"),
+  );
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(form));
+    for (const k of Object.keys(d)) if (!d[k]) delete d[k];
+    await api(`/api/companies/${companyId}/people`, "POST", d);
+    form.reset();
+    await done();
+  });
+  return form;
 }
 
 // Descoberta por fontes gratuitas (OpenStreetMap, registros oficiais) e decisão da pessoa sobre cada candidato.
@@ -2668,6 +2755,13 @@ async function showForeignSearch(id, preloaded) {
   const node = section(`${x.country.name_pt} · ${x.commodity.label || x.commodity.name}`, `Busca de empresas compradoras (SH6 ${x.commodity.hs6.join(", ")}) · porte-alvo: ${x.target.sizesLabel.join(" e ")} · ${x.status === "open" ? "aberta" : `encerrada em ${x.closedAt.slice(0, 10)}`}`);
   node.setAttribute("data-screen", "internacional");
   node.append(text("p", x.notice, "notice-fixed"), button("Voltar ao Radar", () => navigate("Internacional")));
+  if (writable())
+    node.append(
+      button("Pesquisar pessoas de compras (lote de 5 empresas aderentes)", async () => {
+        const r = await api(`/api/foreign-searches/${x.id}/people/research`, "POST", {});
+        notice(`${r.researched} empresa(s) pesquisada(s), ${r.added} pessoa(s) a validar; faltam ${r.remaining}. Veja "Pessoas de compras" em cada empresa.`);
+      }),
+    );
   const m = x.metrics;
   node.append(
     el(

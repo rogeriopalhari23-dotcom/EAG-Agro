@@ -558,3 +558,10 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
 - Caso real Alemanha + café verde: 73 encontradas → 60 para revisão (36 torrefações, 16 traders, 8 a classificar) → **6 potenciais compradoras com declaração própria de importação** → **0 com prova individual**. Custo US$ 0; ~14–17 s por candidata válida.
 - Achado de produção: o registro francês respondeu 429 a partir do Worker (limite por ASN da API, documentado); tratado como temporário.
 - Testes: `tests/kaffeeverband.test.mjs` (casos reais que exigiram ajuste das regras), suíte 342 + 2, UI smoke OK.
+
+### 2026-09-28 — Pessoas de compras nos dois radares
+
+- Implementado: migração `0024_pessoas_de_compras.sql` (`person_candidates` com nome/cargo/e-mail/telefone criptografados e hash do nome; `people_research`), `src/adapters/people.js` (Impressum com robots.txt; BrasilAPI QSA), `src/people.js` (triagem de aderência, até 3 pessoas, lote de 5 por busca, reaproveitamento por prazo, aceite como contato, descarte, registro manual com fonte obrigatória), rotas `/api/companies/:id/people[...]` e `/api/foreign-searches/:id/people/research`, painel "Pessoas de compras" na empresa e na busca, sondas BrasilAPI e Impressum em `/api/integrations/discovery/reach`.
+- Teste real: DE 48 empresas → 37 Impressum → 21 com representante (24 pessoas), 0 e-mail pessoal, US$ 0, ≈12 s por empresa útil. BR 3 CNPJs de Franca/SP → 5 sócios-administradores, 0 e-mail. Detalhes em FONTES-EMPRESAS-EXTERIOR.md §7.
+- Correções achadas no teste real: robots.txt com curinga (`/*?add-to-cart=`) era lido como bloqueio total (19 falsos bloqueios); falsos nomes ("Systemen. Inhalte", "Radbruch Nachfolger", "Commerzbank Leipzig"); lista de exclusão pegava "ust" dentro de nomes (Muster, Gustav).
+- Testes: `tests/people.test.mjs`; suíte 348 + 2; UI smoke OK. Workflow de diagnóstico `receita-velocidade.yml` removido.
