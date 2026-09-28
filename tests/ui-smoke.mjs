@@ -264,7 +264,7 @@ try {
   await page.getByLabel("O que diz (referência)").fill("Site da empresa: 'importamos café verde de Santos'");
   await page.getByRole("button", { name: "Registrar", exact: true }).click();
   await page.getByRole("heading", { name: "Importadoras — perfil a confirmar (1)" }).waitFor();
-  await page.getByText(/potencial importadora/).first().waitFor();
+  await page.getByText(/potencial compradora/).first().waitFor();
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM company_conditions WHERE status='confirmed'").get().n, 0, "indício não confirma");
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM foreign_search_candidates").get().n, 1);
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM company_conditions WHERE status='confirmed'").get().n, 0, "nenhuma condição preenchida pelo dado do país");

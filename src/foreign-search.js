@@ -25,10 +25,12 @@ const PROFILE_LABEL = {
 };
 const ICP_LABEL = { in_icp: "no ICP", out_small: "fora do ICP — micro/MEI", out_giant: "fora do ICP — gigante", out_trader: "trader — só com exceção", pending_size: "porte a confirmar" };
 // Três níveis (mais o intermediário "compradora confirmada"): só evidência da própria empresa sobe de nível.
+// Estados distintos (pedido de Rogério em 2026-09-28): empresa encontrada, potencial compradora, importadora confirmada
+// e consumidora final confirmada. Só evidência da própria empresa, com fonte e data, sobe de estado.
 const BUYER = {
-  confirmed_importer: { rank: 0, label: "importadora confirmada (importa do Brasil)" },
-  confirmed_buyer: { rank: 1, label: "compradora confirmada da commodity (origem Brasil a confirmar)" },
-  potential: { rank: 2, label: "potencial importadora (sinal próprio de importação ou compra, a validar)" },
+  confirmed_importer: { rank: 0, label: "importadora confirmada" },
+  confirmed_buyer: { rank: 1, label: "compradora confirmada (importação não comprovada)" },
+  potential: { rank: 2, label: "potencial compradora (sinal próprio, a validar)" },
   found: { rank: 3, label: "empresa encontrada — importação não verificada" },
 };
 const SOURCE_KINDS = ["web_research", "public_directory", "official_registry", "company_website", "trade_fair", "paid_database", "adapter"];
@@ -214,10 +216,15 @@ async function companyCard(env, actor, x, row, productId) {
     const e = evidences.find((v) => v.id === k.evidence_id);
     if (e) proof.push(evidenceView(e, k.condition));
   }
+  // Documento da empresa conferido que prova importação (qualquer origem): confirma importação, não a origem Brasil.
+  for (const e of evidences.filter((v) => v.category === "business" && v.validation_status === "valid" && supportsOf(v).includes("imports")))
+    if (!proof.some((p) => p.id === e.id)) proof.push(evidenceView(e, "imports"));
   // Indícios: evidências da empresa que ainda não confirmam (indício comercial ou documento não validado).
   const used = new Set(proof.map((p) => p.id));
   const indications = evidences.filter((e) => !used.has(e.id) && (e.category === "commercial_signal" || e.validation_status !== "valid" || supportsOf(e).length)).map((e) => evidenceView(e, supportsOf(e)[0] ?? null));
-  const buyer = confirmed("imports_from_brazil") ? "confirmed_importer" : confirmed("buys_commodity") ? "confirmed_buyer" : indications.length ? "potential" : "found";
+  const brazilConfirmed = !!confirmed("imports_from_brazil");
+  const importConfirmed = brazilConfirmed || proof.some((p) => p.condition === "imports");
+  const buyer = importConfirmed ? "confirmed_importer" : confirmed("buys_commodity") ? "confirmed_buyer" : indications.length ? "potential" : "found";
   const profile = await s(env, "SELECT * FROM buyer_profiles WHERE tenant_id=? AND company_id=? AND unit_key='' AND product_id=?", actor.tenant_id, row.id, productId).first();
   const contactsRaw = (await s(env, "SELECT * FROM contacts WHERE tenant_id=? AND company_id=? ORDER BY created_at", actor.tenant_id, row.id).all()).results;
   const contacts = [];
@@ -247,7 +254,15 @@ async function companyCard(env, actor, x, row, productId) {
     size: row.size_class ? { class: row.size_class, label: SIZE_LABEL[row.size_class], source: row.size_source, checkedAt: row.size_checked_at } : null,
     activity: row.activity_text ? { text: row.activity_text, source: row.activity_source } : null,
     website: row.website,
-    buyerStatus: buyer, buyerStatusLabel: BUYER[buyer].label,
+    buyerStatus: buyer,
+    buyerStatusLabel: buyer === "confirmed_importer" ? `importadora confirmada (${brazilConfirmed ? "origem Brasil comprovada" : "origem Brasil não comprovada"})` : BUYER[buyer].label,
+    states: {
+      found: true,
+      potentialBuyer: buyer !== "found",
+      importerConfirmed: importConfirmed,
+      brazilOriginConfirmed: brazilConfirmed,
+      finalConsumerConfirmed: profile?.profile_class === "final_consumer_confirmed",
+    },
     importEvidence: proof, indications,
     profile: profile ? { class: profile.profile_class, label: PROFILE_LABEL[profile.profile_class], icpStatus: profile.icp_status, icpLabel: ICP_LABEL[profile.icp_status] } : null,
     contacts, ficha: { ok: ficha.ok, reason: ficha.reason ?? ficha.note ?? null, needsIndividualApproval: true },
@@ -297,6 +312,9 @@ export async function getSearch(env, actor, id) {
   const inTarget = (c) => target.sizes.includes(c.size?.class);
   const lastActivity = [x.authorized_at, ...sources.map((s) => s.recorded_at), ...rows.map((r) => r.cand_at)].sort().at(-1);
   const count = (f) => cards.filter(f).length;
+  const valid = count((c) => c.buyerStatus !== "found");
+  const totalMs = sources.reduce((a, s) => a + (s.duration_ms ?? 0) + (s.minutes ?? 0) * 60000, 0);
+  const totalCost = sources.reduce((a, s) => a + s.cost_usd, 0);
   const metrics = {
     coverage: {
       sourcesConsulted: sources.length,
@@ -310,6 +328,10 @@ export async function getSearch(env, actor, id) {
       costUsd: Math.round(sources.reduce((a, s) => a + s.cost_usd, 0) * 100) / 100,
       minutes: sources.reduce((a, s) => a + (s.minutes ?? 0), 0),
       elapsedHours: Math.round(((Date.parse(lastActivity) - Date.parse(x.authorized_at)) / 3600000) * 10) / 10,
+      // Por candidata válida = empresa na busca com evidência ou sinal próprio (potencial compradora ou melhor).
+      validCandidates: valid,
+      costPerValidUsd: valid ? Math.round((totalCost / valid) * 100) / 100 : null,
+      secondsPerValid: valid ? Math.round(totalMs / 1000 / valid) : null,
     },
     yield: {
       found: dsum(() => true),
@@ -323,6 +345,8 @@ export async function getSearch(env, actor, id) {
       traders: groups.traders.length,
       inTargetSize: count(inTarget),
       confirmedImporters: count((c) => c.buyerStatus === "confirmed_importer"),
+      brazilOriginConfirmed: count((c) => c.states.brazilOriginConfirmed),
+      finalConsumersConfirmed: count((c) => c.states.finalConsumerConfirmed),
       confirmedBuyers: count((c) => c.buyerStatus === "confirmed_buyer"),
       potentialBuyers: count((c) => c.buyerStatus === "potential"),
       withVerifiedDecisionMaker: count((c) => c.contacts.some((k) => k.verified && ["decision_maker", "provisional_decision_maker"].includes(k.role))),

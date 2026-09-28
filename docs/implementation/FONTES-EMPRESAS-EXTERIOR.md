@@ -74,3 +74,28 @@ Registro aduaneiro/conhecimento de embarque com nome do importador é a única f
 | Registro da Noruega | 200 · 110 empresas · 0,9 s |
 | GLEIF | 200 · 5 registros · 0,8 s |
 | OpenStreetMap (Overpass) | **521/522** (recusa a Cloudflare) → executado no navegador |
+
+## 6. Fontes do governo brasileiro e diretório setorial — caso Alemanha + café verde SH 090111 (2026-09-28)
+
+| Fonte (URL) | Resultado do teste | Cobertura / campos | Custo e acesso | Condições | Decisão |
+|---|---|---|---|---|---|
+| Catálogo de Empresas Estrangeiras (gov.br/…/catalogo-de-empresas-estrangeiras-1) | O link "Mais informações" leva a `…/invest-export-brasil/erro`: aviso oficial (atualizado em 14/09/2023) diz que o catálogo ficou **indisponível** na migração para o gov.br e voltaria pela plataforma Brasil Exportação; alternativa indicada: pedir contatos aos SECOMs | — | — | — | **Não utilizável**; nada implementado |
+| Brasil Exportação — BRAEXP (brasilexportacao.com.br) | No ar; busca da própria plataforma (`/wp-json/wp/v2/search`) lista ~97 serviços; **"Listas de Empresas Importadoras"** de SECOMs de vários países (ex.: França, Itália, Polônia; importadores coreanos por produto, inclusive café). **Nenhum serviço de lista de importadores do SECOM Berlim** | Por NCM, sob demanda | Grátis; pedido por e-mail ao SECOM (ex.: Atenas: análise em até 2 dias úteis, prazo combinado) | Para empresas brasileiras | **Etapa humana** (Rogério pede; mensagem externa não foi enviada) |
+| SECOM Berlim (secom.berlim@itamaraty.gov.br) | Contato oficial confirmado (gov.br/mre e BRAEXP); sem serviço publicado de lista | — | Grátis, por e-mail | — | **Etapa humana**: pedir lista NCM 0901.11 |
+| Oportunidades de Negócios (gov.br/…/oportunidades-de-negocios-1) — Europa/Alemanha | IXPOS "community" **404**; BDEx 200, mas é a federação alemã do **comércio exportador** (fora do alvo); Europages 202 (desafio anti-robô; só consulta manual); TradersCity 403; Export Helpdesk UE 403 (substituído pelo Access2Markets, sem diretório de empresas); ECIB 200 sem busca pública verificada | — | — | Diretórios proíbem raspagem | Nada implementado |
+| **Deutscher Kaffeeverband — Kaffeekontakte** (kaffeeverband.de/de/kaffeekontakte/) — achado na investigação | **Utilizável**: 151 membros; busca `?s=`; perfil com texto da própria empresa; alcançável do Worker (200) | Alemanha (+ alguns CH/AT/LU); nome, CEP/cidade, site, perfil | Grátis, sem chave | Sem robots.txt; Impressum/Nutzungsbedingungen sem cláusula contra coleta; uso pontual (1 requisição por busca, 1 por perfil, pausa de 0,5 s) | **Implementado** (`de_coffee_assoc`), com cache de 180 dias por empresa |
+| Comex Stat / MDIC | Não consultado para empresas: o MDIC não fornece empresas por produto (sigilo fiscal) | — | — | — | Fora de escopo |
+
+**Caso Alemanha + café verde (execução real, banco local temporário):**
+
+| Etapa | Resultado |
+|---|---|
+| Descoberta (2 buscas: Rohkaffee, Rösterei) | 73 empresas únicas em 2 s |
+| Descarte automático com motivo | 4 fora da Alemanha; 9 prestadores (logística, armazém, máquinas, consultoria) |
+| Validação por perfil (69 consultas, cache gravado) | 60 mantidas para revisão humana: 36 torrefações/processadoras sugeridas, 16 traders, 8 a classificar (perfil vazio ou sem indicação) |
+| **Candidatas com sinal próprio** (declaração da empresa em 1ª pessoa, com URL e data) | **6**: List + Beisler, Touton Specialties, EthioCo, Sandtorkai Handel Papenhagen, Café Chavalo (traders/importadores) e Dethlefsen & Balk (importador e fabricante) |
+| **Prova individual de importação** (documento da empresa) | **0** — exige documento da empresa ou base paga de registros aduaneiros |
+| Menção a Brasil nos perfis | 0 |
+| Custo e tempo | US$ 0; 71 consultas; ~100 s no total; ~14–17 s por candidata válida |
+
+As regras de classificação foram definidas antes da consulta e corrigidas no mesmo dia com os textos reais guardados em cache (sem nova coleta): importador que abastece torrefações é trader; rodapé do site não conta; declaração de importação só em primeira pessoa ("Kooperationen mit Importeuren" não conta); descarte automático só para prestador; o resto fica para revisão humana com papel sugerido.

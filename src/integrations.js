@@ -235,6 +235,11 @@ export async function reachDiscovery(request, env, actor, rid, deps = {}) {
       const d = r.ok ? await r.json() : null;
       return { status: r.status, items: d?.page?.totalElements ?? null };
     }),
+    await probe("Deutscher Kaffeeverband (Kaffeekontakte)", async () => {
+      const r = await f("https://www.kaffeeverband.de/de/kaffeekontakte/?s=Rohkaffee", { headers: { "User-Agent": "EAG-Compass/0.3 (+uso interno EAG Agro; consulta pontual)" }, signal: AbortSignal.timeout(30000) });
+      const h = r.ok ? await r.text() : "";
+      return { status: r.status, items: (h.match(/<li data-zip=/g) || []).length };
+    }),
     await probe("GLEIF", async () => {
       const r = await f("https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Rösterei&filter[entity.legalAddress.country]=DE&page[size]=1", { headers: { Accept: "application/vnd.api+json" }, signal: AbortSignal.timeout(30000) });
       const d = r.ok ? await r.json() : null;

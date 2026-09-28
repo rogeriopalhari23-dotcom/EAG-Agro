@@ -132,8 +132,9 @@ export async function gleifLookup({ name, iso2, base = "https://api.gleif.org/ap
 }
 
 // Fontes disponíveis por país (as demais aparecem como pendentes de chave ou pagas no documento de fontes).
-export function sourcesFor(iso2) {
+export function sourcesFor(iso2, hs4 = null) {
   return [
+    { key: "de_coffee_assoc", label: "Deutscher Kaffeeverband — Kaffeekontakte (diretório de membros)", available: iso2 === "DE" && hs4 === "0901" },
     { key: "osm", label: "OpenStreetMap (fábricas e torrefações mapeadas)", available: true },
     { key: "fr_registry", label: "Registro oficial da França (atividade e porte)", available: iso2 === "FR" },
     { key: "no_registry", label: "Registro oficial da Noruega (atividade, porte e site)", available: iso2 === "NO" },

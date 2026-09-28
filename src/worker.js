@@ -227,11 +227,12 @@ async function route(request, env, rid) {
   if (fsa && fsa[2] && method === "GET") return response(await foreignSearch.listSearches(env, actor, fsa[1]));
   if (path === "/api/foreign-searches" && method === "GET") return response(await foreignSearch.listAllSearches(env, actor));
   // Descoberta por fontes gratuitas e validação assistida (Radar Internacional).
-  const fsd = path.match(/^\/api\/foreign-searches\/([^/]+)\/(discovery|discover|discovery\/accept|discovery\/dismiss)$/);
+  const fsd = path.match(/^\/api\/foreign-searches\/([^/]+)\/(discovery|discover|discovery\/accept|discovery\/dismiss|discovery\/validate)$/);
   if (fsd && fsd[2] === "discovery" && method === "GET") return response(await discovery.getDiscovery(env, actor, fsd[1]));
   if (fsd && fsd[2] === "discover" && method === "POST") return response(await discovery.discover(request, env, actor, rid, fsd[1]), 201);
   if (fsd && fsd[2] === "discovery/accept" && method === "POST") return response(await discovery.accept(request, env, actor, rid, fsd[1]));
   if (fsd && fsd[2] === "discovery/dismiss" && method === "POST") return response(await discovery.dismiss(request, env, actor, rid, fsd[1]));
+  if (fsd && fsd[2] === "discovery/validate" && method === "POST") return response(await discovery.validateCandidates(request, env, actor, rid, fsd[1]));
   const cgl = path.match(/^\/api\/companies\/([^/]+)\/gleif$/);
   if (cgl && method === "GET") return response(await discovery.companyGleif(env, actor, cgl[1]));
   const fsx = path.match(/^\/api\/foreign-searches\/([^/]+)(?:\/(sources|candidates|close))?$/);

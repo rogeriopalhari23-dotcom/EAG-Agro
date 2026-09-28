@@ -9,7 +9,11 @@ import { icpStatus } from "./profiles.js";
 import { proposalFor, MAP_VERSION } from "./discovery-map.js";
 import { osmCandidates, parseOverpass, overpassQuery, frCandidates, noCandidates, gleifLookup, eoriCheck, sourcesFor, OSM_ATTRIBUTION } from "./adapters/discovery.js";
 
-const SOURCE_LABEL = { osm: "OpenStreetMap (Overpass)", fr_registry: "Registro oficial da França (API Recherche d'entreprises)", no_registry: "Registro oficial da Noruega (Brønnøysund)" };
+import { kvSearch, kvProfile, classifyCoffeeProfile, isGermanPlace, REFRESH_DAYS } from "./adapters/kaffeeverband.js";
+
+const SYSTEM_ID = "system-discovery";
+const addDays = (iso, d) => new Date(Date.parse(iso) + d * 86400000).toISOString();
+const SOURCE_LABEL = { de_coffee_assoc: "Deutscher Kaffeeverband — Kaffeekontakte", osm: "OpenStreetMap (Overpass)", fr_registry: "Registro oficial da França (API Recherche d'entreprises)", no_registry: "Registro oficial da Noruega (Brønnøysund)" };
 const NACE_RE = /^\d{2}\.\d{2}$/;
 
 async function searchOf(env, actor, id, { open = false } = {}) {
@@ -35,6 +39,7 @@ export async function getDiscovery(env, actor, id) {
     registry: r.registry_id ? { id: r.registry_id, type: r.registry_type } : null,
     recordUrl: r.record_url, status: r.status, companyId: r.company_id, dismissReason: r.dismiss_reason,
     importSignal: r.eori ? { eori: r.eori, status: r.eori_status, checkedAt: r.eori_checked_at } : null,
+    importStatement: r.import_statement, mentionsBrazil: !!r.mentions_brazil, validatedAt: r.validated_at, validationNote: r.validation_note,
     possibleDuplicate: (byKey.get(normalizeName(r.name)) ?? []).length > 1 || (r.status === "new" && known.some((k) => normalizeName(k.legal_name) === normalizeName(r.name))),
   });
   const items = rows.map(view);
@@ -43,10 +48,15 @@ export async function getDiscovery(env, actor, id) {
     searchId: x.id, country, proposal: proposalFor(hs6), mapVersion: MAP_VERSION,
     // Consulta pronta para o navegador executar no servidor público do OSM (que recusa a Cloudflare).
     osmQuery: proposalFor(hs6)?.processors.osm.length ? overpassQuery(country.iso2, proposalFor(hs6).processors.osm) : null,
-    sources: sourcesFor(country.iso2),
+    sources: sourcesFor(country.iso2, hs6[0]?.slice(0, 4)),
     stage: "empresa encontrada",
     notice: "Candidato encontrado por atividade no cadastro ou no mapa: indício de uso da commodity, não prova de compra nem de importação. EORI ativo (aduana da UE) é sinal próprio de comércio exterior — não prova importação da commodity nem origem Brasil. O dado do país (MDIC/Comtrade) nunca confirma empresa.",
-    counts: { withEori: count((c) => c.importSignal?.status === "valid"), found: items.length, new: count((c) => c.status === "new"), accepted: count((c) => c.status === "accepted"), dismissed: count((c) => c.status === "dismissed"), processors: count((c) => c.role === "processor"), traders: count((c) => c.role === "trader") },
+    counts: {
+      awaitingValidation: count((c) => c.source === "de_coffee_assoc" && c.status === "new" && !c.validatedAt),
+      relevant: count((c) => c.status !== "dismissed" && (c.source !== "de_coffee_assoc" || c.validatedAt)),
+      withImportStatement: count((c) => c.status !== "dismissed" && c.importStatement),
+      autoDismissed: count((c) => c.status === "dismissed" && (c.dismissReason ?? "").startsWith("[automático]")),
+      withEori: count((c) => c.importSignal?.status === "valid"), found: items.length, new: count((c) => c.status === "new"), accepted: count((c) => c.status === "accepted"), dismissed: count((c) => c.status === "dismissed"), processors: count((c) => c.role === "processor"), traders: count((c) => c.role === "trader") },
     processors: items.filter((c) => c.role === "processor"),
     traders: items.filter((c) => c.role === "trader"),
   };
@@ -57,9 +67,10 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
   requireRole(actor, WRITE_ROLES);
   const { x, country, hs6, target } = await searchOf(env, actor, id, { open: true });
   const i = await bodyJson(request);
-  const source = oneOf(i.source, ["osm", "fr_registry", "no_registry"], "fonte");
+  const source = oneOf(i.source, ["osm", "fr_registry", "no_registry", "de_coffee_assoc"], "fonte");
   const role = oneOf(i.role ?? "processor", ["processor", "trader"], "grupo");
-  if (!sourcesFor(country.iso2).find((z) => z.key === source)?.available) fail(422, "source_not_available", "Fonte não cobre este país.");
+  if (!sourcesFor(country.iso2, hs6[0]?.slice(0, 4)).find((z) => z.key === source)?.available) fail(422, "source_not_available", "Fonte não cobre este país ou esta commodity.");
+  if (source === "de_coffee_assoc") return discoverKaffeeverband(env, actor, rid, x, deps);
   const proposal = proposalFor(hs6);
   const nace = i.nace ?? proposal?.[role === "trader" ? "traders" : "processors"]?.nace;
   if (!Array.isArray(nace) || !nace.length || nace.length > 12 || !nace.every((c) => NACE_RE.test(String(c))))
@@ -183,6 +194,16 @@ export async function accept(request, env, actor, rid, id) {
         ),
       );
     }
+    if (c.import_statement)
+      stmts.push(
+        s(
+          env,
+          "INSERT INTO evidence(id,tenant_id,company_id,category,evidence_type,reference,source_url,fact_date,consulted_at,validation_status,validated_by,validated_at,metadata_json,created_by) VALUES (?,?,?,'commercial_signal','self_declaration',?,?,NULL,?,'pending',NULL,NULL,?,?)",
+          crypto.randomUUID(), actor.tenant_id, companyId,
+          `A própria empresa declara, no diretório ${SOURCE_LABEL[c.source]}: "${c.import_statement}". Sinal próprio de importação (origem e produto a confirmar).`,
+          c.record_url, c.validated_at ?? at, JSON.stringify({ supports: ["imports"], mentionsBrazil: !!c.mentions_brazil }), actor.id,
+        ),
+      );
     if (c.eori_status === "valid")
       stmts.push(
         s(
@@ -242,4 +263,130 @@ export function validationLinks(card, commodityTerm, country) {
   if (country.iso2 === "US") links.push({ label: "ImportYeti (registros de embarque dos EUA, gratuito)", url: `https://www.importyeti.com/search?q=${encodeURIComponent(card.name)}` });
   links.push({ label: "LinkedIn: compras da empresa (sem login automatizado)", url: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${card.name} purchasing`)}` });
   return links;
+}
+
+// ---------- Deutscher Kaffeeverband: descoberta (1 busca por termo) e validação por empresa (1 perfil cada, com cache) ----------
+async function cached(env, source, externalId, at) {
+  const r = await s(env, "SELECT * FROM research_cache WHERE source=? AND external_id=? AND refresh_after>?", source, externalId, at).first();
+  return r ? { ...JSON.parse(r.result_json), checkedAt: r.checked_at, url: r.url } : null;
+}
+const ROLE_LABEL = { processor: "torrefação/processadora", trader: "importador/trader", non_buyer: "não comprador", unclassified: "não classificado", empty: "a classificar (perfil sem texto)" };
+function applyValidation(env, c, v, at) {
+  // Descarte automático só para prestador (critério claro); perfil vazio ou sem indicação fica para revisão humana.
+  const dismiss = v.role === "non_buyer" ? 1 : 0;
+  const note = `papel: ${ROLE_LABEL[v.role]}${v.importStatement ? "; declara importação" : ""}${v.mentionsBrazil ? "; menciona Brasil" : ""}`;
+  return s(
+    env,
+    `UPDATE discovery_candidates SET role=?,import_statement=?,mentions_brazil=?,validated_at=?,validation_note=?,
+       status=CASE WHEN ?=1 THEN 'dismissed' ELSE status END,
+       dismiss_reason=CASE WHEN ?=1 THEN ? ELSE dismiss_reason END,
+       decided_by=CASE WHEN ?=1 THEN ? ELSE decided_by END,
+       decided_at=CASE WHEN ?=1 THEN ? ELSE decided_at END
+     WHERE id=? AND status='new'`,
+    v.role === "trader" ? "trader" : "processor", v.importStatement ?? null, v.mentionsBrazil ? 1 : 0, v.checkedAt ?? at, note,
+    dismiss, dismiss, `[automático] ${v.reason}`, dismiss, SYSTEM_ID, dismiss, at, c.id,
+  );
+}
+
+async function discoverKaffeeverband(env, actor, rid, x, deps) {
+  const f = deps.fetch ?? fetch;
+  const at = deps.now?.() ?? now();
+  const started = Date.now();
+  const byId = new Map();
+  let calls = 0;
+  try {
+    for (const term of ["Rohkaffee", "Rösterei"]) {
+      calls++;
+      for (const e of await kvSearch(term, f)) if (!byId.has(e.externalId)) byId.set(e.externalId, e);
+    }
+  } catch (e) {
+    if (e?.name !== "AdapterError") throw e;
+    fail(503, "source_unavailable", `${e.message} Nada foi descartado; tente de novo mais tarde.`);
+  }
+  const runId = crypto.randomUUID();
+  const list = [...byId.values()];
+  const stmts = [
+    s(
+      env,
+      "INSERT INTO foreign_search_sources(id,search_id,source_label,source_kind,query_text,result_count,api_calls,cost_usd,minutes,duration_ms,note,recorded_by) VALUES (?,?,?,'public_directory',?,?,?,0,0,?,?,?)",
+      runId, x.id, SOURCE_LABEL.de_coffee_assoc, "busca ?s=Rohkaffee e ?s=Rösterei (https://www.kaffeeverband.de/de/kaffeekontakte/)", list.length, calls, Date.now() - started,
+      "diretório público de membros; fora da Alemanha descartado automaticamente; validação por perfil em lotes, com cache de 180 dias", actor.id,
+    ),
+  ];
+  for (const e of list) {
+    const foreign = !isGermanPlace(e.place);
+    const city = e.place ? e.place.replace(/^\d{4,5}\s+/, "") : null;
+    stmts.push(
+      s(
+        env,
+        `INSERT OR IGNORE INTO discovery_candidates(id,search_id,run_id,source,external_id,role,name,city,website,activity_code,activity_label,record_url,status,dismiss_reason,decided_by,decided_at)
+         VALUES (?,?,?,'de_coffee_assoc',?,'processor',?,?,?,?,?,?,?,?,?,?)`,
+        crypto.randomUUID(), x.id, runId, e.externalId, e.name, city, e.website, "Kaffeeverband", "membro do Deutscher Kaffeeverband", e.profileUrl,
+        foreign ? "dismissed" : "new", foreign ? `[automático] fora da Alemanha (${e.place ?? "sem endereço"})` : null, foreign ? SYSTEM_ID : null, foreign ? at : null,
+      ),
+    );
+  }
+  stmts.push(auditStatement(env, actor, rid, "foreign_search.discovered", "foreign_search", x.id, { source: "de_coffee_assoc", found: list.length }));
+  for (let k = 0; k < stmts.length; k += 90) await commit(env, stmts.slice(k, k + 90));
+  // Empresas já pesquisadas e dentro do prazo da fonte: validação reaproveitada sem nova consulta.
+  const pending = (await s(env, "SELECT * FROM discovery_candidates WHERE search_id=? AND source='de_coffee_assoc' AND status='new' AND validated_at IS NULL", x.id).all()).results;
+  const reuse = [];
+  for (const c of pending) {
+    const v = await cached(env, "de_coffee_assoc", c.external_id, at);
+    if (v) reuse.push(applyValidation(env, c, v, at));
+  }
+  if (reuse.length) await commit(env, reuse);
+  return { runId, source: "de_coffee_assoc", role: "processor", found: list.length, totalInSource: list.length, truncated: false, reusedFromCache: reuse.length, discovery: await getDiscovery(env, actor, x.id) };
+}
+
+// POST /api/foreign-searches/:id/discovery/validate — segunda etapa, só para as candidatas ainda relevantes.
+export async function validateCandidates(request, env, actor, rid, id, deps = {}) {
+  requireRole(actor, WRITE_ROLES);
+  const { x } = await searchOf(env, actor, id, { open: true });
+  const i = await bodyJson(request);
+  const limit = Math.min(Math.max(Number(i.limit) || 20, 1), 40);
+  const f = deps.fetch ?? fetch;
+  const pause = deps.pause ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const at = deps.now?.() ?? now();
+  const todo = (await s(env, "SELECT * FROM discovery_candidates WHERE search_id=? AND source='de_coffee_assoc' AND status='new' AND validated_at IS NULL ORDER BY name LIMIT ?", x.id, limit).all()).results;
+  const started = Date.now();
+  let calls = 0, reused = 0, failed = 0;
+  const stmts = [];
+  for (const c of todo) {
+    let v = await cached(env, "de_coffee_assoc", c.external_id, at);
+    if (v) reused++;
+    else {
+      if (calls) await pause(500);
+      try {
+        calls++;
+        const text = await kvProfile(c.external_id, f);
+        v = { ...classifyCoffeeProfile(c.name, text), checkedAt: at };
+        stmts.push(
+          s(
+            env,
+            "INSERT INTO research_cache(source,external_id,url,checked_at,refresh_after,result_json,discard_reason) VALUES ('de_coffee_assoc',?,?,?,?,?,?) ON CONFLICT(source,external_id) DO UPDATE SET url=excluded.url,checked_at=excluded.checked_at,refresh_after=excluded.refresh_after,result_json=excluded.result_json,discard_reason=excluded.discard_reason",
+            c.external_id, c.record_url, at, addDays(at, REFRESH_DAYS.de_coffee_assoc),
+            JSON.stringify({ role: v.role, importStatement: v.importStatement, mentionsBrazil: v.mentionsBrazil, reason: v.reason, profileText: text.slice(0, 1500) }), v.reason,
+          ),
+        );
+      } catch (e) {
+        if (e?.name !== "AdapterError") throw e;
+        failed++;
+        continue;
+      }
+    }
+    stmts.push(applyValidation(env, c, v, at));
+  }
+  const runId = crypto.randomUUID();
+  stmts.unshift(
+    s(
+      env,
+      "INSERT INTO foreign_search_sources(id,search_id,source_label,source_kind,query_text,result_count,api_calls,cost_usd,minutes,duration_ms,note,recorded_by) VALUES (?,?,?,'public_directory',?,?,?,0,0,?,?,?)",
+      runId, x.id, `${SOURCE_LABEL.de_coffee_assoc} — validação de perfis`, `${todo.length} perfil(is)`, todo.length - failed, calls, Date.now() - started,
+      `${reused} reaproveitado(s) do cache${failed ? `; ${failed} falha(s) de rede (tentar de novo)` : ""}`, actor.id,
+    ),
+  );
+  stmts.push(auditStatement(env, actor, rid, "foreign_search.validated", "foreign_search", x.id, { checked: todo.length, calls, reused, failed }));
+  for (let k = 0; k < stmts.length; k += 90) await commit(env, stmts.slice(k, k + 90));
+  return { checked: todo.length, calls, reusedFromCache: reused, failed, discovery: await getDiscovery(env, actor, x.id) };
 }

@@ -51,7 +51,7 @@ test("Descoberta: fonte gratuita gera 'empresas encontradas'; repetir não dupli
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM discovery_candidates").get().n, 2, "falha não apaga nem esvazia");
   const d = (await api(`/api/foreign-searches/${searchId}/discovery`)).data;
   assert.equal(d.proposal.hs4, "0901");
-  assert.deepEqual(d.sources.filter((x) => x.available).map((x) => x.key), ["osm"]);
+  assert.deepEqual(d.sources.filter((x) => x.available).map((x) => x.key), ["de_coffee_assoc", "osm"], "Alemanha + café: diretório da associação e OSM");
 });
 
 test("Descoberta: aceitar cria empresa com atividade e perfil de indício; três níveis — encontrada, potencial, importadora confirmada", async (t) => {

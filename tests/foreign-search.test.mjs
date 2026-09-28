@@ -123,7 +123,7 @@ test("Radar: resultado por empresa — consumidoras/fábricas antes, traders à 
   assert.ok(a.pending.includes("E-mail do decisor não validado."));
   const b = r.groups.consumers[1];
   assert.equal(b.buyerStatus, "potential");
-  assert.match(b.buyerStatusLabel, /potencial importadora/);
+  assert.match(b.buyerStatusLabel, /potencial compradora/);
   assert.deepEqual([b.indications[0].sourceUrl, b.indications[0].factDate.slice(0, 10), b.indications[0].condition], ["https://jobs.example/9", "2026-08-01", "buys_commodity"]);
   assert.ok(b.pending.some((p) => /Validar o indício/.test(p)));
   assert.ok(b.pending.includes("Nenhum decisor ou comprador com fonte registrada."));

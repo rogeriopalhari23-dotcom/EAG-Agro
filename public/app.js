@@ -2516,6 +2516,8 @@ function candidateRow(c, chosen) {
       c.importSignal ? text("span", c.importSignal.status === "valid" ? `EORI ${c.importSignal.eori} ativo — sinal de importação` : c.importSignal.status === "not_valid" ? "EORI não encontrado com o SIRET da sede" : "EORI não conferido", c.importSignal.status === "valid" ? "tag" : "tag warn") : text("span", "importação não verificada", "tag warn"),
       text("small", `Fonte: ${c.sourceLabel} · atividade: ${c.activity ? c.activity.label : "—"} · porte: ${c.size ? `${DISC_SIZE[c.size.band]} (${c.size.source})` : "não informado na fonte"}${c.registry ? ` · ${c.registry.type} ${c.registry.id}` : ""}`),
       el("small", {}, c.website ? el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, "site") : "sem site na fonte", " · ", el("a", { href: c.recordUrl, target: "_blank", rel: "noopener noreferrer" }, "registro na fonte")),
+      c.validationNote ? text("small", `Validação (${c.validatedAt ? c.validatedAt.slice(0, 10) : "—"}): ${c.validationNote}`) : c.source === "de_coffee_assoc" && c.status === "new" ? text("small", "Perfil ainda não validado.") : null,
+      c.importStatement ? text("small", `Declaração da própria empresa: "${c.importStatement}"`) : null,
       c.dismissReason ? text("small", `Descartada: ${c.dismissReason}`) : null,
     ),
   );
@@ -2565,13 +2567,20 @@ async function discoveryPanel(x) {
         "div",
         { class: "toolbar" },
         ...avail.map((s) => runBtn(`Gerar candidatos: ${s.label}`, { source: s.key, role: "processor", nace: parse(nace.control.value).length ? parse(nace.control.value) : undefined })),
-        ...avail.filter((s) => s.key !== "osm").map((s) => runBtn(`Gerar traders: ${s.label}`, { source: s.key, role: "trader", nace: parse(naceT.control.value).length ? parse(naceT.control.value) : undefined })),
+        ...avail.filter((s) => ["fr_registry", "no_registry"].includes(s.key)).map((s) => runBtn(`Gerar traders: ${s.label}`, { source: s.key, role: "trader", nace: parse(naceT.control.value).length ? parse(naceT.control.value) : undefined })),
+        d.counts.awaitingValidation
+          ? button(`Validar próximos 20 perfis (${d.counts.awaitingValidation} aguardando)`, async () => {
+              const r = await api(`/api/foreign-searches/${x.id}/discovery/validate`, "POST", { limit: 20 });
+              notice(`${r.checked} perfil(is) conferido(s): ${r.calls} consulta(s), ${r.reusedFromCache} do cache${r.failed ? `, ${r.failed} falha(s) — tente de novo` : ""}.`, r.failed > 0);
+              await showForeignSearch(x.id);
+            }, true)
+          : null,
       ),
       unavailable.length ? text("small", `Fora da cobertura deste país: ${unavailable.map((s) => s.label).join("; ")}.`) : null,
     );
   wrap.append(
     text("p", d.notice, "muted"),
-    text("p", `Encontradas: ${d.counts.found} (${d.counts.processors} consumidoras/processadoras, ${d.counts.traders} traders) · com sinal de importação (EORI ativo): ${d.counts.withEori} · aguardando decisão: ${d.counts.new} · aceitas: ${d.counts.accepted} · descartadas: ${d.counts.dismissed}`),
+    text("p", `Encontradas: ${d.counts.found} · relevantes após validação: ${d.counts.relevant} · aguardando validação: ${d.counts.awaitingValidation} · descartadas automaticamente (fora do país ou não compradoras): ${d.counts.autoDismissed} · com declaração própria de importação: ${d.counts.withImportStatement} · EORI ativo: ${d.counts.withEori} · aceitas: ${d.counts.accepted}`),
   );
   for (const [title, list] of [["Consumidoras finais, fábricas e processadoras encontradas", d.processors], ["Traders e distribuidores encontrados (prioridade secundária)", d.traders]]) {
     if (!list.length) continue;
@@ -2645,7 +2654,7 @@ function importEvidenceForm(c) {
       });
       // Prova conferida de importação do Brasil ou de compra confirma a condição da empresa (R12.10); "importa" genérico nunca confirma.
       if (proof && v.supports !== "imports") await api(`/api/companies/${c.id}/conditions/${state.searchProductId}/${v.supports}`, "PUT", { status: "confirmed", evidenceId: ev.id });
-      notice(proof && v.supports === "imports_from_brazil" ? "Importação do Brasil confirmada por documento da empresa." : "Sinal registrado: a empresa passa a potencial importadora, a validar.");
+      notice(proof && v.supports === "imports_from_brazil" ? "Importação do Brasil confirmada por documento da empresa." : "Sinal registrado: a empresa passa a potencial compradora, a validar.");
       await showForeignSearch(state.searchId);
     },
     "Registrar",
@@ -2665,7 +2674,7 @@ async function showForeignSearch(id, preloaded) {
       "div",
       { class: "stats" },
       el("div", { class: "stat" }, text("strong", "Cobertura"), text("p", `${m.coverage.sourcesConsulted} fonte(s) consultada(s), ${m.coverage.sourcesWithResults} com resultado`), text("p", m.coverage.note)),
-      el("div", { class: "stat" }, text("strong", "Custo"), text("p", `${m.cost.apiCalls} chamada(s) · ${usd(m.cost.costUsd)} · ${m.cost.minutes} min registrados · ${m.cost.elapsedHours} h desde a autorização`)),
+      el("div", { class: "stat" }, text("strong", "Custo"), text("p", `${m.cost.apiCalls} chamada(s) · ${usd(m.cost.costUsd)} · ${m.cost.minutes} min registrados · ${m.cost.elapsedHours} h desde a autorização`), text("p", m.cost.validCandidates ? `Por candidata válida (${m.cost.validCandidates}): ${usd(m.cost.costPerValidUsd)} e ${m.cost.secondsPerValid} s de consulta` : "Ainda sem candidata válida (com sinal próprio).")),
       el(
         "div",
         { class: "stat" },
