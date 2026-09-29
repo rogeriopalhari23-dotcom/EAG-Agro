@@ -95,6 +95,7 @@ test("Pesquisa de pessoas: empresa aderente, até 3, sem duplicar, reaproveita d
   const at = "2026-10-11T10:00:00.000Z";
   const r = await researchCompany(req(), env, admin, "rid", kr, { fetch: site(pages, calls), now: at });
   assert.equal(r.added, 2);
+  assert.equal(DB.raw.prepare("SELECT refresh_after FROM people_research WHERE company_id=?").get(kr).refresh_after, "2027-04-09T10:00:00.000Z", "Impressum: 180 dias");
   assert.equal(calls.length, 2, "robots + impressum: nada além do necessário");
   const again = await researchCompany(req(), env, admin, "rid", kr, { fetch: site(pages, calls), now: "2026-11-01T00:00:00.000Z" });
   assert.equal(again.reused, true);

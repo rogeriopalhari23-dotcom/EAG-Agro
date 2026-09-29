@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
-import { checkMailbox, checkComtrade } from "../src/integrations.js";
+import { checkMailbox, checkComtrade, checkSuppression } from "../src/integrations.js";
 import { AdapterError } from "../src/adapters/errors.js";
 
 const admin = { tenant_id: "eag-internal", id: "system-admin", role: "admin" };
@@ -94,4 +94,17 @@ test("Integrações: chamada real da Comtrade devolve código e metadados, nunca
   assert.equal(ok.calls[0].records[0].partner, "76 Brazil");
   // Sem perfil admin → recusado.
   await assert.rejects(checkComtrade(req(), ctx.env, { ...admin, role: "commercial_manager" }, "rid", { fetch: fetch401 }));
+});
+
+test("Supressão: diagnóstico só leitura reconhece a chave, consulta a lista e não grava entrada; sem chave, acusa", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  const r = await checkSuppression(req(), ctx.env, admin, "rid");
+  assert.deepEqual([r.keyLoaded, r.stableHash, r.lookupOk, r.probeSuppressed, r.entries, r.error], [true, true, true, false, 0, null]);
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM suppression_entries").get().n, 0, "não grava na lista");
+  assert.doesNotMatch(JSON.stringify(r), /[0-9a-f]{64}/, "não devolve hash");
+  const missing = await checkSuppression(req(), { ...ctx.env, SUPPRESSION_HMAC_KEY: undefined }, admin, "rid");
+  assert.equal(missing.keyLoaded, false);
+  assert.match(missing.error, /SUPPRESSION_HMAC_KEY ausente/);
+  await assert.rejects(checkSuppression(req(), ctx.env, { ...admin, role: "operator" }, "rid"), (e) => e.status === 403);
 });

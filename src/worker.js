@@ -213,6 +213,7 @@ async function route(request, env, rid) {
   if (path === "/api/integrations" && method === "GET") return response(await integrations.status(env, actor));
   if (path === "/api/integrations/mailbox/reach" && method === "POST") return response(await integrations.reachMailbox(request, env, actor, rid));
   if (path === "/api/integrations/discovery/reach" && method === "POST") return response(await integrations.reachDiscovery(request, env, actor, rid));
+  if (path === "/api/integrations/suppression/check" && method === "POST") return response(await integrations.checkSuppression(request, env, actor, rid));
   if (path === "/api/integrations/comtrade/check" && method === "POST") return response(await integrations.checkComtrade(request, env, actor, rid));
   if (path === "/api/integrations/mailbox/check" && method === "POST") return response(await integrations.checkMailbox(request, env, actor, rid));
   if (path === "/api/foreign-companies" && method === "POST") return response(await foreign.createForeignCompany(request, env, actor, rid), 201);

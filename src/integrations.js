@@ -4,6 +4,8 @@ import { bodyJson, fail, requireRole } from "./http.js";
 import { statement as s, commit, auditStatement, parameters } from "./store.js";
 import { imapClient } from "./adapters/imap.js";
 import { AdapterError } from "./adapters/errors.js";
+import { identifierHash } from "./crypto.js";
+import { isSuppressed } from "./operations.js";
 import * as comtrade from "./adapters/comtrade.js";
 
 const ADMIN = new Set(["admin"]);
@@ -259,4 +261,26 @@ export async function reachDiscovery(request, env, actor, rid, deps = {}) {
   ];
   await commit(env, [auditStatement(env, actor, rid, "integration.discovery_reached", "integration", "discovery", { ok: results.map((r) => r.ok) })]);
   return { results };
+}
+
+// POST /api/integrations/suppression/check — diagnóstico interno, só leitura (2026-09-29): a chave HMAC carrega, o hash é
+// estável e a consulta à lista de supressão roda. Usa um endereço reservado (.invalid, RFC 2606) que nunca recebe mensagem;
+// não grava na lista nem mostra hash ou chave.
+export async function checkSuppression(request, env, actor, rid) {
+  requireRole(actor, ADMIN);
+  await bodyJson(request);
+  const probe = "verificacao-interna@eag-compass.invalid";
+  const out = { keyLoaded: false, stableHash: false, lookupOk: false, probeSuppressed: null, entries: null, error: null };
+  try {
+    const [a, b] = [await identifierHash(env, actor.tenant_id, "email", probe), await identifierHash(env, actor.tenant_id, "email", probe.toUpperCase())];
+    out.keyLoaded = true;
+    out.stableHash = a === b && /^[0-9a-f]{64}$/.test(a);
+    out.probeSuppressed = await isSuppressed(env, actor.tenant_id, "email", probe);
+    out.entries = (await s(env, "SELECT COUNT(*) n FROM suppression_entries WHERE tenant_id=?", actor.tenant_id).first()).n;
+    out.lookupOk = true;
+  } catch (e) {
+    out.error = String(e?.message || e).slice(0, 160);
+  }
+  await commit(env, [auditStatement(env, actor, rid, "integration.suppression_checked", "integration", "suppression", { keyLoaded: out.keyLoaded, lookupOk: out.lookupOk })]);
+  return out;
 }

@@ -127,12 +127,14 @@ async function research(env, actor, rid, c, deps) {
     }
   }
   const requests = found.reduce((n, x) => n + (x.requests ?? 0), 0);
-  const days = Math.min(...found.filter((x) => x.status === "ok").map((x) => PEOPLE_REFRESH_DAYS[x.kind]), 30);
+  // Prazo da fonte mais curta que respondeu; sem fonte útil, tenta de novo em 30 dias.
+  const okDays = found.filter((x) => x.status === "ok").map((x) => PEOPLE_REFRESH_DAYS[x.kind]);
+  const days = okDays.length ? Math.min(...okDays) : 30;
   stmts.push(
     s(
       env,
       "INSERT INTO people_research(company_id,tenant_id,researched_at,refresh_after,sources_json,requests,duration_ms,researched_by) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(company_id) DO UPDATE SET researched_at=excluded.researched_at,refresh_after=excluded.refresh_after,sources_json=excluded.sources_json,requests=excluded.requests,duration_ms=excluded.duration_ms,researched_by=excluded.researched_by",
-      c.id, actor.tenant_id, at, addDays(at, Number.isFinite(days) ? days : 30), JSON.stringify(sources), requests, Date.now() - started, actor.id,
+      c.id, actor.tenant_id, at, addDays(at, days), JSON.stringify(sources), requests, Date.now() - started, actor.id,
     ),
     auditStatement(env, actor, rid, "people.researched", "company", c.id, { added, requests, sources: sources.map((x) => `${x.kind}:${x.status}`) }),
   );
