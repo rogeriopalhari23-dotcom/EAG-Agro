@@ -154,8 +154,8 @@ export async function researchSearchBatch(request, env, actor, rid, searchId, de
       `SELECT c.* FROM foreign_search_candidates fc JOIN companies c ON c.id=fc.company_id
        JOIN buyer_profiles bp ON bp.company_id=c.id AND bp.tenant_id=c.tenant_id AND bp.product_id=? AND bp.unit_key=''
        LEFT JOIN people_research pr ON pr.company_id=c.id
-       WHERE fc.search_id=? AND c.tenant_id=? AND bp.icp_status IN ('in_icp','pending_size') AND (pr.company_id IS NULL OR pr.refresh_after<=?)
-       ORDER BY CASE bp.icp_status WHEN 'in_icp' THEN 0 ELSE 1 END, fc.added_at LIMIT ?`,
+       WHERE fc.search_id=? AND fc.status='active' AND c.tenant_id=? AND bp.icp_status IN ('in_icp','pending_size') AND (pr.company_id IS NULL OR pr.refresh_after<=?)
+       ORDER BY fc.priority='secondary', CASE bp.icp_status WHEN 'in_icp' THEN 0 ELSE 1 END, fc.added_at LIMIT ?`,
       x.product_id, x.id, actor.tenant_id, at, BATCH,
     ).all()
   ).results;
@@ -171,7 +171,7 @@ export async function researchSearchBatch(request, env, actor, rid, searchId, de
     await s(
       env,
       `SELECT COUNT(*) n FROM foreign_search_candidates fc JOIN buyer_profiles bp ON bp.company_id=fc.company_id AND bp.product_id=? AND bp.unit_key='' LEFT JOIN people_research pr ON pr.company_id=fc.company_id
-       WHERE fc.search_id=? AND bp.icp_status IN ('in_icp','pending_size') AND (pr.company_id IS NULL OR pr.refresh_after<=?)`,
+       WHERE fc.search_id=? AND fc.status='active' AND bp.icp_status IN ('in_icp','pending_size') AND (pr.company_id IS NULL OR pr.refresh_after<=?)`,
       x.product_id, x.id, at,
     ).first()
   ).n;

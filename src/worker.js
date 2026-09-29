@@ -246,6 +246,11 @@ async function route(request, env, rid) {
   if (fsp && method === "POST") return response(await people.researchSearchBatch(request, env, actor, rid, fsp[1]));
   const cgl = path.match(/^\/api\/companies\/([^/]+)\/gleif$/);
   if (cgl && method === "GET") return response(await discovery.companyGleif(env, actor, cgl[1]));
+  // Triagem da empresa nesta busca (empresa/produto): prioridade, descarte com motivo e pontos a verificar.
+  const fst = path.match(/^\/api\/foreign-searches\/([^/]+)\/candidates\/([^/]+)(?:\/checks(?:\/([^/]+))?)?$/);
+  if (fst && !path.includes("/checks") && method === "PATCH") return response(await foreignSearch.triageCandidate(request, env, actor, rid, fst[1], fst[2]));
+  if (fst && path.endsWith("/checks") && method === "POST") return response(await foreignSearch.addCheck(request, env, actor, rid, fst[1], fst[2]), 201);
+  if (fst && fst[3] && method === "PATCH") return response(await foreignSearch.resolveCheck(request, env, actor, rid, fst[1], fst[2], fst[3]));
   const fsx = path.match(/^\/api\/foreign-searches\/([^/]+)(?:\/(sources|candidates|close))?$/);
   if (fsx && !fsx[2] && method === "GET") return response(await foreignSearch.getSearch(env, actor, fsx[1]));
   if (fsx && fsx[2] === "sources" && method === "POST") return response(await foreignSearch.recordSource(request, env, actor, rid, fsx[1]), 201);

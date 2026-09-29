@@ -175,3 +175,38 @@ test("Triagem: empresa sem perfil ou fora do ICP não é pesquisada (nenhuma req
   assert.match(r.reason, /fora da triagem/);
   assert.equal(calls.length, 0);
 });
+
+test("Triagem na busca: prioridade secundária, descarte por empresa/produto com histórico, pontos a verificar; lote pula descartada", async (t) => {
+  const { api, DB, env, companyIds, searchId } = await world(t);
+  const [kr, bw] = companyIds;
+  const base = `/api/foreign-searches/${searchId}/candidates`;
+  assert.equal((await api(`${base}/${bw}`, "PATCH", { action: "dismiss" })).status, 422, "descarte exige motivo");
+  assert.equal((await api(`${base}/${kr}`, "PATCH", { action: "priority", priority: "secondary", reason: "Pertence a grupo; autonomia de compras a verificar" })).status, 200);
+  const chk = await api(`${base}/${kr}/checks`, "POST", { topic: "Vínculo com grupo", note: "Registro comercial lista sócia do grupo", sourceUrl: "https://www.northdata.com/x" });
+  assert.equal(chk.status, 201);
+  await api(`${base}/${kr}/checks`, "POST", { topic: "Autonomia de compras" });
+  assert.equal((await api(`${base}/${bw}`, "PATCH", { action: "dismiss", reason: "Treinamento e eventos; sem compra de café verde" })).status, 200);
+  let s = (await api(`/api/foreign-searches/${searchId}`)).data;
+  const cards = Object.values(s.groups).flat();
+  assert.equal(cards.length, 1, "descartada sai dos grupos");
+  assert.equal(s.dismissed[0].id, bw);
+  assert.match(s.dismissed[0].triage.dismissReason, /sem compra de café verde/);
+  assert.equal(s.metrics.yield.dismissedInSearch, 1);
+  assert.equal(cards[0].triage.priority, "secondary");
+  assert.equal(cards[0].checks.filter((k) => k.status === "open").length, 2);
+  assert.ok(cards[0].pending.includes("A verificar: Vínculo com grupo."));
+  assert.ok(s.humanSteps.some((h) => /2 ponto\(s\) a verificar/.test(h)));
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM companies WHERE id=?").get(bw).n, 1, "empresa preservada");
+  // Lote de pessoas: descartada fica de fora.
+  const batch = await researchSearchBatch(req(), env, admin, "rid", searchId, { fetch: site({}) });
+  assert.deepEqual(batch.results.map((r) => r.companyId), [kr]);
+  assert.equal(batch.remaining, 0);
+  // Conclusão do ponto exige texto; volta da descartada fica no histórico de auditoria.
+  assert.equal((await api(`${base}/${kr}/checks/${chk.data.id}`, "PATCH", { status: "confirmed" })).status, 422);
+  assert.equal((await api(`${base}/${kr}/checks/${chk.data.id}`, "PATCH", { status: "confirmed", resolution: "Handelsregister conferido em 2026-10-01" })).status, 200);
+  assert.equal((await api(`${base}/${kr}/checks/${chk.data.id}`, "PATCH", { status: "cleared", resolution: "x" })).status, 404, "já concluído");
+  assert.equal((await api(`${base}/${bw}`, "PATCH", { action: "restore" })).status, 200);
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action IN ('foreign_search.candidate_priority','foreign_search.candidate_dismiss','foreign_search.candidate_restore')").get().n, 3);
+  s = (await api(`/api/foreign-searches/${searchId}`)).data;
+  assert.equal(s.dismissed.length, 0);
+});

@@ -33,6 +33,7 @@ const BUYER = {
   potential: { rank: 2, label: "potencial compradora (sinal próprio, a validar)" },
   found: { rank: 3, label: "empresa encontrada — importação não verificada" },
 };
+const PRIORITY_LABEL = { primary: "prioridade principal", secondary: "prioridade secundária" };
 const SOURCE_KINDS = ["web_research", "public_directory", "official_registry", "company_website", "trade_fair", "paid_database", "adapter"];
 
 async function campaignContext(env, tenant, campaignId) {
@@ -277,6 +278,7 @@ async function companyCard(env, actor, x, row, productId) {
 const groupOf = (card) =>
   card.buyerStatus === "found" ? "unverified" : card.profile?.class === "trader_distributor" ? "traders" : ["final_consumer_confirmed", "possible_final_consumer"].includes(card.profile?.class) ? "consumers" : "toConfirm";
 const order = (a, b) =>
+  (a.triage?.priority === "secondary" ? 1 : 0) - (b.triage?.priority === "secondary" ? 1 : 0) ||
   (a.profile?.icpStatus === "in_icp" ? 0 : 1) - (b.profile?.icpStatus === "in_icp" ? 0 : 1) ||
   (SIZE_RANK[a.size?.class] ?? 2) - (SIZE_RANK[b.size?.class] ?? 2) ||
   BUYER[a.buyerStatus].rank - BUYER[b.buyerStatus].rank ||
@@ -295,14 +297,24 @@ export async function getSearch(env, actor, id) {
   const rows = (
     await s(
       env,
-      `SELECT c.*,fc.source_label cand_source,fc.source_url cand_url,fc.added_at cand_at FROM foreign_search_candidates fc JOIN companies c ON c.id=fc.company_id
+      `SELECT c.*,fc.source_label cand_source,fc.source_url cand_url,fc.added_at cand_at,fc.priority cand_priority,fc.priority_reason cand_priority_reason,fc.status cand_status,fc.dismiss_reason cand_dismiss_reason,fc.decided_by cand_decided_by,fc.decided_at cand_decided_at FROM foreign_search_candidates fc JOIN companies c ON c.id=fc.company_id
        WHERE fc.search_id=? AND c.tenant_id=? ORDER BY fc.added_at`,
       x.id, actor.tenant_id,
     ).all()
   ).results;
   const plan = await researchPlan(env, { campaign, item, country }, p);
-  const cards = [];
-  for (const r of rows) cards.push(await companyCard(env, actor, { ...x, commodityTerm: plan.term, countryRef: country }, r, x.product_id));
+  const checks = (await s(env, "SELECT * FROM search_candidate_checks WHERE search_id=? ORDER BY created_at", x.id).all()).results;
+  const all = [];
+  for (const r of rows) {
+    const card = await companyCard(env, actor, { ...x, commodityTerm: plan.term, countryRef: country }, r, x.product_id);
+    card.triage = { priority: r.cand_priority, priorityLabel: PRIORITY_LABEL[r.cand_priority], priorityReason: r.cand_priority_reason, status: r.cand_status, dismissReason: r.cand_dismiss_reason, decidedBy: r.cand_decided_by, decidedAt: r.cand_decided_at };
+    card.checks = checks.filter((k) => k.company_id === r.id).map((k) => ({ id: k.id, topic: k.topic, note: k.note, sourceUrl: k.source_url, status: k.status, resolution: k.resolution, createdAt: k.created_at, resolvedAt: k.resolved_at }));
+    if (card.checks.some((k) => k.status === "open")) card.pending.unshift(...card.checks.filter((k) => k.status === "open").map((k) => `A verificar: ${k.topic}.`));
+    all.push(card);
+  }
+  // Descartada nesta busca (empresa/produto): sai dos grupos e das métricas, mas fica visível com motivo e data.
+  const dismissed = all.filter((c) => c.triage.status === "dismissed");
+  const cards = all.filter((c) => c.triage.status !== "dismissed");
   const disc = (await s(env, "SELECT status,role,COUNT(*) n FROM discovery_candidates WHERE search_id=? GROUP BY status,role", x.id).all()).results;
   const dsum = (f) => disc.filter(f).reduce((a, r) => a + r.n, 0);
   const groups = { consumers: [], toConfirm: [], traders: [], unverified: [] };
@@ -338,6 +350,9 @@ export async function getSearch(env, actor, id) {
       foundPending: dsum((r) => r.status === "new"),
       foundDismissed: dsum((r) => r.status === "dismissed"),
       candidates: cards.length,
+      dismissedInSearch: dismissed.length,
+      secondaryPriority: count((c) => c.triage.priority === "secondary"),
+      openChecks: cards.reduce((a, c) => a + c.checks.filter((k) => k.status === "open").length, 0),
       withOwnEvidence: count((c) => c.ownEvidence > 0),
       withImportSignal: count((c) => c.buyerStatus !== "found"),
       unverified: groups.unverified.length,
@@ -362,6 +377,7 @@ export async function getSearch(env, actor, id) {
     count((c) => !c.size) ? `Confirmar o porte (com fonte) de ${count((c) => !c.size)} empresa(s).` : null,
     count((c) => !c.contacts.some((k) => k.verified && ["decision_maker", "provisional_decision_maker"].includes(k.role))) ? `Identificar decisor com fonte em ${count((c) => !c.contacts.some((k) => k.verified && ["decision_maker", "provisional_decision_maker"].includes(k.role)))} empresa(s).` : null,
     "Decidir se contrata base paga de registros aduaneiros para comprovar importação por empresa (comparação em docs/implementation/FONTES-EMPRESAS-EXTERIOR.md; R13.7).",
+    y.openChecks ? `Resolver ${y.openChecks} ponto(s) a verificar registrado(s) nas candidatas.` : null,
     y.eligibleForFicha ? `Aprovar individualmente a ficha de cada empresa antes de qualquer contato (${y.eligibleForFicha} apta(s)).` : "Aprovar individualmente cada ficha antes de qualquer contato (P11).",
   ].filter(Boolean);
   return {
@@ -375,6 +391,7 @@ export async function getSearch(env, actor, id) {
     sources: sources.map((s) => ({ id: s.id, label: s.source_label, kind: s.source_kind, query: s.query_text, results: s.result_count, apiCalls: s.api_calls, costUsd: s.cost_usd, minutes: s.minutes, note: s.note, at: s.recorded_at })),
     metrics,
     groups,
+    dismissed,
   };
 }
 
@@ -388,7 +405,7 @@ export async function listAllSearches(env, actor) {
     await s(
       env,
       `SELECT f.id,f.status,f.authorized_at,f.closed_at,f.iso3,co.name_pt country,c.name campaign,p.commodity,
-         (SELECT COUNT(*) FROM foreign_search_candidates x WHERE x.search_id=f.id) candidates,
+         (SELECT COUNT(*) FROM foreign_search_candidates x WHERE x.search_id=f.id AND x.status='active') candidates,
          (SELECT COUNT(*) FROM foreign_search_sources x WHERE x.search_id=f.id) sources
        FROM foreign_searches f JOIN campaigns c ON c.id=f.campaign_id JOIN countries co ON co.iso3=f.iso3 JOIN products p ON p.id=f.product_id
        WHERE f.tenant_id=? ORDER BY f.authorized_at DESC LIMIT 50`,
@@ -396,4 +413,61 @@ export async function listAllSearches(env, actor) {
     ).all()
   ).results;
   return { items: rows };
+}
+
+async function candidateOf(env, actor, searchId, companyId) {
+  const x = await s(env, "SELECT * FROM foreign_searches WHERE tenant_id=? AND id=?", actor.tenant_id, searchId).first();
+  if (!x) fail(404, "search_not_found", "Busca não encontrada.");
+  if (x.status !== "open") fail(409, "search_closed", "Busca encerrada.");
+  const fc = await s(env, "SELECT * FROM foreign_search_candidates WHERE search_id=? AND company_id=?", x.id, companyId).first();
+  if (!fc) fail(404, "candidate_not_found", "Empresa não está nesta busca.");
+  return { x, fc };
+}
+
+// PATCH /api/foreign-searches/:id/candidates/:companyId — prioridade, descarte ou retorno nesta busca (empresa/produto).
+// Descarte exige motivo e preserva a empresa, as evidências, as pessoas e o histórico.
+export async function triageCandidate(request, env, actor, rid, searchId, companyId) {
+  requireRole(actor, WRITE_ROLES);
+  const { x, fc } = await candidateOf(env, actor, searchId, companyId);
+  const i = await bodyJson(request);
+  const at = now();
+  const action = oneOf(i.action, ["priority", "dismiss", "restore"], "ação");
+  let stmt;
+  if (action === "priority") {
+    const priority = oneOf(i.priority, ["primary", "secondary"], "prioridade");
+    stmt = s(env, "UPDATE foreign_search_candidates SET priority=?,priority_reason=?,decided_by=?,decided_at=? WHERE search_id=? AND company_id=?", priority, str(i.reason, "motivo", 500, priority === "primary"), actor.id, at, x.id, fc.company_id);
+  } else if (action === "dismiss") {
+    if (fc.status === "dismissed") fail(409, "candidate_dismissed", "Empresa já descartada nesta busca.");
+    stmt = s(env, "UPDATE foreign_search_candidates SET status='dismissed',dismiss_reason=?,decided_by=?,decided_at=? WHERE search_id=? AND company_id=?", str(i.reason, "motivo", 500), actor.id, at, x.id, fc.company_id);
+  } else {
+    if (fc.status !== "dismissed") fail(409, "candidate_active", "Empresa já está ativa nesta busca.");
+    stmt = s(env, "UPDATE foreign_search_candidates SET status='active',decided_by=?,decided_at=? WHERE search_id=? AND company_id=?", actor.id, at, x.id, fc.company_id);
+  }
+  await commit(env, [stmt, auditStatement(env, actor, rid, `foreign_search.candidate_${action}`, "foreign_search", x.id, { companyId: fc.company_id, productId: x.product_id, priority: i.priority ?? null, reason: i.reason ?? null, previous: { priority: fc.priority, status: fc.status, dismissReason: fc.dismiss_reason } })]);
+  return { searchId: x.id, companyId: fc.company_id, action };
+}
+
+// POST /api/foreign-searches/:id/candidates/:companyId/checks — ponto a verificar (fica aberto até a conclusão com fonte).
+export async function addCheck(request, env, actor, rid, searchId, companyId) {
+  requireRole(actor, WRITE_ROLES);
+  const { x, fc } = await candidateOf(env, actor, searchId, companyId);
+  const i = await bodyJson(request);
+  const id = crypto.randomUUID();
+  await commit(env, [
+    s(env, "INSERT INTO search_candidate_checks(id,tenant_id,search_id,company_id,topic,note,source_url,created_by) VALUES (?,?,?,?,?,?,?,?)", id, actor.tenant_id, x.id, fc.company_id, str(i.topic, "ponto a verificar", 200), str(i.note, "nota", 1000, true), url(i.sourceUrl), actor.id),
+    auditStatement(env, actor, rid, "foreign_search.check_added", "foreign_search", x.id, { companyId: fc.company_id, checkId: id }),
+  ]);
+  return { id };
+}
+
+// PATCH /api/foreign-searches/:id/candidates/:companyId/checks/:checkId — conclusão (confirmado ou descartado) com texto.
+export async function resolveCheck(request, env, actor, rid, searchId, companyId, checkId) {
+  requireRole(actor, WRITE_ROLES);
+  const { x, fc } = await candidateOf(env, actor, searchId, companyId);
+  const i = await bodyJson(request);
+  const status = oneOf(i.status, ["confirmed", "cleared"], "conclusão");
+  const r = await s(env, "UPDATE search_candidate_checks SET status=?,resolution=?,resolved_by=?,resolved_at=? WHERE id=? AND search_id=? AND company_id=? AND status='open'", status, str(i.resolution, "conclusão", 1000), actor.id, now(), checkId, x.id, fc.company_id).run();
+  if (!r.meta.changes) fail(404, "check_not_open", "Ponto não encontrado ou já concluído.");
+  await commit(env, [auditStatement(env, actor, rid, "foreign_search.check_resolved", "foreign_search", x.id, { companyId: fc.company_id, checkId, status })]);
+  return { id: checkId, status };
 }

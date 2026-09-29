@@ -2471,6 +2471,8 @@ function companyResult(c) {
       {},
       text("strong", c.name),
       text("span", c.buyerStatusLabel, BUYER_TAG[c.buyerStatus]),
+      c.triage?.priority === "secondary" ? text("span", `prioridade secundária${c.triage.priorityReason ? ` — ${c.triage.priorityReason}` : ""}`, "tag warn") : null,
+      c.checks?.length ? el("div", {}, text("small", "Pontos a verificar:"), el("ul", {}, ...c.checks.map((k) => el("li", {}, `${k.status === "open" ? "aberto" : k.status === "confirmed" ? "confirmado" : "descartado"}: ${k.topic}${k.note ? ` — ${k.note}` : ""}${k.resolution ? ` → ${k.resolution}` : ""} `, k.sourceUrl ? el("a", { href: k.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte") : null)))) : null,
       text("small", `Porte: ${c.size ? `${c.size.label} (fonte: ${c.size.source || "sem fonte"})` : "não informado"} · Atividade: ${c.activity ? `${c.activity.text} (fonte: ${c.activity.source})` : "não registrada"} · Perfil: ${c.profile ? `${c.profile.label}, ${c.profile.icpLabel}` : "não registrado"}`),
       c.website ? el("small", {}, "Site: ", el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, c.website)) : text("small", "Site: não registrado"),
       c.importEvidence.length
@@ -2486,6 +2488,31 @@ function companyResult(c) {
       "div",
       { class: "toolbar" },
       button("Abrir empresa", () => showCompany(c.id)),
+      writable() && state.searchId && c.triage
+        ? button(c.triage.priority === "secondary" ? "Tornar prioridade principal" : "Marcar prioridade secundária", async () => {
+            const secondary = c.triage.priority !== "secondary";
+            const reason = secondary ? prompt("Motivo da prioridade secundária:") : null;
+            if (secondary && !reason) return;
+            await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}`, "PATCH", { action: "priority", priority: secondary ? "secondary" : "primary", reason });
+            await showForeignSearch(state.searchId);
+          })
+        : null,
+      writable() && state.searchId && c.triage
+        ? button("Registrar ponto a verificar", async () => {
+            const topic = prompt("Ponto a verificar (ex.: autonomia de compras):");
+            if (!topic) return;
+            await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}/checks`, "POST", { topic });
+            await showForeignSearch(state.searchId);
+          })
+        : null,
+      writable() && state.searchId && c.triage
+        ? button("Descartar desta busca", async () => {
+            const reason = prompt("Motivo do descarte nesta busca (vale só para esta empresa e este produto):");
+            if (!reason) return;
+            await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}`, "PATCH", { action: "dismiss", reason });
+            await showForeignSearch(state.searchId);
+          })
+        : null,
       writable()
         ? button("Conferir identidade (GLEIF)", async () => {
             // Identidade jurídica (nome legal, registro, LEI): não é evidência de compra.
@@ -2789,6 +2816,14 @@ async function showForeignSearch(id, preloaded) {
   for (const [title, list] of groups) node.append(panel(`${title} (${list.length})`, rows(list, companyResult)));
   // Sem sinal próprio de importação a empresa não é candidata importadora: fica recolhida, aguardando validação.
   node.append(details(`Importação não verificada — usam a commodity, sem sinal próprio de importação (${x.groups.unverified.length})`, rows(x.groups.unverified, companyResult)));
+  // Descartadas nesta busca (empresa/produto): ficam visíveis com motivo, data e opção de voltar.
+  if (x.dismissed?.length)
+    node.append(
+      details(
+        `Descartadas nesta busca (${x.dismissed.length})`,
+        el("ul", {}, ...x.dismissed.map((c) => el("li", {}, `${c.name} — ${c.triage.dismissReason} (${(c.triage.decidedAt || "").slice(0, 10)}) `, writable() && x.status === "open" ? button("Voltar para a busca", async () => { await api(`/api/foreign-searches/${x.id}/candidates/${c.id}`, "PATCH", { action: "restore" }); await showForeignSearch(x.id); }) : null))),
+      ),
+    );
   const byGroup = new Map();
   for (const l of x.researchPlan.links) (byGroup.get(l.group) || byGroup.set(l.group, []).get(l.group)).push(l);
   node.append(
