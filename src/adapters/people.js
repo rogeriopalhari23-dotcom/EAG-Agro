@@ -54,7 +54,7 @@ const lines = (html) =>
   html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d|td|tr)>/gi, "\n").replace(/<[^>]+>/g, "\n")
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#8211;/g, "–").split("\n").map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean);
 
-const MARKER = /(gesch(ä|ae)ftsf(ü|ue)hr(er|erin|ung|ende[rn]?)?|vertreten durch|vertretungsberechtigt\w*|inhaber(in|\/in)?|vorstand|gesch(ä|ae)ftsleitung)/i;
+const MARKER = /(gesch(ä|ae)ftsf(ü|ue)hr(er|erin|ung|ende[rn]?)?|vertreten durch|vertretungsberechtigt\w*|inhaber(in|\/in)?|\binh\.|vorstand|gesch(ä|ae)ftsleitung)/i;
 const NAME_WORD = /^(?:[A-ZÄÖÜ][a-zäöüßéèáàóòíìçñ'-]+|[A-Z]\.)$/;
 const ACADEMIC = /^(?:dipl\.?(?:-[a-zäöü]+\.?)?|kfm\.?|kffr\.?|ing\.?|dr\.?|prof\.?|mag\.?|herr|frau|mba)\s+/i;
 // Palavras que aparecem perto do marcador mas não são nome (visto em 2026-09-28: "Systemen. Inhalte", "Radbruch Nachfolger").

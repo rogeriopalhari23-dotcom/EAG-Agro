@@ -29,6 +29,8 @@ test("Impressum: extrai representantes nos formatos reais; não pega registro, e
   assert.deepEqual(parseImpressum("<p>Inhaber:</p><p>Peter Vagt</p><p>Radbruch Nachfolger</p>").people.map((p) => p.name), ["Peter Vagt"]);
   assert.deepEqual(parseImpressum("<p>Geschäftsführer: Dipl. Kfm. Andreas Muster</p>").people.map((p) => p.name), ["Andreas Muster"]);
   assert.deepEqual(parseImpressum("<p>Vorstand:</p><p>Paula Beispiel</p><p>Commerzbank Leipzig</p>").people.map((p) => p.name), ["Paula Beispiel"]);
+  // Abreviação vista na Amori Coffee (2026-09-29): "Inh. Roberto Cascone".
+  assert.deepEqual(parseImpressum("<p>AMORI Coffee Kaffeerösterei<br>Mombacher Str. 68<br>55122 Mainz<br>Inh. Roberto Cascone<br>Telefon: 06131 4996560</p>").people, [{ name: "Roberto Cascone", title: "Inh." }]);
   assert.deepEqual(parseImpressum("<p>Die Beispiel Rösterei GmbH mit Sitz in Köln wird vertreten durch Gustav August</p>").people.map((p) => p.name), ["Gustav August"]);
 });
 
