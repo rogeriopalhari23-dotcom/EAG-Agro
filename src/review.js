@@ -1,5 +1,6 @@
 // Revisor automático PV1–PV12 + R19.13 (P2-T8, R17.3). Regras determinísticas; violação impede aprovação.
 // Entrada: mensagens geradas (generateSequence) e contexto da ficha. Saída: { ok, findings: [{id, ok, detail, step?, contactId?}] }.
+import { ADDRESS_PENDING } from "./postal-address.js";
 import { contactTargetFlag } from "./profiles.js";
 import { SIGNATURE, signatureText, LOGO_PLACEHOLDER } from "./templates/assinatura.js";
 
@@ -190,7 +191,8 @@ export function reviewSequence(raw, ctx) {
     const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
     if (!ok) finding(f, "R19.13", false, `E-mail passo ${m.step} sem endereço físico ou forma de saída.`, { step: m.step, contactId: m.contactId });
   }
-  if (!f.some((x) => x.id === "R19.13")) finding(f, "R19.13", !!ctx.postalAddress, ctx.postalAddress ? "Endereço físico e saída em todos os e-mails." : "Endereço físico da EAG não configurado.");
+  if (ctx.postalAddress && ctx.postalAddressConfirmed !== true) finding(f, "R19.13", false, ADDRESS_PENDING);
+  if (!f.some((x) => x.id === "R19.13")) finding(f, "R19.13", !!ctx.postalAddress, ctx.postalAddress ? "Endereço físico confirmado por Rogério e saída em todos os e-mails." : "Endereço físico da EAG não configurado.");
   return { ok: f.every((x) => x.ok), findings: f };
 }
 
@@ -242,6 +244,7 @@ export function reviewIdentification(raw, ctx) {
     const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
     if (!ok) finding(f, "R19.13", false, `E-mail passo ${m.step} sem endereço físico ou forma de saída.`, { step: m.step, contactId: m.contactId });
   }
-  if (!f.some((x) => x.id === "R19.13")) finding(f, "R19.13", !!ctx.postalAddress, ctx.postalAddress ? "Endereço físico e saída em todos os e-mails." : "Endereço físico da EAG não configurado.");
+  if (ctx.postalAddress && ctx.postalAddressConfirmed !== true) finding(f, "R19.13", false, ADDRESS_PENDING);
+  if (!f.some((x) => x.id === "R19.13")) finding(f, "R19.13", !!ctx.postalAddress, ctx.postalAddress ? "Endereço físico confirmado por Rogério e saída em todos os e-mails." : "Endereço físico da EAG não configurado.");
   return { ok: f.every((x) => x.ok), findings: f };
 }

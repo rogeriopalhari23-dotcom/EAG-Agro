@@ -8,6 +8,7 @@ async function ready(ctx) {
   const { api, env, DB } = ctx;
   Object.assign(env, {
     EAG_POSTAL_ADDRESS: "Rua Exemplo, 100",
+    EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Exemplo, 100",
     PUBLIC_BASE_URL: "https://compass.exemplo",
     UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64"),
   });

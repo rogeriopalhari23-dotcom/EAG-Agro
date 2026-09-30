@@ -1,6 +1,7 @@
 // Revisão para decisão de Rogério (2026-09-30): reúne numa tela as decisões pendentes da busca internacional e as
 // candidatas mais promissoras, a partir do que já está gravado (descoberta, cache do diretório, aviso legal cifrado).
 // Nada aqui aceita candidata, aprova texto, ativa campanha ou envia mensagem. Ordenação determinística, sem IA.
+import { postalAddressConfirmed } from "./postal-address.js";
 import { bodyJson, fail, str, oneOf, url, requireRole, WRITE_ROLES } from "./http.js";
 import { statement as s, commit, auditStatement, now, product } from "./store.js";
 import { decryptPii } from "./crypto.js";
@@ -213,13 +214,14 @@ export async function getReview(env, actor, searchId) {
       texts: {
         status: "rascunho — não aprovado",
         recipient: "canal geral publicado no site oficial de cada empresa",
-        // Endereço físico da assinatura (R19.13): vem de docs/eag-compass-perfil.md (eagagro.com/contato), configurado em
-        // 2026-09-24 na implementação; não há confirmação registrada de Rogério. Sinalizado, sem trocar por outro.
+        // Endereço físico do rodapé (R19.13), separado da assinatura: confirmado só quando EAG_POSTAL_ADDRESS_CONFIRMED guarda
+        // exatamente o texto configurado (validação de Rogério). Sem isso, revisor e aprovação bloqueiam.
         address: {
           value: env.EAG_POSTAL_ADDRESS || null,
-          confirmedByRogerio: false,
-          source: "Perfil da empresa no projeto (docs/eag-compass-perfil.md, de eagagro.com/contato), configurado em 24/09/2026 durante a implementação.",
-          pending: "Endereço sem confirmação registrada de Rogério: confirmar ou corrigir antes de aprovar a ficha (R19.13 exige endereço físico real).",
+          confirmedByRogerio: postalAddressConfirmed(env),
+          placement: "rodapé do e-mail, separado da assinatura, junto do descadastro",
+          source: "Perfil da empresa no projeto (docs/eag-compass-perfil.md, de eagagro.com/contato), configurado em 24/09/2026 durante a implementação; texto exato validado por Rogério em 30/09/2026 (EAG_POSTAL_ADDRESS_CONFIRMED).",
+          pending: postalAddressConfirmed(env) ? null : "Endereço sem confirmação registrada de Rogério: confirmar ou corrigir antes de aprovar a ficha (R19.13 exige endereço físico real).",
         },
         followUpSubject: "O acompanhamento usa o mesmo assunto, sem \"Re:\": o envio não encadeia o segundo e-mail como resposta ao primeiro.",
         stops: "A sequência para com resposta (R20.1), descadastro (R21) ou pausa (R22), como as demais fichas.",

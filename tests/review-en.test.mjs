@@ -13,7 +13,7 @@ const recipients = [
 const sig = { senderName: "Rogério Palhari", postalAddress: "Rua Exemplo, 100 — Sertãozinho/SP, Brazil" };
 const ctx = (over = {}) => ({
   market: "international", commodity: "coffee", otherCommodities: ["sugar", "soybean", "corn"], declarations: {},
-  recipients, postalAddress: sig.postalAddress, unsubUrl: UNSUB, language: "en", languageGapNote: GAP_NOTE, translationApproved: true, templatesVersion: TEMPLATES_EN_VERSION, ...over,
+  recipients, postalAddress: sig.postalAddress, postalAddressConfirmed: true, unsubUrl: UNSUB, language: "en", languageGapNote: GAP_NOTE, translationApproved: true, templatesVersion: TEMPLATES_EN_VERSION, ...over,
 });
 const seq = (over = {}) => generateSequenceEn({ commodity: "coffee", recipients, sig, unsub: UNSUB, ...over });
 const failed = (r) => r.findings.filter((x) => !x.ok).map((x) => x.id);

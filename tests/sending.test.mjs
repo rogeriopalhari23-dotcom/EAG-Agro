@@ -14,6 +14,7 @@ async function ready(ctx, { email = "compras@valeverde.com.br", internal = true,
   const { api, env, DB } = ctx;
   Object.assign(env, {
     EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP",
+    EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Exemplo, 100 — Sertãozinho/SP",
     PUBLIC_BASE_URL: "https://compass.exemplo",
     UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64"),
     MAILBOX_USER: "rogeriopalhari@eagagro.com",

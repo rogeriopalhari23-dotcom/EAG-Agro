@@ -21,6 +21,7 @@ const ctx = (over = {}) => ({
   declarations: {},
   recipients,
   postalAddress: sig.postalAddress,
+  postalAddressConfirmed: true,
   unsubUrl: unsub,
   ...over,
 });

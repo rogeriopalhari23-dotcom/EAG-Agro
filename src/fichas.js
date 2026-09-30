@@ -1,5 +1,6 @@
 // Fichas de aprovação (P2-T9; R18, R17.1–R17.3, errata): versão imutável e cifrada, hash por mensagem,
 // aprovação por destinatário e canal com o hash visto pelo aprovador; mudança comercial invalida a aprovação.
+import { postalAddressConfirmed, ADDRESS_PENDING } from "./postal-address.js";
 import { internationalGate } from "./selections.js";
 import { generateSequenceEn, commodityDisplayEn, TEMPLATES_EN_VERSION, GAP_NOTE } from "./templates/prospeccao-vendas-en.js";
 import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES, APPROVER_ROLES } from "./http.js";
@@ -116,7 +117,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   }
   const review = (ident ? reviewIdentification : reviewSequence)(msgs, {
     market: ctx.campaign.market, commodity, otherCommodities: ctx.others, declarations: ctx.declarations,
-    recipients: ctx.recipients, postalAddress: env.EAG_POSTAL_ADDRESS, unsubUrl: (id) => urls.get(id),
+    recipients: ctx.recipients, postalAddress: env.EAG_POSTAL_ADDRESS, postalAddressConfirmed: postalAddressConfirmed(env), unsubUrl: (id) => urls.get(id),
     language: ctx.language, languageGapNote: gapNote, translationApproved: ctx.translationApproved, templatesVersion,
   });
   const snapshot = JSON.stringify({
@@ -241,6 +242,8 @@ export async function approve(request, env, actor, rid, id) {
   const v = await currentVersion(env, f);
   if (i.versionNo !== v.version_no) fail(409, "version_changed", "A ficha tem versão mais nova. Revise antes de aprovar.");
   if (!v.review_ok) fail(409, "review_failed", "O revisor PV encontrou violações; corrija antes de aprovar (R17.3).");
+  // O revisor rodou na criação da versão; a confirmação do endereço é conferida de novo aqui (pode ter mudado depois).
+  if (!postalAddressConfirmed(env)) fail(409, "postal_address_unconfirmed", ADDRESS_PENDING);
   if (["discarded", "deferred"].includes(f.status)) fail(409, "ficha_not_open", "Ficha adiada ou descartada.");
   const contactId = str(i.contactId, "contato", 80),
     channel = oneOf(i.channel, ["email", "call", "linkedin"], "canal");
@@ -248,6 +251,10 @@ export async function approve(request, env, actor, rid, id) {
     await s(env, "SELECT * FROM ficha_messages WHERE version_id=? AND contact_id=? AND channel=? ORDER BY step_no", v.id, contactId, channel).all()
   ).results;
   if (!list.length) fail(422, "nothing_to_approve", "Nada a aprovar para este destinatário neste canal.");
+  // Versão gerada com outro endereço (antes da confirmação ou de uma troca) não é aprovada: gere nova versão.
+  for (const m of list.filter((x) => x.kind === "auto_email"))
+    if (!(await decryptPii(m.body_enc, env)).includes(env.EAG_POSTAL_ADDRESS_CONFIRMED))
+      fail(409, "postal_address_outdated", "A versão foi gerada com um endereço diferente do confirmado por Rogério. Gere nova versão da ficha (R19.13).");
   // R18.6: destinatário sem fuso confirmado não é aprovado (e o pré-envio também segura, se o fuso for apagado depois).
   const recipient = await s(env, "SELECT timezone FROM contacts WHERE tenant_id=? AND id=?", actor.tenant_id, contactId).first();
   if (!recipient?.timezone) fail(409, "timezone_pending", "Confirme o fuso do destinatário antes de aprovar (R18.6).");

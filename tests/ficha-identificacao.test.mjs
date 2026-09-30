@@ -17,7 +17,7 @@ const withSig = (fn) => async (t) => {
 // Mesmo cenário nacional de tests/fichas.test.mjs (açúcar, SP), com o canal geral publicado da empresa.
 async function ready(ctx) {
   const { api, env, DB } = ctx;
-  Object.assign(env, { EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP", PUBLIC_BASE_URL: "https://compass.exemplo", UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64") });
+  Object.assign(env, { EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP", EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Exemplo, 100 — Sertãozinho/SP", PUBLIC_BASE_URL: "https://compass.exemplo", UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64") });
   await api("/api/parameters/send_timezone", "PUT", { scope: "national", value: "America/Sao_Paulo", reason: "Fuso do piloto" });
   DB.raw.prepare("UPDATE channels SET state='internal_test' WHERE channel='email'").run();
   const camp = await api("/api/campaigns", "POST", {
@@ -85,7 +85,7 @@ test("Assinatura pendente de importação ou de conferência: ficha de identific
   const unsub = () => "https://compass.exemplo/u/abc";
   const sig = { senderName: "Rogério Palhari", postalAddress: "Al. Rio Negro, 503 — Barueri/SP, Brasil" };
   const msgs = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: [{ contactId: "c1" }], sig, unsub });
-  const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel" }], postalAddress: sig.postalAddress, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
+  const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel" }], postalAddress: sig.postalAddress, postalAddressConfirmed: true, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
   const pendingLogo = { ...TEST_SIG, status: "pending_logo", html: '<img src="LOGO_EAG_HTTPS">' };
   assert.deepEqual(reviewIdentification(msgs, { ...ctx, signature: pendingLogo }).findings.filter((x) => !x.ok).map((x) => x.id), ["SIG"]);
   assert.match(reviewIdentification(msgs, { ...ctx, signature: pendingLogo }).findings.find((x) => x.id === "SIG").detail, /logo original pendente/);
@@ -103,7 +103,7 @@ test("Identificação em alemão: texto com Sie, assunto e pergunta certos; revi
   assert.equal(msgs[1].body.split("\n\nRogerio Palhari\nBroker | EAG AGRO")[0], "Guten Tag,\n\nich komme kurz auf meine vorherige Nachricht zurück. Könnten Sie mir bitte mitteilen, an wen ich mich bezüglich des Einkaufs von Rohkaffee wenden kann?\n\nFalls Ihr Unternehmen keinen Rohkaffee einkauft, genügt ein kurzer Hinweis.\n\nVielen Dank.");
   assert.equal(msgs[1].subject, msgs[0].subject);
   assert.match(msgs[0].body, /„abmelden“/);
-  const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
+  const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, postalAddressConfirmed: true, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
   const r = reviewIdentification(msgs, { ...ctx, signature: TEST_SIG });
   assert.equal(r.ok, true, JSON.stringify(r.findings.filter((x) => !x.ok)));
   assert.ok(!r.findings.some((x) => /ID0|aprovação de Rogério/.test(`${x.id} ${x.detail}`)), "nenhuma aprovação extra");
@@ -132,3 +132,35 @@ test("Quatro estados da pessoa: aceitar não confirma compra nem aprova; indíci
   assert.equal(p.purchaseEvidence.confirms, false);
   assert.match(p.purchaseEvidence.note, /conhece produtores/);
 });
+
+test("R19.13: endereço sem confirmação de Rogério é pendência do revisor e bloqueia a aprovação; versão com endereço antigo também", withSig(async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  const { api, env } = ctx;
+  const r = await ready(ctx);
+  delete env.EAG_POSTAL_ADDRESS_CONFIRMED;
+  const channelId = (await api(`/api/companies/${r.companyId}/channels`, "POST", { email: "contato@valeverde.com.br", sourceUrl: "https://valeverde.com.br/contato", timezone: "America/Sao_Paulo" })).data.contactId;
+  const c = await api("/api/fichas", "POST", { companyId: r.companyId, campaignId: r.campaignId, purpose: "identify_buyer", recipients: [channelId] });
+  assert.equal(c.status, 201, "a ficha é criada e fica em revisão");
+  assert.equal(c.data.reviewOk, false);
+  assert.deepEqual(c.data.findings.map((x) => x.id), ["R19.13"]);
+  assert.match(c.data.findings[0].detail, /sem confirmação de Rogério/);
+  const approve = async () => {
+    const f = (await api(`/api/fichas/${c.data.id}`)).data;
+    const x = f.toApprove.find((a) => a.contactId === channelId);
+    return api(`/api/fichas/${c.data.id}/approve`, "POST", { versionNo: f.version.no, contactId: channelId, channel: "email", messagesSha256: x.messagesSha256, startDate: "2099-01-05" });
+  };
+  assert.equal((await approve()).data.error.code, "review_failed");
+  // Confirmado depois: nova versão passa no revisor; se a confirmação sumir, a aprovação volta a bloquear.
+  env.EAG_POSTAL_ADDRESS_CONFIRMED = env.EAG_POSTAL_ADDRESS;
+  let f = (await api(`/api/fichas/${c.data.id}`)).data;
+  const v2 = await api(`/api/fichas/${c.data.id}/versions`, "POST", { expectedRowVersion: f.ficha.row_version });
+  assert.equal(v2.data.reviewOk, true, JSON.stringify(v2.data.findings));
+  delete env.EAG_POSTAL_ADDRESS_CONFIRMED;
+  assert.equal((await approve()).data.error.code, "postal_address_unconfirmed");
+  // Endereço trocado e confirmado depois da versão: a versão com o endereço antigo não é aprovada.
+  Object.assign(env, { EAG_POSTAL_ADDRESS: "Rua Nova, 200 — Sertãozinho/SP", EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Nova, 200 — Sertãozinho/SP" });
+  assert.equal((await approve()).data.error.code, "postal_address_outdated");
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM ficha_approvals").get().n, 0);
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM send_outbox").get().n, 0);
+}));
