@@ -21,6 +21,9 @@ function Processo {
 
 switch ($Comando) {
   "iniciar" {
+    # Confere tudo antes de registrar ou ligar a tarefa (sem pedir senha).
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "iniciar-ponte.ps1") -Validar
+    if ($LASTEXITCODE -ne 0) { Write-Host "Corrija o item acima e rode 'ponte iniciar' de novo."; break }
     if (-not (Get-ScheduledTask -TaskName $tarefa -ErrorAction SilentlyContinue)) { & (Join-Path $PSScriptRoot "instalar-tarefa.ps1") }
     Enable-ScheduledTask -TaskName $tarefa | Out-Null
     if (Processo) { Write-Host "A ponte já está rodando." } else { Start-ScheduledTask -TaskName $tarefa; Start-Sleep -Seconds 8 }
@@ -51,15 +54,22 @@ switch ($Comando) {
       if ($s.stoppedAuth) { Write-Host "ATENÇÃO: login SMTP recusado — envio parado. Confira a senha (guardar-segredos.ps1) e reinicie." }
       if ($p -and $s.lastReadOkAt -and ((Get-Date).ToUniversalTime() - ([DateTime]::Parse($s.lastReadOkAt)).ToUniversalTime()).TotalMinutes -gt 10) { Write-Host "ATENÇÃO: sem leitura da caixa há mais de 10 minutos — o Compass mantém os envios suspensos." }
     } else { Write-Host "Sem estado registrado ainda." }
+    $erro = Join-Path $dir "ultimo-erro.txt"
+    if (Test-Path $erro) { Write-Host ("ÚLTIMO ERRO DE INÍCIO: " + (Get-Content $erro -Raw).Trim()) }
     Write-Host "Motivos comuns: nothing_due (nada vencido), interval (aguardando o intervalo), outside_window/nothing_eligible (fora da janela ou bloqueado), daily_cap (teto do dia), reply_reader_unavailable (caixa não lida)."
   }
   "registro" {
     $l = Join-Path $dir "ponte.log"
     if (Test-Path $l) { Get-Content $l -Tail 30 } else { Write-Host "Sem registro ainda." }
   }
-  "conferir-caixa" { & (Join-Path $PSScriptRoot "iniciar-ponte.ps1") -SoCaixa }
+  "conferir-caixa" {
+    if (Processo) { Write-Host "A ponte está rodando; a conferência usa a mesma caixa e pode ser feita assim mesmo." }
+    & (Join-Path $PSScriptRoot "iniciar-ponte.ps1") -SoCaixa
+    exit $LASTEXITCODE
+  }
   "conferir" {
     if (Processo) { Write-Host "Pare a ponte antes de conferir (ponte parar)."; break }
     & (Join-Path $PSScriptRoot "iniciar-ponte.ps1") -Conferir
+    exit $LASTEXITCODE
   }
 }
