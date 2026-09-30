@@ -40,8 +40,8 @@ export function canHaveFicha(p) {
         : { ok: false, reason: "Microempresa sem aderência comercial à commodity registrada no perfil comprador." };
     case "pending_size":
       return p.size_call_goal
-        ? { ok: true, note: "Porte desconhecido: qualificar o porte é objetivo da ligação (R14.8)." }
-        : { ok: false, reason: "Porte desconhecido: resolva o porte ou registre a qualificação do porte como objetivo da ligação (R14.8)." };
+        ? { ok: true, note: "Porte desconhecido: esclarecer o porte é objetivo do primeiro contato — na ligação ou na conversa aberta pelo e-mail (R14.8, revisada em 2026-09-30)." }
+        : { ok: false, reason: "Porte desconhecido: resolva o porte ou registre o esclarecimento do porte como objetivo do primeiro contato (R14.8)." };
     default:
       return { ok: false, reason: "Perfil comprador sem classificação de ICP válida." };
   }

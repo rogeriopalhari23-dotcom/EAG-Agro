@@ -142,19 +142,22 @@ export async function setSize(request, env, actor, rid, companyId) {
   requireRole(actor, APPROVER_ROLES);
   const c = await company(env, actor, companyId);
   const i = await bodyJson(request);
-  // Faixas (referência: Recomendação UE 2003/361 — micro < 10, pequena < 50, média < 250 pessoas); a faixa vem de fonte citada.
+  // Referência aprovada em 2026-09-30: Recomendação da Comissão Europeia 2003/361/CE, só para priorização (porte nunca
+  // descarta). "comprovado" exige efetivo e dados financeiros de fonte oficial, considerando parceiras e ligadas;
+  // dado parcial (ex.: só número de funcionários) é "estimado". Fora da UE é referência operacional europeia.
   const band = oneOf(i.sizeBand, ["micro", "small", "medium", "medium_plus", "giant"], "porte");
   const source = str(i.source, "fonte do porte", 500);
+  const basis = oneOf(i.basis ?? "estimated", ["estimated", "proven"], "base do porte");
   const at = now();
   const profiles = (await s(env, "SELECT * FROM buyer_profiles WHERE tenant_id=? AND company_id=?", actor.tenant_id, c.id).all()).results;
-  const stmts = [s(env, "UPDATE companies SET size_class=?,size_source=?,size_checked_at=?,updated_at=? WHERE tenant_id=? AND id=?", band, source, at, at, actor.tenant_id, c.id)];
+  const stmts = [s(env, "UPDATE companies SET size_class=?,size_source=?,size_basis=?,size_checked_at=?,updated_at=? WHERE tenant_id=? AND id=?", band, source, basis, at, at, actor.tenant_id, c.id)];
   for (const p of profiles) {
     const status = icpStatus({ profileClass: p.profile_class, sizeCode: null, sizeBand: band, isGiant: !!p.is_giant });
     if (status !== p.icp_status) stmts.push(s(env, "UPDATE buyer_profiles SET icp_status=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=?", status, actor.id, at, p.id));
   }
-  stmts.push(auditStatement(env, actor, rid, "company.size_set", "company", c.id, { sizeBand: band, source }));
+  stmts.push(auditStatement(env, actor, rid, "company.size_set", "company", c.id, { sizeBand: band, source, basis }));
   await commit(env, stmts);
-  return { id: c.id, sizeBand: band };
+  return { id: c.id, sizeBand: band, basis };
 }
 
 // Linha da lista mensal do país para a commodity da campanha, marcada como dado do país (R1.4.2) — só leitura.

@@ -204,7 +204,7 @@ export async function accept(request, env, actor, rid, id) {
       s(env, "INSERT OR IGNORE INTO foreign_search_candidates(search_id,company_id,source_id,source_label,source_url,added_by) VALUES (?,?,?,?,?,?)", x.id, companyId, c.run_id, SOURCE_LABEL[c.source], c.record_url, actor.id),
     ];
     // Porte oficial do registro, com a fonte, quando a empresa ainda não tem porte.
-    if (c.size_band && !co?.size_class) stmts.push(s(env, "UPDATE companies SET size_class=?,size_source=?,size_checked_at=?,updated_at=? WHERE id=? AND size_class IS NULL", c.size_band, c.size_source, at, at, companyId));
+    if (c.size_band && !co?.size_class) stmts.push(s(env, "UPDATE companies SET size_class=?,size_source=?,size_basis='estimated',size_checked_at=?,updated_at=? WHERE id=? AND size_class IS NULL", c.size_band, c.size_source, at, at, companyId));
     // Perfil pela atividade (indício): processadora → possível consumidora final; atacado → trader (R14.2 permite só "possível").
     const profile = await s(env, "SELECT id FROM buyer_profiles WHERE tenant_id=? AND company_id=? AND unit_key='' AND product_id=?", actor.tenant_id, companyId, p.id).first();
     if (!profile) {

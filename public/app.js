@@ -1849,7 +1849,7 @@ async function pilotPanels(id, data) {
               })
             : null,
           p.icp_status === "pending_size" && writable() && !p.size_call_goal
-            ? button("Qualificar porte na ligação", async () => {
+            ? button("Esclarecer o porte no primeiro contato (ligação ou e-mail)", async () => {
                 await api(`/api/profiles/${p.id}`, "PATCH", { sizeCallGoal: true, expectedRevision: p.revision });
                 await showCompany(id);
               })
@@ -2473,7 +2473,7 @@ function companyResult(c) {
       text("span", c.buyerStatusLabel, BUYER_TAG[c.buyerStatus]),
       c.triage?.priority === "secondary" ? text("span", `prioridade secundária${c.triage.priorityReason ? ` — ${c.triage.priorityReason}` : ""}`, "tag warn") : null,
       c.checks?.length ? el("div", {}, text("small", "Pontos a verificar:"), el("ul", {}, ...c.checks.map((k) => el("li", {}, `${k.status === "open" ? "aberto" : k.status === "confirmed" ? "confirmado" : "descartado"}: ${k.topic}${k.note ? ` — ${k.note}` : ""}${k.resolution ? ` → ${k.resolution}` : ""} `, k.sourceUrl ? el("a", { href: k.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte") : null)))) : null,
-      text("small", `Porte: ${c.size ? `${c.size.label} (fonte: ${c.size.source || "sem fonte"})` : "não informado"} · Atividade: ${c.activity ? `${c.activity.text} (fonte: ${c.activity.source})` : "não registrada"} · Perfil: ${c.profile ? `${c.profile.label}, ${c.profile.icpLabel}` : "não registrado"}`),
+      text("small", `Porte: ${c.size ? `${c.size.label} — ${c.size.basis}, ${c.size.reference} (fonte: ${c.size.source || "sem fonte"})` : "desconhecido — pendência pesquisável"} · Atividade: ${c.activity ? `${c.activity.text} (fonte: ${c.activity.source})` : "não registrada"} · Perfil: ${c.profile ? `${c.profile.label}, ${c.profile.icpLabel}` : "não registrado"}`),
       c.website ? el("small", {}, "Site: ", el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, c.website)) : text("small", "Site: não registrado"),
       c.importEvidence.length
         ? el("div", {}, text("small", "Evidência de importação/compra (da própria empresa):"), el("ul", {}, ...c.importEvidence.map(evidenceLine)))
@@ -2842,14 +2842,16 @@ async function showDecisionReview(searchId) {
       el("div", {}, text("small", "Continua pendente depois dela:"), el("ul", {}, ...d.commercialValidation.stillPending.map((m) => el("li", {}, m)))),
     ),
     panel(
-      "2. Porte — regra vigente e proposta de referência",
+      `2. Porte — referência ${d.sizeReference.status || "proposta"}`,
       text("p", d.sizeReference.current),
       text("small", d.sizeReference.proposal),
       table(["Categoria", "Efetivo (UTA)", "Faturamento", "Balanço"], d.sizeReference.table.map((z) => [z.category, z.staff, z.turnover, z.balance])),
       text("small", `Empresas de grupo: ${d.sizeReference.groups}`),
+      d.sizeReference.headcount ? text("small", d.sizeReference.headcount) : null,
+      d.sizeReference.source ? text("small", `Fonte: ${d.sizeReference.source}`) : null,
       text("small", d.sizeReference.estimatedVsProven),
     ),
-    panel(`3. R14.8 — ${d.r148.status}`, text("small", "Atual:"), pre(d.r148.current), text("small", "Proposta:"), pre(d.r148.proposed)),
+    panel(`3. R14.8 — ${d.r148.status}`, pre(d.r148.current), d.r148.proposed ? el("div", {}, text("small", "Proposta:"), pre(d.r148.proposed)) : null),
     panel(
       `4. Textos — ${d.texts.status}`,
       text("small", `Destinatário: ${d.texts.recipient}. Sequência: ${d.texts.steps.map((z) => `passo ${z.step} no dia ${z.day}`).join(", ")}.`),

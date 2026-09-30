@@ -15,6 +15,10 @@ import { canHaveFicha, contactTargetFlag } from "./profiles.js";
 import { validationLinks } from "./discovery.js";
 
 const SIZE_LABEL = { micro: "Micro", small: "Pequena", medium: "Média", medium_plus: "Média-mais", giant: "Grande / grupo" };
+// Referência de porte (aprovada em 2026-09-30): Recomendação da Comissão Europeia 2003/361/CE; fora da UE é referência
+// operacional europeia, não enquadramento legal do país.
+const EU_ISO2 = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
+const sizeReference = (iso2) => (EU_ISO2.has(iso2) ? "Recomendação UE 2003/361/CE" : "referência operacional europeia (Recomendação UE 2003/361/CE), não enquadramento legal local");
 // Pequenas e médias primeiro (pedido de Rogério em 2026-09-27); média-mais depois; porte desconhecido, micro e gigante no fim.
 const SIZE_RANK = { small: 0, medium: 0, medium_plus: 1 };
 const PROFILE_LABEL = {
@@ -253,7 +257,7 @@ async function companyCard(env, actor, x, row, productId) {
   if (deciders.length && !deciders.some((c) => c.timezone)) pending.push("Fuso do destinatário não confirmado.");
   return {
     id: row.id, name: row.legal_name, tradeName: row.trade_name,
-    size: row.size_class ? { class: row.size_class, label: SIZE_LABEL[row.size_class], source: row.size_source, checkedAt: row.size_checked_at } : null,
+    size: row.size_class ? { class: row.size_class, label: SIZE_LABEL[row.size_class], basis: row.size_basis === "proven" ? "comprovado" : "estimado", reference: sizeReference(row.country_code), source: row.size_source, checkedAt: row.size_checked_at } : null,
     activity: row.activity_text ? { text: row.activity_text, source: row.activity_source } : null,
     website: row.website,
     buyerStatus: buyer,

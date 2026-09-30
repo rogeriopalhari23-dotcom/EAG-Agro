@@ -45,7 +45,9 @@ test("Revisão para decisão: decisões, textos lado a lado e dez candidatas a p
   assert.equal(r.decisions.commercialValidation.status, "pendente");
   assert.match(r.decisions.commercialValidation.phrase, /café verde em grão, não torrado e não descafeinado \(SH 0901\.11\)/);
   assert.match(r.decisions.commercialValidation.authorizes, /Não autoriza envio/);
-  assert.equal(r.decisions.r148.status, "proposta — não aplicada");
+  assert.equal(r.decisions.r148.status, "aprovada em 2026-09-30");
+  assert.match(r.decisions.sizeReference.headcount, /contrato de aprendizagem ou de formação profissional/);
+  assert.match(r.decisions.sizeReference.groups, /não se decide só pela porcentagem/);
   assert.deepEqual(r.decisions.texts.steps.map((z) => z.day), [0, 4]);
   assert.equal(r.decisions.texts.steps[0].de.subject, "Zuständige Person für den Rohkaffee-Einkauf");
   assert.equal(r.decisions.texts.steps[1].de.subject, "Zuständige Person für den Rohkaffee-Einkauf", "acompanhamento sem Re: (envio não encadeia)");
