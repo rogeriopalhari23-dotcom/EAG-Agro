@@ -46,6 +46,11 @@ test("P2-T11: classificação — ausência, bounce, descadastro, alerta do prov
   assert.equal(classify(parseMessage(dsn("x@y.com", "4.2.2"))).kind, "bounce_soft");
   assert.equal(classify(parseMessage(reply({ body: "SAIR" }))).kind, "unsubscribe");
   assert.equal(classify(parseMessage(reply({ body: "Please remove me from your list" }))).kind, "unsubscribe");
+  // Fichas em alemão pedem „abmelden“ no rodapé (2026-09-30).
+  assert.equal(classify(parseMessage(reply({ body: "abmelden" }))).kind, "unsubscribe");
+  assert.equal(classify(parseMessage(reply({ body: "Bitte abmelden, danke." }))).kind, "unsubscribe");
+  assert.equal(classify(parseMessage(reply({ subject: "Abwesenheitsnotiz: Rohkaffee-Einkauf" }))).kind, "auto_reply");
+  assert.equal(classify(parseMessage(reply({ body: "Guten Tag, zuständig ist Frau Muster.\r\n> Wenn Sie keine weiteren Nachrichten erhalten möchten, antworten Sie mit „abmelden“" }))).kind, "human", "„abmelden“ citado do nosso rodapé não é pedido de saída");
   // "sair" citado do nosso e-mail não é pedido de saída.
   assert.equal(classify(parseMessage(reply({ body: "Oi, tudo bem\r\n> responda \"sair\" ou use este link" }))).kind, "human");
   assert.equal(classify(parseMessage(`From: suporte@hostinger.com\r\nSubject: Your account was suspended for spam\r\n\r\nx`)).kind, "provider_alert");

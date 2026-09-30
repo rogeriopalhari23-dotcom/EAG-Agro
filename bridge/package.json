@@ -1,0 +1,18 @@
+{
+  "name": "eag-mail-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ponte de e-mail do EAG Compass: transporta mensagens congeladas e aprovadas pelo SMTP da Hostinger e devolve as respostas lidas pelo IMAP.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "imapflow": "2.1.2",
+    "nodemailer": "10.0.13"
+  }
+}

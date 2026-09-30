@@ -19,6 +19,7 @@ import * as profiles from "./profiles.js";
 import * as emailValidation from "./email-validation.js";
 import * as fichas from "./fichas.js";
 import { handleUnsubscribe } from "./unsubscribe.js";
+import { handleBridge } from "./bridge.js";
 import * as sanctions from "./sanctions.js";
 import * as changes from "./changes.js";
 import * as sending from "./sending.js";
@@ -56,6 +57,8 @@ async function route(request, env, rid) {
   }
   if (path === "/api/health" && method === "GET")
     return response({ status: "ok", service: "eag-compass", version: VERSION });
+  // Ponte de e-mail: identidade própria (token de serviço do Access + assinatura HMAC), só nestas rotas.
+  if (path.startsWith("/api/bridge/")) return handleBridge(request, env, path, rid);
   const actor = await getActor(request, env);
   assertSameOrigin(request);
   if (path === "/api/session" && method === "GET")
@@ -525,8 +528,11 @@ export default {
     const tenant = env.DEFAULT_TENANT_ID;
     if (controller.cron === "*/5 * * * *") {
       // Respostas primeiro: uma resposta recém-chegada pausa antes do próximo envio.
-      await inbound.poll(env, tenant).catch((e) => console.error("inbound_poll_failed", { kind: e?.kind ?? null }));
-      await sending.tick(env, tenant);
+      // Com a ponte (SEND_TRANSPORT=bridge), leitura e envio acontecem pelas rotas /api/bridge/*; o cron não fala com a caixa.
+      if (env.SEND_TRANSPORT !== "bridge") {
+        await inbound.poll(env, tenant).catch((e) => console.error("inbound_poll_failed", { kind: e?.kind ?? null }));
+        await sending.tick(env, tenant);
+      }
     }
     else if (controller.cron === "17 2 * * *") {
       await sending.evaluateRamp(env, tenant);

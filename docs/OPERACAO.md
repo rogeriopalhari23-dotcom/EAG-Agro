@@ -122,7 +122,7 @@ Envio só das 09:00 às 17:00, de segunda a sexta, **no fuso confirmado de cada 
 
 O Worker **não consegue** abrir conexão com `smtp.hostinger.com`/`imap.hostinger.com`: esses servidores estão atrás da Cloudflare, e Workers bloqueiam sockets TCP para IPs da própria Cloudflare (documentação oficial). Opções para decisão de Rogério (nenhuma aplicada):
 
-1. **Ponte na VPS da Hostinger (recomendada):** um serviço pequeno na VPS (fora da faixa da Cloudflare) recebe do Worker por HTTPS autenticado e fala SMTP/IMAP com a Hostinger. Mantém o remetente `rogeriopalhari@eagagro.com`, o risco do §12 já assumido e o custo atual. A senha da caixa fica na VPS, não no Worker. Depende de confirmar a identidade da VPS (OpenClaw) e de manter a VPS.
+1. **Ponte fora da Cloudflare — ESCOLHIDA por Rogério em 2026-09-30:** processo `bridge/` que pede ao Worker, por HTTPS autenticado, só mensagens congeladas e aprovadas e fala SMTP/IMAP com a Hostinger. Mantém o remetente `rogeriopalhari@eagagro.com`. Premissa corrigida no mesmo dia: Rogério não administra domínio, DNS nem servidores da EAG, e nenhuma VPS Hostinger é considerada disponível (o servidor do OpenClaw não é usado). Hospedagem em decisão: servidor independente (Hetzner CX23) ou o computador de Rogério — ver `docs/implementation/PONTE-EMAIL-PROPOSTA.md`.
 2. **Provedor de envio por API HTTP** (ex.: Amazon SES): exige verificar o domínio `eagagro.com` (DNS em outra conta Cloudflare), tem custo por volume e regras próprias para prospecção; respostas continuariam precisando de leitura da caixa.
 3. **Mudar a hospedagem de e-mail** para um provedor fora da Cloudflare: mudança maior, afeta a caixa em uso.
 

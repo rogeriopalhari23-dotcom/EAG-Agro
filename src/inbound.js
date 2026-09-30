@@ -6,9 +6,10 @@ import { identifierHash } from "./crypto.js";
 import { parseMessage, header, addressOf, messageIds } from "./mime.js";
 import { imapClient } from "./adapters/imap.js";
 
-const UNSUB_RE = /^\s*(?:please,?\s+|por favor,?\s+)?(sair|descadastr\w*|remover|remova[- ]me|me (tire|remova)|unsubscribe|remove me|stop|opt[ -]?out|take me off)\b/im;
-const PRICE_RE = /pre[çc]o|tabela|cota[çc][ãa]o|apresenta[çc][ãa]o|proposta|price|pricing|quote|quotation|catalog|proposal|presentation/i;
-const AUTO_SUBJECT = /^(resposta autom[áa]tica|automatic reply|auto[- ]?reply|out of office|aus[êe]ncia|f[ée]rias|ooo\b)/i;
+// Alemão (fichas de identificação, 2026-09-30): o rodapé pede „abmelden“ — suprime como "sair".
+const UNSUB_RE = /^\s*(?:please,?\s+|por favor,?\s+|bitte,?\s+)?(sair|descadastr\w*|remover|remova[- ]me|me (tire|remova)|unsubscribe|remove me|stop|opt[ -]?out|take me off|abmelden|abbestellen|austragen)\b/im;
+const PRICE_RE = /pre[çc]o|tabela|cota[çc][ãa]o|apresenta[çc][ãa]o|proposta|price|pricing|quote|quotation|catalog|proposal|presentation|preis|angebot/i;
+const AUTO_SUBJECT = /^(resposta autom[áa]tica|automatic reply|auto[- ]?reply|out of office|aus[êe]ncia|f[ée]rias|ooo\b|abwesenheit|automatische antwort)/i;
 const PROVIDER_ALERT = /suspens|bloque|limit|spam|abuse|abuso|blacklist|violation|viola[çc][ãa]o/i;
 const LOOKBACK_DAYS = 60;
 // Orientação fixa quando o comprador pede preço/tabela (R28.13; skill: nada de preço antes da reunião).
@@ -147,6 +148,12 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
   return { id, classification: c.kind, correlation: corr.correlation };
 }
 
+// Saúde da leitura de respostas (ponte de e-mail): horário do Worker; sem leitura recente, nenhum envio sai (sending.js).
+export const recordReaderOk = (env, tenant, at, reader, version = null) =>
+  s(env, "INSERT INTO reply_reader_state(tenant_id,last_read_ok_at,reader,bridge_version,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET last_read_ok_at=excluded.last_read_ok_at,reader=excluded.reader,bridge_version=excluded.bridge_version,updated_at=excluded.updated_at", tenant, at, reader, version, at).run();
+export const recordReaderError = (env, tenant, at, error) =>
+  s(env, "INSERT INTO reply_reader_state(tenant_id,last_error,last_error_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET last_error=excluded.last_error,last_error_at=excluded.last_error_at,updated_at=excluded.updated_at", tenant, error, at, at).run();
+
 // Leitura periódica com lease por caixa; UIDVALIDITY diferente recomeça a contagem.
 export async function poll(env, tenant, deps = {}) {
   const at = deps.now ?? now();
@@ -177,6 +184,7 @@ export async function poll(env, tenant, deps = {}) {
     }
     if (!messages.length)
       await s(env, "UPDATE inbound_cursor SET uidvalidity=?,updated_at=? WHERE tenant_id=? AND mailbox=? AND lease_owner=?", uidValidity, at, tenant, mailbox, owner).run();
+    await recordReaderOk(env, tenant, at, "worker");
     return { processed };
   } finally {
     await s(env, "UPDATE inbound_cursor SET lease_owner=NULL,lease_until=NULL WHERE tenant_id=? AND mailbox=? AND lease_owner=?", tenant, mailbox, owner).run();

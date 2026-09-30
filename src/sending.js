@@ -111,101 +111,161 @@ async function approvedMessage(env, row) {
   return { subject, body, html, versionId: m.version_id };
 }
 
+// Leitura de respostas saudável (ponte de e-mail, 2026-09-30): sem leitura bem-sucedida da caixa nos últimos
+// READER_MAX_AGE_MS, nenhum envio sai — uma resposta não lida nunca fica para trás de um novo toque.
+export const READER_MAX_AGE_MS = 10 * 60000;
+export async function readerHealthy(env, tenant, at) {
+  const r = await s(env, "SELECT last_read_ok_at FROM reply_reader_state WHERE tenant_id=?", tenant).first();
+  return !!r?.last_read_ok_at && Date.parse(r.last_read_ok_at) >= Date.parse(at) - READER_MAX_AGE_MS;
+}
+
+// Escolhe e reserva (lease) o próximo passo elegível, com todas as verificações pré-envio. Não envia.
+// Devolve { reason } ou { row, token, email, msg, headers, messageId, ctx } para o transporte e para settle().
+async function prepareNext(env, tenant, at, owner, state, leaseMs = LEASE_MS) {
+  await expireLeases(env, tenant, at);
+  await releaseWaiting(env, tenant, at);
+  if (state.stopped_at) return { reason: "sender_stopped" };
+  const p = await parameters(env, tenant);
+  const ramp = p["send_daily_ramp:email"],
+    interval = p["send_interval_minutes:email"],
+    nationalTz = null; // não há mais fuso de mercado no envio (regra de 2026-09-25)
+  if (!Array.isArray(ramp) || !interval) return { reason: "parameters_missing" }; // R7.1.1 (janela conferida por mercado em cada passo)
+  const internationalEnabled = p["international_enabled:international"]?.enabled === true;
+  const senderDay = localDate(at, SENDER_TZ);
+  const sentToday = state.day === senderDay ? state.sent_today : 0;
+  const cap = ramp[Math.min(state.ramp_step, ramp.length - 1)];
+  if (sentToday >= cap) return { reason: "daily_cap" }; // 7 (teto do remetente, soma dos mercados)
+  if (state.next_send_at && state.next_send_at > at) return { reason: "interval" };
+  if (!(await readerHealthy(env, tenant, at))) return { reason: "reply_reader_unavailable" };
+  const candidates = (
+    await s(
+      env,
+      `SELECT o.*,f.campaign_id,c.market FROM send_outbox o JOIN fichas f ON f.id=o.ficha_id JOIN campaigns c ON c.id=f.campaign_id
+       WHERE o.tenant_id=? AND o.channel='email' AND o.status IN ('pending','temp_failed') AND (o.next_attempt_at IS NULL OR o.next_attempt_at<=?)
+       ORDER BY o.planned_date,o.step_no,o.created_at LIMIT 100`,
+      tenant, at,
+    ).all()
+  ).results;
+  for (const row of candidates) {
+    const check = await preSendCheck(env, row, { at, nationalTz, campaignId: row.campaign_id, market: row.market, internationalEnabled });
+    if (check.cancel || check.block) {
+      await env.DB.batch([
+        s(env, "UPDATE send_outbox SET status=?,block_reason=?,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')", check.cancel ? "cancelled" : "blocked", check.cancel || check.block, at, row.id),
+        log(env, row.id, "blocked", check.cancel || check.block),
+      ]);
+      continue;
+    }
+    if (check.skip) {
+      await s(env, "UPDATE send_outbox SET block_reason=?,updated_at=? WHERE id=?", check.skip, at, row.id).run();
+      continue;
+    }
+    // Janela do mercado da campanha, no fuso do destinatário (R19.2 item 7); teto do dia segue único (soma dos mercados).
+    const window = p[`send_window:${row.market}`];
+    if (!window) {
+      await s(env, "UPDATE send_outbox SET block_reason='window_missing',updated_at=? WHERE id=?", at, row.id).run();
+      continue;
+    }
+    if (!inWindow(at, check.tz, window)) {
+      await s(env, "UPDATE send_outbox SET block_reason='outside_window',updated_at=? WHERE id=?", at, row.id).run();
+      continue;
+    }
+    const msg = await approvedMessage(env, row);
+    if (!msg) {
+      await env.DB.batch([
+        s(env, "UPDATE send_outbox SET status='blocked',block_reason='content_mismatch',updated_at=? WHERE id=?", at, row.id),
+        log(env, row.id, "blocked", "conteúdo difere do aprovado"),
+      ]);
+      continue;
+    }
+    // Aquisição do passo (UPDATE condicional): outro executor não pega o mesmo passo.
+    const messageId = row.message_id || `<ob-${row.id}@${String(env.MAILBOX_USER || "eagagro.com").split("@").pop()}>`;
+    const leaseUntil = new Date(Date.parse(at) + leaseMs).toISOString();
+    const took = await s(
+      env,
+      "UPDATE send_outbox SET status='leased',lease_owner=?,lease_until=?,lease_token=lease_token+1,attempts=attempts+1,message_id=?,block_reason=NULL,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')",
+      owner, leaseUntil, messageId, at, row.id,
+    ).run();
+    if (!took.meta.changes) continue;
+    const token = (await s(env, "SELECT lease_token FROM send_outbox WHERE id=?", row.id).first()).lease_token;
+    await log(env, row.id, "leased", null, token).run();
+    const listUnsub = await unsubUrl(env, msg.versionId, row.contact_id);
+    const headers = { "Message-ID": messageId, "List-Unsubscribe": `<${listUnsub}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+    return { row, token, leaseUntil, email: check.email, msg, headers, messageId, ctx: { sentToday, senderDay, interval } };
+  }
+  return { reason: candidates.length ? "nothing_eligible" : "nothing_due" };
+}
+
 // Uma execução do agendador. deps: { transport, now, owner, random }
+// Com SEND_TRANSPORT=bridge o cron não envia: quem transporta é a ponte, pelo claim (src/bridge.js).
 export async function tick(env, tenant, deps = {}) {
   const at = deps.now ?? now();
+  const out = { sent: 0, reason: null };
+  if (env.SEND_TRANSPORT === "bridge" && !deps.transport) return { ...out, reason: "bridge_transport" };
   const sender = env.MAILBOX_USER || "sender";
   const owner = deps.owner ?? crypto.randomUUID();
-  const out = { sent: 0, reason: null };
   const state = await acquireSender(env, tenant, sender, owner, at);
   if (!state) return { ...out, reason: "sender_busy" };
   try {
-    await expireLeases(env, tenant, at);
-    await releaseWaiting(env, tenant, at);
-    if (state.stopped_at) return { ...out, reason: "sender_stopped" };
-    const p = await parameters(env, tenant);
-    const ramp = p["send_daily_ramp:email"],
-      interval = p["send_interval_minutes:email"],
-      nationalTz = null; // não há mais fuso de mercado no envio (regra de 2026-09-25)
-    if (!Array.isArray(ramp) || !interval) return { ...out, reason: "parameters_missing" }; // R7.1.1 (janela conferida por mercado em cada passo)
-    const internationalEnabled = p["international_enabled:international"]?.enabled === true;
-    const senderDay = localDate(at, SENDER_TZ);
-    const sentToday = state.day === senderDay ? state.sent_today : 0;
-    const cap = ramp[Math.min(state.ramp_step, ramp.length - 1)];
-    if (sentToday >= cap) return { ...out, reason: "daily_cap" }; // 7 (teto do remetente, soma dos mercados)
-    if (state.next_send_at && state.next_send_at > at) return { ...out, reason: "interval" };
-    const candidates = (
-      await s(
-        env,
-        `SELECT o.*,f.campaign_id,c.market FROM send_outbox o JOIN fichas f ON f.id=o.ficha_id JOIN campaigns c ON c.id=f.campaign_id
-         WHERE o.tenant_id=? AND o.channel='email' AND o.status IN ('pending','temp_failed') AND (o.next_attempt_at IS NULL OR o.next_attempt_at<=?)
-         ORDER BY o.planned_date,o.step_no,o.created_at LIMIT 100`,
-        tenant, at,
-      ).all()
-    ).results;
-    for (const row of candidates) {
-      const check = await preSendCheck(env, row, { at, nationalTz, campaignId: row.campaign_id, market: row.market, internationalEnabled });
-      if (check.cancel || check.block) {
-        await env.DB.batch([
-          s(env, "UPDATE send_outbox SET status=?,block_reason=?,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')", check.cancel ? "cancelled" : "blocked", check.cancel || check.block, at, row.id),
-          log(env, row.id, "blocked", check.cancel || check.block),
-        ]);
-        continue;
-      }
-      if (check.skip) {
-        await s(env, "UPDATE send_outbox SET block_reason=?,updated_at=? WHERE id=?", check.skip, at, row.id).run();
-        continue;
-      }
-      // Janela do mercado da campanha, no fuso do destinatário (R19.2 item 7); teto do dia segue único (soma dos mercados).
-      const window = p[`send_window:${row.market}`];
-      if (!window) {
-        await s(env, "UPDATE send_outbox SET block_reason='window_missing',updated_at=? WHERE id=?", at, row.id).run();
-        continue;
-      }
-      if (!inWindow(at, check.tz, window)) {
-        await s(env, "UPDATE send_outbox SET block_reason='outside_window',updated_at=? WHERE id=?", at, row.id).run();
-        continue;
-      }
-      const msg = await approvedMessage(env, row);
-      if (!msg) {
-        await env.DB.batch([
-          s(env, "UPDATE send_outbox SET status='blocked',block_reason='content_mismatch',updated_at=? WHERE id=?", at, row.id),
-          log(env, row.id, "blocked", "conteúdo difere do aprovado"),
-        ]);
-        continue;
-      }
-      // Aquisição do passo (UPDATE condicional): outro executor não pega o mesmo passo.
-      const messageId = row.message_id || `<ob-${row.id}@${String(env.MAILBOX_USER || "eagagro.com").split("@").pop()}>`;
-      const leaseUntil = new Date(Date.parse(at) + LEASE_MS).toISOString();
-      const took = await s(
-        env,
-        "UPDATE send_outbox SET status='leased',lease_owner=?,lease_until=?,lease_token=lease_token+1,attempts=attempts+1,message_id=?,block_reason=NULL,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')",
-        owner, leaseUntil, messageId, at, row.id,
-      ).run();
-      if (!took.meta.changes) continue;
-      const token = (await s(env, "SELECT lease_token FROM send_outbox WHERE id=?", row.id).first()).lease_token;
-      await log(env, row.id, "leased", null, token).run();
-      const listUnsub = await unsubUrl(env, msg.versionId, row.contact_id);
-      const result = await (deps.transport ?? smtpTransport(env)).send({
-        to: check.email,
-        subject: msg.subject,
-        text: msg.body,
-        html: msg.html ?? undefined,
-        headers: {
-          "Message-ID": messageId,
-          "List-Unsubscribe": `<${listUnsub}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
-      });
-      await settle(env, row, token, result, at, sentToday, senderDay, interval, deps);
-      out.sent = result.kind === "accepted" ? 1 : 0;
-      out.reason = result.kind;
-      return out; // no máximo um envio por execução
-    }
-    return { ...out, reason: candidates.length ? "nothing_eligible" : "nothing_due" };
+    const next = await prepareNext(env, tenant, at, owner, state);
+    if (next.reason) return { ...out, reason: next.reason };
+    const result = await (deps.transport ?? smtpTransport(env)).send({
+      to: next.email, subject: next.msg.subject, text: next.msg.body, html: next.msg.html ?? undefined, headers: next.headers,
+    });
+    await settle(env, next.row, next.token, result, at, next.ctx.sentToday, next.ctx.senderDay, next.ctx.interval, deps);
+    out.sent = result.kind === "accepted" ? 1 : 0;
+    out.reason = result.kind;
+    return out; // no máximo um envio por execução
   } finally {
     await releaseSender(env, tenant, sender, owner);
   }
+}
+
+// Reserva para a ponte (claim): mesmo caminho do tick, sem enviar. Um passo em trânsito por vez: enquanto houver lease
+// vigente, nada novo é reservado (o intervalo é marcado no resultado).
+export const BRIDGE_LEASE_MS = 5 * 60000;
+export async function reserveForBridge(env, tenant, at) {
+  const sender = env.MAILBOX_USER || "sender";
+  const claimOwner = `bridge-claim-${crypto.randomUUID()}`;
+  const state = await acquireSender(env, tenant, sender, claimOwner, at);
+  if (!state) return { reason: "sender_busy" };
+  try {
+    await expireLeases(env, tenant, at);
+    const inFlight = await s(env, "SELECT id FROM send_outbox WHERE tenant_id=? AND status='leased' LIMIT 1", tenant).first();
+    if (inFlight) return { reason: "in_flight" };
+    return await prepareNext(env, tenant, at, "bridge", state, BRIDGE_LEASE_MS);
+  } finally {
+    await releaseSender(env, tenant, sender, claimOwner);
+  }
+}
+
+// Resultado informado pela ponte, com o mesmo efeito do transporte direto (settle). Idempotente por lease.
+// Lease vencido (indeterminado) só é fechado automaticamente como aceito, com a prova da ponte; o resto fica para Rogério.
+export async function settleFromBridge(env, tenant, outboxId, token, result, at, deps = {}) {
+  const sender = env.MAILBOX_USER || "sender";
+  const row = await s(env, "SELECT * FROM send_outbox WHERE tenant_id=? AND id=?", tenant, outboxId).first();
+  if (!row) return { status: 404, code: "outbox_not_found" };
+  if (row.lease_token !== token) return { status: 409, code: "lease_mismatch" };
+  const p = await parameters(env, tenant);
+  const interval = p["send_interval_minutes:email"] || { min: 15, max: 25 };
+  const st = (await s(env, "SELECT * FROM sender_state WHERE tenant_id=? AND sender=?", tenant, sender).first()) || {};
+  const senderDay = localDate(at, SENDER_TZ);
+  const sentToday = st.day === senderDay ? st.sent_today : 0;
+  if (row.status === "leased" && row.lease_owner === "bridge") {
+    await settle(env, row, token, result, at, sentToday, senderDay, interval, deps);
+    return { status: 200, outcome: result.kind };
+  }
+  const done = { accepted: "accepted", temporary: "temp_failed", permanent: "perm_failed", indeterminate: "indeterminate" }[result.kind];
+  if (row.status === done && !(row.status === "indeterminate" && row.block_reason === "lease_expired")) return { status: 200, outcome: result.kind, idempotent: true };
+  if (row.status === "indeterminate" && row.block_reason === "lease_expired" && result.kind === "accepted") {
+    await env.DB.batch([
+      s(env, "UPDATE send_outbox SET status='accepted',accepted_at=?,resolved_by='bridge',resolved_reason=?,updated_at=? WHERE id=? AND status='indeterminate' AND lease_token=?", at, result.detail ?? "aceito pelo SMTP (informado pela ponte)", at, row.id, token),
+      log(env, row.id, "accepted_after_lease_expired", result.detail ?? null, token),
+      s(env, "UPDATE sender_state SET day=?,sent_today=?,ramp_started_on=COALESCE(ramp_started_on,?) WHERE tenant_id=? AND sender=?", senderDay, sentToday + 1, senderDay, tenant, sender),
+    ]);
+    return { status: 200, outcome: "accepted", recovered: true };
+  }
+  await log(env, row.id, "bridge_result_ignored", `${result.kind} com status ${row.status}`, token).run();
+  return { status: 409, code: "not_in_flight", current: row.status };
 }
 
 async function settle(env, row, token, result, at, sentToday, senderDay, interval, deps) {

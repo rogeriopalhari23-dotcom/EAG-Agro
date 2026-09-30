@@ -72,6 +72,8 @@ export function setup() {
       throw e;
     }
   }
+  // Leitura de respostas saudável por padrão (os testes de envio usam datas de 2099); tests/bridge.test.mjs cobre o portão.
+  DB.raw.exec("INSERT INTO reply_reader_state(tenant_id,last_read_ok_at,reader) VALUES ('eag-internal','2999-12-31T00:00:00.000Z','teste')");
   const env = {
     DB,
     ENVIRONMENT: "local",
