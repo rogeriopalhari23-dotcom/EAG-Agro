@@ -1,0 +1,42 @@
+{
+  "descricao": "Registros do teste interno da ponte de e-mail em produção (IDs; sem credenciais). Todos marcados TESTE INTERNO.",
+  "campanha": "5069cc54-d933-42de-bae7-1448406b5398",
+  "canalAntes": "planned",
+  "casos": {
+    "A": {
+      "destinatario": "rogeriopalhari23+ponte-a@gmail.com",
+      "empresa": "607b0076-0f47-46b2-b169-73980980a41d",
+      "contato": "878b1275-44fe-4e91-a8ea-14843793c642",
+      "perfil": "38dd9029-f298-4b59-a01c-3d358a95bae2",
+      "ficha": "615c7472-233f-477c-becc-70b1cf0cc0a4"
+    },
+    "B": {
+      "destinatario": "rogeriopalhari23+ponte-b@gmail.com",
+      "empresa": "821b6081-4b9c-45fa-8bbf-2421fad8c51a",
+      "contato": "f1265c98-bdf3-42b4-b2f3-331416c9164a",
+      "perfil": "2378eded-3c36-4a65-8dbe-5cf7f76ee5ff",
+      "ficha": "e0af3304-a91a-4e6c-853e-236503b3338a"
+    },
+    "C": {
+      "destinatario": "rogeriopalhari23+ponte-c@gmail.com",
+      "empresa": "50323b67-368f-4719-aad4-3967a74bc19e",
+      "contato": "4626dfe9-b619-4e1d-8a1f-3dad6d5ed9e7",
+      "perfil": "edd72ff6-54a6-4fdd-b210-34207bf13a80",
+      "ficha": "eab82e99-c1d2-472f-a110-d08ce554337d"
+    },
+    "F": {
+      "destinatario": "teste-externo@example.com",
+      "empresa": "b33cbe03-dc28-4cc3-bb7b-fc17dead2cf0",
+      "contato": "d8b5ab59-c5d4-4440-8f65-3459f813d5d5",
+      "perfil": "c2323e5e-3724-4a8f-9ada-3022f9df6877",
+      "ficha": "7ba1962a-f4b9-43d3-905e-f1d3ab454dac"
+    },
+    "D": {
+      "destinatario": "rogeriopalhari23+ponte-link@gmail.com",
+      "empresa": "05873665-3f76-4b94-b8bf-dccba099ee47",
+      "contato": "c8cb3b2b-6c54-442c-8901-6a3509514ebf",
+      "perfil": "eb2328a3-1d27-479a-b37e-e2bbc3ad630d",
+      "ficha": "19fcd6ec-4876-41ee-b41f-5a9bc27ab820"
+    }
+  }
+}

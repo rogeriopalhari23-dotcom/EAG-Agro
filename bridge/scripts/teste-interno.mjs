@@ -34,6 +34,9 @@ if (modo === "claim") {
     await compass.call("/api/bridge/result", { outboxId: r.message.outboxId, leaseToken: r.message.leaseToken, outcome: "temporary", evidence: "teste interno: reservado sem envio" });
     out({ aviso: "passo reservado e devolvido sem envio" });
   }
+} else if (modo === "bloquear") {
+  const r = await compass.call("/api/bridge/lockdown", { reason: process.argv[3] || "trava manual do teste interno" });
+  out({ cenario: "trava", ...r });
 } else if (modo === "seguranca") {
   const nonce = randomUUID(), ts = String(Date.now());
   const a = await raw("/api/bridge/cursor", { nonce, ts });

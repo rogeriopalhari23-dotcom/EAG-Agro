@@ -142,9 +142,26 @@ const saveState = () => {
 };
 saveState();
 
+// Prazo do teste interno (BRIDGE_TEST_DEADLINE, ISO): passado o prazo, a ponte nunca pede envio — desliga o canal de
+// e-mail no Compass (rota de trava, só desliga) e encerra. Vale a cada início, independente de sessão ou agendamento.
+const deadline = env.BRIDGE_TEST_DEADLINE ? Date.parse(env.BRIDGE_TEST_DEADLINE) : null;
+async function deadlinePassed() {
+  if (!deadline || Date.now() < deadline) return false;
+  try {
+    const r = await deps.compass.call("/api/bridge/lockdown", { reason: "prazo do teste interno encerrado" });
+    log("deadline_lockdown", { previous: r.previous, state: r.state });
+  } catch (e) {
+    log("deadline_lockdown_failed", { status: e.status ?? null, code: e.code ?? null });
+  }
+  state.lastReason = "prazo do teste interno encerrado";
+  saveState();
+  return true;
+}
+
 let stopping = false;
 let authStopped = false;
 do {
+  if (await deadlinePassed()) break;
   try {
     if (!authStopped) {
       const r = await runCycle(deps);

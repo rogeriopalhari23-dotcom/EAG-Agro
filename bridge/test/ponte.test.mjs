@@ -316,3 +316,17 @@ test("Ponte: chave em hexadecimal (formato de produção) assina igual nos dois 
   ctx.env.BRIDGE_HMAC_KEY = "  " + hex + "\r\n"; // espaço/quebra em volta não atrapalha
   assert.equal((await compass.call("/api/bridge/cursor")).mailbox, "INBOX");
 });
+
+test("Ponte: trava local desliga o canal (nunca liga) e segura a fila", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  const d = bridgeDeps(ctx);
+  const r = await d.compass.call("/api/bridge/lockdown", { reason: "prazo do teste interno" });
+  assert.deepEqual(r, { channel: "email", previous: "internal_test", state: "planned" });
+  assert.equal((await runCycle(d)).sent, false);
+  assert.equal(ctx.DB.raw.prepare("SELECT block_reason FROM send_outbox WHERE step_no=1").get().block_reason, "channel_not_enabled");
+  assert.equal(d.smtp.raws.length, 0);
+  assert.equal((await d.compass.call("/api/bridge/lockdown", {})).previous, "planned", "idempotente");
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='bridge.lockdown'").get().n, 2);
+});

@@ -268,7 +268,20 @@ export async function reachDiscovery(request, env, actor, rid, deps = {}) {
 // não grava na lista nem mostra hash ou chave.
 export async function checkSuppression(request, env, actor, rid) {
   requireRole(actor, ADMIN);
-  await bodyJson(request);
+  const i = await bodyJson(request);
+  // Teste interno: só endereços da lista interna (INTERNAL_TEST_RECIPIENTS); devolve se cada um está suprimido e se o hash
+  // de algum alias coincide com o do primeiro endereço da lista (não deve — "+alias" é outro identificador). Sem hashes.
+  if (Array.isArray(i.internalEmails)) {
+    const allowed = String(env.INTERNAL_TEST_RECIPIENTS || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
+    const list = i.internalEmails.map((x) => String(x).trim().toLowerCase());
+    if (!list.length || list.length > 10 || list.some((x) => !allowed.includes(x))) fail(422, "not_internal", "Só endereços da lista de teste interno.");
+    const main = await identifierHash(env, actor.tenant_id, "email", allowed[0]);
+    const result = [];
+    for (const e of list)
+      result.push({ email: e, suppressed: await isSuppressed(env, actor.tenant_id, "email", e), sameHashAsMain: e !== allowed[0] && (await identifierHash(env, actor.tenant_id, "email", e)) === main });
+    await commit(env, [auditStatement(env, actor, rid, "integration.suppression_checked", "integration", "suppression", { internalEmails: list.length })]);
+    return { main: allowed[0], result };
+  }
   const probe = "verificacao-interna@eag-compass.invalid";
   const out = { keyLoaded: false, stableHash: false, lookupOk: false, probeSuppressed: null, entries: null, error: null };
   try {

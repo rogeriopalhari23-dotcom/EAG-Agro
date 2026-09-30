@@ -163,6 +163,17 @@ export async function handleBridge(request, env, path, rid) {
     return response({ uid, duplicate: !!r.duplicate, classification: r.classification ?? null });
   }
 
+  if (path === "/api/bridge/lockdown") {
+    // Trava de segurança local (prazo do teste interno, encerramento sem sessão): só DESLIGA o canal de e-mail (volta a
+    // "planned"); nunca liga. Tudo o que estava na fila fica parado pelo pré-envio (channel_not_enabled).
+    const prev = await s(env, "SELECT state FROM channels WHERE tenant_id=? AND channel='email'", tenant).first();
+    await env.DB.batch([
+      s(env, "UPDATE channels SET state='planned',evidence_ref=?,changed_by=?,changed_at=? WHERE tenant_id=? AND channel='email' AND state<>'planned'", String(input.reason ?? "trava da ponte").slice(0, 200), actor.id, at, tenant),
+      auditStatement(env, actor, rid, "bridge.lockdown", "channel", "email", { from: prev?.state ?? null, reason: String(input.reason ?? "").slice(0, 120) }),
+    ]);
+    return response({ channel: "email", previous: prev?.state ?? null, state: "planned" });
+  }
+
   if (path === "/api/bridge/read-status") {
     // A ponte informa o fim de um ciclo de leitura. "ok" só vale se o cursor do Compass já chegou ao maior UID lido.
     if (input.ok === true) {
