@@ -28,8 +28,8 @@
     "SENDER_PERSON_NAME": "Rogério Palhari",
     // Ponte de e-mail (opção B, computador de Rogério, 2026-09-30): o cron não fala com a caixa; a ponte transporta pelas rotas /api/bridge/*.
     "SEND_TRANSPORT": "bridge",
-    // Client ID do token de serviço do Access usado pela ponte (não é segredo); vazio = rotas da ponte recusam.
-    "BRIDGE_ACCESS_CLIENT_ID": "",
+    // BRIDGE_ACCESS_CLIENT_ID (token de serviço da ponte) e BRIDGE_ACCESS_AUD (aplicação do Access só de /api/bridge) são
+    // secrets do Worker, gravados pela API na configuração do Access; sem eles as rotas da ponte recusam.
     "MAILBOX_USER": "rogeriopalhari@eagagro.com",
     "EAG_POSTAL_ADDRESS": "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil",
     // Validação de Rogério (2026-09-30): texto exato do endereço do rodapé. Sem ele (ou diferente), revisor e aprovação bloqueiam.

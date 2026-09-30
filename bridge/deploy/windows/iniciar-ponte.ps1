@@ -39,7 +39,7 @@ if (-not $node) { Parar "Node.js não encontrado no PATH (instale o Node.js 24 L
 $versao = [version]((& node -p "process.versions.node").Trim())
 if ($versao -lt [version]"22.5.0") { Parar "Node.js $versao é antigo; a ponte precisa de 22.5 ou mais recente" }
 if (-not (Test-Path $config)) {
-  @{ COMPASS_URL = "https://eag-compass-production.rogeriopalhari23.workers.dev"; MAILBOX_USER = "rogeriopalhari@eagagro.com"; ACCESS_CLIENT_ID = ""; SMTP_PORT = "465" } |
+  @{ COMPASS_URL = "https://eag-compass-production.rogeriopalhari23.workers.dev"; MAILBOX_USER = "rogeriopalhari@eagagro.com"; SMTP_PORT = "465" } |
     ConvertTo-Json | Set-Content -Encoding utf8 $config
   Write-Host "Configuração criada em $config."
 }
@@ -50,8 +50,7 @@ if (Test-Path $segredos) { $guardados = (Get-Content $segredos -Raw | ConvertFro
 if (-not $SoCaixa) {
   # Ligação com o Compass: exige URL, Client ID do token de serviço e os dois segredos guardados.
   if (-not $cfg.COMPASS_URL) { Parar "COMPASS_URL ausente em $config" }
-  if (-not $cfg.ACCESS_CLIENT_ID) { Parar "ACCESS_CLIENT_ID ausente — rode guardar-segredos.ps1 depois de criar o token de serviço" }
-  foreach ($n in "BRIDGE_HMAC_KEY", "ACCESS_CLIENT_SECRET") { if ($guardados -notcontains $n) { Parar "segredo $n não guardado (guardar-segredos.ps1 / configurar-chave-compass.ps1)" } }
+  foreach ($n in "ACCESS_CLIENT_ID", "BRIDGE_HMAC_KEY", "ACCESS_CLIENT_SECRET") { if ($guardados -notcontains $n) { Parar "segredo $n não guardado (guardar-segredos.ps1 / configurar-chave-compass.ps1)" } }
 }
 if (-not $interativo -and $guardados -notcontains "MAILBOX_PASSWORD") { Parar "senha da caixa não guardada; no modo automático a ponte não pede senha (rode guardar-segredos.ps1)" }
 if ($Validar) { Write-Host "Validação OK: ponte em $ponte, Node.js $versao, configuração e segredos presentes."; exit 0 }
@@ -88,3 +87,4 @@ try {
   Remove-Item Env:MAILBOX_PASSWORD, Env:BRIDGE_HMAC_KEY, Env:ACCESS_CLIENT_SECRET -ErrorAction SilentlyContinue
 }
 exit $codigo # código diferente de 0 faz a tarefa agendada reiniciar a ponte
+

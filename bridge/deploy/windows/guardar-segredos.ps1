@@ -8,17 +8,24 @@ New-Item -ItemType Directory -Force $dir | Out-Null
 $arquivo = Join-Path $dir "segredos.json"
 $atuais = @{}
 if (Test-Path $arquivo) { (Get-Content $arquivo -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $atuais[$_.Name] = $_.Value } }
-foreach ($nome in "MAILBOX_PASSWORD", "ACCESS_CLIENT_SECRET") {
-  $rotulo = @{ MAILBOX_PASSWORD = "Senha da caixa rogeriopalhari@eagagro.com"; ACCESS_CLIENT_SECRET = "Client Secret do token de serviço (Cloudflare Zero Trust)" }[$nome]
+# Os três valores são digitados (ou colados) sem aparecer na tela e ficam cifrados; o Client ID também, a pedido de Rogério.
+foreach ($nome in "MAILBOX_PASSWORD", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET") {
+  $rotulo = @{ MAILBOX_PASSWORD = "Senha da caixa rogeriopalhari@eagagro.com"; ACCESS_CLIENT_ID = "Client ID do token de serviço (termina em .access)"; ACCESS_CLIENT_SECRET = "Client Secret do token de serviço" }[$nome]
   $valor = Read-Host -AsSecureString "$rotulo — não aparece na tela; Enter vazio mantém o atual"
   if ($valor.Length -gt 0) { $atuais[$nome] = $valor | ConvertFrom-SecureString }
 }
 $atuais | ConvertTo-Json | Set-Content -Encoding utf8 $arquivo
-# Client ID não é segredo (identifica o token); fica na configuração.
+# Conferência sem exibir valores: o Client ID precisa terminar em ".access".
+if ($atuais.ACCESS_CLIENT_ID) {
+  $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR(($atuais.ACCESS_CLIENT_ID | ConvertTo-SecureString))
+  try { $okId = ([Runtime.InteropServices.Marshal]::PtrToStringBSTR($b)).Trim().EndsWith(".access") } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
+  if (-not $okId) { Write-Host "ATENÇÃO: o Client ID guardado não termina em .access — confira e rode este script de novo." }
+}
+# A configuração existente é preservada; um Client ID antigo em texto (versão anterior deste script) sai dela.
 $config = Join-Path $dir "config.json"
-$cfg = @{ COMPASS_URL = "https://eag-compass-production.rogeriopalhari23.workers.dev"; MAILBOX_USER = "rogeriopalhari@eagagro.com"; ACCESS_CLIENT_ID = ""; SMTP_PORT = "465" }
-if (Test-Path $config) { (Get-Content $config -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $cfg[$_.Name] = $_.Value } }
-$id = Read-Host "Client ID do token de serviço (termina em .access; Enter vazio mantém o atual)"
-if ($id) { $cfg.ACCESS_CLIENT_ID = $id.Trim() }
-$cfg | ConvertTo-Json | Set-Content -Encoding utf8 $config
-Write-Host "Guardado em $dir (segredos cifrados para a conta $env:USERNAME)."
+if (Test-Path $config) {
+  $cfg = @{}
+  (Get-Content $config -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { if ($_.Name -ne "ACCESS_CLIENT_ID") { $cfg[$_.Name] = $_.Value } }
+  $cfg | ConvertTo-Json | Set-Content -Encoding utf8 $config
+}
+Write-Host ("Guardado em $dir, cifrado para a conta $env:USERNAME: " + (($atuais.Keys | Sort-Object) -join ", ") + ". Valores não exibidos.")

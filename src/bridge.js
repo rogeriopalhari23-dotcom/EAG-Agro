@@ -2,8 +2,9 @@
 // (IPs da Cloudflare); um processo fora da Cloudflare (bridge/) transporta. A ponte não decide nada: o claim roda o mesmo
 // caminho do tick (verificações pré-envio, rampa, intervalo, janela, lease, hash aprovado) e só entrega a mensagem
 // congelada; respostas voltam para o processMessage de sempre; sem leitura recente da caixa, nada sai.
-// Autenticação: token de serviço do Cloudflare Access (common_name = BRIDGE_ACCESS_CLIENT_ID) + assinatura HMAC-SHA256
-// do corpo com carimbo de tempo e nonce de uso único. Só as rotas /api/bridge/* aceitam essa identidade.
+// Autenticação: token de serviço do Cloudflare Access (common_name = BRIDGE_ACCESS_CLIENT_ID) emitido pela aplicação do
+// Access só de /api/bridge (audiência BRIDGE_ACCESS_AUD, regra Service Auth só para esse token) + assinatura HMAC-SHA256 do
+// corpo com carimbo de tempo e nonce de uso único. Só as rotas /api/bridge/* aceitam essa identidade.
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { fail, response } from "./http.js";
 import { accessConfig, localAuthAllowed } from "./auth.js";
@@ -36,12 +37,13 @@ async function verifyServiceToken(request, env) {
   if (localAuthAllowed(request, env)) return;
   const config = accessConfig(env);
   const token = request.headers.get("cf-access-jwt-assertion");
-  if (!token || !env.BRIDGE_ACCESS_CLIENT_ID) fail(401, "bridge_auth_required", "Token de serviço da ponte obrigatório.");
+  if (!env.BRIDGE_ACCESS_CLIENT_ID || !env.BRIDGE_ACCESS_AUD) fail(503, "bridge_not_configured", "Ponte de e-mail não configurada.");
+  if (!token) fail(401, "bridge_auth_required", "Token de serviço da ponte obrigatório.");
   if (!keysets.has(config.issuer))
     keysets.set(config.issuer, createRemoteJWKSet(new URL(`${config.issuer}/cdn-cgi/access/certs`), { timeoutDuration: 5000, cooldownDuration: 30000 }));
   try {
     const { payload } = await jwtVerify(token, keysets.get(config.issuer), {
-      issuer: config.issuer, audience: config.audience, algorithms: ["RS256"], requiredClaims: ["exp", "iat", "common_name"], clockTolerance: 5,
+      issuer: config.issuer, audience: env.BRIDGE_ACCESS_AUD, algorithms: ["RS256"], requiredClaims: ["exp", "iat", "common_name"], clockTolerance: 5,
     });
     if (payload.common_name !== env.BRIDGE_ACCESS_CLIENT_ID) throw new Error("wrong service token");
   } catch {
