@@ -3,8 +3,9 @@
 // (Impressum do site da empresa, QSA da Receita) e pesquisa assistida com links para o LinkedIn/site, registro manual.
 // Estados: "contato de compras a validar" (pessoa encontrada numa fonte) → contato aceito → "cargo verificado"
 // (contact_verifications job_title) → "decisor de compras confirmado" (decision_authority). Nada disso autoriza envio.
-// Economia: só empresas aderentes (perfil no ICP ou porte a confirmar, nunca trader/gigante/micro), no máximo 3 pessoas,
-// lotes de 5, pesquisa repetida só depois do prazo de atualização da fonte.
+// Economia: só empresas com perfil comprador registrado (porte não exclui desde 2026-09-30; prioridade: pequena/média,
+// porte a confirmar, micro, grande/grupo, trader por último), no máximo 3 pessoas, lotes de 5, pesquisa repetida só
+// depois do prazo de atualização da fonte.
 import { bodyJson, fail, str, oneOf, url, requireRole, WRITE_ROLES } from "./http.js";
 import { statement as s, company, commit, companyLock, auditStatement, now } from "./store.js";
 import { encryptPii, decryptPii, secretKey, identifierHash } from "./crypto.js";
@@ -17,7 +18,7 @@ const MAX_PEOPLE = 3;
 const BATCH = 5;
 const IMPRESSUM_COUNTRIES = new Set(["DE", "AT", "CH", "LI"]);
 const addDays = (iso, d) => new Date(Date.parse(iso) + d * 86400000).toISOString();
-const ADHERENT = ["in_icp", "pending_size"];
+const ADHERENT = ["in_icp", "pending_size", "out_small", "out_giant", "out_trader"];
 const SOURCE_LABEL = {
   impressum: "Impressum (aviso legal obrigatório) no site da empresa",
   registry_qsa: "QSA da Receita Federal (BrasilAPI)",
@@ -58,7 +59,36 @@ async function buyingUnit(env, tenant, companyId) {
   return units[0] ?? null;
 }
 
-async function findPeople(c, unit, deps) {
+// Resultado do aviso legal por origem do site (research_cache, fonte "impressum"), cifrado porque traz nomes (P7).
+// Serve de evidência das candidatas antes do aceite e evita repetir a consulta depois dele.
+export const siteOrigin = (website) => {
+  try {
+    return new URL(website).origin;
+  } catch {
+    return null;
+  }
+};
+export async function cachedImpressum(env, origin, at) {
+  const r = await s(env, "SELECT * FROM research_cache WHERE source='impressum' AND external_id=? AND refresh_after>?", origin, at).first();
+  return r ? { ...JSON.parse(await decryptPii(r.result_json, env)), checkedAt: r.checked_at, fromCache: true } : null;
+}
+export async function impressumWithCache(env, website, at, f) {
+  const origin = siteOrigin(website);
+  const hit = origin && (await cachedImpressum(env, origin, at));
+  if (hit) return { result: { ...hit, requests: 0 }, stmt: null };
+  const r = await impressumPeople(website, f);
+  const payload = { status: r.status, httpStatus: r.httpStatus ?? null, url: r.url, people: r.people ?? [], email: r.email ?? null, phone: r.phone ?? null, requests: r.requests };
+  // Resultado sem aviso legal lido (inacessível ou não achado) expira em 7 dias para nova tentativa; lido, 180 dias.
+  const days = r.status === "ok" || r.status === "blocked_by_robots" ? PEOPLE_REFRESH_DAYS.impressum : 7;
+  const stmt = s(
+    env,
+    "INSERT INTO research_cache(source,external_id,url,checked_at,refresh_after,result_json,discard_reason) VALUES ('impressum',?,?,?,?,?,NULL) ON CONFLICT(source,external_id) DO UPDATE SET url=excluded.url,checked_at=excluded.checked_at,refresh_after=excluded.refresh_after,result_json=excluded.result_json",
+    origin, r.url ?? origin, at, addDays(at, days), await encryptPii(JSON.stringify(payload), env),
+  );
+  return { result: { ...payload, checkedAt: at, fromCache: false }, stmt };
+}
+
+async function findPeople(c, unit, deps, env, at) {
   const f = deps.fetch ?? fetch;
   const out = [];
   if (c.country_code === "BR" || unit) {
@@ -69,7 +99,11 @@ async function findPeople(c, unit, deps) {
       out.push({ kind: "registry_qsa", ...r, requests: 1, unitId: unit.id, headOnly: r.unit?.headOffice && unit.unit_role !== "consumer" });
     }
   }
-  if (c.website && IMPRESSUM_COUNTRIES.has(c.country_code)) out.push({ kind: "impressum", ...(await impressumPeople(c.website, f)) });
+  if (c.website && IMPRESSUM_COUNTRIES.has(c.country_code)) {
+    const { result, stmt } = await impressumWithCache(env, c.website, at, f);
+    if (stmt) deps.cacheStmts = [...(deps.cacheStmts ?? []), stmt];
+    out.push({ kind: "impressum", ...result });
+  }
   else if (c.country_code !== "BR") out.push({ kind: "impressum", status: "skipped", note: c.website ? `País ${c.country_code} sem aviso legal padronizado; use a pesquisa assistida.` : "Empresa sem site registrado." });
   return out;
 }
@@ -96,7 +130,7 @@ async function research(env, actor, rid, c, deps) {
   const started = Date.now();
   let found;
   try {
-    found = await findPeople(c, unit, deps);
+    found = await findPeople(c, unit, deps, env, at);
   } catch (e) {
     if (e instanceof AdapterError) fail(e.retryable ? 503 : 502, `people_source_${e.kind}`, e.message);
     throw e;
@@ -104,7 +138,8 @@ async function research(env, actor, rid, c, deps) {
   const existing = (await s(env, "SELECT name_hash,status FROM person_candidates WHERE tenant_id=? AND company_id=?", actor.tenant_id, c.id).all()).results;
   const hashes = new Set(existing.map((r) => r.name_hash));
   let room = MAX_PEOPLE - existing.filter((r) => r.status !== "dismissed").length;
-  const stmts = [];
+  const stmts = [...(deps.cacheStmts ?? [])];
+  deps.cacheStmts = [];
   let added = 0;
   const sources = [];
   for (const src of found) {
@@ -155,8 +190,8 @@ export async function researchSearchBatch(request, env, actor, rid, searchId, de
       `SELECT c.* FROM foreign_search_candidates fc JOIN companies c ON c.id=fc.company_id
        JOIN buyer_profiles bp ON bp.company_id=c.id AND bp.tenant_id=c.tenant_id AND bp.product_id=? AND bp.unit_key=''
        LEFT JOIN people_research pr ON pr.company_id=c.id
-       WHERE fc.search_id=? AND fc.status='active' AND c.tenant_id=? AND bp.icp_status IN ('in_icp','pending_size') AND (pr.company_id IS NULL OR pr.refresh_after<=?)
-       ORDER BY fc.priority='secondary', CASE bp.icp_status WHEN 'in_icp' THEN 0 ELSE 1 END, fc.added_at LIMIT ?`,
+       WHERE fc.search_id=? AND fc.status='active' AND c.tenant_id=? AND bp.icp_status IN ('in_icp','pending_size','out_small','out_giant','out_trader') AND (pr.company_id IS NULL OR pr.refresh_after<=?)
+       ORDER BY fc.priority='secondary', CASE bp.icp_status WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 WHEN 'out_trader' THEN 4 ELSE 5 END, fc.added_at LIMIT ?`,
       x.product_id, x.id, actor.tenant_id, at, BATCH,
     ).all()
   ).results;
@@ -172,7 +207,7 @@ export async function researchSearchBatch(request, env, actor, rid, searchId, de
     await s(
       env,
       `SELECT COUNT(*) n FROM foreign_search_candidates fc JOIN buyer_profiles bp ON bp.company_id=fc.company_id AND bp.product_id=? AND bp.unit_key='' LEFT JOIN people_research pr ON pr.company_id=fc.company_id
-       WHERE fc.search_id=? AND fc.status='active' AND bp.icp_status IN ('in_icp','pending_size') AND (pr.company_id IS NULL OR pr.refresh_after<=?)`,
+       WHERE fc.search_id=? AND fc.status='active' AND bp.icp_status IN ('in_icp','pending_size','out_small','out_giant','out_trader') AND (pr.company_id IS NULL OR pr.refresh_after<=?)`,
       x.product_id, x.id, at,
     ).first()
   ).n;

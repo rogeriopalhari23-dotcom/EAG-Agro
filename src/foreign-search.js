@@ -14,7 +14,7 @@ import { ensureForeignCompany } from "./foreign-companies.js";
 import { canHaveFicha, contactTargetFlag } from "./profiles.js";
 import { validationLinks } from "./discovery.js";
 
-const SIZE_LABEL = { micro: "Micro/MEI", small: "Pequena", medium: "Média", medium_plus: "Média-mais", giant: "Gigante do setor" };
+const SIZE_LABEL = { micro: "Micro", small: "Pequena", medium: "Média", medium_plus: "Média-mais", giant: "Grande / grupo" };
 // Pequenas e médias primeiro (pedido de Rogério em 2026-09-27); média-mais depois; porte desconhecido, micro e gigante no fim.
 const SIZE_RANK = { small: 0, medium: 0, medium_plus: 1 };
 const PROFILE_LABEL = {
@@ -23,7 +23,8 @@ const PROFILE_LABEL = {
   trader_distributor: "trader/distribuidor",
   unconfirmed: "perfil não confirmado",
 };
-const ICP_LABEL = { in_icp: "no ICP", out_small: "fora do ICP — micro/MEI", out_giant: "fora do ICP — gigante", out_trader: "trader — só com exceção", pending_size: "porte a confirmar" };
+// Porte ordena, não exclui (2026-09-30): micro e grande/grupo seguem candidatas, com prioridade menor.
+const ICP_LABEL = { in_icp: "prioridade — pequena/média", out_small: "micro — candidata (prioridade menor)", out_giant: "grande ou grupo — candidata (avaliar unidade, uso, autonomia e acesso)", out_trader: "trader — classificação à parte", pending_size: "porte a confirmar (pesquisável)" };
 // Três níveis (mais o intermediário "compradora confirmada"): só evidência da própria empresa sobe de nível.
 // Estados distintos (pedido de Rogério em 2026-09-28): empresa encontrada, potencial compradora, importadora confirmada
 // e consumidora final confirmada. Só evidência da própria empresa, com fonte e data, sobe de estado.

@@ -3,8 +3,11 @@ import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES, APPROVER_ROLES } 
 import { statement as s, company, commit, auditStatement, now, product } from "./store.js";
 
 export const PROFILE_CLASSES = ["final_consumer_confirmed", "possible_final_consumer", "trader_distributor", "unconfirmed"];
-// Receita: 01 Micro (inclui MEI) fica fora; 03 Pequeno porte e 05 Demais entram (K1 revisado em 2026-09-27:
-// exceção P16/P17 na Constituição — pequenas no ICP nos dois mercados; muito pequenas/MEI continuam fora).
+// Porte ordena, não exclui (decisão de Rogério em 2026-09-30, nos dois mercados): pequenas e médias consumidoras finais
+// primeiro; microempresas seguem candidatas quando o perfil mostra uso da commodity; grandes empresas e empresas de grupo
+// seguem candidatas, com unidade compradora, uso, autonomia de compras e acesso ao responsável como pendências da ficha;
+// traders classificados à parte (K3). Os valores gravados (out_small, out_giant) foram mantidos por compatibilidade e hoje
+// significam "micro — candidata" e "grande/grupo — candidata". Receita: 01 Micro (inclui MEI); 03 Pequeno porte; 05 Demais.
 const MICRO_SIZE_CODES = new Set(["01"]);
 
 // Regra K1/K3 pura. sizeCode vem da fonte (Receita via Casa dos Dados); sizeBand é o porte manual com fonte (exterior).
@@ -27,15 +30,20 @@ export function canHaveFicha(p) {
         ? { ok: true, note: `Exceção de ${p.exception_by} em ${p.exception_at}: ${p.exception_reason}` }
         : { ok: false, reason: "Trader/distribuidor fica fora da prospecção ativa sem exceção registrada (K3)." };
     case "out_giant":
-      return p.relationship_note
-        ? { ok: true, note: `Relacionamento prévio registrado por ${p.relationship_by} em ${p.relationship_at}.` }
-        : { ok: false, reason: "Gigante do setor só com relacionamento prévio registrado (R14.6)." };
+      return {
+        ok: true,
+        note: `Grande empresa ou grupo: confirmar a unidade compradora, o uso da commodity, a autonomia de compras e o acesso ao responsável.${p.relationship_note ? ` Relacionamento prévio registrado por ${p.relationship_by} em ${p.relationship_at}.` : ""}`,
+      };
+    case "out_small":
+      return ["final_consumer_confirmed", "possible_final_consumer"].includes(p.profile_class)
+        ? { ok: true, note: "Microempresa: candidata com prioridade menor; aderência à commodity pelo perfil comprador." }
+        : { ok: false, reason: "Microempresa sem aderência comercial à commodity registrada no perfil comprador." };
     case "pending_size":
       return p.size_call_goal
         ? { ok: true, note: "Porte desconhecido: qualificar o porte é objetivo da ligação (R14.8)." }
         : { ok: false, reason: "Porte desconhecido: resolva o porte ou registre a qualificação do porte como objetivo da ligação (R14.8)." };
     default:
-      return { ok: false, reason: "Fora do ICP — porte: microempresa ou MEI (R14.6)." };
+      return { ok: false, reason: "Perfil comprador sem classificação de ICP válida." };
   }
 }
 

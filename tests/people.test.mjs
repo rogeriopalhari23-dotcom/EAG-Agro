@@ -166,14 +166,22 @@ test("Aceitar vira contato (só e-mail pessoal publicado); estados cargo verific
   assert.equal((await add({ name: "Quarta Pessoa", title: "Einkauf", sourceKind: "company_site", sourceUrl: "https://bohnen.example/team" })).status, 409);
 });
 
-test("Triagem: empresa sem perfil ou fora do ICP não é pesquisada (nenhuma requisição externa)", async (t) => {
-  const { env, DB, companyIds } = await world(t);
-  DB.raw.prepare("UPDATE buyer_profiles SET icp_status='out_trader' WHERE company_id=?").run(companyIds[0]);
+test("Triagem: empresa sem perfil não é pesquisada; micro, grande/grupo e trader são pesquisados, trader por último no lote", async (t) => {
+  const { env, DB, companyIds, searchId } = await world(t);
+  const [a, b] = companyIds;
+  DB.raw.prepare("DELETE FROM buyer_profiles WHERE company_id=?").run(a);
   const calls = [];
-  const r = await researchCompany(req(), env, admin, "rid", companyIds[0], { fetch: site({}, calls) });
+  const r = await researchCompany(req(), env, admin, "rid", a, { fetch: site({}, calls) });
   assert.equal(r.skipped, true);
-  assert.match(r.reason, /fora da triagem/);
+  assert.match(r.reason, /sem perfil comprador/);
   assert.equal(calls.length, 0);
+  // Porte ordena, não exclui (2026-09-30).
+  for (const st of ["out_small", "out_giant", "out_trader"]) {
+    DB.raw.prepare("UPDATE buyer_profiles SET icp_status=? WHERE company_id=?").run(st, b);
+    DB.raw.prepare("DELETE FROM people_research WHERE company_id=?").run(b);
+    const x = await researchCompany(req(), env, admin, "rid", b, { fetch: site({}) });
+    assert.notEqual(x.skipped, true, st);
+  }
 });
 
 test("Triagem na busca: prioridade secundária, descarte por empresa/produto com histórico, pontos a verificar; lote pula descartada", async (t) => {
@@ -209,4 +217,46 @@ test("Triagem na busca: prioridade secundária, descarte por empresa/produto com
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action IN ('foreign_search.candidate_priority','foreign_search.candidate_dismiss','foreign_search.candidate_restore')").get().n, 3);
   s = (await api(`/api/foreign-searches/${searchId}`)).data;
   assert.equal(s.dismissed.length, 0);
+});
+
+test("Contatos das candidatas: aviso legal lido antes do aceite, guardado cifrado como evidência e reaproveitado depois do aceite", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  keepCountries(ctx.DB, ["DEU", "CHN"]);
+  await tradeParams(ctx.api, { period_default_months: 12 });
+  const d = driver(ctx.env, sources(), { at: "2026-10-10T12:00:00.000Z" });
+  await d.start();
+  await d.drain();
+  const analysis = (await ctx.api("/api/country-analyses", "POST", { iso3: "DEU" })).data;
+  const sel = await ctx.api(`/api/country-analyses/${analysis.id}/selections`, "POST", { items: [{ productId: "product-05", label: "Café", hs6: ["090111"] }] });
+  const searchId = (await ctx.api(`/api/campaigns/${sel.data.campaigns[0].id}/foreign-search`, "POST", { confirm: true })).data.id;
+  const elements = [{ type: "node", id: 21, tags: { name: "Kleine Rösterei", craft: "coffee_roaster", "addr:city": "Passau", website: "https://kleine-roesterei.example" } }];
+  await discover(req({ source: "osm" }), ctx.env, admin, "rid", searchId, { fetch: async () => new Response(JSON.stringify({ elements }), { status: 200 }) });
+  const calls = [];
+  const pages = { "/impressum": IMP_BM.replace(" | ", "</p><p>") };
+  const { researchCandidateContacts } = await import("../src/discovery.js");
+  const r = await researchCandidateContacts(req({}), ctx.env, admin, "rid", searchId, { fetch: site(pages, calls) });
+  assert.deepEqual([r.checked, r.reusedFromCache, r.withPeople], [1, 0, 1]);
+  const raw = ctx.DB.raw.prepare("SELECT result_json FROM research_cache WHERE source='impressum'").get().result_json;
+  assert.doesNotMatch(raw, /Natalia|Konstantinova/, "nomes cifrados no cache");
+  const disc = (await ctx.api(`/api/foreign-searches/${searchId}/discovery`)).data;
+  const cand = disc.processors[0];
+  assert.equal(cand.status, "new", "pesquisar contatos não aceita a empresa");
+  assert.deepEqual(cand.contactEvidence.people.map((p) => p.name), ["Natalia Konstantinova", "Yulia Yanyuk"]);
+  assert.match(cand.contactEvidence.people[0].kind, /a validar/);
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM person_candidates").get().n, 0, "nenhuma pessoa gravada antes do aceite");
+  // Depois do aceite, a pesquisa de pessoas reaproveita o cache (nenhuma requisição nova).
+  const acc = await ctx.api(`/api/foreign-searches/${searchId}/discovery/accept`, "POST", { ids: [cand.id] });
+  const after = [];
+  await researchCompany(req(), ctx.env, admin, "rid", acc.data.results[0].companyId, { fetch: site(pages, after) });
+  assert.equal(after.length, 0);
+});
+
+test("Aviso legal: site que recusa a conexão fica 'inacessível' (não 'sem aviso legal') e expira em 7 dias", async () => {
+  const { impressumPeople } = await import("../src/adapters/people.js");
+  const r = await impressumPeople("https://recusa.example", async () => new Response("forbidden", { status: 403 }));
+  assert.equal(r.status, "unreachable");
+  assert.equal(r.httpStatus, 403);
+  const nf = await impressumPeople("https://semimpressum.example", async (u) => (new URL(String(u)).pathname === "/" ? new Response("<a href='/kontakt'>Kontakt</a>", { status: 200 }) : new Response("", { status: 404 })));
+  assert.equal(nf.status, "not_found");
 });

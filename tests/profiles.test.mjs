@@ -34,12 +34,17 @@ test("P2-T6: regra do ICP (K1/K3) é determinística", () => {
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeBand: "small" }), "in_icp");
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeBand: "micro" }), "out_small");
   assert.equal(icpStatus({ profileClass: "trader_distributor", sizeBand: "small" }), "out_trader", "trader segue fora mesmo pequeno");
-  assert.match(canHaveFicha({ icp_status: "out_small" }).reason, /microempresa ou MEI/);
+  // Porte ordena, não exclui (decisão de 2026-09-30): micro com uso da commodity pode ter ficha; sem aderência, não.
+  assert.equal(canHaveFicha({ icp_status: "out_small", profile_class: "possible_final_consumer" }).ok, true);
+  assert.match(canHaveFicha({ icp_status: "out_small", profile_class: "unconfirmed" }).reason, /sem aderência comercial/);
+  // Grande empresa ou grupo: candidata; a ficha leva unidade, uso, autonomia e acesso como pendências.
+  assert.equal(canHaveFicha({ icp_status: "out_giant" }).ok, true);
+  assert.match(canHaveFicha({ icp_status: "out_giant" }).note, /unidade compradora.*autonomia de compras.*acesso ao responsável/);
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeCode: null }), "pending_size");
   assert.equal(icpStatus({ profileClass: "trader_distributor", sizeCode: "05" }), "out_trader");
   assert.equal(icpStatus({ profileClass: "final_consumer_confirmed", sizeCode: "05", isGiant: true }), "out_giant");
   assert.equal(icpStatus({ profileClass: "unconfirmed", sizeBand: "medium_plus" }), "in_icp");
-  assert.deepEqual(canHaveFicha({ icp_status: "out_small" }).ok, false);
+  assert.deepEqual(canHaveFicha({ icp_status: "out_small" }).ok, false, "micro sem perfil de uso da commodity");
   assert.deepEqual(canHaveFicha(null).ok, false);
 });
 

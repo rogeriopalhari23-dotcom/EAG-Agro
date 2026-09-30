@@ -301,7 +301,7 @@ export async function resumeSearch(request, env, actor, rid, id, deps = {}) {
 
 // Sem perfil registrado, o porte da fonte dá uma ordem provisória (marcada como provisória).
 const ICP_SQL = `COALESCE(icp,CASE WHEN size_code = '01' THEN 'out_small' ELSE 'pending_size' END)`;
-const ICP_RANK_SQL = `CASE ${ICP_SQL} WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_trader' THEN 2 WHEN 'out_giant' THEN 3 ELSE 4 END`;
+const ICP_RANK_SQL = `CASE ${ICP_SQL} WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 WHEN 'out_trader' THEN 4 ELSE 5 END`;
 
 export async function listCandidates(request, env, actor, id) {
   const { search } = await getSearch(env, actor, id);

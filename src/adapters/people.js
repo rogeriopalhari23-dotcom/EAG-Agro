@@ -114,13 +114,17 @@ export async function impressumPeople(website, fetchImpl = fetch) {
   }
   requests++;
   const home = await get(origin + "/", fetchImpl);
+  // Página inicial recusada (403/429/5xx) ou sem conexão: "inacessível", não "sem aviso legal" (visto em 2026-09-30:
+  // sites que respondem a uma rede e recusam a da Cloudflare).
+  if (home.status !== 200) return { status: home.status === 404 || home.status === 410 ? "not_found" : "unreachable", httpStatus: home.status, requests, url: origin, people: [] };
   const href = /href="([^"]*(?:impressum|imprint|legal-notice)[^"]*)"/i.exec(home.text)?.[1];
   if (!href) return { status: "not_found", requests, url: origin, people: [] };
   const target = new URL(href, origin + "/").toString();
   if (!robotsAllows(robots.text, new URL(target).pathname)) return { status: "blocked_by_robots", requests, url: target, people: [] };
   requests++;
   const r = await get(target, fetchImpl);
-  return r.status === 200 ? { status: "ok", requests, url: r.url, ...parseImpressum(r.text) } : { status: "not_found", requests, url: target, people: [] };
+  if (r.status === 200) return { status: "ok", requests, url: r.url, ...parseImpressum(r.text) };
+  return { status: r.status === 404 || r.status === 410 ? "not_found" : "unreachable", httpStatus: r.status, requests, url: target, people: [] };
 }
 
 // QSA e dados da unidade pelo CNPJ (BrasilAPI, gratuita, dados abertos da Receita).

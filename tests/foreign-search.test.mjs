@@ -128,8 +128,10 @@ test("Radar: resultado por empresa — consumidoras/fábricas antes, traders à 
   assert.ok(b.pending.some((p) => /Validar o indício/.test(p)));
   assert.ok(b.pending.includes("Nenhum decisor ou comprador com fonte registrada."));
   const e = r.groups.unverified.find((c) => c.name === "Mini Café Einzelunternehmen");
-  assert.equal(e.ficha.ok, false);
-  assert.match(e.ficha.reason, /microempresa ou MEI/);
+  // Porte ordena, não exclui (2026-09-30): micro com uso da commodity no perfil segue candidata, com prioridade menor.
+  assert.equal(e.ficha.ok, true);
+  assert.match(e.ficha.reason, /Microempresa: candidata com prioridade menor/);
+  assert.match(e.profile.icpLabel, /micro — candidata/);
   assert.equal(r.groups.traders[0].ficha.ok, false, "trader só com exceção registrada");
   // Cobertura, custo e rendimento.
   assert.equal(r.metrics.coverage.sourcesConsulted, 2);

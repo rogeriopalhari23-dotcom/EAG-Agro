@@ -229,12 +229,13 @@ async function route(request, env, rid) {
   if (fsa && fsa[2] && method === "GET") return response(await foreignSearch.listSearches(env, actor, fsa[1]));
   if (path === "/api/foreign-searches" && method === "GET") return response(await foreignSearch.listAllSearches(env, actor));
   // Descoberta por fontes gratuitas e validação assistida (Radar Internacional).
-  const fsd = path.match(/^\/api\/foreign-searches\/([^/]+)\/(discovery|discover|discovery\/accept|discovery\/dismiss|discovery\/validate)$/);
+  const fsd = path.match(/^\/api\/foreign-searches\/([^/]+)\/(discovery|discover|discovery\/accept|discovery\/dismiss|discovery\/validate|discovery\/contacts)$/);
   if (fsd && fsd[2] === "discovery" && method === "GET") return response(await discovery.getDiscovery(env, actor, fsd[1]));
   if (fsd && fsd[2] === "discover" && method === "POST") return response(await discovery.discover(request, env, actor, rid, fsd[1]), 201);
   if (fsd && fsd[2] === "discovery/accept" && method === "POST") return response(await discovery.accept(request, env, actor, rid, fsd[1]));
   if (fsd && fsd[2] === "discovery/dismiss" && method === "POST") return response(await discovery.dismiss(request, env, actor, rid, fsd[1]));
   if (fsd && fsd[2] === "discovery/validate" && method === "POST") return response(await discovery.validateCandidates(request, env, actor, rid, fsd[1]));
+  if (fsd && fsd[2] === "discovery/contacts" && method === "POST") return response(await discovery.researchCandidateContacts(request, env, actor, rid, fsd[1]));
   // Pessoas de compras (dois radares): pesquisa em fontes permitidas, aceite, descarte e registro manual.
   const ppl = path.match(/^\/api\/companies\/([^/]+)\/people(?:\/(research)|\/([^/]+)\/(accept|dismiss))?$/);
   if (ppl && !ppl[2] && !ppl[3] && method === "GET") return response(await people.listPeople(env, actor, ppl[1]));

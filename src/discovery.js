@@ -10,6 +10,8 @@ import { proposalFor, MAP_VERSION } from "./discovery-map.js";
 import { osmCandidates, parseOverpass, overpassQuery, frCandidates, noCandidates, gleifLookup, eoriCheck, sourcesFor, OSM_ATTRIBUTION } from "./adapters/discovery.js";
 
 import { kvSearch, kvProfile, classifyCoffeeProfile, isGermanPlace, REFRESH_DAYS } from "./adapters/kaffeeverband.js";
+import { impressumWithCache, cachedImpressum, siteOrigin, emailScope } from "./people.js";
+import { decryptPii } from "./crypto.js";
 
 const SYSTEM_ID = "system-discovery";
 const addDays = (iso, d) => new Date(Date.parse(iso) + d * 86400000).toISOString();
@@ -43,6 +45,23 @@ export async function getDiscovery(env, actor, id) {
     possibleDuplicate: (byKey.get(normalizeName(r.name)) ?? []).length > 1 || (r.status === "new" && known.some((k) => normalizeName(k.legal_name) === normalizeName(r.name))),
   });
   const items = rows.map(view);
+  // Evidência de contatos (aviso legal do site), só leitura: não é aceite nem autorização de envio.
+  const at = now();
+  const cache = new Map((await s(env, "SELECT external_id,url,checked_at,refresh_after,result_json FROM research_cache WHERE source='impressum'").all()).results.map((r) => [r.external_id, r]));
+  for (const c of items) {
+    const row = c.website ? cache.get(siteOrigin(c.website)) : null;
+    if (!row) {
+      c.contactEvidence = null;
+      continue;
+    }
+    const hit = JSON.parse(await decryptPii(row.result_json, env));
+    c.contactEvidence = {
+      status: hit.status, url: hit.url, checkedAt: row.checked_at, stale: row.refresh_after <= at, source: "aviso legal (Impressum) do site da empresa",
+      people: (hit.people ?? []).map((p) => ({ name: p.name, title: p.title, kind: "representante legal — contato a validar" })),
+      generalEmail: hit.email ? { value: hit.email, scope: hit.people?.length && emailScope(hit.email, hit.people[0].name, "impressum") === "personal" ? "personal" : "generic" } : null,
+      phone: hit.phone ?? null,
+    };
+  }
   const count = (f) => items.filter(f).length;
   return {
     searchId: x.id, country, proposal: proposalFor(hs6), mapVersion: MAP_VERSION,
@@ -90,7 +109,14 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
         if (Number.isInteger(informed) && informed > r.candidates.length) Object.assign(r, { truncated: true, total: informed });
       } else r = await osmCandidates({ iso2: country.iso2, filters: proposal.processors.osm }, f);
     } else if (source === "fr_registry") {
+      // Porte ordena, não exclui (2026-09-30): primeiro as faixas prioritárias da busca; depois todas as outras (micro,
+      // grandes e sem faixa) na mesma execução. Cada candidata guarda a faixa informada pelo INSEE com a fonte.
       r = await frCandidates({ nace, sizes: role === "processor" ? target.sizes : null }, f);
+      if (role === "processor" && target.sizes?.length) {
+        const rest = await frCandidates({ nace, sizes: null }, f);
+        const seen = new Set(r.candidates.map((c) => c.externalId));
+        r = { ...r, query: `${r.query} + todas as faixas`, calls: (r.calls ?? 1) + (rest.calls ?? 1), total: rest.total, truncated: rest.truncated, candidates: [...r.candidates, ...rest.candidates.filter((c) => !seen.has(c.externalId))] };
+      }
       // Sinal de importação gratuito: EORI = FR + SIRET da sede, validado no serviço público da Comissão Europeia.
       try {
         const e = await eoriCheck(r.candidates.map((c) => c.eori).filter(Boolean), f);
@@ -389,4 +415,39 @@ export async function validateCandidates(request, env, actor, rid, id, deps = {}
   stmts.push(auditStatement(env, actor, rid, "foreign_search.validated", "foreign_search", x.id, { checked: todo.length, calls, reused, failed }));
   for (let k = 0; k < stmts.length; k += 90) await commit(env, stmts.slice(k, k + 90));
   return { checked: todo.length, calls, reusedFromCache: reused, failed, discovery: await getDiscovery(env, actor, x.id) };
+}
+
+// POST /api/foreign-searches/:id/discovery/contacts — lê o aviso legal do site das candidatas ainda não aceitas (lote de até
+// 25), reaproveitando o cache de 180 dias. Guarda o resultado como evidência cifrada; não aceita empresa, não cria contato.
+export async function researchCandidateContacts(request, env, actor, rid, id, deps = {}) {
+  requireRole(actor, WRITE_ROLES);
+  const { x, country } = await searchOf(env, actor, id, { open: true });
+  if (!["DE", "AT", "CH", "LI"].includes(country.iso2)) fail(422, "impressum_not_applicable", "Aviso legal padronizado (Impressum) só existe em DE, AT, CH e LI.");
+  const i = await bodyJson(request);
+  const limit = Math.min(Math.max(Number(i.limit) || 25, 1), 25);
+  const f = deps.fetch ?? fetch;
+  const at = deps.now?.() ?? now();
+  const rows = (await s(env, "SELECT id,name,website FROM discovery_candidates WHERE search_id=? AND status='new' AND website IS NOT NULL ORDER BY name", x.id).all()).results;
+  let checked = 0, reused = 0, requests = 0, withPeople = 0;
+  const stmts = [];
+  const seen = new Set();
+  for (const c of rows) {
+    const origin = siteOrigin(c.website);
+    if (!origin || seen.has(origin)) continue;
+    seen.add(origin);
+    if (await cachedImpressum(env, origin, at)) {
+      reused++;
+      continue;
+    }
+    if (checked >= limit) continue;
+    const { result, stmt } = await impressumWithCache(env, c.website, at, f);
+    checked++;
+    requests += result.requests ?? 0;
+    if (result.people?.length) withPeople++;
+    if (stmt) stmts.push(stmt);
+  }
+  const pending = [...new Set(rows.map((c) => siteOrigin(c.website)).filter(Boolean))].length - reused - checked;
+  stmts.push(auditStatement(env, actor, rid, "discovery.contacts_researched", "foreign_search", x.id, { checked, reused, requests, withPeople }));
+  await commit(env, stmts);
+  return { checked, reusedFromCache: reused, requests, withPeople, remaining: Math.max(pending, 0) };
 }

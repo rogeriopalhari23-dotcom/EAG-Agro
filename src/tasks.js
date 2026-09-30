@@ -6,7 +6,7 @@ import { LEVEL0_SCRIPT } from "./templates/prospeccao-vendas.js";
 import { decryptPii } from "./crypto.js";
 
 const MANUAL = new Set(["call_l0", "call_l1", "call_l2", "linkedin"]);
-const ICP_BADNESS = "CASE (SELECT bp.icp_status FROM buyer_profiles bp WHERE bp.tenant_id=t.tenant_id AND bp.company_id=t.company_id ORDER BY bp.unit_key='' DESC LIMIT 1) WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_trader' THEN 2 WHEN 'out_giant' THEN 3 ELSE 4 END";
+const ICP_BADNESS = "CASE (SELECT bp.icp_status FROM buyer_profiles bp WHERE bp.tenant_id=t.tenant_id AND bp.company_id=t.company_id ORDER BY bp.unit_key='' DESC LIMIT 1) WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 WHEN 'out_trader' THEN 4 ELSE 5 END";
 
 // Tarefas geradas na aprovação de um canal manual (a ficha já tem os roteiros congelados).
 export function manualTaskStatements(env, { tenant, ficha, contactId, commodity, owner, start, messages, addDays }) {

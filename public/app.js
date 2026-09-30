@@ -1752,8 +1752,8 @@ const pilotLabels = {
   in_icp: "No ICP",
   pending_size: "Porte pendente",
   out_trader: "Trader/distribuidor",
-  out_giant: "Gigante",
-  out_small: "Micro/MEI",
+  out_giant: "Grande/grupo — candidata",
+  out_small: "Micro — candidata",
   confirmed: "Dentro do raio",
   estimated: "Dentro (estimado)",
   outside: "Fora do raio",
@@ -2666,7 +2666,11 @@ function candidateRow(c, chosen) {
       text("small", `Fonte: ${c.sourceLabel} · atividade: ${c.activity ? c.activity.label : "—"} · porte: ${c.size ? `${DISC_SIZE[c.size.band]} (${c.size.source})` : "não informado na fonte"}${c.registry ? ` · ${c.registry.type} ${c.registry.id}` : ""}`),
       el("small", {}, c.website ? el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, "site") : "sem site na fonte", " · ", el("a", { href: c.recordUrl, target: "_blank", rel: "noopener noreferrer" }, "registro na fonte")),
       c.validationNote ? text("small", `Validação (${c.validatedAt ? c.validatedAt.slice(0, 10) : "—"}): ${c.validationNote}`) : c.source === "de_coffee_assoc" && c.status === "new" ? text("small", "Perfil ainda não validado.") : null,
-      c.importStatement ? text("small", `Declaração da própria empresa: "${c.importStatement}"`) : null,
+      c.importStatement ? text("small", `Autodeclaração da empresa (diretório, ${c.validatedAt ? c.validatedAt.slice(0, 10) : "—"}): "${c.importStatement}" — origem ${c.mentionsBrazil ? "menciona o Brasil (não comprovada)" : "Brasil não mencionada"}`) : null,
+      // Evidência de contatos (aviso legal do site), sem aceite nem autorização de envio.
+      c.contactEvidence
+        ? text("small", `Aviso legal (${c.contactEvidence.checkedAt.slice(0, 10)}${c.contactEvidence.stale ? ", vencido" : ""}): ${c.contactEvidence.people.length ? c.contactEvidence.people.map((p) => `${p.name} (${p.title})`).join("; ") + " — representantes legais, a validar" : "sem nome publicado"}${c.contactEvidence.generalEmail ? ` · e-mail ${c.contactEvidence.generalEmail.scope === "personal" ? "pessoal" : "geral"}: ${c.contactEvidence.generalEmail.value}` : ""}`)
+        : null,
       c.dismissReason ? text("small", `Descartada: ${c.dismissReason}`) : null,
     ),
   );
@@ -2750,6 +2754,11 @@ async function discoveryPanel(x) {
                 notice(`${r.accepted} aceita(s) como empresa encontrada.${bad.length ? ` ${bad.length} não aceita(s): ${bad.map((z) => z.reason).join(" | ")}` : ""}`, bad.length > 0);
                 await showForeignSearch(x.id);
               }, true),
+              button("Pesquisar contatos das candidatas (aviso legal, lote de 25)", async () => {
+                const r = await api(`/api/foreign-searches/${x.id}/discovery/contacts`, "POST", { limit: 25 });
+                notice(`${r.checked} site(s) lido(s), ${r.reusedFromCache} reaproveitado(s), ${r.withPeople} com representante; faltam ${r.remaining}. Evidência — não é aceite nem autorização de envio.`);
+                await showForeignSearch(x.id);
+              }),
               button("Descartar selecionadas", async () => {
                 if (!chosen.size) return notice("Marque ao menos uma empresa.", true);
                 if (!reason.control.value.trim()) return notice("Informe o motivo do descarte.", true);
