@@ -1,6 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
 import { readdirSync, readFileSync } from "node:fs";
 import worker from "../../src/worker.js";
+import { SIGNATURE } from "../../src/templates/assinatura.js";
+// Assinatura de teste já conferida (a real depende do logo original e da conferência visual de Rogério).
+export { TEST_SIGNATURE_HTML } from "./signature.mjs";
+import { TEST_SIGNATURE_HTML } from "./signature.mjs";
 export class D1Test {
   constructor() {
     this.raw = new DatabaseSync(":memory:");
@@ -56,6 +60,7 @@ export const migrations = readdirSync(
     readFileSync(new URL(`../../migrations/${f}`, import.meta.url), "utf8"),
   );
 export function setup() {
+  Object.assign(SIGNATURE, { status: "confirmed", html: TEST_SIGNATURE_HTML });
   const DB = new D1Test();
   for (const sql of migrations) {
     DB.raw.exec("BEGIN");

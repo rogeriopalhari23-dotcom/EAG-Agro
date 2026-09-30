@@ -1,7 +1,24 @@
 // Revisor automático PV1–PV12 + R19.13 (P2-T8, R17.3). Regras determinísticas; violação impede aprovação.
 // Entrada: mensagens geradas (generateSequence) e contexto da ficha. Saída: { ok, findings: [{id, ok, detail, step?, contactId?}] }.
 import { contactTargetFlag } from "./profiles.js";
-import { SIGNATURE, signatureText } from "./templates/assinatura.js";
+import { SIGNATURE, signatureText, LOGO_PLACEHOLDER } from "./templates/assinatura.js";
+
+// SIG (pedido de Rogério em 2026-09-30): assinatura oficial (fonte única) pronta — logo original resolvido, conferida por
+// Rogério — e presente uma única vez no texto e no HTML de cada e-mail. Sem isso nenhuma ficha é aprovável.
+function signatureFinding(f, raw, sig) {
+  const once = (hay, needle) => !!needle && !!hay && hay.split(needle).length === 2;
+  const pendingLogo = !sig.html || sig.html.includes(LOGO_PLACEHOLDER);
+  const ok = !pendingLogo && sig.status === "confirmed" && raw.filter((m) => m.kind === "auto_email").every((m) => once(m.body, signatureText(sig)) && once(m.html, sig.html));
+  finding(f, "SIG", ok, ok ? `Assinatura oficial (${sig.version}) uma vez no texto e no HTML.` : pendingLogo ? "Assinatura com o logo original pendente (marcador LOGO_EAG_HTTPS): não aprovável nem enviável." : sig.status !== "confirmed" ? "Assinatura aguardando a conferência visual de Rogério." : "Assinatura ausente ou repetida em algum e-mail.");
+}
+
+// Texto lido pelas regras de conteúdo: sem o link de descadastro da própria ficha e sem a assinatura oficial fixa (conferida
+// por SIG; o aviso de confidencialidade em inglês cita "third parties", o que dispararia a regra alemã de "Partie").
+function contentView(raw, ctx) {
+  const ownLinks = [...new Set(raw.map((m) => ctx.unsubUrl(m.contactId)))];
+  const sigText = signatureText(ctx.signature ?? SIGNATURE);
+  return raw.map((m) => ({ ...m, body: [sigText, ...ownLinks].reduce((b, u) => b.split(u).join(" "), m.body) }));
+}
 
 const FORBIDDEN_PT = /\bR\$|\bUS\$|pre[çc]o|cota[çc][ãa]o|\blotes?\b|estoque|prazo de entrega|certifica|pagamento|concorrente|fornecedor atual/i;
 const APOLOGY_PT = /poderia falar com o setor de compras|desculp[ae] (o |pelo )?inc[ôo]mod|desculpe incomodar|perd[ãa]o pelo inc[ôo]modo/i;
@@ -57,8 +74,7 @@ export function reviewSequence(raw, ctx) {
   // As regras de conteúdo leem o texto sem o link de descadastro da própria ficha: o token é aleatório (base64url) e pode
   // conter, entre dígitos ou "-", siglas como "CGM"/"UCO" ou palavras vetadas, o que reprovaria uma ficha correta.
   // Só PV2 (links: cada destinatário só pode ter o próprio) e R19.13 (presença do link e do endereço) olham o texto original.
-  const ownLinks = [...new Set(raw.map((m) => ctx.unsubUrl(m.contactId)))];
-  const messages = raw.map((m) => ({ ...m, body: ownLinks.reduce((b, u) => b.split(u).join(" "), m.body) }));
+  const messages = contentView(raw, ctx);
   const L = LANG[ctx.language || "pt-BR"] || LANG["pt-BR"];
   const emails = messages.filter((m) => m.kind === "auto_email");
   const byContact = new Map();
@@ -168,6 +184,7 @@ export function reviewSequence(raw, ctx) {
       !gap ? "Lacuna 🔴 do internacional não registrada na ficha (R28.15)." : !translation ? `Tradução em inglês (${ctx.templatesVersion}) aguardando aprovação de Rogério lado a lado com o português.` : "Idioma da campanha e lacuna 🔴 registrados.",
     );
   }
+  signatureFinding(f, raw, ctx.signature ?? SIGNATURE);
   // R19.13 / R21.7: endereço físico e saída em todo e-mail.
   for (const m of raw.filter((x) => x.kind === "auto_email")) {
     const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
@@ -183,16 +200,10 @@ export function reviewSequence(raw, ctx) {
 // PV10, PV12 e R19.13. Sem aprovação extra de modelo: a aprovação individual da ficha aprova o texto (R18.3).
 export function reviewIdentification(raw, ctx) {
   const f = [];
-  const ownLinks = [...new Set(raw.map((m) => ctx.unsubUrl(m.contactId)))];
-  const messages = raw.map((m) => ({ ...m, body: ownLinks.reduce((b, u) => b.split(u).join(" "), m.body) }));
+  const messages = contentView(raw, ctx);
   const L = LANG[ctx.language || "pt-BR"] || LANG["pt-BR"];
   const ask = IDENT_ASK[ctx.language || "pt-BR"] || IDENT_ASK["pt-BR"];
-  // SIG (pedido de Rogério em 2026-09-30): assinatura oficial importada da Hostinger, conferida por ele, uma única vez
-  // no texto e no HTML. Sem isso a ficha não é aprovável.
-  const sig = ctx.signature ?? SIGNATURE;
-  const once = (hay, needle) => !!needle && hay.split(needle).length === 2;
-  const sigOk = sig.status === "confirmed" && raw.filter((m) => m.kind === "auto_email").every((m) => once(m.body, signatureText(sig)) && !!m.html && once(m.html, sig.html));
-  finding(f, "SIG", sigOk, sigOk ? `Assinatura oficial (${sig.version}) uma vez no texto e no HTML.` : sig.status === "pending_import" ? "Assinatura HTML original da Hostinger ainda não importada." : sig.status === "imported_pending_visual" ? "Assinatura importada aguardando a conferência visual de Rogério." : "Assinatura ausente ou repetida em algum e-mail.");
+  signatureFinding(f, raw, ctx.signature ?? SIGNATURE);
   for (const r of ctx.recipients) {
     const list = messages.filter((m) => m.contactId === r.contactId && m.kind === "auto_email").sort((a, b) => a.day - b.day);
     const e1 = list.find((m) => m.step === 1);

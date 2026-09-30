@@ -13,7 +13,7 @@
 //        diria que é resposta sem ser. O inglês continua na versão 1.0.0 (não revisado).
 export const IDENT_VERSION = { "pt-BR": "id-pt-1.1.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
 
-import { signatureText, renderHtml } from "./assinatura.js";
+import { emailParts } from "./assinatura.js";
 const COMPANY = "EAG Agro";
 // Rodapé separado da assinatura: endereço físico (R19.13) e forma de saída (R21.7).
 const footer = (s, unsubLine) => [s.postalAddress, unsubLine];
@@ -57,11 +57,9 @@ export function generateIdentification({ language = "pt-BR", commodity, recipien
     const e2 = t.e2 ? t.e2(commodity).join("\n\n") : [t.hello, t.follow(commodity)].join("\n");
     // Texto: corpo, assinatura oficial (uma vez) e rodapé separado; HTML com a assinatura original, quando importada.
     const foot = footer(sig, t.unsub(unsub(r.contactId)));
-    const tail = ["", signatureText(), "", "—", ...foot].join("\n");
-    const html = (text) => renderHtml({ bodyText: text, footerLines: foot });
     // Mesmo assunto no acompanhamento: o envio não encadeia como resposta real (sem In-Reply-To/References).
-    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 1, day: 0, subject: t.subject(commodity), body: `${e1}\n${tail}`, html: html(e1), objective: "identificar o responsável pela compra e o canal profissional" });
-    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 2, day: 4, subject: t.subject(commodity), body: `${e2}\n${tail}`, html: html(e2), objective: "obter a indicação do responsável ou a confirmação de que não compra" });
+    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 1, day: 0, subject: t.subject(commodity), ...emailParts(e1, foot), objective: "identificar o responsável pela compra e o canal profissional" });
+    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 2, day: 4, subject: t.subject(commodity), ...emailParts(e2, foot), objective: "obter a indicação do responsável ou a confirmação de que não compra" });
   }
   return out;
 }

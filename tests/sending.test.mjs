@@ -65,7 +65,8 @@ check("P2-T10: envia o texto aprovado byte a byte, com Message-ID e descadastro 
   const approved = r.f.messages.find((x) => x.step === 1 && x.channel === "email");
   assert.equal(m.text, approved.body);
   assert.equal(m.subject, "Fornecedor açúcar");
-  assert.equal(createHash("sha256").update(`${m.subject}\n\n${m.text}`).digest("hex"), approved.sha256);
+  assert.equal(createHash("sha256").update(m.html ? `${m.subject}\n\n${m.text}\n\n--html--\n${m.html}` : `${m.subject}\n\n${m.text}`).digest("hex"), approved.sha256, "hash cobre assunto, texto e HTML aprovados");
+  assert.equal(m.html.split('<table id="assinatura-teste">').length, 2, "HTML aprovado com a assinatura uma vez");
   assert.match(m.headers["Message-ID"], /^<ob-.+@eagagro\.com>$/);
   assert.match(m.headers["List-Unsubscribe"], /^<https:\/\/compass\.exemplo\/u\/.+>$/);
   assert.equal(m.headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");

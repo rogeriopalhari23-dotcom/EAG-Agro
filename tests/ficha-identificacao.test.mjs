@@ -1,3 +1,4 @@
+import "./helpers/signature.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
@@ -85,8 +86,9 @@ test("Assinatura pendente de importação ou de conferência: ficha de identific
   const sig = { senderName: "Rogério Palhari", postalAddress: "Al. Rio Negro, 503 — Barueri/SP, Brasil" };
   const msgs = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: [{ contactId: "c1" }], sig, unsub });
   const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel" }], postalAddress: sig.postalAddress, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
-  assert.deepEqual(reviewIdentification(msgs, ctx).findings.filter((x) => !x.ok).map((x) => x.id), ["SIG"]);
-  assert.match(reviewIdentification(msgs, ctx).findings.find((x) => x.id === "SIG").detail, /não importada/);
+  const pendingLogo = { ...TEST_SIG, status: "pending_logo", html: '<img src="LOGO_EAG_HTTPS">' };
+  assert.deepEqual(reviewIdentification(msgs, { ...ctx, signature: pendingLogo }).findings.filter((x) => !x.ok).map((x) => x.id), ["SIG"]);
+  assert.match(reviewIdentification(msgs, { ...ctx, signature: pendingLogo }).findings.find((x) => x.id === "SIG").detail, /logo original pendente/);
   const pendingVisual = reviewIdentification(msgs, { ...ctx, signature: { ...TEST_SIG, status: "imported_pending_visual" } });
   assert.match(pendingVisual.findings.find((x) => x.id === "SIG").detail, /conferência visual/);
 });
@@ -103,7 +105,7 @@ test("Identificação em alemão: texto com Sie, assunto e pergunta certos; revi
   assert.match(msgs[0].body, /„abmelden“/);
   const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
   const r = reviewIdentification(msgs, { ...ctx, signature: TEST_SIG });
-  assert.deepEqual(r.findings.filter((x) => !x.ok).map((x) => x.id), ["SIG"], "html de teste não está nas mensagens geradas sem assinatura importada");
+  assert.equal(r.ok, true, JSON.stringify(r.findings.filter((x) => !x.ok)));
   assert.ok(!r.findings.some((x) => /ID0|aprovação de Rogério/.test(`${x.id} ${x.detail}`)), "nenhuma aprovação extra");
   const fakeReply = msgs.map((m, i) => (i === 1 ? { ...m, subject: `Re: ${m.subject}` } : m));
   assert.ok(reviewIdentification(fakeReply, ctx).findings.some((x) => x.id === "PV4" && !x.ok && /Re:/.test(x.detail)), "Re: sem resposta encadeada é barrado");

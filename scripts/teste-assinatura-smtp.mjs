@@ -8,6 +8,7 @@ import tls from "node:tls";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { generateIdentification } from "../src/templates/identificacao.js";
+import { LOGO_PLACEHOLDER } from "../src/templates/assinatura.js";
 
 const cfg = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 const pick = (k) => new RegExp(`"${k}"\\s*:\\s*"([^"]*)"`).exec(cfg)?.[1];
@@ -69,6 +70,11 @@ if (process.env.DRY_RUN) {
   console.log(message.split("\r\n\r\n")[0].replace(/=\?UTF-8\?B\?([^?]+)\?=/g, (_, x) => Buffer.from(x, "base64").toString("utf8")));
   console.log("\n" + body);
   process.exit(0);
+}
+// Nunca envia com o marcador do logo pendente: o teste interno usa o mesmo formato do envio real.
+if (!html || html.includes(LOGO_PLACEHOLDER)) {
+  console.log(`Assinatura com o logo original pendente (${LOGO_PLACEHOLDER}). Nada foi enviado: preencha LOGO_URL em src/templates/assinatura.js.`);
+  process.exit(1);
 }
 // Confirmação explícita do destinatário interno antes de pedir a senha.
 if (!process.env.CONFIRM_INTERNAL) {

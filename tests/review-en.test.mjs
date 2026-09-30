@@ -1,3 +1,4 @@
+import "./helpers/signature.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateSequenceEn, commodityDisplayEn, GAP_NOTE, TEMPLATES_EN_VERSION } from "../src/templates/prospeccao-vendas-en.js";

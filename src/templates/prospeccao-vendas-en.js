@@ -4,6 +4,7 @@
 // ✋ Portão humano: a tradução só vale depois de Rogério aprová-la lado a lado com o português
 // (docs/implementation/AMOSTRAS-TEXTOS-EN.md). Até lá o revisor marca a ficha em inglês como não aprovável.
 // A-EN1 Prova social declarada (texto em português) não entra no texto em inglês: nunca misturar idiomas.
+import { emailParts } from "./assinatura.js";
 export const TEMPLATES_EN_VERSION = "pv-en-1.0.0";
 export const GAP_NOTE =
   "Lacuna 🔴 (R28.15): a skill /prospeccao-vendas não tem método específico para exportação — o curso diz que o processo é o mesmo, em inglês. Feiras, câmaras de comércio e bases de importadores não são cobertos.";
@@ -30,9 +31,8 @@ function foundSentence(sourceLabel) {
   if (/\bsite\b|website/i.test(sourceLabel || "")) return "I found your contact on your website and took the liberty of sending you a quick message.";
   return null;
 }
-function signature(sig, unsubUrl) {
-  return ["", `${sig.senderName} — ${COMPANY}`, sig.postalAddress, `To stop receiving these messages, reply "unsubscribe" or use this link: ${unsubUrl}`].join("\n");
-}
+// Assinatura oficial (fonte única) e rodapé separado com endereço e descadastro.
+const footerLines = (sig, unsubUrl) => [sig.postalAddress, `To stop receiving these messages, reply "unsubscribe" or use this link: ${unsubUrl}`];
 
 // Mesma assinatura de generateSequence (português); `declarations.socialProof` é ignorada (A-EN1).
 export function generateSequenceEn({ commodity, recipients, declarations = {}, sig, unsub }) {
@@ -68,9 +68,9 @@ export function generateSequenceEn({ commodity, recipients, declarations = {}, s
       "I'll close here so as not to take up more of your time. If this topic makes sense at some point, just reply to this email.",
       "Best regards,",
     ].join("\n");
-    const sigText = signature(sig, unsub(r.contactId));
+    const foot = footerLines(sig, unsub(r.contactId));
     const email = (step, day, subj, body, objective) =>
-      out.push({ contactId: r.contactId, role: r.role, channel: "email", kind: "auto_email", step, day, subject: subj, body: body + "\n" + sigText, objective });
+      out.push({ contactId: r.contactId, role: r.role, channel: "email", kind: "auto_email", step, day, subject: subj, ...emailParts(body, foot), objective });
     email(1, 0, subject, e1, "iniciar conversa e pedir 20 minutos");
     email(2, 4, `Re: ${subject}`, e2, "confirmar se viu e se o canal é este");
     email(3, 10, subject, e3, "reaparecer com ângulo novo e pedir conversa");
@@ -100,7 +100,7 @@ export function generateSequenceEn({ commodity, recipients, declarations = {}, s
       `I'm with ${COMPANY}; we trade commodities, and I've been trying to reach your purchasing team about supplying ${commodity}.`,
       "Could you help me with a 20-minute conversation, or point me to the most appropriate person to discuss this topic?",
     ].join("\n");
-    out.push({ contactId: r.contactId, role: r.role, channel: "email", kind: "auto_email", step: 3, day: 10, subject, body: body + "\n" + signature(sig, unsub(r.contactId)), objective: "pedir conversa ao influenciador ou indicação" });
+    out.push({ contactId: r.contactId, role: r.role, channel: "email", kind: "auto_email", step: 3, day: 10, subject, ...emailParts(body, footerLines(sig, unsub(r.contactId))), objective: "pedir conversa ao influenciador ou indicação" });
   }
   return out;
 }

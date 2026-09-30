@@ -10,6 +10,7 @@
 //  A-R19 Assinatura com endereço físico e forma de saída (R19.13, R21.7).
 //  A-G1  Break sem gênero: "ou com projetos mais urgentes" no lugar de "ou envolvido em projetos mais urgentes"
 //        (decisão de Rogério em 2026-09-24; serve para qualquer contato sem inferir gênero). Versão pv-1.1.0.
+import { emailParts } from "./assinatura.js";
 export const SKILL_SHA256 = "33bd093f5dcb87a7d4aa51d31597c6d6ddfc637097693e3830a38f9b219f9dd8";
 export const TEMPLATES_VERSION = "pv-1.1.0";
 export const GENERATOR_VERSION = "tpl-1.0.0";
@@ -34,14 +35,8 @@ function foundSentence(sourceLabel) {
   if (/\bsite\b/i.test(sourceLabel || "")) return "Encontrei seu contato no site de vocês e tomei a liberdade de te enviar uma mensagem rápida.";
   return null;
 }
-function signature(sig, unsubUrl) {
-  return [
-    "",
-    `${sig.senderName} — ${COMPANY}`,
-    sig.postalAddress,
-    `Para não receber mais mensagens, responda "sair" ou use este link: ${unsubUrl}`,
-  ].join("\n");
-}
+// Assinatura oficial (fonte única, src/templates/assinatura.js) e rodapé separado com endereço e descadastro.
+const footerLines = (sig, unsubUrl) => [sig.postalAddress, `Para não receber mais mensagens, responda "sair" ou use este link: ${unsubUrl}`];
 
 // Sequência de uma ficha. recipients: [{ contactId, role, fullName, sourceLabel, linkedin?: bool }]
 // declarations: { volumeAvailable: true|false|null, socialProof: string|null }
@@ -80,9 +75,9 @@ export function generateSequence({ commodity, recipients, declarations = {}, sig
       "Vou encerrar por aqui para não tomar mais seu tempo. Se em algum momento esse tema fizer sentido, é só responder este e-mail.",
       "Um abraço,",
     ].join("\n");
-    const sigText = signature(sig, unsub(r.contactId));
+    const foot = footerLines(sig, unsub(r.contactId));
     const email = (step, day, subject, body, objective) =>
-      out.push({ contactId: r.contactId, role: r.role, channel: "email", kind: "auto_email", step, day, subject, body: body + "\n" + sigText, objective });
+      out.push({ contactId: r.contactId, role: r.role, channel: "email", kind: "auto_email", step, day, subject, ...emailParts(body, foot), objective });
     email(1, 0, `Fornecedor ${commodity}`, e1, "iniciar conversa e pedir 20 minutos");
     email(2, 4, `Re: Fornecedor ${commodity}`, e2, "confirmar se viu e se o canal é este");
     email(3, 10, `Fornecedor ${commodity}`, e3, "reaparecer com ângulo novo e pedir conversa");
@@ -123,7 +118,7 @@ export function generateSequence({ commodity, recipients, declarations = {}, sig
       step: 3,
       day: 10,
       subject: `Fornecedor ${commodity}`,
-      body: body + "\n" + signature(sig, unsub(r.contactId)),
+      ...emailParts(body, footerLines(sig, unsub(r.contactId))),
       objective: "pedir conversa ao influenciador ou indicação",
     });
   }

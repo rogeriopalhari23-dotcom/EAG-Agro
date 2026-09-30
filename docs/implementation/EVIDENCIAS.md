@@ -673,3 +673,11 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
 - As três fichas v1 continuam como estavam (texto antigo, sem aprovação; aprovação impossível hoje: campanha em rascunho e internacional não liberado). Nova versão só depois da conferência visual da assinatura.
 - Modelos da sequência de reunião (PV, pt/en) ainda com a assinatura antiga — ajustar antes de usá-los.
 - Ponto de restauração D1 `000006c3-00000000-000050f6-a524ca28f46355426ed7ef570fa5e3a5`; versão `74647395`; suíte 360 + 2; UI smoke OK.
+
+### Assinatura oficial — HTML de Rogério integrado como fonte única (2026-09-30)
+- `src/templates/assinatura.js` (`sig-eag-1.0.0`): HTML fornecido por Rogério, sem alteração de layout, cores, cargo, bandeiras, links e aviso de confidencialidade; texto simples equivalente; `emailParts()` monta corpo + assinatura (uma vez) + rodapé separado (endereço físico e descadastro). Usada pelos modelos de identificação (de/pt/en) e de reunião (PV pt/en) e, via HTML congelado na ficha, pelo envio real.
+- Logo: o original tinha URL `blob:` temporária. Não recuperado — nenhum arquivo no projeto, nenhuma mensagem interna com a assinatura no Gmail; os logos de eagagro.com são horizontais (1424×205, WebP), não o original 128×128. Marcador `LOGO_EAG_HTTPS` mantido; status `pending_logo`.
+- Bloqueios enquanto houver marcador: regra SIG do revisor (reunião e identificação) reprova a ficha; `scripts/teste-assinatura-smtp.mjs` recusa enviar (testado: "Nada foi enviado", saída 1).
+- Regras de conteúdo passam a ler o texto sem a assinatura fixa (conferida só pela SIG): o aviso "third parties" disparava a regra alemã `\bpartie`.
+- Pré-visualização (Chrome/Playwright, 1100 px e 375 px): legível, sem rolagem horizontal; ícones icons8 (3), bandeiras flagcdn (2) e eagagro.com respondem 200; só o logo ausente.
+- Testes: 360/360 (`npm run check`). Endereço físico "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP" continua vindo de eagagro.com/contato, sem confirmação registrada de Rogério.
