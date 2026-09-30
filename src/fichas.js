@@ -88,10 +88,7 @@ async function context(env, actor, companyId, campaignId, contactIds, opts = {})
   ).results.map(c.language === "en" ? commodityDisplayEn : commodityDisplay).filter(Boolean);
   // Idioma: o da campanha; a ficha de identificação pode usar o idioma do país (alemão), com modelo aprovado por Rogério.
   const language = purpose === "identify_buyer" && opts.language ? oneOf(opts.language, ["pt-BR", "en", "de"], "idioma") : c.language;
-  const translationApproved =
-    purpose === "identify_buyer"
-      ? params[`templates_ident_approved:${IDENT_VERSION[language]}`]?.enabled === true
-      : params[`templates_en_approved:${TEMPLATES_EN_VERSION}`]?.enabled === true;
+  const translationApproved = params[`templates_en_approved:${TEMPLATES_EN_VERSION}`]?.enabled === true;
   return { campaign: c, product: p, company, profile, gate, timezone, recipients, declarations, declarationIds: decl.map((d) => d.id), others: [...new Set(others)], language, translationApproved, purpose };
 }
 

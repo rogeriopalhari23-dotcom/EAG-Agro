@@ -1,4 +1,4 @@
-// Rascunhos da ficha de identificação do responsável (busca Alemanha/café verde) para revisão de Rogério.
+// Revisão da ficha de identificação do responsável (busca Alemanha/café verde), para Rogério aprovar textos e fichas.
 // Usa o gerador e o revisor do sistema: o texto é o mesmo que a ficha produziria. Nada é enviado nem gravado no banco.
 import { writeFileSync } from "node:fs";
 import { generateIdentification, IDENT_VERSION } from "../src/templates/identificacao.js";
@@ -6,31 +6,32 @@ import { reviewIdentification } from "../src/review.js";
 
 const sig = { senderName: "Rogério Palhari", postalAddress: "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil" };
 const UNSUB = "[link de descadastro próprio, gerado na ficha]";
+const rec = [{ contactId: "canal", sourceLabel: "Canal geral publicado no site da empresa (site)" }];
+// Português só como referência lado a lado (a campanha da Alemanha envia em alemão); "café verde" = Rohkaffee.
+const de = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: rec, sig, unsub: () => UNSUB });
+const pt = generateIdentification({ language: "pt-BR", commodity: "café verde", recipients: rec, sig, unsub: () => UNSUB });
+const review = reviewIdentification(de, { market: "international", recipients: [{ contactId: "canal", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, unsubUrl: () => UNSUB, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de });
+const cell = (s) => s.replace(/\|/g, "\\|");
+const side = (a, b) => {
+  const la = a.split("\n"), lb = b.split("\n");
+  return ["| Alemão (enviado) | Português (referência) |", "| --- | --- |", ...la.map((x, i) => `| ${cell(x) || " "} | ${cell(lb[i] ?? "") || " "} |`)].join("\n");
+};
 const companies = [
-  { name: "24grad Kaffeerösterei GmbH (Hannover)", channel: "info@24grad.net", source: "https://www.24grad.net/impressum/", pending: ["Responsabilidade de compra de Markus Glaubitz não demonstrada pelas fontes (contato relevante, diretor-geral).", "Porte a confirmar (bloqueia a ficha: R14.8)."] },
-  { name: "AMORI Coffee (Mainz)", channel: "info@amori.coffee", source: "https://amori.coffee/policies/contact-information", pending: ["Responsabilidade de compra de Roberto Cascone (dono) não demonstrada; compra via importadores parceiros.", "Porte a confirmar (bloqueia a ficha: R14.8)."] },
-  { name: "BLACK & YUM GenussRösterei (Telgte)", channel: "genuss@blackandyum.de (publicado como “genuss ∂ blackandyum.de”)", source: "https://www.blackandyum.de/kontakt/", pending: ["Responsabilidade de compra de Reinhold Schmelter (dono) não demonstrada.", "Porte a confirmar (bloqueia a ficha: R14.8)."] },
+  { name: "24grad Kaffeerösterei GmbH (Hannover)", to: "info@24grad.net", src: "https://www.24grad.net/impressum/", mx: "10 www53.your-server.de", size: "Desconhecido. North Data: GmbH, capital social EUR 25.000; porte/funcionários só no serviço pago. Indício não oficial: página \"Über uns\" lista 48 primeiros nomes (café + torrefação)." },
+  { name: "AMORI Coffee (Mainz)", to: "info@amori.coffee", src: "https://amori.coffee/policies/contact-information", mx: "10 mx00.udag.de, 20 mx01.udag.de", size: "Desconhecido. Empresa individual (\"Inh. Roberto Cascone\"); nenhuma fonte pública de funcionários ou faturamento." },
+  { name: "BLACK & YUM GenussRösterei (Telgte)", to: "genuss@blackandyum.de (publicado como \"genuss ∂ blackandyum.de\")", src: "https://www.blackandyum.de/kontakt/", mx: "0 mail.blackandyum.de", size: "Desconhecido. Impressum: \"Rechtsform Einzelunternehmen\"; nenhuma fonte pública de funcionários ou faturamento." },
 ];
 const lines = [
-  "# Rascunhos — identificação do responsável pela compra de café verde (Alemanha)",
+  "# Revisão — ficha de identificação do responsável pela compra de café verde (Alemanha)",
   "",
-  `Gerado por \`scripts/rascunhos-identificacao.mjs\` com o gerador \`${IDENT_VERSION.de}\` e o revisor do sistema. **Rascunho para revisão: nada foi enviado.** Não inclui preço, lote, volume nem condição comercial. Destino: canal geral publicado de cada empresa (não é pessoa). Envio só depois de: modelo alemão aprovado por Rogério lado a lado com o português (ID0), porte resolvido (R14.8), campanha ativa, internacional liberado e aprovação individual da ficha.`,
+  `Gerado por \`scripts/rascunhos-identificacao.mjs\` (modelo \`${IDENT_VERSION.de}\`, revisor do sistema). **Nada foi enviado nem aprovado.** Sequência: **um destinatário** (o canal geral publicado da empresa) e **dois passos** — E-mail 1 no dia 0 e E-mail 2 no dia 4, nunca em dias seguidos (R19.2 item 12). A contagem de passos é escolha do modelo (como os E-mails 1 e 2 da skill), não exigência da Spec.`,
+  "",
+  `Revisor (regras da Spec aplicáveis): ${review.findings.map((x) => `${x.id} ${x.ok ? "ok" : "falha"}`).join(" · ")}`,
   "",
 ];
-for (const c of companies) {
-  const msgs = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: [{ contactId: "canal", sourceLabel: "Canal geral publicado no site da empresa (site)" }], sig, unsub: () => UNSUB });
-  const review = reviewIdentification(msgs, { market: "international", recipients: [{ contactId: "canal", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, unsubUrl: () => UNSUB, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de, translationApproved: false });
-  lines.push(`## ${c.name}`, "", `Canal: ${c.channel} — fonte: ${c.source}`, "");
-  for (const m of msgs) lines.push(`**E-mail ${m.step} (dia ${m.day}) — Assunto: ${m.subject}**`, "", "```", m.body, "```", "");
-  lines.push(`Revisor: ${review.findings.filter((x) => !x.ok).map((x) => `${x.id} — ${x.detail}`).join("; ") || "sem pendências"}`, "", "Pendências da empresa:", ...c.pending.map((p) => `- ${p}`), "");
-}
-lines.push(
-  "## Tradução literal para revisão (igual para as três empresas)",
-  "",
-  "E-mail 1 — Assunto: Fornecedor de café verde. “Bom dia, / encontrei seus dados de contato no site de vocês e escrevo rapidamente. / Sou da EAG Agro; trabalhamos com commodities agrícolas e gostaria de falar com a pessoa responsável pela compra de café verde na empresa de vocês. / Poderiam me dizer quem responde por essa área e por qual contato profissional consigo falar melhor com essa pessoa?” + assinatura com endereço físico e forma de saída.",
-  "",
-  "E-mail 2 (dia 5) — “Bom dia, / chegaram a ver minha mensagem de alguns dias atrás? Basta uma indicação rápida de quem responde pela compra de café verde e como falar melhor com essa pessoa.”",
-  "",
-);
+for (const [i, m] of de.entries()) lines.push(`## E-mail ${m.step} — dia ${m.day}`, "", `Assunto: **${m.subject}** — referência: **${pt[i].subject}**`, "", side(m.body, pt[i].body), "");
+lines.push("## Por empresa", "", "| Empresa | Destinatário (fonte oficial) | MX (DNS, 30/09/2026) | Entregabilidade | Porte (fonte) |", "| --- | --- | --- | --- | --- |");
+for (const c of companies) lines.push(`| ${c.name} | ${cell(c.to)} — ${c.src} | ${c.mx} | não verificada (verificador exigido por R19.2 item 11) | ${cell(c.size)} |`);
+lines.push("");
 writeFileSync(new URL("../docs/implementation/RASCUNHOS-IDENTIFICACAO-DEU.md", import.meta.url), lines.join("\n"));
 console.log(lines.join("\n"));

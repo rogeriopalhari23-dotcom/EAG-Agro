@@ -21,7 +21,6 @@ async function ready(ctx) {
   const owner = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Ana Dona", email: "ana@valeverde.com.br", jobTitle: "Sócia-administradora", prospectRole: "provisional_decision_maker", sourceLabel: "QSA", timezone: "America/Sao_Paulo" })).data.id;
   return { campaignId: camp.data.id, companyId: co.data.id, owner };
 }
-const release = (api, key, scope) => api(`/api/parameters/${key}`, "PUT", { scope, value: { enabled: true, evidenceRef: "docs/eag-compass-t1-validacao.md#liberacao" }, reason: "Modelo aprovado no teste" });
 
 test("Identificação do responsável: canal geral com fonte vira destinatário só da ficha de identificação, sem exigir decisor", async (t) => {
   const ctx = setup();
@@ -40,18 +39,18 @@ test("Identificação do responsável: canal geral com fonte vira destinatário 
   const c = await ficha({ purpose: "identify_buyer", recipients: [channelId] });
   assert.equal(c.status, 201, JSON.stringify(c.data));
   assert.equal(c.data.purpose, "identify_buyer");
-  assert.deepEqual(c.data.findings.map((x) => x.id), ["ID0"], "só falta a aprovação do modelo por Rogério");
+  assert.equal(c.data.reviewOk, true, JSON.stringify(c.data.findings));
+  assert.deepEqual(c.data.findings, [], "sem aprovação extra de modelo: a aprovação da ficha aprova o texto (R18.3)");
   let f = (await api(`/api/fichas/${c.data.id}`)).data;
   assert.equal(f.version.purpose, "identify_buyer");
   const emails = f.messages.filter((m) => m.kind === "auto_email");
-  assert.deepEqual(emails.map((m) => m.day), [0, 5]);
+  assert.deepEqual(emails.map((m) => m.day), [0, 4], "E-mail 2 no dia 4, como na skill; dias não seguidos (R19.2 item 12)");
   assert.match(emails[0].body, /pessoa responsável pela compra de açúcar/);
   assert.match(emails[0].body, /canal profissional/);
   assert.doesNotMatch(emails.map((m) => m.body).join("\n"), /20 minutos|preço|lote|volume/i, "sem reunião nem condição comercial");
   assert.match(emails[0].body, /Rua Exemplo, 100/);
   assert.match(emails[0].body, /"sair"/);
-  // Modelo aprovado → nova versão passa na revisão; a finalidade segue a versão anterior.
-  await release(api, "templates_ident_approved", IDENT_VERSION["pt-BR"]);
+  // Nova versão mantém a finalidade da anterior.
   const v2 = await api(`/api/fichas/${c.data.id}/versions`, "POST", { expectedRowVersion: f.ficha.row_version });
   assert.equal(v2.status, 201, JSON.stringify(v2.data));
   assert.equal(v2.data.reviewOk, true, JSON.stringify(v2.data.findings));
@@ -67,7 +66,7 @@ test("Identificação do responsável: canal geral com fonte vira destinatário 
   assert.equal(people.channels[0].approval, "destinatário aprovado para abordagem");
 });
 
-test("Identificação em alemão: texto com Sie, assunto e pergunta certos; revisor barra preço/quantidade e exige modelo aprovado", () => {
+test("Identificação em alemão: texto com Sie, assunto e pergunta certos; revisor barra preço/quantidade e dias seguidos, sem aprovação extra", () => {
   const unsub = () => "https://compass.exemplo/u/abc";
   const sig = { senderName: "Rogério Palhari", postalAddress: "Al. Rio Negro, 503 — Barueri/SP, Brasil" };
   const msgs = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: [{ contactId: "c1", sourceLabel: "Canal geral publicado no site da empresa (site)" }], sig, unsub });
@@ -76,14 +75,15 @@ test("Identificação em alemão: texto com Sie, assunto e pergunta certos; revi
   assert.match(msgs[0].body, /für den Einkauf von Rohkaffee zuständig ist/);
   assert.match(msgs[0].body, /„abmelden“/);
   const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
-  let r = reviewIdentification(msgs, { ...ctx, translationApproved: false });
-  assert.deepEqual(r.findings.filter((x) => !x.ok).map((x) => x.id), ["ID0"]);
-  r = reviewIdentification(msgs, { ...ctx, translationApproved: true });
+  const r = reviewIdentification(msgs, ctx);
   assert.equal(r.ok, true, JSON.stringify(r.findings));
+  assert.ok(!r.findings.some((x) => /ID0|aprovação de Rogério/.test(`${x.id} ${x.detail}`)), "nenhuma aprovação extra");
+  const sameDay = msgs.map((m, i) => (i === 1 ? { ...m, day: 1 } : m));
+  assert.ok(reviewIdentification(sameDay, ctx).findings.some((x) => x.id === "R19.2-12" && !x.ok), "dias seguidos barrados");
   const withPrice = msgs.map((m, i) => (i === 0 ? { ...m, body: m.body.replace("Könnten Sie", "Wir haben eine Partie zum besten Preis. Könnten Sie") } : m));
-  assert.ok(reviewIdentification(withPrice, { ...ctx, translationApproved: true }).findings.some((x) => x.id === "PV7" && !x.ok));
-  const toPerson = reviewIdentification(msgs, { ...ctx, translationApproved: true, recipients: [{ contactId: "c1", kind: "person" }] });
-  assert.ok(toPerson.findings.some((x) => x.id === "ID2" && !x.ok), "identificação só ao canal geral");
+  assert.ok(reviewIdentification(withPrice, ctx).findings.some((x) => x.id === "PV7" && !x.ok));
+  const toPerson = reviewIdentification(msgs, { ...ctx, recipients: [{ contactId: "c1", kind: "person" }] });
+  assert.ok(toPerson.findings.some((x) => x.id === "DEST" && !x.ok), "identificação só ao canal geral");
 });
 
 test("Quatro estados da pessoa: aceitar não confirma compra nem aprova; indício de compra exige fonte e não confirma", async (t) => {

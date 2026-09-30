@@ -171,8 +171,9 @@ export function reviewSequence(raw, ctx) {
 }
 
 // Ficha para identificar o responsável (purpose identify_buyer). Destinatário é o canal geral da empresa, não pessoa:
-// PV1/PV5/PV6/PV8/PV11 (estrutura e papéis do decisor) não se aplicam; vale ID1 (pergunta certa, sem reunião nem venda),
-// ID2 (no máximo 2 e-mails, dias não seguidos, só canal geral) e as regras comuns PV2, PV3, PV4, PV7, PV9, PV10, PV12, R19.13.
+// PV1/PV5/PV6/PV8/PV11 (estrutura, cadência e papéis do decisor) não se aplicam. Só regras com base na Spec:
+// PV3 (objetivo "descobrir a pessoa certa", verificado no texto), R19.2 item 12 (nunca dias seguidos), PV2, PV4, PV7, PV9,
+// PV10, PV12 e R19.13. Sem aprovação extra de modelo: a aprovação individual da ficha aprova o texto (R18.3).
 export function reviewIdentification(raw, ctx) {
   const f = [];
   const ownLinks = [...new Set(raw.map((m) => ctx.unsubUrl(m.contactId)))];
@@ -183,10 +184,11 @@ export function reviewIdentification(raw, ctx) {
     const list = messages.filter((m) => m.contactId === r.contactId && m.kind === "auto_email").sort((a, b) => a.day - b.day);
     const e1 = list.find((m) => m.step === 1);
     const ok1 = !!e1 && L.hello.test(e1.body) && ask.test(e1.body) && !L.minutes.test(e1.body);
-    finding(f, "ID1", ok1, ok1 ? "E-mail 1 pergunta quem responde pela compra e o canal profissional, sem pedir reunião." : "E-mail 1 não pergunta pelo responsável e pelo canal, ou já pede reunião.", { contactId: r.contactId });
+    finding(f, "PV3", ok1, ok1 ? "E-mail 1 pergunta quem responde pela compra e o canal profissional (descobrir a pessoa certa), sem pedir reunião." : "E-mail 1 não pergunta pelo responsável e pelo canal, ou já pede reunião.", { contactId: r.contactId });
     const gaps = list.slice(1).map((m, i) => m.day - list[i].day);
-    const ok2 = r.kind === "company_channel" && list.length >= 1 && list.length <= 2 && gaps.every((g) => g >= 2);
-    finding(f, "ID2", ok2, ok2 ? "Canal geral da empresa; até 2 e-mails em dias não seguidos." : r.kind !== "company_channel" ? "Destinatário não é o canal geral da empresa." : "Mais de 2 e-mails ou em dias seguidos.", { contactId: r.contactId });
+    const ok2 = list.length >= 1 && gaps.every((g) => g >= 2);
+    finding(f, "R19.2-12", ok2, ok2 ? "E-mails em dias não seguidos." : "E-mails em dias seguidos.", { contactId: r.contactId });
+    if (r.kind !== "company_channel") finding(f, "DEST", false, "Ficha de identificação vai ao canal geral publicado da empresa, não a uma pessoa.", { contactId: r.contactId });
   }
   for (const [i, m] of messages.entries()) {
     const links = (raw[i].body.match(URL_RE) || []).filter((u) => u !== ctx.unsubUrl(m.contactId));
@@ -195,7 +197,7 @@ export function reviewIdentification(raw, ctx) {
   }
   if (!f.some((x) => x.id === "PV2")) finding(f, "PV2", true, "Uma commodity, sem anexo e sem link além do descadastro.");
   const noObjective = messages.filter((m) => !m.objective);
-  finding(f, "PV3", !noObjective.length, noObjective.length ? `${noObjective.length} passo(s) sem objetivo.` : "Objetivo de cada toque: descobrir a pessoa certa.");
+  if (noObjective.length) finding(f, "PV3", false, `${noObjective.length} passo(s) sem objetivo.`);
   const liar = messages.filter((m) => L.linkedin.test(m.body) && !/linkedin/i.test(ctx.recipients.find((r) => r.contactId === m.contactId)?.sourceLabel || ""));
   finding(f, "PV4", !liar.length, liar.length ? "Texto cita LinkedIn, mas a fonte registrada do canal é outra." : "Afirmações coerentes com a fonte registrada do canal.");
   const sale = messages.filter((m) => L.forbidden.test(m.body) || L.volume.test(m.body));
@@ -206,9 +208,6 @@ export function reviewIdentification(raw, ctx) {
   }
   const apologies = messages.filter((m) => L.apology.test(m.body));
   finding(f, "PV10", !apologies.length, apologies.length ? `Frase proibida no passo ${apologies.map((m) => m.step).join(", ")}.` : "Tom direto, sem pedido de desculpas.");
-  // ID0: adaptação nova da skill (A-ID1–A-ID4) — o modelo de cada idioma só vale depois da aprovação de Rogério.
-  const langName = { "pt-BR": "português", en: "inglês", de: "alemão" }[ctx.language || "pt-BR"];
-  finding(f, "ID0", ctx.translationApproved === true, ctx.translationApproved === true ? `Modelo de identificação em ${langName} (${ctx.templatesVersion}) aprovado.` : `Modelo de identificação em ${langName} (${ctx.templatesVersion}) aguardando aprovação de Rogério lado a lado com o português.`);
   if (ctx.market !== "international") finding(f, "PV12", true, "Não se aplica (nacional).");
   else finding(f, "PV12", !!ctx.languageGapNote, ctx.languageGapNote ? "Idioma do país e lacuna 🔴 registrados." : "Lacuna 🔴 do internacional não registrada na ficha (R28.15).");
   for (const m of raw.filter((x) => x.kind === "auto_email")) {
