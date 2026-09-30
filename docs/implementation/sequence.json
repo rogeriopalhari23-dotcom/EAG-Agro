@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-28T04:05:17.305Z",
+  "updatedAt": "2026-09-30T22:55:15.373Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -794,6 +794,24 @@
       "validation": "npm run check (tests/people.test.mjs); teste real 48 empresas DE + 3 CNPJs de Franca/SP",
       "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": "Uso em produção depende de Rogério aceitar candidatas na busca (produção sem empresas em 2026-09-28); descoberta nacional bloqueada (chave Casa dos Dados ausente; dados abertos da Receita lentos/bloqueados fora do Brasil); validação de e-mail depende da chave Snov. Próxima ação: aceitar as candidatas da Alemanha e rodar o lote de pessoas."
+    },
+    {
+      "id": "SUPRESSAO-RETENCAO",
+      "title": "Supressão: remoção pelo Administrador com motivo e base e critério de retenção por registro (implementação)",
+      "status": "pending",
+      "dependsOn": [],
+      "plan": "docs/eag-compass-spec.md",
+      "section": "R9.2 (matriz: Remover supressão — Administrador, com motivo e base), R21.1 (critério de retenção por registro), R9.1.1–R9.1.2",
+      "read": [
+        "src/operations.js",
+        "src/crypto.js",
+        "migrations/0003_v2_fundacao.sql"
+      ],
+      "acceptance": "Rota de remoção só para Administrador, exigindo motivo e base, auditada e sem apagar o histórico (registro de remoção, não exclusão silenciosa); retention_until preenchido por registro segundo o critério vigente; descadastros existentes preservados; testes de permissão (R9.2.1) e de não recontato. O critério de retenção é o aprovado em T11 — enquanto T11 não validar, a implementação usa campo explícito sem prazo automático de expiração.",
+      "validation": "npm run check; testes de permissão, auditoria e preservação das supressões existentes",
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": null,
+      "note": "Divergência encontrada em 30/09/2026 ao conferir a implementação contra a Spec: não há rota de remoção e retention_until nunca é preenchido. Tarefa de implementação, separada da validação jurídica T11 (que define a política de retenção e a base de remoção). Nenhum descadastro real é alterado por esta tarefa sem decisão de Rogério."
     }
   ]
 }
