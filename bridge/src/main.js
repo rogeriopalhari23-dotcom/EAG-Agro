@@ -4,7 +4,7 @@
 //      node src/main.js --once     (um ciclo e sai)
 //      node src/main.js --check    (só confere Compass, SMTP e IMAP, sem enviar)
 //      node src/main.js --mailbox-only  (só a caixa: estado da INBOX e login SMTP, sem Compass e sem enviar)
-import { readFileSync, writeFileSync, openSync, closeSync, unlinkSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, openSync, closeSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { compassClient } from "./compass.js";
 import { smtpClient, imapClient } from "./mail.js";
@@ -62,6 +62,13 @@ const deps = {
   smtp: smtpClient({ host: cfg.smtpHost, port: cfg.smtpPort, user: cfg.mailboxUser, pass }),
   imap: imapClient({ host: cfg.imapHost, port: cfg.imapPort, user: cfg.mailboxUser, pass }),
   log, version: VERSION,
+  // Teste interno: BRIDGE_FAULT=before_smtp|after_smtp encerra o processo nesse ponto; imap_down simula a caixa fora do ar.
+  fault: (point) => {
+    if (env.BRIDGE_FAULT !== point) return;
+    log("fault_injected", { point });
+    if (point === "imap_down") throw Object.assign(new Error("caixa indisponível (simulação do teste interno)"), { code: "IMAP_SIMULATED_DOWN" });
+    process.exit(86);
+  },
 };
 
 // Uma única instância por diário (evita dois processos enviando pela mesma caixa).
@@ -108,6 +115,20 @@ if (process.argv.includes("--check")) {
   process.exit(0);
 }
 
+// Estado local para o comando "estado" (sem conteúdo, sem endereço, sem segredo).
+const statePath = join(dirname(cfg.journalPath), "estado.json");
+const stopPath = join(dirname(cfg.journalPath), "parar");
+try {
+  unlinkSync(stopPath); // pedido antigo não impede o novo início
+} catch {}
+const state = { pid: process.pid, version: VERSION, startedAt: new Date().toISOString(), lastCycleAt: null, lastReadOkAt: null, lastReadError: null, lastSentAt: null, sentSinceStart: 0, lastReason: null, stoppedAuth: false };
+const saveState = () => {
+  try {
+    writeFileSync(statePath, JSON.stringify(state, null, 2));
+  } catch {}
+};
+saveState();
+
 let stopping = false;
 let authStopped = false;
 do {
@@ -115,8 +136,15 @@ do {
     if (!authStopped) {
       const r = await runCycle(deps);
       log("cycle", { readOk: r.readOk, sent: r.sent, reason: r.reason ?? null });
+      Object.assign(state, { lastCycleAt: new Date().toISOString(), lastReason: r.reason ?? null });
+      if (r.readOk) Object.assign(state, { lastReadOkAt: state.lastCycleAt, lastReadError: null });
+      else state.lastReadError = r.reason ?? "leitura indisponível";
+      if (r.sent) Object.assign(state, { lastSentAt: state.lastCycleAt, sentSinceStart: state.sentSinceStart + 1 });
+      saveState();
       if (r.stop === "auth") {
         authStopped = true;
+        state.stoppedAuth = true;
+        saveState();
         log("smtp_auth_failed", { note: "envio parado até reiniciar a ponte com a senha correta" });
       }
     }
@@ -124,5 +152,16 @@ do {
     log("cycle_failed", { status: e.status ?? null, code: e.code ?? e.name ?? null });
   }
   if (process.argv.includes("--once")) break;
-  await new Promise((r) => setTimeout(r, cfg.intervalMs + Math.floor(Math.random() * 10000)));
+  // Espera o próximo ciclo conferindo o pedido de parada (arquivo "parar" criado por ponte.ps1): sai entre ciclos,
+  // nunca no meio de um envio.
+  const until = Date.now() + cfg.intervalMs + Math.floor(Math.random() * 10000);
+  while (Date.now() < until && !stopping) {
+    if (existsSync(stopPath)) stopping = true;
+    else await new Promise((r) => setTimeout(r, 2000));
+  }
 } while (!stopping);
+try {
+  unlinkSync(stopPath);
+} catch {}
+log("stopped", { reason: "pedido de parada" });
+process.exit(0);

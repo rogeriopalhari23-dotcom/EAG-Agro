@@ -99,7 +99,10 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
     : { correlation: "none", targets: [] };
   const id = crypto.randomUUID();
   let r2Key = "not_stored";
-  if (env.FILES) {
+  // Caixa de trabalho de Rogério: só guarda o conteúdo do que interessa ao Compass (resposta ligada a um envio, bounce,
+  // aviso do provedor, descadastro). Demais mensagens ficam só como chave (evita reprocessar), sem conteúdo.
+  const relevant = corr.targets.length > 0 || ["bounce_hard", "bounce_soft", "provider_alert", "unsubscribe"].includes(c.kind);
+  if (env.FILES && relevant) {
     r2Key = `inbound/${uidValidity}/${uid}.eml`;
     await env.FILES.put(r2Key, bytes);
   }
@@ -151,8 +154,9 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
 // Saúde da leitura de respostas (ponte de e-mail): horário do Worker; sem leitura recente, nenhum envio sai (sending.js).
 export const recordReaderOk = (env, tenant, at, reader, version = null) =>
   s(env, "INSERT INTO reply_reader_state(tenant_id,last_read_ok_at,reader,bridge_version,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET last_read_ok_at=excluded.last_read_ok_at,reader=excluded.reader,bridge_version=excluded.bridge_version,updated_at=excluded.updated_at", tenant, at, reader, version, at).run();
+// Erro de leitura suspende o envio na hora (não espera os 10 minutos): a última leitura boa deixa de valer.
 export const recordReaderError = (env, tenant, at, error) =>
-  s(env, "INSERT INTO reply_reader_state(tenant_id,last_error,last_error_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET last_error=excluded.last_error,last_error_at=excluded.last_error_at,updated_at=excluded.updated_at", tenant, error, at, at).run();
+  s(env, "INSERT INTO reply_reader_state(tenant_id,last_read_ok_at,last_error,last_error_at,updated_at) VALUES (?,NULL,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET last_read_ok_at=NULL,last_error=excluded.last_error,last_error_at=excluded.last_error_at,updated_at=excluded.updated_at", tenant, error, at, at).run();
 
 // Leitura periódica com lease por caixa; UIDVALIDITY diferente recomeça a contagem.
 export async function poll(env, tenant, deps = {}) {

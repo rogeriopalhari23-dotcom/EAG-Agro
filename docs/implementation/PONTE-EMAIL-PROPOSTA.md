@@ -100,3 +100,36 @@ diário local só precisa estar vazio de pendências na troca).
   congeladas e aprovadas; o Worker continua dono de fila, verificação pré-envio, idempotência, supressão e registro".
 - **Spec:** "SE a última leitura de respostas bem-sucedida tiver mais de 10 minutos, ENTÃO nenhum e-mail DEVE ser enviado", com
   teste de aceitação; T1 (P2-T17) passa a validar pela ponte.
+
+## 7. Opção B escolhida (Rogério, 2026-09-30) — operação no computador
+
+Comandos (na pasta `C:\Users\Roger\eag-compass`):
+
+| Comando | Efeito |
+| --- | --- |
+| `bridge\ponte iniciar` | liga agora e a cada entrada no Windows (tarefa agendada, uma instância só) |
+| `bridge\ponte parar` | para ao fim do ciclo em andamento (nunca no meio de um envio) e desliga o início automático |
+| `bridge\ponte estado` | rodando ou não, última leitura da caixa, último envio e motivo do último ciclo, em horário de Cuiabá |
+| `bridge\ponte registro` | últimas linhas do registro (sem conteúdo, endereços ou senhas) |
+| `bridge\ponte conferir-caixa` | IMAP + login SMTP, sem enviar |
+
+Credenciais: senha da caixa e segredo do token do Access digitados por Rogério em `guardar-segredos.ps1` (DPAPI da conta
+dele); a chave compartilhada com o Compass é criada por `configurar-chave-compass.ps1` sem exibição. Nada no código, no
+registro ou na conversa.
+
+Ao iniciar ou voltar da suspensão, cada ciclo lê a caixa antes de pedir envio; sem leitura (computador desligado, caixa fora do
+ar, erro), o Compass recusa envio na hora. Atrasados saem um por vez, com o intervalo de 15–25 min, a janela e o teto do dia; o
+passo que sai atrasado empurra os seguintes para manter os dias aprovados entre passos.
+
+Quando o computador precisa estar ligado (horário de Cuiabá, UTC−4, sem horário de verão; janela aprovada 9h–17h no fuso de
+cada destinatário, dias úteis dele):
+
+| Destinatários | Janela de envio em Cuiabá |
+| --- | --- |
+| Brasil, horário de Brasília | 8h às 16h |
+| Cuiabá (teste interno) | 9h às 17h |
+| Alemanha até 24/10/2026 (horário de verão europeu) | 3h às 11h |
+| Alemanha a partir de 25/10/2026 | 4h às 12h |
+
+Fora da janela a ponte só lê respostas. Ligar o computador um pouco antes da janela garante que as respostas da noite sejam
+lidas antes do primeiro envio do dia (isso acontece de qualquer jeito, só atrasa o primeiro envio).

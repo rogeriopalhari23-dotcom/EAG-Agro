@@ -273,3 +273,32 @@ test("Ponte: hash local igual ao do congelamento da ficha", async () => {
   const { messageHash: workerHash } = await import("../../src/fichas.js");
   for (const [s, b, h] of [["Assunto", "Texto", null], ["Zuständige Person", "Guten Tag,\n\nText", "<p>x</p>"]]) assert.equal(messageHash(s, b, h), await workerHash(s, b, h));
 });
+
+test("Ponte: erro de leitura depois de uma leitura boa suspende o envio na hora", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  const d = bridgeDeps(ctx);
+  assert.equal(await readReplies(d), true);
+  d.imap.down = true;
+  assert.equal(await readReplies(d), false);
+  assert.equal((await d.compass.call("/api/bridge/claim")).reason, "reply_reader_unavailable");
+  assert.equal(d.smtp.raws.length, 0);
+});
+
+test("Ponte: passo enviado com atraso empurra os seguintes, mantendo os dias aprovados entre passos", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  const day = (n) => new Date(Date.parse(todaySP() + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+  // Aprovado para começar 3 dias atrás (computador desligado): passo 1 atrasado, passo 2 (dia 4) venceria amanhã.
+  const offsets = ctx.DB.raw.prepare("SELECT o.step_no, m.day_offset FROM send_outbox o JOIN ficha_messages m ON m.id=o.message_row_id ORDER BY o.step_no").all();
+  for (const r of offsets) ctx.DB.raw.prepare("UPDATE send_outbox SET planned_date=? WHERE step_no=?").run(day(r.day_offset - 3), r.step_no);
+  const d = bridgeDeps(ctx);
+  assert.equal((await runCycle(d)).sent, true);
+  const planned = ctx.DB.raw.prepare("SELECT o.step_no, o.planned_date, m.day_offset FROM send_outbox o JOIN ficha_messages m ON m.id=o.message_row_id WHERE o.step_no>1 ORDER BY o.step_no").all();
+  const first = offsets.find((r) => r.step_no === 1).day_offset;
+  for (const r of planned) assert.equal(r.planned_date, day(r.day_offset - first), `passo ${r.step_no}: mesma distância do passo 1 enviado hoje`);
+  assert.equal(d.smtp.raws.length, 1, "atrasados não saem juntos");
+  assert.equal((await runCycle(d)).reason, "interval");
+});

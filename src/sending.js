@@ -273,9 +273,25 @@ async function settle(env, row, token, result, at, sentToday, senderDay, interva
   const minutes = interval.min + Math.floor((deps.random ?? Math.random)() * (interval.max - interval.min + 1));
   const next = new Date(Date.parse(at) + minutes * 60000).toISOString();
   const sender = env.MAILBOX_USER || "sender";
-  if (result.kind === "accepted")
+  if (result.kind === "accepted") {
+    // Passo que saiu com atraso (computador desligado, leitura indisponível, janela): os seguintes do mesmo destinatário
+    // mantêm a distância aprovada entre passos (dias da ficha), contada a partir da data real do envio no fuso dele.
+    const tz = (await s(env, "SELECT timezone FROM contacts WHERE id=?", row.contact_id).first())?.timezone || SENDER_TZ;
+    const cur = await s(env, "SELECT day_offset FROM ficha_messages WHERE id=?", row.message_row_id).first();
+    const sentOn = localDate(at, tz);
+    const shift = cur
+      ? [
+          s(
+            env,
+            `UPDATE send_outbox SET planned_date=MAX(planned_date,date(?,'+'||((SELECT day_offset FROM ficha_messages WHERE id=send_outbox.message_row_id)-?)||' days')),updated_at=?
+             WHERE ficha_id=? AND contact_id=? AND channel=? AND step_no>? AND status IN ('pending','waiting_sequence','temp_failed','blocked')`,
+            sentOn, cur.day_offset, at, row.ficha_id, row.contact_id, row.channel, row.step_no,
+          ),
+        ]
+      : [];
     return env.DB.batch([
       s(env, `UPDATE send_outbox SET status='accepted',accepted_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE ${fence}`, at, at, row.id, token),
+      ...shift,
       log(env, row.id, "accepted", null, token),
       s(env, "UPDATE sender_state SET day=?,sent_today=?,next_send_at=?,ramp_started_on=COALESCE(ramp_started_on,?) WHERE tenant_id=? AND sender=?", senderDay, sentToday + 1, next, senderDay, row.tenant_id, sender),
       // Break enviado sem resposta: sugestão de retorno em 6 meses (ou no ciclo do ICP), sem nova sequência automática (R28.11, R17.7).
@@ -292,6 +308,7 @@ async function settle(env, row, token, result, at, sentToday, senderDay, interva
           ]
         : []),
     ]);
+  }
   if (result.kind === "temporary") {
     const final = row.attempts + 1 >= MAX_TEMP_ATTEMPTS;
     return env.DB.batch([

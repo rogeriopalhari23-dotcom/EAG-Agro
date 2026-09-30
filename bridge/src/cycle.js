@@ -34,8 +34,10 @@ export async function recover({ compass, imap, journal, log }) {
   }
 }
 
-export async function readReplies({ compass, imap, log, version }) {
+// fault: só no teste interno (BRIDGE_FAULT) — simula queda ou caixa indisponível num ponto exato.
+export async function readReplies({ compass, imap, log, version, fault }) {
   try {
+    fault?.("imap_down");
     const cursor = await compass.call("/api/bridge/cursor");
     const got = await imap.fetchNew(cursor);
     // Primeira leitura ou caixa renumerada: o Compass passa a contar da posição atual; só as recentes são registradas.
@@ -52,7 +54,7 @@ export async function readReplies({ compass, imap, log, version }) {
   }
 }
 
-export async function sendOne({ compass, smtp, imap, journal, log }) {
+export async function sendOne({ compass, smtp, imap, journal, log, fault }) {
   const { message: m, reason } = await compass.call("/api/bridge/claim");
   if (!m) return { sent: false, reason };
   journal.claimed(m);
@@ -70,9 +72,11 @@ export async function sendOne({ compass, smtp, imap, journal, log }) {
     return { sent: false, reason: "already_accepted" };
   }
   const { raw, envelope } = await buildRaw(m);
+  fault?.("before_smtp");
   journal.smtpStarted(m);
   const r = await smtp.send(raw, envelope);
   journal.smtpDone(m, r);
+  if (r.kind === "accepted") fault?.("after_smtp");
   log("smtp_result", { outboxId: m.outboxId, kind: r.kind, code: r.code ?? null });
   if (r.kind === "accepted") await imap.appendSent(raw).catch((e) => log("append_sent_failed", { code: e.code ?? null }));
   await compass.call("/api/bridge/result", { outboxId: m.outboxId, leaseToken: m.leaseToken, outcome: r.kind, sentSha256: m.sha256, smtp: { code: r.code, text: r.text } });

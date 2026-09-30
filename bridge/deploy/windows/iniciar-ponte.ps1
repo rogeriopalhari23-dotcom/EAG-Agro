@@ -1,4 +1,4 @@
-# Ponte de e-mail do EAG Compass — inicia no seu computador.
+﻿# Ponte de e-mail do EAG Compass — inicia no seu computador.
 # Lê a configuração de %LOCALAPPDATA%\eag-mail-bridge\config.json e os segredos cifrados (guardar-segredos.ps1);
 # os segredos ficam só nas variáveis deste processo e do processo da ponte.
 # Uso:
@@ -33,10 +33,16 @@ $env:BRIDGE_JOURNAL = Join-Path $dir "journal.sqlite"
 $argumentos = @("src\main.js")
 if ($SoCaixa) { $argumentos += "--mailbox-only" } elseif ($Conferir) { $argumentos += "--check" } elseif ($UmCiclo) { $argumentos += "--once" }
 Push-Location (Join-Path $raiz "bridge")
+$codigo = 0
 try {
-  if ($SoCaixa -or $Conferir -or $UmCiclo) { & node @argumentos }
-  else { & node @argumentos *>> (Join-Path $dir "ponte.log") }
+  $ErrorActionPreference = "Continue" # linhas de erro do node não interrompem o registro
+  if ($SoCaixa -or $Conferir -or $UmCiclo) { & node @argumentos; $codigo = $LASTEXITCODE }
+  else {
+    & node @argumentos 2>&1 | ForEach-Object { "$_" } | Out-File -Append -Encoding utf8 (Join-Path $dir "ponte.log")
+    $codigo = $LASTEXITCODE
+  }
 } finally {
   Pop-Location
   Remove-Item Env:MAILBOX_PASSWORD, Env:BRIDGE_HMAC_KEY, Env:ACCESS_CLIENT_SECRET -ErrorAction SilentlyContinue
 }
+exit $codigo # código diferente de 0 faz a tarefa agendada reiniciar a ponte
