@@ -31,7 +31,7 @@ export function smtpTransport(env) {
       }
       try {
         await mailer.send({
-          from: { name: env.SENDER_NAME || "Rogério Palhari", email: env.MAILBOX_USER },
+          from: { name: env.SENDER_NAME || "EAG Agro - Brasil", email: env.MAILBOX_USER }, // nome exibido no campo De
           to: { email: to },
           reply: { email: env.MAILBOX_USER },
           subject,

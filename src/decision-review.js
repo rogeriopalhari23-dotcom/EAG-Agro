@@ -92,7 +92,7 @@ export async function getReview(env, actor, searchId) {
   const green = p.commodity === "coffee" && hs6.every((h) => h.startsWith("090111"));
   const ptCommodity = green ? "café verde" : commodityDisplay(p);
   const deCommodity = commodityDisplayDe(p);
-  const sig = { senderName: env.SENDER_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS || "[endereço físico da EAG não configurado]" };
+  const sig = { senderName: env.SENDER_PERSON_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS || "[endereço físico da EAG não configurado]" };
   const rec = [{ contactId: "canal", sourceLabel: "site" }];
   const unsub = () => "[link de descadastro próprio, gerado na ficha]";
   const de = deCommodity ? generateIdentification({ language: "de", commodity: deCommodity, recipients: rec, sig, unsub }) : [];

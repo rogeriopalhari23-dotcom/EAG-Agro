@@ -105,7 +105,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   if (!commodity) fail(422, "commodity_name_missing", `Commodity sem nome cadastrado nos modelos (${ctx.language}).`);
   const templatesVersion = ident ? IDENT_VERSION[ctx.language] : en ? TEMPLATES_EN_VERSION : TEMPLATES_VERSION;
   const gapNote = ctx.campaign.market === "international" ? GAP_NOTE : null;
-  const sig = { senderName: env.SENDER_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS };
+  const sig = { senderName: env.SENDER_PERSON_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS };
   const msgs = ident
     ? generateIdentification({ language: ctx.language, commodity, recipients: ctx.recipients, sig, unsub: (id) => urls.get(id) })
     : (en ? generateSequenceEn : generateSequence)({ commodity, recipients: ctx.recipients, declarations: ctx.declarations, sig, unsub: (id) => urls.get(id) });

@@ -17,7 +17,7 @@ const withSig = (fn) => async (t) => {
 // Mesmo cenário nacional de tests/fichas.test.mjs (açúcar, SP), com o canal geral publicado da empresa.
 async function ready(ctx) {
   const { api, env, DB } = ctx;
-  Object.assign(env, { EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP", EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Exemplo, 100 — Sertãozinho/SP", PUBLIC_BASE_URL: "https://compass.exemplo", UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64") });
+  Object.assign(env, { SENDER_NAME: "EAG Agro - Brasil", EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP", EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Exemplo, 100 — Sertãozinho/SP", PUBLIC_BASE_URL: "https://compass.exemplo", UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64") });
   await api("/api/parameters/send_timezone", "PUT", { scope: "national", value: "America/Sao_Paulo", reason: "Fuso do piloto" });
   DB.raw.prepare("UPDATE channels SET state='internal_test' WHERE channel='email'").run();
   const camp = await api("/api/campaigns", "POST", {
@@ -57,6 +57,8 @@ test("Identificação do responsável: canal geral com fonte vira destinatário 
   assert.deepEqual(emails.map((m) => m.day), [0, 4], "E-mail 2 no dia 4, como na skill; dias não seguidos (R19.2 item 12)");
   assert.match(emails[0].body, /Quem é responsável pela compra de açúcar na empresa\?/);
   assert.match(emails[0].body, /contato profissional adequado/);
+  assert.match(emails[0].body, /Meu nome é Rogério Palhari, da EAG Agro/, "SENDER_NAME é só o nome do campo De; o texto usa o nome da pessoa");
+  assert.doesNotMatch(emails[0].body, /EAG Agro - Brasil/);
   assert.equal(emails[1].subject, emails[0].subject, "acompanhamento sem Re:");
   assert.doesNotMatch(emails.map((m) => m.body).join("\n"), /20 minutos|preço|lote|volume/i, "sem reunião nem condição comercial");
   assert.match(emails[0].body, /Rua Exemplo, 100/);

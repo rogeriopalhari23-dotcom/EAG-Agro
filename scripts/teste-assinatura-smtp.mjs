@@ -15,7 +15,8 @@ const pick = (k) => new RegExp(`"${k}"\\s*:\\s*"([^"]*)"`).exec(cfg)?.[1];
 const USER = pick("MAILBOX_USER");
 const TO = (pick("INTERNAL_TEST_RECIPIENTS") || "").split(",")[0].trim();
 const ADDRESS = pick("EAG_POSTAL_ADDRESS");
-const SENDER = pick("SENDER_NAME") || "Rogério Palhari";
+const SENDER = pick("SENDER_NAME") || "EAG Agro - Brasil"; // campo De, como no envio real
+const PERSON = pick("SENDER_PERSON_NAME") || "Rogério Palhari"; // nome no texto
 if (!USER || !/^[^@\s]+@[^@\s]+$/.test(TO)) throw new Error("MAILBOX_USER ou INTERNAL_TEST_RECIPIENTS ausente no wrangler.jsonc.");
 if (/@(24grad|amori|blackandyum)\./i.test(TO)) throw new Error("Destinatário não é interno.");
 
@@ -43,7 +44,7 @@ async function askHidden(prompt) {
 }
 
 const marker = randomUUID().slice(0, 8);
-const [m] = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: [{ contactId: "teste", sourceLabel: "site" }], sig: { senderName: SENDER, postalAddress: ADDRESS }, unsub: () => "[link de descadastro — teste interno, sem link real]" });
+const [m] = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: [{ contactId: "teste", sourceLabel: "site" }], sig: { senderName: PERSON, postalAddress: ADDRESS }, unsub: () => "[link de descadastro — teste interno, sem link real]" });
 const body = `${m.body}\n\n--- fim do texto gerado pelo Compass (marcador ${marker}) ---`;
 const subject = `[TESTE INTERNO ${marker}] ${m.subject}`;
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");

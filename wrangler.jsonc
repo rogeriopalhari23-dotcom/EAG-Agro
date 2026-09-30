@@ -23,7 +23,9 @@
     // E-mail (P2-T17): remetente fixado na Spec R19.13; endereço físico da EAG em docs/eag-compass-perfil.md (eagagro.com/contato).
     // Teste interno só para o endereço autorizado por Rogério em 2026-09-24. A senha da caixa é segredo (MAILBOX_PASSWORD).
     "PUBLIC_BASE_URL": "https://eag-compass-production.rogeriopalhari23.workers.dev",
-    "SENDER_NAME": "Rogério Palhari",
+    // Nome exibido no campo De dos e-mails (decisão de Rogério, 2026-09-30). O nome da pessoa no texto e na assinatura é SENDER_PERSON_NAME.
+    "SENDER_NAME": "EAG Agro - Brasil",
+    "SENDER_PERSON_NAME": "Rogério Palhari",
     "MAILBOX_USER": "rogeriopalhari@eagagro.com",
     "EAG_POSTAL_ADDRESS": "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil",
     // Validação de Rogério (2026-09-30): texto exato do endereço do rodapé. Sem ele (ou diferente), revisor e aprovação bloqueiam.
