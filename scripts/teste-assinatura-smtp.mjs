@@ -46,6 +46,13 @@ const [m] = generateIdentification({ language: "de", commodity: "Rohkaffee", rec
 const body = `${m.body}\n\n--- fim do texto gerado pelo Compass (marcador ${marker}) ---`;
 const subject = `[TESTE INTERNO ${marker}] ${m.subject}`;
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
+const wrap = (s) => b64(s).replace(/.{76}/g, "$&\r\n");
+// Com a assinatura HTML importada, envia como o Compass: multipart/alternative (texto + HTML); sem ela, só texto.
+const html = m.html ? m.html.replace("</body>", `<p style="font-size:11px;color:#999">--- fim do texto gerado pelo Compass (marcador ${marker}) ---</p></body>`) : null;
+const boundary = `compass-${marker}`;
+const content = html
+  ? [`Content-Type: multipart/alternative; boundary="${boundary}"`, "", `--${boundary}`, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "", wrap(body), `--${boundary}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "", wrap(html), `--${boundary}--`]
+  : ["Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "", wrap(body)];
 const message = [
   `From: =?UTF-8?B?${b64(SENDER)}?= <${USER}>`,
   `To: <${TO}>`,
@@ -54,10 +61,7 @@ const message = [
   `Date: ${new Date().toUTCString()}`,
   `Message-ID: <teste-${marker}@eagagro.com>`,
   "MIME-Version: 1.0",
-  "Content-Type: text/plain; charset=utf-8",
-  "Content-Transfer-Encoding: base64",
-  "",
-  b64(body).replace(/.{76}/g, "$&\r\n"),
+  ...content,
 ].join("\r\n");
 
 // DRY_RUN=1: mostra a mensagem que seria enviada, sem conectar nem pedir senha.

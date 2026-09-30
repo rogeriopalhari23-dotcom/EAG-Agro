@@ -12,7 +12,7 @@ export function classifySmtpError(error, stage) {
 
 export function smtpTransport(env) {
   return {
-    async send({ to, subject, text, headers }) {
+    async send({ to, subject, text, html, headers }) {
       if (!env.MAILBOX_USER || !env.MAILBOX_PASSWORD) return { kind: "temporary", detail: "credenciais da caixa não configuradas" };
       let mailer;
       try {
@@ -36,6 +36,7 @@ export function smtpTransport(env) {
           reply: { email: env.MAILBOX_USER },
           subject,
           text,
+          ...(html ? { html } : {}),
           headers,
         });
         return { kind: "accepted" };

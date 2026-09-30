@@ -1,6 +1,7 @@
 // Revisor automático PV1–PV12 + R19.13 (P2-T8, R17.3). Regras determinísticas; violação impede aprovação.
 // Entrada: mensagens geradas (generateSequence) e contexto da ficha. Saída: { ok, findings: [{id, ok, detail, step?, contactId?}] }.
 import { contactTargetFlag } from "./profiles.js";
+import { SIGNATURE, signatureText } from "./templates/assinatura.js";
 
 const FORBIDDEN_PT = /\bR\$|\bUS\$|pre[çc]o|cota[çc][ãa]o|\blotes?\b|estoque|prazo de entrega|certifica|pagamento|concorrente|fornecedor atual/i;
 const APOLOGY_PT = /poderia falar com o setor de compras|desculp[ae] (o |pelo )?inc[ôo]mod|desculpe incomodar|perd[ãa]o pelo inc[ôo]modo/i;
@@ -186,6 +187,12 @@ export function reviewIdentification(raw, ctx) {
   const messages = raw.map((m) => ({ ...m, body: ownLinks.reduce((b, u) => b.split(u).join(" "), m.body) }));
   const L = LANG[ctx.language || "pt-BR"] || LANG["pt-BR"];
   const ask = IDENT_ASK[ctx.language || "pt-BR"] || IDENT_ASK["pt-BR"];
+  // SIG (pedido de Rogério em 2026-09-30): assinatura oficial importada da Hostinger, conferida por ele, uma única vez
+  // no texto e no HTML. Sem isso a ficha não é aprovável.
+  const sig = ctx.signature ?? SIGNATURE;
+  const once = (hay, needle) => !!needle && hay.split(needle).length === 2;
+  const sigOk = sig.status === "confirmed" && raw.filter((m) => m.kind === "auto_email").every((m) => once(m.body, signatureText(sig)) && !!m.html && once(m.html, sig.html));
+  finding(f, "SIG", sigOk, sigOk ? `Assinatura oficial (${sig.version}) uma vez no texto e no HTML.` : sig.status === "pending_import" ? "Assinatura HTML original da Hostinger ainda não importada." : sig.status === "imported_pending_visual" ? "Assinatura importada aguardando a conferência visual de Rogério." : "Assinatura ausente ou repetida em algum e-mail.");
   for (const r of ctx.recipients) {
     const list = messages.filter((m) => m.contactId === r.contactId && m.kind === "auto_email").sort((a, b) => a.day - b.day);
     const e1 = list.find((m) => m.step === 1);

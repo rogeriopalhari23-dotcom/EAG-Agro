@@ -18,7 +18,7 @@ async function sha256(text) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-export const messageHash = (subject, body) => sha256(`${subject ?? ""}\n\n${body}`);
+export const messageHash = (subject, body, html = null) => sha256(html ? `${subject ?? ""}\n\n${body}\n\n--html--\n${html}` : `${subject ?? ""}\n\n${body}`);
 export const approvalHash = (hashes) => sha256(hashes.join(","));
 
 async function fichaRow(env, actor, id) {
@@ -139,9 +139,9 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
     statements.push(
       s(
         env,
-        "INSERT INTO ficha_messages(id,version_id,contact_id,channel,step_no,kind,day_offset,subject_enc,body_enc,message_sha256) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO ficha_messages(id,version_id,contact_id,channel,step_no,kind,day_offset,subject_enc,body_enc,message_sha256,body_html_enc) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         crypto.randomUUID(), versionId, m.contactId, m.channel, m.step, m.kind, m.day,
-        m.subject == null ? null : await encryptPii(m.subject, env), await encryptPii(m.body, env), await messageHash(m.subject, m.body),
+        m.subject == null ? null : await encryptPii(m.subject, env), await encryptPii(m.body, env), await messageHash(m.subject, m.body, m.html ?? null), m.html ? await encryptPii(m.html, env) : null,
       ),
     );
   return { versionId, review, statements };
@@ -206,7 +206,7 @@ export async function getFicha(env, actor, id) {
   for (const m of msgs.results)
     messages.push({
       id: m.id, contactId: m.contact_id, channel: m.channel, step: m.step_no, kind: m.kind, day: m.day_offset,
-      subject: await decryptPii(m.subject_enc, env), body: await decryptPii(m.body_enc, env), sha256: m.message_sha256,
+      subject: await decryptPii(m.subject_enc, env), body: await decryptPii(m.body_enc, env), html: m.body_html_enc ? await decryptPii(m.body_html_enc, env) : null, sha256: m.message_sha256,
     });
   const groups = {};
   for (const m of messages) (groups[`${m.contactId}|${m.channel}`] ||= []).push(m);

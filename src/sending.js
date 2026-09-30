@@ -105,9 +105,10 @@ async function approvedMessage(env, row) {
   const m = await s(env, "SELECT * FROM ficha_messages WHERE id=?", row.message_row_id).first();
   const subject = await decryptPii(m.subject_enc, env);
   const body = await decryptPii(m.body_enc, env);
-  const h = await messageHash(subject, body);
+  const html = m.body_html_enc ? await decryptPii(m.body_html_enc, env) : null;
+  const h = await messageHash(subject, body, html);
   if (h !== m.message_sha256 || h !== row.message_sha256) return null;
-  return { subject, body, versionId: m.version_id };
+  return { subject, body, html, versionId: m.version_id };
 }
 
 // Uma execução do agendador. deps: { transport, now, owner, random }
@@ -189,6 +190,7 @@ export async function tick(env, tenant, deps = {}) {
         to: check.email,
         subject: msg.subject,
         text: msg.body,
+        html: msg.html ?? undefined,
         headers: {
           "Message-ID": messageId,
           "List-Unsubscribe": `<${listUnsub}>`,

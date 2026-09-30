@@ -13,7 +13,10 @@
 //        diria que é resposta sem ser. O inglês continua na versão 1.0.0 (não revisado).
 export const IDENT_VERSION = { "pt-BR": "id-pt-1.1.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
 
+import { signatureText, renderHtml } from "./assinatura.js";
 const COMPANY = "EAG Agro";
+// Rodapé separado da assinatura: endereço físico (R19.13) e forma de saída (R21.7).
+const footer = (s, unsubLine) => [s.postalAddress, unsubLine];
 // Termo de mercado da commodity em alemão (sem entrada → a ficha em alemão não é gerada).
 const COMMODITY_DE = { coffee: "Rohkaffee", sugar: "Zucker", soy: "Sojabohnen", corn: "Mais", soy_meal: "Sojaschrot", soy_oil: "Sojaöl", ethanol: "Ethanol" };
 export const commodityDisplayDe = (product) => COMMODITY_DE[product.commodity] ?? null;
@@ -23,7 +26,7 @@ const TEXT = {
     subject: (c) => `Responsável pela compra de ${c}`,
     e1: (c, s) => ["Olá,", `Meu nome é ${s.senderName}, da ${COMPANY}, no Brasil. Atuamos na intermediação de commodities agrícolas, incluindo ${c} brasileiro.`, `Quem é responsável pela compra de ${c} na empresa? Poderia encaminhar esta mensagem à pessoa responsável ou indicar um contato profissional adequado?`, "Obrigado pela atenção."],
     e2: (c) => ["Olá,", `Retomo brevemente minha mensagem anterior. Poderia indicar com quem devo falar sobre a compra de ${c}?`, `Se a empresa não compra ${c}, uma breve confirmação já ajuda.`, "Obrigado."],
-    sig: (s, u) => ["", `${s.senderName} — ${COMPANY}`, s.postalAddress, `Para não receber mais mensagens, responda "sair" ou use este link: ${u}`],
+    unsub: (u) => `Para não receber mais mensagens, responda "sair" ou use este link: ${u}`,
   },
   en: {
     subject: (c) => `${c.charAt(0).toUpperCase()}${c.slice(1)} supplier`,
@@ -32,14 +35,14 @@ const TEXT = {
     who: (c) => `I'm with ${COMPANY}; we trade agricultural commodities, and I would like to speak with the person responsible for purchasing ${c} at your company.`,
     ask: "Could you tell me who is responsible for this area and the best professional channel to reach them?",
     follow: (c) => `Did you get a chance to see the message I sent a few days ago? I only need to know who is responsible for purchasing ${c} and the best channel to reach them.`,
-    sig: (s, u) => ["", `${s.senderName} — ${COMPANY}`, s.postalAddress, `To stop receiving these messages, reply "unsubscribe" or use this link: ${u}`],
+    unsub: (u) => `To stop receiving these messages, reply "unsubscribe" or use this link: ${u}`,
   },
   de: {
     // Texto de Rogério para Rohkaffee; o substantivo composto vale para café verde.
     subject: (c) => `Zuständige Person für den ${c}-Einkauf`,
     e1: (c, s) => ["Guten Tag,", `mein Name ist ${s.senderName}, ich bin bei ${COMPANY} in Brasilien tätig. Wir vermitteln Agrarrohstoffe, darunter brasilianischen ${c}.`, `Wer ist in Ihrem Unternehmen für den Einkauf von ${c} zuständig? Könnten Sie meine Nachricht bitte an die zuständige Person weiterleiten oder mir eine geeignete geschäftliche Kontaktadresse nennen?`, "Vielen Dank für Ihre Unterstützung."],
     e2: (c) => ["Guten Tag,", `ich komme kurz auf meine vorherige Nachricht zurück. Könnten Sie mir bitte mitteilen, an wen ich mich bezüglich des Einkaufs von ${c} wenden kann?`, `Falls Ihr Unternehmen keinen ${c} einkauft, genügt ein kurzer Hinweis.`, "Vielen Dank."],
-    sig: (s, u) => ["", `${s.senderName} — ${COMPANY}`, s.postalAddress, `Wenn Sie keine weiteren Nachrichten erhalten möchten, antworten Sie mit „abmelden“ oder nutzen Sie diesen Link: ${u}`],
+    unsub: (u) => `Wenn Sie keine weiteren Nachrichten erhalten möchten, antworten Sie mit „abmelden“ oder nutzen Sie diesen Link: ${u}`,
   },
 };
 
@@ -52,10 +55,13 @@ export function generateIdentification({ language = "pt-BR", commodity, recipien
     // Versão 1.1.0 (pt/de): parágrafos separados por linha em branco; versão 1.0.0 (en): linhas simples.
     const e1 = t.e1 ? t.e1(commodity, sig).join("\n\n") : [t.hello, ...(/\bsite\b|website/i.test(r.sourceLabel || "") ? [t.found] : []), t.who(commodity), t.ask].join("\n");
     const e2 = t.e2 ? t.e2(commodity).join("\n\n") : [t.hello, t.follow(commodity)].join("\n");
-    const tail = t.sig(sig, unsub(r.contactId)).join("\n");
+    // Texto: corpo, assinatura oficial (uma vez) e rodapé separado; HTML com a assinatura original, quando importada.
+    const foot = footer(sig, t.unsub(unsub(r.contactId)));
+    const tail = ["", signatureText(), "", "—", ...foot].join("\n");
+    const html = (text) => renderHtml({ bodyText: text, footerLines: foot });
     // Mesmo assunto no acompanhamento: o envio não encadeia como resposta real (sem In-Reply-To/References).
-    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 1, day: 0, subject: t.subject(commodity), body: `${e1}\n${tail}`, objective: "identificar o responsável pela compra e o canal profissional" });
-    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 2, day: 4, subject: t.subject(commodity), body: `${e2}\n${tail}`, objective: "obter a indicação do responsável ou a confirmação de que não compra" });
+    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 1, day: 0, subject: t.subject(commodity), body: `${e1}\n${tail}`, html: html(e1), objective: "identificar o responsável pela compra e o canal profissional" });
+    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 2, day: 4, subject: t.subject(commodity), body: `${e2}\n${tail}`, html: html(e2), objective: "obter a indicação do responsável ou a confirmação de que não compra" });
   }
   return out;
 }

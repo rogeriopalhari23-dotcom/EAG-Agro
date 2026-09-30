@@ -664,3 +664,12 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
 - Teste novo: microempresa e pequena, ambas com perfil "não confirmado", recebem o mesmo tratamento (ficha permitida) e o perfil continua "não confirmado" — ausência de evidência não vira consumo confirmado.
 - `scripts/teste-assinatura-smtp.mjs`: confirmação explícita ("SIM") do destinatário interno antes de pedir a senha; recusa qualquer outro destinatário. Teste ainda não executado (depende de Rogério digitar a senha no próprio terminal); fichas sem nova versão até o resultado.
 - Suíte 359 + 2; UI smoke OK.
+
+### 2026-09-30 — Assinatura oficial no envio do Compass (estrutura pronta; HTML original pendente de importação)
+
+- Teste interno recebido por Rogério (Gmail, 30/09 16:51 UTC, marcador ab97b5ee): nada depois de "--- fim do texto gerado pelo Compass ---" — o SMTP da Hostinger não acrescenta a assinatura do webmail. O Compass precisa enviar a assinatura.
+- Implementado: `src/templates/assinatura.js` (assinatura única, versão `sig-eag-0.1.0`, dados exatos de Rogério; `html` = HTML original a importar, sem redesenho; status `pending_import` → `imported_pending_visual` → `confirmed`); modelos de identificação com assinatura uma vez e rodapé separado (endereço físico R19.13 e descadastro R21.7); parte HTML (multipart texto + HTML) congelada na ficha (migração `0029_html_da_ficha.sql`, `ficha_messages.body_html_enc`) e incluída no hash aprovado; envio passa `html` ao `worker-mailer`; revisor da ficha de identificação com a regra SIG (assinatura importada, conferida por Rogério e presente uma única vez no texto e no HTML). `worker-mailer` 1.2.1 envia HTML, mas não imagens embutidas (sem Content-ID): logo e bandeiras precisam dos endereços originais da assinatura.
+- `scripts/teste-assinatura-smtp.mjs` envia no mesmo formato (texto + HTML quando importado). Print citado por Rogério não chegou a esta sessão (só texto); nenhuma mensagem do webmail com a assinatura encontrada no Gmail interno.
+- As três fichas v1 continuam como estavam (texto antigo, sem aprovação; aprovação impossível hoje: campanha em rascunho e internacional não liberado). Nova versão só depois da conferência visual da assinatura.
+- Modelos da sequência de reunião (PV, pt/en) ainda com a assinatura antiga — ajustar antes de usá-los.
+- Ponto de restauração D1 `000006c3-00000000-000050f6-a524ca28f46355426ed7ef570fa5e3a5`; versão `74647395`; suíte 360 + 2; UI smoke OK.
