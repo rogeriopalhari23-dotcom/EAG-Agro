@@ -16,7 +16,8 @@ assert.ok(fonts.every((f) => /^[a-z0-9-]+\.woff2$|^LICENSE-[a-z0-9-]+\.txt$/.tes
 const css = await readFile(resolve(root, "dist/app.css"), "utf8");
 for (const [, file] of css.matchAll(/url\("fonts\/([^"]+)"\)/g))
   assert.ok(fonts.includes(file), `Fonte ausente: ${file}`);
-for (const family of ["roboto", "barlow-condensed", "ibm-plex-mono"])
+// Cada família presente (nome antes de "-latin-") precisa da licença OFL correspondente.
+for (const family of new Set(fonts.filter((f) => f.endsWith(".woff2")).map((f) => f.split("-latin-")[0])))
   assert.ok(fonts.includes(`LICENSE-${family}.txt`), `Licença ausente: ${family}`);
 const worker = await import(pathToFileURL(resolve(root, "src/worker.js")).href);
 assert.equal(typeof worker.default.fetch, "function");

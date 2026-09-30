@@ -20,9 +20,8 @@ ctx.env.ASSETS = {
       "/": ["index.html", "text/html"],
       "/app.js": ["app.js", "text/javascript"],
       "/app.css": ["app.css", "text/css"],
-      "/fonts/roboto-latin-400-normal.woff2": ["fonts/roboto-latin-400-normal.woff2", "font/woff2"],
-      "/fonts/barlow-condensed-latin-700-normal.woff2": ["fonts/barlow-condensed-latin-700-normal.woff2", "font/woff2"],
     };
+    if (/^\/fonts\/[a-z0-9-]+\.woff2$/.test(path)) files[path] = [path.slice(1), "font/woff2"];
     if (!files[path]) return new Response("Not found", { status: 404 });
     return new Response(
       await readFile(new URL("../public/" + files[path][0], import.meta.url)),
@@ -67,17 +66,32 @@ try {
     }),
     errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const MAIN = { Início: "Início", Hoje: "Início", Empresas: "Empresas", Radar: "Radar Nacional", "Radar Nacional": "Radar Nacional", Internacional: "Radar Internacional", "Radar Internacional": "Radar Internacional", Abordagem: "Abordagem", Configurações: "Configurações" };
+  const TABS = ["Fichas", "Envios", "Tarefas"];
+  const clickNav = async (label) => {
+    if (await page.getByRole("button", { name: "Menu" }).isVisible()) await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("navigation").getByRole("button", { name: label, exact: true }).click();
+  };
+  // Vai para uma tela pelo caminho do usuário: item principal, aba de Abordagem ou cartão de Configurações.
+  const nav = async (label) => {
+    if (MAIN[label]) return clickNav(MAIN[label]);
+    if (TABS.includes(label)) {
+      await clickNav("Abordagem");
+      await page.getByRole("heading", { name: "Abordagem", exact: true }).waitFor();
+      return page.getByRole("tab", { name: label, exact: true }).click();
+    }
+    await clickNav("Configurações");
+    await page.getByRole("heading", { name: "Configurações", exact: true }).waitFor();
+    await page.locator(".settings-list button").filter({ has: page.locator("strong", { hasText: new RegExp(`^${label}$`) }) }).click();
+  };
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  await page.getByRole("heading", { name: "Hoje", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Início", exact: true }).waitFor();
   await mkdir("review-output", { recursive: true });
   await page.screenshot({
     path: "review-output/hoje-desktop.png",
     fullPage: true,
   });
-  await page
-    .getByRole("navigation")
-    .getByRole("button", { name: "Empresas", exact: true })
-    .click();
+  await nav("Empresas");
   await page.getByText("Cadastrar empresa", { exact: true }).first().click();
   const cf = page
     .locator("details")
@@ -134,10 +148,7 @@ try {
     "Supressão",
     "Pausas",
   ]) {
-    await page
-      .getByRole("navigation")
-      .getByRole("button", { name: label, exact: true })
-      .click();
+    await nav(label);
     await page.getByRole("heading", { name: label, exact: true }).waitFor();
     assert.equal(
       await page.locator("#content .error").filter({ visible: true }).count(),
@@ -145,8 +156,6 @@ try {
     );
   }
   // P1-T7: ficha do produto e código pendente pelo formulário do admin.
-  const nav = (label) =>
-    page.getByRole("navigation").getByRole("button", { name: label, exact: true }).click();
   const form = (summary) =>
     page
       .locator("details")
@@ -202,7 +211,7 @@ try {
   await page.screenshot({ path: "review-output/campanha-desktop.png", fullPage: true });
   // P2-T18: telas do piloto com o cenário aprovado (ficha, fila e tarefas); nenhuma tela envia.
   const p = await pilot(ctx);
-  for (const label of ["Radar", "Fichas", "Envios", "Tarefas"]) {
+  for (const label of ["Radar Nacional", "Fichas", "Envios", "Tarefas"]) {
     await nav(label);
     await page.getByRole("heading", { name: label, exact: true }).waitFor();
     assert.equal(await page.locator("#content .error").filter({ visible: true }).count(), 0, label);
@@ -211,11 +220,11 @@ try {
   await page.getByText("Teste interno", { exact: true }).waitFor();
   await page.locator(".row").filter({ hasText: "Doces Vale Verde" }).first().waitFor();
   await nav("Fichas");
-  await page.locator(".row").filter({ hasText: "Doces Vale Verde" }).getByRole("button", { name: "Abrir" }).click();
+  await page.locator(".row").filter({ hasText: "Doces Vale Verde" }).getByRole("button", { name: /^(Abrir|Revisar e aprovar)$/ }).click();
   await page.getByRole("heading", { name: "Revisor PV", exact: true }).waitFor();
   await page.getByText(/^Aprovado por /).first().waitFor();
   await page.screenshot({ path: "review-output/ficha-desktop.png", fullPage: true });
-  await nav("Radar");
+  await nav("Setores e CNAE");
   await page.getByRole("heading", { name: "Setores usuários → CNAE", exact: true }).waitFor();
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM send_log").get().n, 0);
   assert.ok(p.fichaId);
@@ -226,7 +235,7 @@ try {
   await d.start();
   await d.drain();
   // Radar Internacional: lista básica de países importadores → resumo curto → commodity → busca de empresas.
-  await nav("Internacional");
+  await nav("Radar Internacional");
   await page.getByRole("heading", { name: "Radar Internacional", exact: true }).waitFor();
   // Resumo do MDIC publicado pelo Worker nesta rotina: o admin prepara na hora (o cron diário também faria).
   await page.getByRole("button", { name: "Preparar agora" }).click();
@@ -250,15 +259,18 @@ try {
   await page.getByRole("button", { name: "Autorizar busca de empresas" }).click();
   await page.getByRole("heading", { name: /^Alemanha · / }).waitFor();
   await page.getByText(/porte-alvo: Pequena e Média/).waitFor();
-  await page.getByRole("heading", { name: "Importadoras — traders e distribuidores (prioridade secundária) (0)" }).waitFor();
+  await page.getByText(/^Sem empresas importadoras ainda em: consumidoras finais, fábricas e processadoras; perfil a confirmar; traders e distribuidores/).waitFor();
   await page.getByRole("heading", { name: "Descobrir empresas (fontes gratuitas)" }).waitFor();
   await page.getByText("Registrar empresa encontrada").click();
   await page.getByLabel("Razão social").fill("Kleine Rösterei GmbH");
   await page.getByLabel("Onde foi encontrada (fonte)").fill("Europages — torrefações");
   await page.getByRole("button", { name: "Registrar empresa" }).click();
   // Cadastro manual sem sinal próprio de importação: não é candidata importadora até ser validada.
-  await page.getByText(/^Importação não verificada — usam a commodity, sem sinal próprio de importação \(1\)/).click();
+  const unverified = page.locator("details").filter({ has: page.locator("summary", { hasText: /^Importação não verificada — usam a commodity, sem sinal próprio de importação \(1\)/ }) });
+  assert.equal(await unverified.evaluate((d) => d.open), true, "sem importadoras, a lista não verificada abre sozinha");
   await page.getByText("empresa encontrada — importação não verificada").first().waitFor();
+  await page.getByText(/^Próximo passo: /).first().waitFor();
+  await unverified.getByText("Detalhes, evidências e pessoas").click();
   // Validação assistida: sinal próprio de importação registrado no cartão → sobe para "Importadoras".
   await page.getByText("Registrar sinal ou prova de importação").click();
   await page.getByLabel("O que diz (referência)").fill("Site da empresa: 'importamos café verde de Santos'");
@@ -279,14 +291,11 @@ try {
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   );
-  await nav("Internacional");
+  await nav("Radar Internacional");
   await page.getByRole("heading", { name: "Radar Internacional", exact: true }).waitFor();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Radar Internacional sem rolagem horizontal em 390 px");
-  await page
-    .getByRole("navigation")
-    .getByRole("button", { name: "Hoje", exact: true })
-    .click();
-  await page.getByRole("heading", { name: "Hoje", exact: true }).waitFor();
+  await nav("Início");
+  await page.getByRole("heading", { name: "Início", exact: true }).waitFor();
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -298,7 +307,7 @@ try {
   });
   assert.deepEqual(errors, []);
   console.log(
-    "UI smoke OK: cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar, Fichas, Envios, Tarefas, Radar Internacional (lista de países, resumo, seleção e busca de empresas), Lista mensal, 13 telas e viewport 390 px, sem erros JS.",
+    "UI smoke OK (redesign): navegação em 6 itens + Configurações e abas de Abordagem; cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar Nacional, Fichas, Envios, Tarefas, Radar Internacional (países, resumo, seleção, busca e cartão compacto), Lista mensal, 390 px com menu, sem erros JS.",
   );
 } finally {
   await browser.close();

@@ -316,7 +316,7 @@ export async function listCandidates(request, env, actor, id) {
     await s(
       env,
       `WITH base AS (
-         SELECT sc.distance_km,sc.distance_basis,sc.inside_radius,u.id unit_id,u.cnpj,u.trade_name,u.municipality_name,u.uf,u.geo_precision,u.size_code,u.size_label,
+         SELECT sc.distance_km,sc.distance_basis,sc.inside_radius,u.id unit_id,u.cnpj,u.trade_name,u.municipality_name,u.uf,u.geo_precision,u.lat,u.lon,u.size_code,u.size_label,
                 c.id company_id,c.legal_name,
                 (SELECT bp.icp_status FROM buyer_profiles bp WHERE bp.tenant_id=c.tenant_id AND bp.company_id=c.id AND bp.product_id=? AND bp.unit_key IN ('',u.id) ORDER BY bp.unit_key DESC LIMIT 1) icp
          FROM search_candidates sc JOIN company_units u ON u.id=sc.unit_id JOIN companies c ON c.id=u.company_id

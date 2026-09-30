@@ -113,6 +113,7 @@ export async function getCompany(request, env, actor, id) {
         sourceLabel: c.source_label,
         sourceUrl: c.source_url,
         prospectRole: c.prospect_role,
+        contactKind: c.contact_kind,
         emailValidation: c.email_validation,
         emailValidatedAt: c.email_validated_at,
         relationshipNote: c.relationship_note,

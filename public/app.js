@@ -124,15 +124,379 @@ function makeForm(fields, onSubmit, label = "Salvar") {
 }
 const details = (title, content) =>
   el("details", {}, el("summary", {}, title), content);
+// ===== Blocos novos do redesign (inseridos em public/app.js) =====
+
+// Cabeçalho de página: título e uma frase de apoio (sem rótulo decorativo).
 function section(title, subtitle) {
+  return el("div", {}, el("div", { class: "page-head" }, text("h1", title), subtitle ? text("p", subtitle, "muted") : null));
+}
+
+// Navegação principal curta; telas de apoio ficam sob o item "pai" (abas ou Configurações).
+const MAIN_NAV = ["Início", "Radar Nacional", "Radar Internacional", "Empresas", "Abordagem", "Configurações"];
+const PARENT = {
+  Hoje: "Início",
+  Radar: "Radar Nacional",
+  Internacional: "Radar Internacional",
+  "Lista mensal": "Radar Internacional",
+  Fichas: "Abordagem",
+  Envios: "Abordagem",
+  Tarefas: "Abordagem",
+  Campanhas: "Configurações",
+  Catálogo: "Configurações",
+  Parâmetros: "Configurações",
+  Supressão: "Configurações",
+  Pausas: "Configurações",
+  "Setores e CNAE": "Configurações",
+};
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+function setCrumb(...parts) {
+  const nodes = [];
+  parts.forEach((p, i) => {
+    if (i) nodes.push(" / ");
+    nodes.push(i < parts.length - 1 && MAIN_NAV.includes(p) ? el("button", { type: "button", onclick: () => navigate(p) }, p) : p);
+  });
+  $("breadcrumb").replaceChildren(...nodes);
+}
+function markNav(view) {
+  const parent = PARENT[view] || view;
+  for (const b of $("navigation").querySelectorAll("button")) b.setAttribute("aria-current", b.dataset.view === parent ? "page" : "false");
+  // Nomes antigos (Hoje, Radar, Internacional) são apelidos do item principal.
+  setCrumb(...(parent === view || ["Hoje", "Radar", "Internacional"].includes(view) ? [parent] : [parent, view]));
+  closeMenu();
+}
+function closeMenu() {
+  $("app").classList.remove("nav-open");
+  $("menu").setAttribute("aria-expanded", "false");
+}
+// Troca de tela direta (detalhes de empresa, busca, ficha): mantém o item de navegação e o caminho.
+function showScreen(node, ...crumb) {
+  $("content").replaceChildren(node);
+  if (crumb.length) setCrumb(...crumb);
+  $("content").focus({ preventScroll: true });
+  window.scrollTo({ top: 0 });
+}
+
+// Início: o que precisa de atenção agora, com uma ação por item. Só dados reais; zero é zero.
+async function home() {
+  const [d, fichas, tasks, today] = await Promise.all([
+    api("/api/dashboard"),
+    api("/api/fichas?limit=100"),
+    api(`/api/tasks?until=${new Date().toISOString().slice(0, 10)}&limit=100`),
+    api("/api/sending/today"),
+  ]);
+  const p = d.pipeline;
+  const total = Object.values(p).reduce((a, b) => a + b, 0);
+  const waiting = fichas.items.filter((f) => f.status === "in_approval").length;
+  const openTasks = tasks.items.filter((t) => t.status === "open").length;
+  const stuck = today.queue.filter((o) => ["blocked", "indeterminate"].includes(o.status)).length;
+  const node = section("Início", "O que precisa da sua atenção agora.");
+  const channel = {
+    planned: ["Envio de e-mails desligado", "O canal está em planejamento: nenhuma mensagem sai, mesmo com ficha aprovada."],
+    internal_test: ["Envio em teste interno", "Só os endereços da lista interna recebem mensagens. Empresas não recebem nada."],
+    enabled: ["Envio ligado", `Sai somente o que foi aprovado individualmente, na janela do destinatário e dentro do limite do dia (${today.sentToday} de ${today.dailyCap ?? "—"} hoje).`],
+  }[today.channel] || ["Canal de e-mail", lbl(today.channel)];
+  node.append(
+    el("div", { class: today.stopped ? "callout warn" : "callout" }, el("p", {}, text("strong", today.stopped ? "Envio parado automaticamente. " : `${channel[0]}. `), today.stopped ? `Motivo: ${today.stopped.reason}. Só a retomada registrada da operação libera novos envios.` : channel[1]), button("Ver envios", () => navigate("Envios"))),
+  );
+  const items = [
+    [waiting, "Fichas aguardando sua aprovação", "Cada destinatário é aprovado individualmente; nada sai sem isso.", "Revisar fichas", "Fichas"],
+    [openTasks, "Tarefas de contato para hoje", "Respostas, ligações e confirmações em aberto.", "Ver tarefas", "Tarefas"],
+    [stuck, "Envios bloqueados ou indeterminados", "Precisam de decisão registrada antes de voltar à fila.", "Resolver envios", "Envios"],
+    [p.qualifying || 0, "Empresas em qualificação", "Faltam evidências, demanda ou validações para qualificar.", "Revisar empresas", "Empresas"],
+  ];
+  const pending = items.filter(([n]) => n > 0);
+  node.append(
+    panel(
+      "Próximas ações",
+      pending.length
+        ? el(
+            "div",
+            { class: "actions-list" },
+            ...pending.map(([n, title, why, label, view]) =>
+              el("div", { class: "action-item" }, text("span", n, "action-count"), el("div", {}, text("strong", title), text("small", why)), button(label, () => navigate(view), true)),
+            ),
+          )
+        : text("p", "Nada pendente agora. Comece por uma busca de compradores.", "empty"),
+    ),
+    el(
+      "div",
+      { class: "start-grid" },
+      el("div", { class: "start-card" }, text("h2", "Compradores no Brasil"), text("p", "Empresas próximas da cidade do fornecedor, por commodity e raio, em lista e mapa.", "muted"), button("Abrir Radar Nacional", () => navigate("Radar Nacional"), true)),
+      el("div", { class: "start-card" }, text("h2", "Compradores no exterior"), text("p", "Países que importam do Brasil e, em cada um, empresas compradoras e seus responsáveis.", "muted"), button("Abrir Radar Internacional", () => navigate("Radar Internacional"), true)),
+    ),
+    panel(
+      "Empresas no funil",
+      el(
+        "div",
+        { class: "stats" },
+        ...[
+          ["Cadastradas", total],
+          ["Com evidência", p.prospected || 0],
+          ["Em qualificação", p.qualifying || 0],
+          ["Qualificadas", p.qualified || 0],
+        ].map(([label, value]) => el("div", { class: "stat" }, text("strong", value), text("span", label))),
+      ),
+      el("ol", { class: "flow", "aria-label": "Etapas" }, ...["Buscar compradores", "Revisar empresas", "Contatos e decisores", "Preparar ficha", "Aprovar", "Acompanhar respostas"].map((s) => text("li", s))),
+    ),
+  );
+  return node;
+}
+
+// Abordagem: fichas, envios e tarefas em abas (uma tela, três visões).
+const ABORDAGEM_TABS = ["Fichas", "Envios", "Tarefas"];
+async function abordagemView(tab) {
+  const views = { Fichas: fichasView, Envios: enviosView, Tarefas: tarefasView };
+  const sub = await views[tab]();
+  const head = sub.querySelector(".page-head");
+  if (head) {
+    const h = head.querySelector("h1");
+    const h2 = text("h2", h.textContent);
+    h.replaceWith(h2);
+  }
+  const node = section("Abordagem", "Preparar e aprovar fichas, acompanhar envios, respostas e tarefas de contato.");
+  node.append(
+    el(
+      "div",
+      { class: "tabs", role: "tablist", "aria-label": "Abordagem" },
+      ...ABORDAGEM_TABS.map((t) => el("button", { type: "button", role: "tab", "aria-selected": t === tab ? "true" : "false", onclick: () => navigate(t) }, t)),
+    ),
+    sub,
+  );
+  return node;
+}
+
+// Configurações: cadastros e regras que não fazem parte do trabalho diário.
+async function settingsView() {
+  const node = section("Configurações", "Cadastros, regras e controles da operação. O trabalho diário fica nos radares, em Empresas e em Abordagem.");
+  const items = [
+    ["Campanhas", "Commodity, cidade de origem e cliente ideal de cada busca; ativação."],
+    ["Catálogo", "Produtos, identidade e códigos NCM/HS."],
+    ["Setores e CNAE", "Setores usuários ligados às subclasses CNAE da busca nacional."],
+    ["Lista mensal", "Rotina mensal de países importadores e fontes (MDIC, Comtrade)."],
+    ["Parâmetros", "Raios, janelas e limites de envio, prazos."],
+    ["Pausas", "Pausas de empresa, campanha, commodity ou da operação."],
+    ["Supressão", "Descadastros e endereços que não podem receber contato."],
+  ];
+  node.append(el("div", { class: "settings-list" }, ...items.map(([name, desc]) => el("button", { type: "button", onclick: () => navigate(name) }, text("strong", name), text("span", desc)))));
+  return node;
+}
+
+// Setores usuários → CNAE (antes no Radar; é cadastro de apoio da busca nacional).
+async function sectorsView() {
+  const sectors = await api("/api/sectors");
+  const node = section("Setores e CNAE", "Setor sem CNAE aprovado bloqueia a busca nacional. Cadastre a subclasse com a fonte da CONCLA/IBGE.");
+  node.append(panel("Setores usuários → CNAE", rows(sectors.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", `${x.sector_key} · ${x.cnae_code}`), text("small", `${x.label} · ${x.source}`))))));
+  if (admin())
+    node.append(
+      details(
+        "Cadastrar setor → CNAE",
+        makeForm(
+          [input("Setor usuário (como no ICP)", "sector"), input("CNAE (subclasse, 7 dígitos)", "cnaeCode"), input("Descrição da subclasse", "label"), input("Fonte (URL)", "source")],
+          async (v) => {
+            await api("/api/sectors", "POST", v);
+            notice("Associação registrada.");
+            await navigate("Setores e CNAE");
+          },
+          "Cadastrar",
+        ),
+      ),
+    );
+  return node;
+}
+
+// Menu de ações secundárias (a principal fica visível ao lado).
+function moreMenu(label, ...buttons) {
+  const list = buttons.filter(Boolean);
+  if (!list.length) return null;
+  const menu = el("details", { class: "more" }, el("summary", {}, label), el("div", { class: "more-list" }, ...list));
+  menu.addEventListener("click", (e) => {
+    if (e.target.closest(".more-list button")) menu.open = false;
+  });
+  return menu;
+}
+
+// Painel lateral: abre a empresa sem sair da lista (fecha com Esc ou "Fechar").
+function openDrawer(title, build) {
+  document.querySelector("dialog.drawer")?.remove();
+  const body = el("div", { class: "drawer-body" }, text("p", "Carregando…", "muted"));
+  const dlg = el(
+    "dialog",
+    { class: "drawer", "aria-label": title },
+    el("div", { class: "drawer-head" }, text("strong", title), button("Fechar", () => dlg.close())),
+    body,
+  );
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg);
+  dlg.showModal();
+  safe(async () => body.replaceChildren(await build()));
+  return dlg;
+}
+
+// Radar Nacional: commodity + cidade do fornecedor (campanha) + raio → compradores próximos.
+async function radarView() {
+  const node = section("Radar Nacional", "Compradores próximos da cidade do fornecedor. A cidade é o centro da busca; o raio define até onde procurar.");
+  const [campaigns, params] = await Promise.all([campaignsOf("national"), api("/api/parameters")]);
+  const active = campaigns.filter((c) => c.status === "active");
+  const radii = params.parameters["radius_allowed_km:national"] || [];
+  const productName = (id) => state.products.find((p) => p.id === id)?.variant_name || "commodity";
+  if (!active.length) {
+    const drafts = campaigns.filter((c) => c.status === "draft");
+    node.append(
+      el(
+        "div",
+        { class: "callout warn" },
+        el("p", {}, text("strong", "Nenhuma busca nacional disponível. "), drafts.length ? `Há ${drafts.length} campanha(s) nacional(is) em rascunho: ative a que tem a commodity e a cidade do fornecedor.` : "Crie uma campanha nacional com a commodity e a cidade do fornecedor para buscar compradores."),
+        button(drafts.length ? "Ver campanhas" : "Criar campanha", () => navigate("Campanhas"), true),
+      ),
+    );
+  } else if (writable()) {
+    const choice = select("Commodity e cidade do fornecedor", "campaignId", active.map((c) => [c.id, `${productName(c.product_id)} · ${c.origin_city}/${c.origin_uf}`]), active[0].id);
+    const radius = select("Raio de busca", "radiusKm", radii.map((r) => [String(r), `${r} km`]), String(active[0].radius_km));
+    choice.control.addEventListener("change", () => {
+      const c = active.find((x) => x.id === choice.control.value);
+      if (c) radius.control.value = String(c.radius_km);
+    });
+    node.append(
+      panel(
+        "Nova busca de compradores",
+        makeForm(
+          [choice, radius],
+          async (v) => {
+            const r = await api("/api/searches", "POST", { campaignId: v.campaignId, radiusKm: Number(v.radiusKm) });
+            notice(r.reused ? "A busca de hoje com estes parâmetros já existe; abrindo o resultado." : `Busca iniciada em ${r.partitions} consulta(s).`);
+            await showSearch(r.searchId);
+          },
+          "Buscar compradores",
+        ),
+        text("small", "Outra commodity ou cidade? Cadastre ou ative a campanha em Configurações > Campanhas.", "muted"),
+      ),
+    );
+  }
+  const recent = [];
+  for (const c of active) for (const s of (await api(`/api/searches?campaignId=${c.id}`)).items) recent.push({ ...s, label: `${productName(c.product_id)} · ${c.origin_city}/${c.origin_uf}` });
+  recent.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+  node.append(
+    panel(
+      "Buscas recentes",
+      rows(recent.slice(0, 12), (s) =>
+        el(
+          "div",
+          { class: "row" },
+          el("div", {}, text("strong", `${s.label} · ${s.radius_km} km`), text("small", `${s.candidates_count} compradores encontrados${s.coverage_note ? ` · ${s.coverage_note}` : ""}`)),
+          text("span", lbl(s.status), s.status === "complete" ? "tag ok" : ["partial", "failed"].includes(s.status) ? "tag warn" : "tag"),
+          button("Ver compradores", () => showSearch(s.id)),
+        ),
+      ),
+    ),
+  );
+  return node;
+}
+
+// Mapa esquemático (sem mapa de fundo): posição relativa de cada unidade ao centro da busca, na escala do raio.
+function radarMap(search, items) {
+  const size = 320, c = size / 2, R = size / 2 - 18;
+  const lat0 = search.origin_lat, lon0 = search.origin_lon;
+  const kmX = (lon) => (lon - lon0) * 111.32 * Math.cos((lat0 * Math.PI) / 180);
+  const kmY = (lat) => (lat - lat0) * 110.57;
+  const scale = R / Math.max(1, search.radius_km);
+  const ns = "http://www.w3.org/2000/svg";
+  const svgEl = (tag, attrs) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    return n;
+  };
+  const svg = svgEl("svg", { viewBox: `0 0 ${size} ${size}`, role: "img", "aria-label": `Mapa esquemático: ${items.length} compradores em até ${search.radius_km} km do centro da busca` });
+  svg.append(
+    svgEl("rect", { x: 0, y: 0, width: size, height: size, rx: 10, fill: "#f8faf8" }),
+    svgEl("circle", { cx: c, cy: c, r: R, fill: "#e5f2e9", stroke: "#1d7a43", "stroke-width": 1.2, "stroke-dasharray": "4 4" }),
+    svgEl("circle", { cx: c, cy: c, r: R / 2, fill: "none", stroke: "#c5cfc8", "stroke-width": 1 }),
+    svgEl("circle", { cx: c, cy: c, r: 5, fill: "#17231c" }),
+  );
+  let placed = 0;
+  for (const x of items) {
+    if (x.lat == null || x.lon == null) continue;
+    let px = kmX(x.lon) * scale, py = -kmY(x.lat) * scale;
+    const d = Math.hypot(px, py);
+    if (d > R + 12) (px = (px / d) * (R + 12)), (py = (py / d) * (R + 12));
+    const exact = x.geo_precision && !/munic/.test(String(x.geo_precision));
+    const dot = svgEl("circle", { cx: c + px, cy: c + py, r: 4.5, fill: exact ? "#1d7a43" : "#ffffff", stroke: "#1d7a43", "stroke-width": 1.6 });
+    const t = svgEl("title", {});
+    t.textContent = `${x.trade_name || x.legal_name} · ${x.distance_km == null ? "distância desconhecida" : `${x.distance_km.toFixed(1)} km`}`;
+    dot.append(t);
+    svg.append(dot);
+    placed++;
+  }
+  const noPos = items.length - placed;
   return el(
     "div",
-    {},
-    text("div", "EAG / INTELIGÊNCIA COMERCIAL", "eyebrow"),
-    text("h1", title),
-    text("p", subtitle, "muted"),
+    { class: "map-wrap" },
+    text("strong", "Mapa"),
+    svg,
+    el("div", { class: "map-legend" }, el("span", {}, el("i", { class: "dot-origin" }), "centro da busca"), el("span", {}, el("i", { class: "dot-exact" }), "endereço da unidade"), el("span", {}, el("i", { class: "dot-est" }), "centro do município (estimativa)")),
+    text("small", `Círculo tracejado: ${search.radius_km} km; interno: ${Math.round(search.radius_km / 2)} km. Esquema sem mapa de fundo.${noPos ? ` ${noPos} desta página sem posição conhecida (fora do mapa).` : ""}`, "muted"),
   );
 }
+
+async function showSearch(id, order = "icp", offset = 0) {
+  const [d, c] = await Promise.all([api(`/api/searches/${id}`), api(`/api/searches/${id}/candidates?order=${order}&limit=50&offset=${offset}`)]);
+  const s = d.search;
+  const node = section(`Compradores em até ${s.radius_km} km`, `${lbl(s.status)} · ${s.candidates_count} empresa(s) encontrada(s) · versão ${s.version} da busca`);
+  const head = el("div", { class: "toolbar" }, button("Voltar ao Radar", () => navigate("Radar Nacional")));
+  if (["partial", "failed"].includes(s.status) && approver())
+    head.append(
+      button("Tentar de novo", async () => {
+        await api(`/api/searches/${id}/resume`, "POST", {});
+        notice("Consultas com falha voltaram para a fila.");
+        await showSearch(id, order);
+      }),
+    );
+  node.append(head);
+  if (s.coverage_note) node.append(el("div", { class: "callout warn" }, el("p", {}, text("strong", "Cobertura parcial. "), s.coverage_note)));
+  node.append(
+    el(
+      "div",
+      { class: "toolbar" },
+      text("span", "Ordenar:", "muted"),
+      el(
+        "div",
+        { class: "segmented", role: "group", "aria-label": "Ordenar" },
+        el("button", { type: "button", "aria-pressed": order === "icp" ? "true" : "false", onclick: () => safe(() => showSearch(id, "icp")) }, "Aderência ao perfil"),
+        el("button", { type: "button", "aria-pressed": order === "distance" ? "true" : "false", onclick: () => safe(() => showSearch(id, "distance")) }, "Distância"),
+      ),
+    ),
+  );
+  const list = rows(c.items, (x) =>
+    el(
+      "div",
+      { class: "row" },
+      el(
+        "div",
+        {},
+        text("strong", x.trade_name || x.legal_name),
+        text("small", `${x.municipality_name || "—"}/${x.uf || "—"} · ${x.distance_km == null ? "distância desconhecida" : `${x.distance_km.toFixed(1)} km`} (${lbl(x.distance_basis)}) · porte ${x.size_label || "não informado"}`),
+      ),
+      text("span", `${lbl(x.icp_status)}${x.icp_provisional ? " (provisório)" : ""}`, x.icp_status === "in_icp" ? "tag ok" : "tag"),
+      button("Abrir", () => openCompanyPanel(x.company_id, x.trade_name || x.legal_name)),
+    ),
+  );
+  node.append(el("div", { class: "radar-results" }, el("div", { class: "panel" }, text("h2", "Lista"), list, c.nextOffset != null ? button("Próxima página", () => showSearch(id, order, c.nextOffset)) : null), radarMap(s, c.items)));
+  showScreen(node, "Radar Nacional", "Compradores");
+}
+
+// Empresa no painel lateral: o mesmo conteúdo da tela da empresa, sem perder a lista.
+function openCompanyPanel(companyId, name) {
+  const dlg = openDrawer(name || "Empresa", async () => {
+    const n = await companyNode(companyId, 0, true);
+    n.prepend(el("div", { class: "toolbar" }, button("Abrir em tela cheia", () => { document.querySelector("dialog.drawer")?.close(); return showCompany(companyId); })));
+    return n;
+  });
+  dlg.dataset.company = companyId;
+}
+
 function panel(title, ...children) {
   return el("section", { class: "panel" }, text("h2", title), ...children);
 }
@@ -214,13 +578,12 @@ async function navigate(view = state.view) {
   const generation = ++state.generation;
   $("content").setAttribute("aria-busy", "true");
   $("content").replaceChildren(text("p", "Carregando…", "muted"));
-  for (const b of $("navigation").children)
-    b.setAttribute("aria-current", b.textContent === view ? "page" : "false");
+  markNav(view);
   try {
     const content = await views[view]();
     if (generation !== state.generation) return;
     $("content").replaceChildren(content);
-    $("breadcrumb").textContent = `EAG / ${view.toUpperCase()}`;
+    window.scrollTo({ top: 0 });
     $("content").focus({ preventScroll: true });
   } catch (e) {
     if (generation !== state.generation) return;
@@ -233,71 +596,6 @@ async function navigate(view = state.view) {
     if (generation === state.generation)
       $("content").setAttribute("aria-busy", "false");
   }
-}
-async function home() {
-  const d = await api("/api/dashboard"),
-    p = d.pipeline,
-    total = Object.values(p).reduce((a, b) => a + b, 0),
-    n = p.qualifying || 0;
-  const node = section(
-    "Hoje",
-    "Acompanhe as empresas e os dados que precisam de confirmação.",
-  );
-  node.append(
-    el(
-      "div",
-      { class: "hero" },
-      text("span", n, "big-number"),
-      el(
-        "div",
-        {},
-        text("h2", "EMPRESAS EM QUALIFICAÇÃO"),
-        text(
-          "p",
-          "Complete evidências, demanda e validações antes de qualificar.",
-          "muted",
-        ),
-        button("Revisar empresas", () => navigate("Empresas"), true),
-      ),
-    ),
-    el(
-      "div",
-      { class: "stats" },
-      ...[
-        ["Cadastradas", total],
-        ["Com evidência", p.prospected || 0],
-        ["Qualificadas", p.qualified || 0],
-      ].map(([label, value]) =>
-        el(
-          "div",
-          { class: "stat" },
-          text("strong", value),
-          text("span", label),
-        ),
-      ),
-    ),
-    el(
-      "div",
-      { class: "grid" },
-      panel(
-        "Próximas decisões",
-        text(
-          "p",
-          "Confira produto, mercado e fonte de cada demanda. Dados ausentes continuam pendentes.",
-        ),
-        button("Consultar catálogo", () => navigate("Catálogo")),
-      ),
-      panel(
-        "Operação assistida",
-        text(
-          "p",
-          "Radar, fichas, envios, tarefas e a lista internacional estão prontos; o envio externo só começa depois do teste interno (T1) e da liberação por escrito de Rogério.",
-        ),
-        text("p", "Nenhuma mensagem sai com o canal em planejamento ou teste interno para quem não está na lista interna.", "muted"),
-      ),
-    ),
-  );
-  return node;
 }
 async function companiesView() {
   const d = await api(
@@ -659,17 +957,84 @@ function demandForm(companyId, d, existing = []) {
   });
   return form;
 }
-async function showCompany(id, offset = 0) {
-  const generation = ++state.generation;
-  $("content").replaceChildren(text("p", "Carregando empresa…"));
+
+// Empresa: resumo compacto no topo + abas. Os blocos existentes (formulários, evidências, contatos, ficha) são os mesmos;
+// só passam a ficar agrupados por assunto, com a aba "Resumo e demanda" aberta.
+const COMPANY_TABS = [
+  ["resumo", "Resumo e demanda"],
+  ["contatos", "Contatos e pessoas"],
+  ["evidencias", "Evidências e perfil"],
+  ["ficha", "Ficha"],
+];
+function companyTabOf(block) {
+  const title = (block.querySelector(":scope > h2, :scope > summary")?.textContent || "").trim();
+  if (/^(Pessoas de compras|Contatos|Cadastrar contato|Registrar verificação)/.test(title)) return "contatos";
+  if (/^(Gerar ficha|Fichas|Validação de e-mail)/.test(title)) return "ficha";
+  if (/^(Evidências|Registrar evidência|Unidades|Perfil comprador|Registrar perfil|Registrar observação de risco|Riscos|Condições|Importação|Compra)/.test(title)) return "evidencias";
+  return "resumo";
+}
+function companySummary(data, goTab) {
+  const c = data.company;
+  const profile = (data.profiles || [])[0];
+  const unit = (data.units || [])[0];
+  const contacts = data.contacts || [];
+  const decisor = contacts.find((k) => ["decision_maker", "provisional_decision_maker"].includes(k.prospectRole));
+  const channel = contacts.find((k) => k.contactKind === "company_channel");
+  const evidence = (data.evidence || []).length;
+  const why = profile ? `${lbl(profile.profile_class)}${profile.basis ? ` (base: ${profile.basis})` : ""}` : "Perfil comprador não registrado";
+  const size = unit?.size_label ? `${unit.size_label} (cadastro da unidade)` : c.size_basis ? `${lbl(c.size_basis)}` : "Desconhecido";
+  const contact = decisor
+    ? `${decisor.fullName || "Decisor"}${decisor.jobTitle ? `, ${decisor.jobTitle}` : " (cargo não verificado)"}${decisor.emailValidation === "valid" ? " · e-mail validado" : " · e-mail não validado"}`
+    : channel
+      ? "Canal geral da empresa; responsável por compras ainda não identificado"
+      : contacts.length
+        ? `${contacts.length} contato(s); nenhum decisor identificado`
+        : "Nenhum contato registrado";
+  let pending, action;
+  if (!profile) (pending = "Perfil comprador não registrado para a commodity."), (action = ["Registrar perfil", "evidencias"]);
+  else if (!profile.ficha?.ok) (pending = profile.ficha?.reason || "Perfil ainda não permite ficha."), (action = ["Ver perfil e evidências", "evidencias"]);
+  else if (!contacts.length) (pending = "Falta um contato com fonte (pessoa de compras ou canal geral publicado)."), (action = ["Encontrar contatos", "contatos"]);
+  else if (!decisor && !channel) (pending = "Responsável por compras não identificado."), (action = ["Encontrar responsável", "contatos"]);
+  else (pending = "Pronta para preparar a ficha; o envio só acontece após aprovação individual."), (action = ["Preparar ficha", "ficha"]);
+  const item = (k, v, extra) => el("div", {}, text("span", k, "k"), text("strong", v), extra ? text("small", extra) : null);
+  return el(
+    "div",
+    { class: "company-summary" },
+    item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
+    item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
+    item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
+    item("Contato e responsável", contact),
+    item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`),
+    el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), button(action[0], () => goTab(action[1]), true)),
+  );
+}
+function organizeCompany(node, data) {
+  const head = node.querySelector(".page-head");
+  const blocks = [...node.children].filter((ch) => ch !== head && !(ch.tagName === "BUTTON"));
+  const loose = [...node.children].filter((ch) => ch.tagName === "BUTTON");
+  const panels = Object.fromEntries(COMPANY_TABS.map(([k]) => [k, el("div", { class: "tab-panel", role: "tabpanel", id: `tab-${k}` })]));
+  for (const b of blocks) panels[companyTabOf(b)].append(b);
+  for (const [k, p] of Object.entries(panels)) if (!p.children.length) p.append(text("p", "Nada registrado nesta parte ainda.", "empty"));
+  const tabs = el("div", { class: "tabs", role: "tablist", "aria-label": "Partes da empresa" });
+  const goTab = (key) => {
+    state.companyTab = key;
+    for (const b of tabs.children) b.setAttribute("aria-selected", b.dataset.tab === key ? "true" : "false");
+    for (const [k, p] of Object.entries(panels)) p.hidden = k !== key;
+  };
+  for (const [k, label] of COMPANY_TABS) tabs.append(el("button", { type: "button", role: "tab", "data-tab": k, "aria-controls": `tab-${k}`, onclick: () => goTab(k) }, label));
+  node.replaceChildren(head, ...(loose.length ? [el("div", { class: "toolbar" }, ...loose)] : []), companySummary(data, goTab), tabs, ...Object.values(panels));
+  goTab(COMPANY_TABS.some(([k]) => k === state.companyTab) ? state.companyTab : "resumo");
+  return node;
+}
+
+async function companyNode(id, offset = 0, inDrawer = false) {
   const data = await api(`/api/companies/${id}?limit=50&offset=${offset}`);
-  if (generation !== state.generation) return;
   const c = data.company,
     node = section(
       c.legal_name,
       `${c.country_code} · ${statusLabels[c.pipeline_status]} · Fonte: ${c.source_label}`,
     );
-  node.append(button("Voltar às empresas", () => navigate("Empresas")));
+  if (!inDrawer) node.append(button("Voltar às empresas", () => navigate("Empresas")));
   node.append(details("Pessoas de compras", peoplePanel(id)));
   for (const d of data.demands) {
     const scoreBox = el("div", {});
@@ -1005,8 +1370,24 @@ async function showCompany(id, offset = 0) {
           : null,
       ),
     );
-  $("content").replaceChildren(node);
-  $("content").focus({ preventScroll: true });
+  return organizeCompany(node, data);
+}
+async function showCompany(id, offset = 0) {
+  if (!offset && state.companyShown !== id) state.companyTab = "resumo";
+  state.companyShown = id;
+  // Painel lateral aberto para esta empresa: atualiza nele (ações registradas não tiram a pessoa da lista).
+  const dlg = document.querySelector("dialog.drawer[open]");
+  if (dlg && dlg.dataset.company === id) {
+    const node = await companyNode(id, offset, true);
+    node.prepend(el("div", { class: "toolbar" }, button("Abrir em tela cheia", () => { dlg.close(); return showCompany(id); })));
+    dlg.querySelector(".drawer-body").replaceChildren(node);
+    return;
+  }
+  const generation = ++state.generation;
+  $("content").replaceChildren(text("p", "Carregando empresa…", "muted"));
+  const node = await companyNode(id, offset);
+  if (generation !== state.generation) return;
+  showScreen(node, "Empresas", node.querySelector("h1")?.textContent || "Empresa");
 }
 const originLabels = {
   SITE: "Site",
@@ -1278,8 +1659,7 @@ async function showProduct(id) {
       ),
     );
   }
-  $("content").replaceChildren(node);
-  $("content").focus({ preventScroll: true });
+  showScreen(node);
 }
 async function parametersView() {
   const d = await api("/api/parameters"),
@@ -1628,8 +2008,7 @@ async function showCampaign(id) {
         ),
       ),
     );
-  $("content").replaceChildren(node);
-  $("content").focus({ preventScroll: true });
+  showScreen(node);
 }
 async function suppressionView() {
   const node = section(
@@ -1918,111 +2297,27 @@ async function pilotPanels(id, data) {
 }
 
 // Radar nacional: setores → CNAE, busca por campanha, cobertura e candidatos.
-async function radarView() {
-  const node = section("Radar", "Compradores por raio a partir da cidade do fornecedor. Centro do município é estimativa; fonte parcial nunca vira “nenhuma empresa”.");
-  const [campaigns, params, sectors] = await Promise.all([campaignsOf("national"), api("/api/parameters"), api("/api/sectors")]);
-  const active = campaigns.filter((c) => c.status === "active");
-  if (!active.length) node.append(text("p", "Nenhuma campanha nacional ativa. Ative uma campanha para buscar.", "empty"));
-  const radii = params.parameters["radius_allowed_km:national"] || [];
-  for (const c of active) {
-    const box = panel(`${c.name} · ${c.origin_city}/${c.origin_uf}`);
-    const list = await api(`/api/searches?campaignId=${c.id}`);
-    box.append(
-      rows(list.items, (s) =>
-        el(
-          "div",
-          { class: "row" },
-          el("div", {}, text("strong", `Versão ${s.version} · ${s.radius_km} km`), text("small", `${s.candidates_count} candidatos · ${s.api_calls} consultas${s.coverage_note ? " · " + s.coverage_note : ""}`)),
-          text("span", lbl(s.status), "tag"),
-          button("Ver candidatos", () => showSearch(s.id)),
-        ),
-      ),
-    );
-    if (writable())
-      box.append(
-        makeForm(
-          [select("Raio (km)", "radiusKm", radii.map((r) => [String(r), `${r} km`]), String(c.radius_km))],
-          async (v) => {
-            const r = await api("/api/searches", "POST", { campaignId: c.id, radiusKm: Number(v.radiusKm) });
-            notice(r.reused ? "Busca de hoje já existe para estes parâmetros." : `Busca iniciada em ${r.partitions} consulta(s).`);
-            await navigate("Radar");
-          },
-          "Buscar",
-        ),
-      );
-    node.append(box);
-  }
-  node.append(
-    panel(
-      "Setores usuários → CNAE",
-      text("p", "Setor sem CNAE aprovado bloqueia a busca. Cadastre a subclasse com a fonte da CONCLA/IBGE.", "muted"),
-      rows(sectors.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", `${x.sector_key} · ${x.cnae_code}`), text("small", `${x.label} · ${x.source}`)))),
-    ),
-  );
-  if (admin())
-    node.append(
-      details(
-        "Cadastrar setor → CNAE",
-        makeForm(
-          [input("Setor usuário (como no ICP)", "sector"), input("CNAE (subclasse, 7 dígitos)", "cnaeCode"), input("Descrição da subclasse", "label"), input("Fonte (URL)", "source")],
-          async (v) => {
-            await api("/api/sectors", "POST", v);
-            notice("Associação registrada.");
-            await navigate("Radar");
-          },
-          "Cadastrar",
-        ),
-      ),
-    );
-  return node;
-}
 
-async function showSearch(id, order = "icp", offset = 0) {
-  const [d, c] = await Promise.all([api(`/api/searches/${id}`), api(`/api/searches/${id}/candidates?order=${order}&limit=50&offset=${offset}`)]);
-  const s = d.search;
-  const node = section(`Busca v${s.version} · ${s.radius_km} km`, `${lbl(s.status)} · ${s.candidates_count} candidatos · ${s.api_calls} consultas`);
-  node.append(button("Voltar ao Radar", () => navigate("Radar")));
-  if (s.coverage_note) node.append(text("p", s.coverage_note, "error"));
-  if (["partial", "failed"].includes(s.status) && approver())
-    node.append(button("Tentar de novo", async () => {
-      await api(`/api/searches/${id}/resume`, "POST", {});
-      notice("Consultas com falha voltaram para a fila.");
-      await showSearch(id, order);
-    }));
-  node.append(
-    el(
-      "div",
-      { class: "toolbar" },
-      button("Ordenar por ICP", () => showSearch(id, "icp")),
-      button("Ordenar por distância", () => showSearch(id, "distance")),
-    ),
-    rows(c.items, (x) =>
-      el(
-        "div",
-        { class: "row" },
-        el(
-          "div",
-          {},
-          text("strong", x.trade_name || x.legal_name),
-          text("small", `${x.municipality_name || "—"}/${x.uf || "—"} · ${x.distance_km == null ? "distância desconhecida" : `${x.distance_km.toFixed(1)} km`} (${lbl(x.distance_basis)}) · porte ${x.size_label || "não informado"}`),
-        ),
-        text("span", `${lbl(x.icp_status)}${x.icp_provisional ? " (provisório)" : ""} · ${lbl(x.inside_radius)}`, "tag"),
-        button("Empresa", () => showCompany(x.company_id)),
-      ),
-    ),
-  );
-  if (c.nextOffset != null) node.append(button("Próxima página", () => showSearch(id, order, c.nextOffset)));
-  $("content").replaceChildren(node);
-  $("content").focus({ preventScroll: true });
-}
 
 // Fichas: aprovação por destinatário e canal, com o hash do que está na tela.
 async function fichasView() {
   const d = await api("/api/fichas?limit=100");
   const node = section("Fichas", "Textos congelados por versão. Aprovar vale para o destinatário e o canal mostrados; qualquer mudança exige nova versão.");
+  // Aguardando aprovação primeiro; cada uma com a ação que cabe a ela.
+  const order = { in_approval: 0, draft: 1, approved: 2, deferred: 3, discarded: 4 };
+  const items = [...d.items].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
   node.append(
-    rows(d.items, (f) =>
-      el("div", { class: "row" }, el("div", {}, text("strong", f.legal_name), text("small", `Versão ${f.current_version} · atualizada em ${f.updated_at}`)), text("span", lbl(f.status), "tag"), button("Abrir", () => showFicha(f.id))),
+    panel(
+      `Fichas (${d.items.length})`,
+      rows(items, (f) =>
+        el(
+          "div",
+          { class: "row" },
+          el("div", {}, text("strong", f.legal_name), text("small", `Versão ${f.current_version} · atualizada em ${fmtDate(f.updated_at)}`)),
+          text("span", f.status === "in_approval" ? "Aguardando aprovação" : lbl(f.status), f.status === "in_approval" ? "tag warn" : f.status === "approved" ? "tag ok" : "tag"),
+          f.status === "in_approval" && approver() ? button("Revisar e aprovar", () => showFicha(f.id), true) : button("Abrir", () => showFicha(f.id)),
+        ),
+      ),
     ),
   );
   return node;
@@ -2096,8 +2391,7 @@ async function showFicha(id) {
           : null,
       ),
     );
-  $("content").replaceChildren(node);
-  $("content").focus({ preventScroll: true });
+  showScreen(node);
 }
 
 // Envios: rampa, teto, próximo horário, fila e bloqueios; respostas recebidas.
@@ -2210,78 +2504,87 @@ function importerSource(src, title) {
 }
 
 async function internacionalView(query = "", all = false) {
-  const node = section("Radar Internacional", "Lista básica de países importadores de commodities agrícolas do Brasil, lida da lista mensal já guardada. Nenhuma consulta externa ao abrir.");
+  const node = section("Radar Internacional", "Escolha o país e a commodity; depois encontre as empresas compradoras e os responsáveis por compras.");
   node.setAttribute("data-screen", "internacional");
   const params = new URLSearchParams();
   if (query) params.set("q", query);
   if (!all) params.set("purchase", "1");
-  const d = await api(`/api/radar/importers?${params}`);
-  node.append(text("p", d.notice, "notice-fixed"));
-  const search = el("input", { type: "search", name: "q", "aria-label": "Buscar país", placeholder: "Buscar país (ex.: Alemanha)", value: query });
-  const showAll = el("input", { type: "checkbox", name: "all", "aria-label": "Mostrar também países sem compra identificada" });
-  showAll.checked = all;
-  const form = el("form", { class: "toolbar", role: "search" }, search, el("label", {}, showAll, " incluir países sem compra identificada"), el("button", { type: "submit" }, "Buscar"));
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    safe(async () => $("content").replaceChildren(await internacionalView(search.value.trim(), showAll.checked)));
-  });
-  node.append(
-    form,
-    text("p", `Fontes: MDIC/Comex Stat (exportações do Brasil, FOB, janela de ${d.periodMonths} meses) e UN Comtrade (importações declaradas pelo país, origem Brasil, último ano declarado) — lado a lado, nunca somadas.${d.latestMonthly ? ` Última rotina mensal: ${d.latestMonthly}.` : ""}`, "muted"),
-  );
-  if (d.pendingSummaries)
-    node.append(
-      el(
-        "p",
-        { class: "muted" },
-        `${d.pendingSummaries} resumo(s) em preparação (a lista já está publicada; o cron diário completa). `,
-        admin()
-          ? button("Preparar agora", async () => {
-              const r = await api("/api/radar/importers/summaries/rebuild", "POST", {});
-              notice(`${r.built} resumo(s) preparados; faltam ${r.remaining}.`);
-              $("content").replaceChildren(await internacionalView(query, all));
-            })
-          : null,
-      ),
-    );
-  const shown = d.items.slice(0, 80);
-  node.append(
-    rows(shown, (c) =>
-      el(
-        "div",
-        { class: "row" },
-        el(
-          "div",
-          {},
-          text("strong", `${c.name} (${c.iso3})`),
-          importerSource(c.sources.mdic, "MDIC — exportações do Brasil (FOB)"),
-          importerSource(c.sources.comtrade, "Comtrade — importações declaradas, origem Brasil (CIF)"),
-        ),
-        button("Escolher", async () => {
-          const a = await api("/api/country-analyses", "POST", { iso3: c.iso3 });
-          await showAnalysis(a.id, a);
-        }),
-      ),
-    ),
-  );
-  if (d.items.length > shown.length) node.append(text("p", `Mostrando ${shown.length} de ${d.items.length}. Refine a busca.`, "muted"));
-  const searches = await api("/api/foreign-searches");
+  const [d, searches, hist] = await Promise.all([api(`/api/radar/importers?${params}`), api("/api/foreign-searches"), api("/api/country-analyses")]);
+  // Trabalho em andamento primeiro: buscas de empresas já autorizadas.
+  const open = searches.items.filter((x) => x.status === "open");
   if (searches.items.length)
     node.append(
       panel(
-        "Buscas de empresas",
+        open.length ? `Continuar buscas de empresas (${open.length} aberta(s))` : "Buscas de empresas",
         rows(searches.items, (x) =>
           el(
             "div",
             { class: "row" },
-            el("div", {}, text("strong", `${x.country} · ${x.commodity}`), text("small", `${x.status === "open" ? "Aberta" : "Encerrada"} · autorizada em ${x.authorized_at.slice(0, 10)} · ${x.candidates} empresa(s) · ${x.sources} fonte(s) consultada(s)`)),
+            el("div", {}, text("strong", `${x.country} · ${x.commodity}`), text("small", `autorizada em ${fmtDate(x.authorized_at).slice(0, 10)} · ${x.candidates} empresa(s) · ${x.sources} fonte(s) consultada(s)`)),
+            text("span", x.status === "open" ? "Aberta" : "Encerrada", x.status === "open" ? "tag ok" : "tag"),
             button("Abrir", () => showForeignSearch(x.id)),
           ),
         ),
       ),
     );
-  const hist = await api("/api/country-analyses");
+  const search = el("input", { type: "search", name: "q", "aria-label": "Buscar país", placeholder: "Buscar país (ex.: Alemanha)", value: query });
+  const showAll = el("input", { type: "checkbox", name: "all", "aria-label": "Mostrar também países sem compra identificada" });
+  showAll.checked = all;
+  const form = el("form", { class: "toolbar", role: "search" }, search, el("label", { class: "check" }, showAll, "incluir países sem compra identificada"), el("button", { type: "submit" }, "Buscar"));
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    safe(async () => showScreen(await internacionalView(search.value.trim(), showAll.checked)));
+  });
+  const shown = d.items.slice(0, 80);
   node.append(
+    panel(
+      `Países importadores do Brasil (${d.items.length})`,
+      text("p", d.notice, "notice-fixed"),
+      form,
+      rows(shown, (c) =>
+        el(
+          "div",
+          { class: "row" },
+          el(
+            "div",
+            {},
+            text("strong", `${c.name} (${c.iso3})`),
+            importerSource(c.sources.mdic, "MDIC — exportações do Brasil (FOB)"),
+            importerSource(c.sources.comtrade, "Comtrade — importações declaradas, origem Brasil (CIF)"),
+          ),
+          button("Escolher", async () => {
+            const a = await api("/api/country-analyses", "POST", { iso3: c.iso3 });
+            await showAnalysis(a.id, a);
+          }),
+        ),
+      ),
+      d.items.length > shown.length ? text("p", `Mostrando ${shown.length} de ${d.items.length}. Refine a busca.`, "muted") : null,
+    ),
+  );
+  node.append(
+    details(
+      "Fontes e atualização",
+      el(
+        "div",
+        { class: "rows" },
+        text("p", `Fontes: MDIC/Comex Stat (exportações do Brasil, FOB, janela de ${d.periodMonths} meses) e UN Comtrade (importações declaradas pelo país, origem Brasil, último ano declarado) — lado a lado, nunca somadas.${d.latestMonthly ? ` Última rotina mensal: ${d.latestMonthly}.` : ""}`, "muted"),
+        d.pendingSummaries
+          ? el(
+              "p",
+              { class: "muted" },
+              `${d.pendingSummaries} resumo(s) em preparação (a lista já está publicada; o cron diário completa). `,
+              admin()
+                ? button("Preparar agora", async () => {
+                    const r = await api("/api/radar/importers/summaries/rebuild", "POST", {});
+                    notice(`${r.built} resumo(s) preparados; faltam ${r.remaining}.`);
+                    showScreen(await internacionalView(query, all));
+                  })
+                : null,
+            )
+          : null,
+        button("Abrir a lista mensal completa", () => navigate("Lista mensal")),
+      ),
+    ),
     details(
       "Análises, seleções e campanhas registradas",
       rows(hist.items, (a) =>
@@ -2294,6 +2597,7 @@ async function internacionalView(query = "", all = false) {
       ),
     ),
   );
+  if (d.pendingSummaries) node.querySelector("details").open = true;
   return node;
 }
 
@@ -2445,8 +2749,7 @@ async function showAnalysis(id, preloaded) {
     }, true);
     node.append(el("div", { class: "toolbar" }, choose));
   }
-  $("content").replaceChildren(node);
-  $("content").focus({ preventScroll: true });
+  showScreen(node);
 }
 
 const BUYER_TAG = { confirmed_importer: "tag", confirmed_buyer: "tag", potential: "tag warn" };
@@ -2463,6 +2766,45 @@ function evidenceLine(e) {
 }
 function companyResult(c) {
   const contacts = c.contacts.filter((k) => k.verified);
+  // Resumo compacto: quem é, por que pode comprar, porte (com incerteza), contato, etapa, pendência e próxima ação.
+  const why = c.activity ? c.activity.text : c.profile ? c.profile.label : "atividade não registrada";
+  const size = c.size ? `${c.size.label} (${c.size.basis})` : "porte desconhecido";
+  const contact = contacts.length ? `${contacts.length} contato(s) com fonte${contacts.some((k) => k.emailValidation === "valid") ? ", e-mail validado" : ", e-mail a validar"}` : "sem contato com fonte";
+  const nextStep = c.pending[0] || (c.ficha.ok ? "Preparar ficha (envio só após aprovação individual)." : c.ficha.reason);
+  const secondary = [
+    writable() && state.searchId && c.triage
+      ? button(c.triage.priority === "secondary" ? "Tornar prioridade principal" : "Marcar prioridade secundária", async () => {
+          const secondaryNow = c.triage.priority !== "secondary";
+          const reason = secondaryNow ? prompt("Motivo da prioridade secundária:") : null;
+          if (secondaryNow && !reason) return;
+          await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}`, "PATCH", { action: "priority", priority: secondaryNow ? "secondary" : "primary", reason });
+          await showForeignSearch(state.searchId);
+        })
+      : null,
+    writable() && state.searchId && c.triage
+      ? button("Registrar ponto a verificar", async () => {
+          const topic = prompt("Ponto a verificar (ex.: autonomia de compras):");
+          if (!topic) return;
+          await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}/checks`, "POST", { topic });
+          await showForeignSearch(state.searchId);
+        })
+      : null,
+    writable()
+      ? button("Conferir identidade (GLEIF)", async () => {
+          // Identidade jurídica (nome legal, registro, LEI): não é evidência de compra.
+          const r = await api(`/api/companies/${c.id}/gleif`);
+          notice(r.matches.length ? `GLEIF — ${c.name}: ${r.matches.map((g) => `${g.legalName} · ${g.registeredAs || "registro não informado"} · ${g.city || "—"} · LEI ${g.lei} (${g.status})`).join(" | ")}` : `GLEIF — ${c.name}: nenhum registro. ${r.note}`);
+        })
+      : null,
+    writable() && state.searchId && c.triage
+      ? button("Descartar desta busca", async () => {
+          const reason = prompt("Motivo do descarte nesta busca (vale só para esta empresa e este produto):");
+          if (!reason) return;
+          await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}`, "PATCH", { action: "dismiss", reason });
+          await showForeignSearch(state.searchId);
+        })
+      : null,
+  ];
   return el(
     "div",
     { class: "row" },
@@ -2470,60 +2812,34 @@ function companyResult(c) {
       "div",
       {},
       text("strong", c.name),
-      text("span", c.buyerStatusLabel, BUYER_TAG[c.buyerStatus]),
-      c.triage?.priority === "secondary" ? text("span", `prioridade secundária${c.triage.priorityReason ? ` — ${c.triage.priorityReason}` : ""}`, "tag warn") : null,
-      c.checks?.length ? el("div", {}, text("small", "Pontos a verificar:"), el("ul", {}, ...c.checks.map((k) => el("li", {}, `${k.status === "open" ? "aberto" : k.status === "confirmed" ? "confirmado" : "descartado"}: ${k.topic}${k.note ? ` — ${k.note}` : ""}${k.resolution ? ` → ${k.resolution}` : ""} `, k.sourceUrl ? el("a", { href: k.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte") : null)))) : null,
-      text("small", `Porte: ${c.size ? `${c.size.label} — ${c.size.basis}, ${c.size.reference} (fonte: ${c.size.source || "sem fonte"})` : "desconhecido — pendência pesquisável"} · Atividade: ${c.activity ? `${c.activity.text} (fonte: ${c.activity.source})` : "não registrada"} · Perfil: ${c.profile ? `${c.profile.label}, ${c.profile.icpLabel}` : "não registrado"}`),
-      c.website ? el("small", {}, "Site: ", el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, c.website)) : text("small", "Site: não registrado"),
-      c.importEvidence.length
-        ? el("div", {}, text("small", "Evidência de importação/compra (da própria empresa):"), el("ul", {}, ...c.importEvidence.map(evidenceLine)))
-        : c.indications.length
-          ? el("div", {}, text("small", "Indícios (não confirmam — potencial compradora a validar):"), el("ul", {}, ...c.indications.map(evidenceLine)))
-          : text("small", "Sem evidência nem indício de compra registrado."),
-      text("small", contacts.length ? `Decisores/contatos com fonte: ${contacts.map((k) => `${k.name}${k.jobTitle ? ` (${k.jobTitle})` : ""} — ${k.source}${k.emailValidation === "valid" ? ", e-mail validado" : ", e-mail não validado"}`).join("; ")}` : "Decisores/contatos com fonte: nenhum"),
-      c.pending.length ? el("div", {}, text("small", "Pendências:"), el("ul", {}, ...c.pending.map((p) => el("li", {}, p)))) : null,
-      text("small", `Encontrada em: ${c.foundBy.source}${c.foundBy.at ? ` (${c.foundBy.at.slice(0, 10)})` : ""} · Ficha: ${c.ficha.ok ? "pode ser preparada; envio só após aprovação individual" : c.ficha.reason}`),
+      el("div", { class: "tags" }, text("span", c.buyerStatusLabel, BUYER_TAG[c.buyerStatus] || "tag"), c.triage?.priority === "secondary" ? text("span", "prioridade secundária", "tag warn") : null),
+      text("small", `${why} · ${size} · ${contact}`),
+      text("small", `Próximo passo: ${nextStep}`),
     ),
-    el(
-      "div",
-      { class: "toolbar" },
-      button("Abrir empresa", () => showCompany(c.id)),
-      writable() && state.searchId && c.triage
-        ? button(c.triage.priority === "secondary" ? "Tornar prioridade principal" : "Marcar prioridade secundária", async () => {
-            const secondary = c.triage.priority !== "secondary";
-            const reason = secondary ? prompt("Motivo da prioridade secundária:") : null;
-            if (secondary && !reason) return;
-            await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}`, "PATCH", { action: "priority", priority: secondary ? "secondary" : "primary", reason });
-            await showForeignSearch(state.searchId);
-          })
-        : null,
-      writable() && state.searchId && c.triage
-        ? button("Registrar ponto a verificar", async () => {
-            const topic = prompt("Ponto a verificar (ex.: autonomia de compras):");
-            if (!topic) return;
-            await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}/checks`, "POST", { topic });
-            await showForeignSearch(state.searchId);
-          })
-        : null,
-      writable() && state.searchId && c.triage
-        ? button("Descartar desta busca", async () => {
-            const reason = prompt("Motivo do descarte nesta busca (vale só para esta empresa e este produto):");
-            if (!reason) return;
-            await api(`/api/foreign-searches/${state.searchId}/candidates/${c.id}`, "PATCH", { action: "dismiss", reason });
-            await showForeignSearch(state.searchId);
-          })
-        : null,
-      writable()
-        ? button("Conferir identidade (GLEIF)", async () => {
-            // Identidade jurídica (nome legal, registro, LEI): não é evidência de compra.
-            const r = await api(`/api/companies/${c.id}/gleif`);
-            notice(r.matches.length ? `GLEIF — ${c.name}: ${r.matches.map((g) => `${g.legalName} · ${g.registeredAs || "registro não informado"} · ${g.city || "—"} · LEI ${g.lei} (${g.status})`).join(" | ")}` : `GLEIF — ${c.name}: nenhum registro. ${r.note}`);
-          })
-        : null,
+    button("Abrir empresa", () => openCompanyPanel(c.id, c.name), true),
+    moreMenu("Mais ações", ...secondary),
+    details(
+      "Detalhes, evidências e pessoas",
+      el(
+        "div",
+        { class: "rows" },
+        c.triage?.priority === "secondary" && c.triage.priorityReason ? text("small", `Prioridade secundária: ${c.triage.priorityReason}`) : null,
+        c.checks?.length ? el("div", {}, text("small", "Pontos a verificar:"), el("ul", {}, ...c.checks.map((k) => el("li", {}, `${k.status === "open" ? "aberto" : k.status === "confirmed" ? "confirmado" : "descartado"}: ${k.topic}${k.note ? ` — ${k.note}` : ""}${k.resolution ? ` → ${k.resolution}` : ""} `, k.sourceUrl ? el("a", { href: k.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte") : null)))) : null,
+        text("small", `Porte: ${c.size ? `${c.size.label} — ${c.size.basis}, ${c.size.reference} (fonte: ${c.size.source || "sem fonte"})` : "desconhecido — pendência pesquisável"} · Atividade: ${c.activity ? `${c.activity.text} (fonte: ${c.activity.source})` : "não registrada"} · Perfil: ${c.profile ? `${c.profile.label}, ${c.profile.icpLabel}` : "não registrado"}`),
+        c.website ? el("small", {}, "Site: ", el("a", { href: c.website, target: "_blank", rel: "noopener noreferrer" }, c.website)) : text("small", "Site: não registrado"),
+        c.importEvidence.length
+          ? el("div", {}, text("small", "Evidência de importação/compra (da própria empresa):"), el("ul", {}, ...c.importEvidence.map(evidenceLine)))
+          : c.indications.length
+            ? el("div", {}, text("small", "Indícios (não confirmam — potencial compradora a validar):"), el("ul", {}, ...c.indications.map(evidenceLine)))
+            : text("small", "Sem evidência nem indício de compra registrado."),
+        text("small", contacts.length ? `Decisores/contatos com fonte: ${contacts.map((k) => `${k.name}${k.jobTitle ? ` (${k.jobTitle})` : ""} — ${k.source}${k.emailValidation === "valid" ? ", e-mail validado" : ", e-mail não validado"}`).join("; ")}` : "Decisores/contatos com fonte: nenhum"),
+        c.pending.length ? el("div", {}, text("small", "Pendências:"), el("ul", {}, ...c.pending.map((p) => el("li", {}, p)))) : null,
+        text("small", `Encontrada em: ${c.foundBy.source}${c.foundBy.at ? ` (${c.foundBy.at.slice(0, 10)})` : ""} · Ficha: ${c.ficha.ok ? "pode ser preparada; envio só após aprovação individual" : c.ficha.reason}`),
+        details("Validação assistida (links para você abrir)", el("ul", {}, ...c.validationLinks.map((l) => el("li", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))))),
+        writable() ? details("Registrar sinal ou prova de importação", importEvidenceForm(c)) : null,
+        details("Pessoas de compras", peoplePanel(c.id)),
+      ),
     ),
-    details("Validação assistida (links para você abrir)", el("ul", {}, ...c.validationLinks.map((l) => el("li", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))))),
-    writable() ? details("Registrar sinal ou prova de importação", importEvidenceForm(c)) : null,
-    details("Pessoas de compras", peoplePanel(c.id)),
   );
 }
 
@@ -2904,41 +3220,60 @@ async function showForeignSearch(id, preloaded) {
   state.searchCampaignId = x.campaign.id;
   const node = section(`${x.country.name_pt} · ${x.commodity.label || x.commodity.name}`, `Busca de empresas compradoras (SH6 ${x.commodity.hs6.join(", ")}) · porte-alvo: ${x.target.sizesLabel.join(" e ")} · ${x.status === "open" ? "aberta" : `encerrada em ${x.closedAt.slice(0, 10)}`}`);
   node.setAttribute("data-screen", "internacional");
-  node.append(text("p", x.notice, "notice-fixed"), button("Voltar ao Radar", () => navigate("Internacional")), button("Revisão para decisão", () => showDecisionReview(x.id), true));
-  if (writable())
-    node.append(
-      button("Pesquisar pessoas de compras (lote de 5 empresas aderentes)", async () => {
-        const r = await api(`/api/foreign-searches/${x.id}/people/research`, "POST", {});
-        notice(`${r.researched} empresa(s) pesquisada(s), ${r.added} pessoa(s) a validar; faltam ${r.remaining}. Veja "Pessoas de compras" em cada empresa.`);
-      }),
-    );
-  const m = x.metrics;
   node.append(
     el(
       "div",
-      { class: "stats" },
-      el("div", { class: "stat" }, text("strong", "Cobertura"), text("p", `${m.coverage.sourcesConsulted} fonte(s) consultada(s), ${m.coverage.sourcesWithResults} com resultado`), text("p", m.coverage.note)),
-      el("div", { class: "stat" }, text("strong", "Custo"), text("p", `${m.cost.apiCalls} chamada(s) · ${usd(m.cost.costUsd)} · ${m.cost.minutes} min registrados · ${m.cost.elapsedHours} h desde a autorização`), text("p", m.cost.validCandidates ? `Por candidata válida (${m.cost.validCandidates}): ${usd(m.cost.costPerValidUsd)} e ${m.cost.secondsPerValid} s de consulta` : "Ainda sem candidata válida (com sinal próprio).")),
+      { class: "toolbar" },
+      button("Voltar ao Radar", () => navigate("Radar Internacional")),
+      button("Revisão para decisão", () => showDecisionReview(x.id), true),
+      writable()
+        ? moreMenu(
+            "Mais ações",
+            button("Pesquisar pessoas de compras (lote de 5 empresas aderentes)", async () => {
+              const r = await api(`/api/foreign-searches/${x.id}/people/research`, "POST", {});
+              notice(`${r.researched} empresa(s) pesquisada(s), ${r.added} pessoa(s) a validar; faltam ${r.remaining}. Veja "Pessoas de compras" em cada empresa.`);
+            }),
+          )
+        : null,
+    ),
+    text("p", x.notice, "notice-fixed"),
+  );
+  if (x.humanSteps.length) node.append(panel("O que ainda depende de você", el("ul", {}, ...x.humanSteps.map((h) => el("li", {}, h)))));
+  const m = x.metrics;
+  const totalCandidates = x.groups.consumers.length + x.groups.toConfirm.length + x.groups.traders.length + x.groups.unverified.length;
+  const metricsBox = details(
+    "Cobertura, custo e rendimento da busca",
+    el(
+      "div",
+      { class: "grid" },
+      el("div", { class: "stat" }, text("h3", "Cobertura"), text("p", `${m.coverage.sourcesConsulted} fonte(s) consultada(s), ${m.coverage.sourcesWithResults} com resultado`), text("p", m.coverage.note, "muted")),
+      el("div", { class: "stat" }, text("h3", "Custo"), text("p", `${m.cost.apiCalls} chamada(s) · ${usd(m.cost.costUsd)} · ${m.cost.minutes} min registrados · ${m.cost.elapsedHours} h desde a autorização`), text("p", m.cost.validCandidates ? `Por candidata válida (${m.cost.validCandidates}): ${usd(m.cost.costPerValidUsd)} e ${m.cost.secondsPerValid} s de consulta` : "Ainda sem candidata válida (com sinal próprio).")),
       el(
         "div",
         { class: "stat" },
-        text("strong", "Rendimento"),
+        text("h3", "Rendimento"),
         text("p", `${m.yield.found} encontrada(s) pelas fontes gratuitas (${m.yield.foundPending} aguardando decisão, ${m.yield.foundDismissed} descartada(s)) · ${m.yield.candidates} na busca: ${m.yield.consumers} consumidora(s)/processadora(s), ${m.yield.traders} trader(s) · ${m.yield.inTargetSize} no porte-alvo`),
         text("p", `${m.yield.withImportSignal} candidata(s) importadora(s) (evidência ou sinal próprio) · ${m.yield.unverified} com importação não verificada · ${m.yield.withOwnEvidence} com evidência própria`),
         text("p", `${m.yield.confirmedImporters} importadora(s) confirmada(s) · ${m.yield.confirmedBuyers} compradora(s) confirmada(s) · ${m.yield.potentialBuyers} potencial(is) a validar · ${m.yield.withVerifiedDecisionMaker} com decisor com fonte · ${m.yield.eligibleForFicha} apta(s) a ficha`),
       ),
     ),
   );
-  node.append(await discoveryPanel(x));
-  node.append(panel("O que ainda depende de você", el("ul", {}, ...x.humanSteps.map((h) => el("li", {}, h)))));
+  const discovery = details(totalCandidates ? "Descobrir mais empresas (fontes gratuitas)" : "Descobrir empresas (fontes gratuitas)", await discoveryPanel(x));
+  if (!totalCandidates) discovery.open = true;
   const groups = [
     ["Importadoras — consumidoras finais, fábricas e processadoras", x.groups.consumers],
     ["Importadoras — perfil a confirmar", x.groups.toConfirm],
     ["Importadoras — traders e distribuidores (prioridade secundária)", x.groups.traders],
   ];
-  for (const [title, list] of groups) node.append(panel(`${title} (${list.length})`, rows(list, companyResult)));
+  // Só grupos com empresas ocupam espaço; os vazios viram uma linha.
+  for (const [title, list] of groups) if (list.length) node.append(panel(`${title} (${list.length})`, rows(list, companyResult)));
+  const emptyGroups = groups.filter(([, list]) => !list.length).map(([title]) => title.replace(/^Importadoras — /, ""));
+  if (emptyGroups.length) node.append(text("p", `Sem empresas importadoras ainda em: ${emptyGroups.join("; ")}.`, "muted"));
   // Sem sinal próprio de importação a empresa não é candidata importadora: fica recolhida, aguardando validação.
-  node.append(details(`Importação não verificada — usam a commodity, sem sinal próprio de importação (${x.groups.unverified.length})`, rows(x.groups.unverified, companyResult)));
+  const unverified = details(`Importação não verificada — usam a commodity, sem sinal próprio de importação (${x.groups.unverified.length})`, rows(x.groups.unverified, companyResult));
+  if (x.groups.unverified.length && !groups.some(([, list]) => list.length)) unverified.open = true;
+  node.append(unverified);
+  node.append(discovery, metricsBox);
   // Descartadas nesta busca (empresa/produto): ficam visíveis com motivo, data e opção de voltar.
   if (x.dismissed?.length)
     node.append(
@@ -3006,8 +3341,7 @@ async function showForeignSearch(id, preloaded) {
   }
   if (x.status === "open" && approver())
     node.append(details("Encerrar a busca", makeForm([input("Observação de encerramento", "note", "textarea")], async (v) => showForeignSearch((await api(`/api/foreign-searches/${x.id}/close`, "POST", { note: v.note })).id), "Encerrar")));
-  $("content").replaceChildren(node);
-  $("content").focus({ preventScroll: true });
+  showScreen(node);
 }
 
 async function listaMensalView() {
@@ -3126,19 +3460,25 @@ function internationalPanels(id, data) {
 }
 
 const views = {
-  Hoje: home,
+  Início: home,
+  "Radar Nacional": radarView,
+  "Radar Internacional": () => internacionalView(),
   Empresas: companiesView,
+  Abordagem: () => abordagemView("Fichas"),
+  Configurações: settingsView,
+  Fichas: () => abordagemView("Fichas"),
+  Envios: () => abordagemView("Envios"),
+  Tarefas: () => abordagemView("Tarefas"),
   Campanhas: campaignView,
-  Radar: radarView,
-  Fichas: fichasView,
-  Envios: enviosView,
-  Tarefas: tarefasView,
-  Internacional: () => internacionalView(),
   "Lista mensal": listaMensalView,
   Catálogo: catalogView,
+  "Setores e CNAE": sectorsView,
   Parâmetros: parametersView,
   Supressão: suppressionView,
   Pausas: pausesView,
+  Hoje: home,
+  Radar: radarView,
+  Internacional: () => internacionalView(),
 };
 async function start() {
   try {
@@ -3151,9 +3491,12 @@ async function start() {
     $("session").textContent =
       `${session.actor.display_name} · ${session.environment === "local" ? "Ambiente local" : "Produção"}`;
     $("navigation").replaceChildren(
-      ...Object.keys(views).map((v) => button(v, () => navigate(v))),
+      ...MAIN_NAV.map((v) => {
+        const b = el("button", { type: "button", "data-view": v, onclick: () => navigate(v) }, v);
+        return v === "Configurações" ? [el("div", { class: "nav-sep" }), b] : b;
+      }).flat(),
     );
-    await navigate("Hoje");
+    await navigate("Início");
   } catch (e) {
     $("session").textContent = "Acesso indisponível";
     $("content").replaceChildren(
@@ -3167,6 +3510,15 @@ async function start() {
     $("content").setAttribute("aria-busy", "false");
   }
 }
+$("menu").addEventListener("click", () => {
+  const open = !$("app").classList.contains("nav-open");
+  $("app").classList.toggle("nav-open", open);
+  $("menu").setAttribute("aria-expanded", String(open));
+  if (open) $("navigation").querySelector("button")?.focus();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("app").classList.contains("nav-open")) closeMenu();
+});
 $("refresh").addEventListener("click", () =>
   safe(() => (state.actor ? navigate() : start())),
 );
