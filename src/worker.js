@@ -34,6 +34,7 @@ import * as foreign from "./foreign-companies.js";
 import * as foreignSearch from "./foreign-search.js";
 import * as discovery from "./discovery.js";
 import * as people from "./people.js";
+import * as decisionReview from "./decision-review.js";
 import * as integrations from "./integrations.js";
 import { handleQueue } from "./queue.js";
 import { geocodeUnitRoute } from "./geocoding.js";
@@ -229,6 +230,13 @@ async function route(request, env, rid) {
   if (fsa && fsa[2] && method === "GET") return response(await foreignSearch.listSearches(env, actor, fsa[1]));
   if (path === "/api/foreign-searches" && method === "GET") return response(await foreignSearch.listAllSearches(env, actor));
   // Descoberta por fontes gratuitas e validação assistida (Radar Internacional).
+  // Revisão para decisão (só leitura) e investigação/devolução de candidatas (nunca aceita nem envia).
+  const frv = path.match(/^\/api\/foreign-searches\/([^/]+)\/review$/);
+  if (frv && method === "GET") return response(await decisionReview.getReview(env, actor, frv[1]));
+  const frs = path.match(/^\/api\/foreign-searches\/([^/]+)\/discovery\/restore$/);
+  if (frs && method === "POST") return response(await decisionReview.restoreCandidates(request, env, actor, rid, frs[1]));
+  const fin = path.match(/^\/api\/foreign-searches\/([^/]+)\/discovery\/([0-9a-f-]{36})$/);
+  if (fin && method === "PATCH") return response(await decisionReview.investigateCandidate(request, env, actor, rid, fin[1], fin[2]));
   const fsd = path.match(/^\/api\/foreign-searches\/([^/]+)\/(discovery|discover|discovery\/accept|discovery\/dismiss|discovery\/validate|discovery\/contacts)$/);
   if (fsd && fsd[2] === "discovery" && method === "GET") return response(await discovery.getDiscovery(env, actor, fsd[1]));
   if (fsd && fsd[2] === "discover" && method === "POST") return response(await discovery.discover(request, env, actor, rid, fsd[1]), 201);

@@ -1,6 +1,6 @@
 # Revisão única para decisão — busca Alemanha / café verde (SH 0901.11)
 
-Consolidado em 2026-09-30. Nada foi aceito, aprovado, ativado ou enviado. A aprovação individual de Rogério continua obrigatória antes de qualquer envio (R18.3). Credenciais do Snov: pendência separada (item 8).
+Consolidado em 2026-09-30. **A revisão agora está no Compass:** Radar Internacional → busca → botão "Revisão para decisão" (montada do que está gravado; ordem e recomendações podem diferir desta cópia estática, que fica como registro). Nada foi aceito, aprovado, ativado ou enviado. A aprovação individual de Rogério continua obrigatória antes de qualquer envio (R18.3). Credenciais do Snov: pendência separada (item 8).
 
 ## 0. Já aplicado por decisão de Rogério (2026-09-30): porte ordena, não exclui
 
@@ -75,7 +75,7 @@ Critérios, nesta ordem: aderência (processadora/consumidora antes de trader), 
 
 **Traders (16, classificação à parte, prioridade secundária):** com autodeclaração de importação — Café Chavalo, EthioCo, List + Beisler, Sandtorkai, Touton; demais — Delight & Style, Gollücke & Rothfos (e-mail da Volcafe no aviso legal: ligada a grupo, a verificar), Kater, COL-SPIRIT, Fetiya Schubart, Meámbar, HACOFCO, ReiCat, CCS Capital Coffee, Coffy, F.L. Michaelis.
 
-**Grandes/grupos para avaliação (não descartadas):** Gollücke & Rothfos (Volcafe), Ecom Kaffee, CR3 (Hermsen-Gruppe), Vollers Group, Schirmer Kaffee (mesmo representante legal da Azul no aviso legal de 28/09). Avaliar unidade compradora, uso da commodity, autonomia de compras e acesso ao responsável.
+**Grandes/grupos para avaliação (não descartadas):** Gollücke & Rothfos (Volcafe), Ecom Kaffee, CR3 (Hermsen-Gruppe), Vollers Group, Schirmer Kaffee (só indício fraco: mesmo representante legal da Azul no aviso legal de 28/09 — representante em comum não comprova vínculo). Avaliar unidade compradora, uso da commodity, autonomia de compras e acesso ao responsável.
 
 **Cobertura dos contatos (aviso legal lido pelo Worker em 30/09):** 49 com site — 23 com representante nomeado, 10 com aviso legal sem nome, 12 inacessíveis a partir da Cloudflare (nova tentativa em 7 dias), 3 sem aviso legal localizado, 1 bloqueado por robots.txt; 6 sem site.
 
@@ -89,3 +89,22 @@ npx wrangler secret put SNOV_CLIENT_ID
 npx wrangler secret put SNOV_CLIENT_SECRET
 npx wrangler secret list
 ```
+
+## 7. Investigação de atividade (2026-09-30) — processadora que compra × prestadora
+
+Registrada nas candidatas, com fonte (aparece na tela):
+
+| Empresa | Atividade | Evidência | Grupo |
+| --- | --- | --- | --- |
+| CR3-Kaffeeveredelung | beneficia produto de terceiros | "einer der führenden Dienstleister für die Veredelung von Rohkaffee" (site) | confirmado por texto próprio: "Teil der Hermsen-Gruppe" |
+| Coffein Compagnie | compra e presta serviço | "handeln entkoffeinierte … Kaffees" e "Lohnveredelung Ihrer Kaffees" (site) | — |
+| NKG Kala (descartada) | beneficia produto de terceiros | armazenagem, limpeza e beneficiamento para clientes (diretório) | confirmado: "Mitglied der … Neumann Kaffee Gruppe" |
+| Vollers Group | logística | "Logistik-Dienstleistern" (diretório) | — |
+| Ecom Kaffee | trader | site do diretório redireciona para ecomgroup.com | indício (redirecionamento) |
+| Utamtsi | trader | "Direkt gehandelter Rohkaffee" | — |
+| Gollücke & Rothfos | trader | "Wir liefern Rohkaffees" | indício (e-mail @volcafe.com no aviso legal) |
+| Dethlefsen & Balk | compra e revende | "Importeur, Hersteller und Großhändler" + "hauseigene Rösterei" | — |
+| Rigano | compra e presta serviço | serviço de máquinas + "Spezialitätenrösterei" | — |
+| Kater | compra e revende | comércio + torra própria (marca própria) | — |
+| Haberland Getränkesysteme (descartada) | compra e presta serviço | "unseren eigenen Kaffee zu rösten … Moin Bohne" — **descarte automático a reconsiderar** | — |
+| Schirmer Kaffee | — | — | indício fraco (representante em comum) |

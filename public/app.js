@@ -2819,6 +2819,79 @@ function importEvidenceForm(c) {
   );
 }
 
+// Revisão para decisão (2026-09-30): decisões pendentes e candidatas mais promissoras, montadas do que já está gravado.
+// Só leitura: nada é aceito, aprovado, ativado ou enviado por esta tela.
+async function showDecisionReview(searchId) {
+  const r = await api(`/api/foreign-searches/${searchId}/review`);
+  const d = r.decisions;
+  const node = section("Revisão para decisão", `Busca ${r.search.country} · SH6 ${r.search.hs6.join(", ")}${r.search.campaign ? ` · campanha ${r.search.campaign.name} (${r.search.campaign.status})` : ""}`);
+  node.setAttribute("data-screen", "internacional");
+  const table = (head, rows) => el("table", {}, el("thead", {}, el("tr", {}, ...head.map((h) => el("th", {}, h)))), el("tbody", {}, ...rows.map((cells) => el("tr", {}, ...cells.map((c) => el("td", {}, c ?? "—"))))));
+  const pre = (s) => el("pre", { class: "message" }, s);
+  const link = (l) => el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label);
+  node.append(
+    text("p", r.notice, "notice-fixed"),
+    button("Voltar à busca", () => showForeignSearch(searchId)),
+    panel(
+      `1. Validação comercial (${d.commercialValidation.rule}) — ${d.commercialValidation.status}`,
+      text("p", "Frase a confirmar:"),
+      pre(d.commercialValidation.phrase),
+      text("small", `Por que é pedida: ${d.commercialValidation.why}`),
+      text("small", `O que autoriza: ${d.commercialValidation.authorizes}`),
+      el("div", {}, text("small", "Já cumprido:"), el("ul", {}, ...d.commercialValidation.met.map((m) => el("li", {}, m)))),
+      el("div", {}, text("small", "Continua pendente depois dela:"), el("ul", {}, ...d.commercialValidation.stillPending.map((m) => el("li", {}, m)))),
+    ),
+    panel(
+      "2. Porte — regra vigente e proposta de referência",
+      text("p", d.sizeReference.current),
+      text("small", d.sizeReference.proposal),
+      table(["Categoria", "Efetivo (UTA)", "Faturamento", "Balanço"], d.sizeReference.table.map((z) => [z.category, z.staff, z.turnover, z.balance])),
+      text("small", `Empresas de grupo: ${d.sizeReference.groups}`),
+      text("small", d.sizeReference.estimatedVsProven),
+    ),
+    panel(`3. R14.8 — ${d.r148.status}`, text("small", "Atual:"), pre(d.r148.current), text("small", "Proposta:"), pre(d.r148.proposed)),
+    panel(
+      `4. Textos — ${d.texts.status}`,
+      text("small", `Destinatário: ${d.texts.recipient}. Sequência: ${d.texts.steps.map((z) => `passo ${z.step} no dia ${z.day}`).join(", ")}.`),
+      ...d.texts.steps.map((z) => el("div", {}, text("strong", `Passo ${z.step} — dia ${z.day}`), table(["Alemão (enviado)", "Português (referência)"], [[z.de.subject, z.pt.subject], [pre(z.de.body), pre(z.pt.body)]]))),
+    ),
+    panel(
+      `5. Dez candidatas mais promissoras (de ${r.counts.consumers} consumidoras; ${r.counts.traders} traders à parte)`,
+      table(
+        ["Empresa", "Atividade", "Compra/consumo", "Porte", "Contato", "Pendências", "Recomendação"],
+        r.top10.map((c) => [
+          el("div", {}, text("strong", c.name), text("small", c.city || ""), el("a", { href: c.profileUrl, target: "_blank", rel: "noopener noreferrer" }, "perfil")),
+          c.activity.typeLabel ? `${c.activity.typeLabel} — ${c.activity.evidence}` : c.activity.summary,
+          [c.purchaseEvidence.consumption ? `Consumo (texto próprio): "${c.purchaseEvidence.consumption.text}"` : null, c.purchaseEvidence.importStatement ? `Autodeclara importação (${c.purchaseEvidence.importStatement.brazil})` : null].filter(Boolean).join(" · ") || "sem frase própria",
+          c.size.band ? `${c.size.band} (${c.size.kind})` : c.size.note,
+          `${c.contact.technicalState}${c.contact.people.length ? ` · ${c.contact.people.map((q) => `${q.name} (${q.title})`).join("; ")}` : ""}${c.contact.generalEmail ? ` · ${c.contact.generalEmail}` : ""}`,
+          el("ul", {}, ...c.pending.map((q) => el("li", {}, q))),
+          el("div", {}, text("strong", c.recommendation), text("small", c.rationale)),
+        ]),
+      ),
+      text("small", "Aceitar é decisão sua, na aba de descoberta da busca. Esta tela não aceita nenhuma candidata."),
+    ),
+    panel(
+      "6. Classificação a revisar — prestadora × processadora que compra",
+      r.reclassify.length
+        ? table(["Empresa", "Atividade investigada", "Evidência", "Grupo"], r.reclassify.map((c) => [c.name, c.activity.typeLabel, el("span", {}, c.activity.evidence || "—", " ", c.activity.sourceUrl ? link({ url: c.activity.sourceUrl, label: "fonte" }) : ""), c.group ? `${c.group.level}: ${c.group.note}` : "—"]))
+        : text("small", "Nenhuma."),
+      r.restoreSuggestions.length ? el("div", {}, text("strong", "Descartes automáticos a reconsiderar (texto próprio indica compra):"), table(["Empresa", "Motivo do descarte", "Evidência"], r.restoreSuggestions.map((c) => [c.name, c.dismissReason, c.purchaseEvidence.consumption?.text || c.activity.evidence || "—"]))) : null,
+      r.dismissedInvestigated.length ? el("div", {}, text("small", "Descartadas com atividade investigada:"), el("ul", {}, ...r.dismissedInvestigated.map((c) => el("li", {}, `${c.name}: ${c.activity.typeLabel}${c.group ? ` · grupo (${c.group.level})` : ""}`)))) : null,
+    ),
+    panel(
+      `7. Sites inacessíveis à Cloudflare (${r.unreachable.length}) — estado técnico, não ausência de empresa ou contato`,
+      ...r.unreachable.map((u) => details(`${u.name}${u.city ? ` · ${u.city}` : ""} (${u.httpStatus ? `HTTP ${u.httpStatus}` : "sem resposta"}, ${(u.checkedAt || "").slice(0, 10)})`, el("ul", {}, ...u.assisted.map((l) => el("li", {}, link(l)))))),
+    ),
+    panel(
+      `8. Snov (verificador de e-mail) — ${r.snov.configured ? "configurado" : "pendente"}`,
+      text("small", r.snov.note),
+      el("ol", {}, ...r.snov.steps.map((q) => el("li", {}, q))),
+    ),
+  );
+  $("content").replaceChildren(node);
+}
+
 async function showForeignSearch(id, preloaded) {
   const x = preloaded || (await api(`/api/foreign-searches/${id}`));
   state.searchId = x.id;
@@ -2826,7 +2899,7 @@ async function showForeignSearch(id, preloaded) {
   state.searchCampaignId = x.campaign.id;
   const node = section(`${x.country.name_pt} · ${x.commodity.label || x.commodity.name}`, `Busca de empresas compradoras (SH6 ${x.commodity.hs6.join(", ")}) · porte-alvo: ${x.target.sizesLabel.join(" e ")} · ${x.status === "open" ? "aberta" : `encerrada em ${x.closedAt.slice(0, 10)}`}`);
   node.setAttribute("data-screen", "internacional");
-  node.append(text("p", x.notice, "notice-fixed"), button("Voltar ao Radar", () => navigate("Internacional")));
+  node.append(text("p", x.notice, "notice-fixed"), button("Voltar ao Radar", () => navigate("Internacional")), button("Revisão para decisão", () => showDecisionReview(x.id), true));
   if (writable())
     node.append(
       button("Pesquisar pessoas de compras (lote de 5 empresas aderentes)", async () => {
