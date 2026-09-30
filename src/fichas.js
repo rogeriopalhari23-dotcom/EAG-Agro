@@ -8,7 +8,8 @@ import { encryptPii, decryptPii } from "./crypto.js";
 import { isSuppressed } from "./operations.js";
 import { canHaveFicha, contactTargetFlag } from "./profiles.js";
 import { generateSequence, commodityDisplay, SKILL_SHA256, TEMPLATES_VERSION, GENERATOR_VERSION } from "./templates/prospeccao-vendas.js";
-import { reviewSequence } from "./review.js";
+import { reviewSequence, reviewIdentification } from "./review.js";
+import { generateIdentification, commodityDisplayDe, IDENT_VERSION } from "./templates/identificacao.js";
 import { unsubUrl } from "./unsub-token.js";
 import { manualTaskStatements } from "./tasks.js";
 
@@ -30,7 +31,10 @@ async function currentVersion(env, f) {
 }
 
 // Contexto comum de geração: campanha, produto, perfil, declarações, fuso e destinatários conferidos.
-async function context(env, actor, companyId, campaignId, contactIds) {
+// purpose: "meeting" (sequência da skill ao comprador) ou "identify_buyer" (canal geral da empresa, para descobrir o
+// responsável — PV3). A finalidade e o idioma valem por versão da ficha.
+async function context(env, actor, companyId, campaignId, contactIds, opts = {}) {
+  const purpose = oneOf(opts.purpose ?? "meeting", ["meeting", "identify_buyer"], "finalidade da ficha");
   const c = await s(env, "SELECT * FROM campaigns WHERE tenant_id=? AND id=?", actor.tenant_id, campaignId).first();
   if (!c) fail(404, "campaign_not_found", "Campanha não encontrada.");
   if (["ended", "paused"].includes(c.status)) fail(409, "campaign_not_available", "Campanha pausada ou encerrada.");
@@ -57,7 +61,9 @@ async function context(env, actor, companyId, campaignId, contactIds) {
   for (const id of [...new Set(contactIds)]) {
     const ct = await s(env, "SELECT * FROM contacts WHERE tenant_id=? AND id=? AND company_id=?", actor.tenant_id, str(id, "contato", 80), companyId).first();
     if (!ct) fail(422, "invalid_recipients", "Contato não pertence à empresa.");
-    if (!ROLES.includes(ct.prospect_role)) fail(422, "recipient_role", "Destinatário precisa ser decisor, decisor provisório ou influenciador (PV8).");
+    if (purpose === "identify_buyer" && ct.contact_kind !== "company_channel") fail(422, "recipient_not_channel", "A ficha de identificação vai ao canal geral publicado da empresa, não a uma pessoa.");
+    if (purpose === "meeting" && ct.contact_kind === "company_channel") fail(422, "recipient_is_channel", "Canal geral da empresa não é decisor: use a ficha de identificação do responsável.");
+    if (purpose === "meeting" && !ROLES.includes(ct.prospect_role)) fail(422, "recipient_role", "Destinatário precisa ser decisor, decisor provisório ou influenciador (PV8).");
     const [fullName, jobTitle, email, linkedin] = await Promise.all(
       ["full_name", "job_title", "email", "linkedin_url"].map((k) => decryptPii(ct[`${k}_encrypted`], env)),
     );
@@ -65,11 +71,11 @@ async function context(env, actor, companyId, campaignId, contactIds) {
     if (await isSuppressed(env, actor.tenant_id, "email", email)) fail(409, "recipient_suppressed", "Destinatário em supressão (R2.1.2).");
     if (c.market === "international" && !ct.timezone) fail(422, "timezone_pending", "Fuso do destinatário pendente (R18.6).");
     recipients.push({
-      contactId: ct.id, role: ct.prospect_role, fullName, jobTitle, sourceLabel: ct.source_label, linkedin: !!linkedin,
+      contactId: ct.id, role: ct.prospect_role, kind: ct.contact_kind, fullName, jobTitle, sourceLabel: ct.source_label, linkedin: !!linkedin,
       relationshipNote: ct.relationship_note, emailHash: ct.email_hash, timezone: ct.timezone || null,
     });
   }
-  if (!recipients.some((r) => r.role !== "influencer")) fail(422, "decision_maker_required", "A ficha precisa de um decisor (PV8).");
+  if (purpose === "meeting" && !recipients.some((r) => r.role !== "influencer")) fail(422, "decision_maker_required", "A ficha precisa de um decisor (PV8).");
   const decl = (
     await s(env, "SELECT id,kind,value_bool,text FROM campaign_declarations WHERE campaign_id=? AND status='approved' AND (review_due_at IS NULL OR review_due_at>?) ORDER BY approved_at", c.id, now()).all()
   ).results;
@@ -80,8 +86,13 @@ async function context(env, actor, companyId, campaignId, contactIds) {
   const others = (
     await s(env, "SELECT DISTINCT group_name,variant_name,commodity FROM products WHERE tenant_id=? AND commodity<>?", actor.tenant_id, p.commodity).all()
   ).results.map(c.language === "en" ? commodityDisplayEn : commodityDisplay).filter(Boolean);
-  const translationApproved = params[`templates_en_approved:${TEMPLATES_EN_VERSION}`]?.enabled === true;
-  return { campaign: c, product: p, company, profile, gate, timezone, recipients, declarations, declarationIds: decl.map((d) => d.id), others: [...new Set(others)], language: c.language, translationApproved };
+  // Idioma: o da campanha; a ficha de identificação pode usar o idioma do país (alemão), com modelo aprovado por Rogério.
+  const language = purpose === "identify_buyer" && opts.language ? oneOf(opts.language, ["pt-BR", "en", "de"], "idioma") : c.language;
+  const translationApproved =
+    purpose === "identify_buyer"
+      ? params[`templates_ident_approved:${IDENT_VERSION[language]}`]?.enabled === true
+      : params[`templates_en_approved:${TEMPLATES_EN_VERSION}`]?.enabled === true;
+  return { campaign: c, product: p, company, profile, gate, timezone, recipients, declarations, declarationIds: decl.map((d) => d.id), others: [...new Set(others)], language, translationApproved, purpose };
 }
 
 // Monta a versão: gera, revisa, cifra e calcula os hashes. Edições manuais substituem textos antes da revisão.
@@ -91,22 +102,22 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   for (const r of ctx.recipients) urls.set(r.contactId, await unsubUrl(env, versionId, r.contactId));
   // Idioma da campanha (PV12, R28.15): inglês pelo modelo traduzido; português para o nacional e países lusófonos.
   const en = ctx.language === "en";
-  const commodity = en ? commodityDisplayEn(ctx.product) : commodityDisplay(ctx.product);
-  if (!commodity) fail(422, "commodity_name_en_missing", "Commodity sem nome em inglês cadastrado nos modelos.");
-  const templatesVersion = en ? TEMPLATES_EN_VERSION : TEMPLATES_VERSION;
+  const ident = ctx.purpose === "identify_buyer";
+  const commodity = ctx.language === "de" ? commodityDisplayDe(ctx.product) : en ? commodityDisplayEn(ctx.product) : commodityDisplay(ctx.product);
+  if (!commodity) fail(422, "commodity_name_missing", `Commodity sem nome cadastrado nos modelos (${ctx.language}).`);
+  const templatesVersion = ident ? IDENT_VERSION[ctx.language] : en ? TEMPLATES_EN_VERSION : TEMPLATES_VERSION;
   const gapNote = ctx.campaign.market === "international" ? GAP_NOTE : null;
-  const msgs = (en ? generateSequenceEn : generateSequence)({
-    commodity, recipients: ctx.recipients, declarations: ctx.declarations,
-    sig: { senderName: env.SENDER_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS },
-    unsub: (id) => urls.get(id),
-  });
+  const sig = { senderName: env.SENDER_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS };
+  const msgs = ident
+    ? generateIdentification({ language: ctx.language, commodity, recipients: ctx.recipients, sig, unsub: (id) => urls.get(id) })
+    : (en ? generateSequenceEn : generateSequence)({ commodity, recipients: ctx.recipients, declarations: ctx.declarations, sig, unsub: (id) => urls.get(id) });
   for (const e of edits) {
     const m = msgs.find((x) => x.contactId === e.contactId && x.channel === e.channel && x.step === e.step);
     if (!m) fail(422, "edit_target_missing", `Passo ${e.step} (${e.channel}) inexistente para o destinatário.`);
     if (e.subject !== undefined) m.subject = e.subject === null ? null : str(e.subject, "assunto", 200);
     m.body = str(e.body, "texto", 5000);
   }
-  const review = reviewSequence(msgs, {
+  const review = (ident ? reviewIdentification : reviewSequence)(msgs, {
     market: ctx.campaign.market, commodity, otherCommodities: ctx.others, declarations: ctx.declarations,
     recipients: ctx.recipients, postalAddress: env.EAG_POSTAL_ADDRESS, unsubUrl: (id) => urls.get(id),
     language: ctx.language, languageGapNote: gapNote, translationApproved: ctx.translationApproved, templatesVersion,
@@ -114,7 +125,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   const snapshot = JSON.stringify({
     companyId: ctx.company.id, campaignId: ctx.campaign.id, campaignVersion: ctx.campaign.version,
     productId: ctx.product.id, commodity: ctx.product.commodity, profileId: ctx.profile?.id ?? null,
-    icpStatus: ctx.profile?.icp_status ?? null, fichaNote: [ctx.gate.note, gapNote].filter(Boolean).join(" ") || null, timezone: ctx.timezone, language: ctx.language,
+    icpStatus: ctx.profile?.icp_status ?? null, fichaNote: [ctx.gate.note, gapNote].filter(Boolean).join(" ") || null, timezone: ctx.timezone, language: ctx.language, purpose: ctx.purpose,
     declarationIds: ctx.declarationIds,
     recipients: ctx.recipients.map((r) => ({ contactId: r.contactId, role: r.role, emailHash: r.emailHash, timezone: r.timezone, targetFlag: contactTargetFlag(r.jobTitle, r.relationshipNote) })),
     skill: SKILL_SHA256, templates: templatesVersion, generator: GENERATOR_VERSION, edits: edits.length,
@@ -122,9 +133,9 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   const statements = [
     s(
       env,
-      "INSERT INTO ficha_versions(id,ficha_id,version_no,snapshot_enc,snapshot_sha256,pv_report_json,review_ok,skill_sha256,templates_version,generator_version,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO ficha_versions(id,ficha_id,version_no,snapshot_enc,snapshot_sha256,pv_report_json,review_ok,skill_sha256,templates_version,generator_version,created_by,purpose,language) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
       versionId, fichaId, versionNo, await encryptPii(snapshot, env), await sha256(snapshot), JSON.stringify(review.findings),
-      review.ok ? 1 : 0, SKILL_SHA256, templatesVersion, GENERATOR_VERSION, actor.id,
+      review.ok ? 1 : 0, SKILL_SHA256, templatesVersion, GENERATOR_VERSION, actor.id, ctx.purpose, ctx.language,
     ),
   ];
   for (const m of msgs)
@@ -146,15 +157,15 @@ export async function createFicha(request, env, actor, rid) {
     campaignId = str(i.campaignId, "campanha", 80);
   const existing = await s(env, "SELECT id FROM fichas WHERE tenant_id=? AND company_id=? AND campaign_id=?", actor.tenant_id, companyId, campaignId).first();
   if (existing) fail(409, "ficha_exists", "Já existe ficha desta empresa nesta campanha.", { id: existing.id });
-  const ctx = await context(env, actor, companyId, campaignId, i.recipients);
+  const ctx = await context(env, actor, companyId, campaignId, i.recipients, { purpose: i.purpose, language: i.language });
   const id = crypto.randomUUID();
   const v = await buildVersion(env, actor, id, 1, ctx);
   await commit(env, [
     s(env, "INSERT INTO fichas(id,tenant_id,company_id,campaign_id,status,created_by) VALUES (?,?,?,?,?,?)", id, actor.tenant_id, companyId, campaignId, "in_approval", actor.id),
     ...v.statements,
-    auditStatement(env, actor, rid, "ficha.created", "ficha", id, { version: 1, reviewOk: v.review.ok, recipients: ctx.recipients.length }),
+    auditStatement(env, actor, rid, "ficha.created", "ficha", id, { version: 1, reviewOk: v.review.ok, recipients: ctx.recipients.length, purpose: ctx.purpose, language: ctx.language }),
   ]);
-  return { id, version: 1, reviewOk: v.review.ok, findings: v.review.findings.filter((x) => !x.ok) };
+  return { id, version: 1, purpose: ctx.purpose, language: ctx.language, reviewOk: v.review.ok, findings: v.review.findings.filter((x) => !x.ok) };
 }
 
 // Nova versão (edição de texto, troca de destinatários ou regeneração após mudança comercial).
@@ -171,7 +182,8 @@ export async function newVersion(request, env, actor, rid, id) {
   const edits = Array.isArray(i.edits)
     ? i.edits.map((e) => ({ contactId: str(e.contactId, "contato", 80), channel: oneOf(e.channel, ["email", "call", "linkedin"], "canal"), step: e.step, subject: e.subject, body: e.body }))
     : [];
-  const ctx = await context(env, actor, f.company_id, f.campaign_id, contactIds);
+  // Finalidade e idioma continuam os da versão anterior, salvo pedido explícito (ex.: responsável identificado → reunião).
+  const ctx = await context(env, actor, f.company_id, f.campaign_id, contactIds, { purpose: i.purpose ?? prev.purpose, language: i.language ?? (prev.purpose === "identify_buyer" ? prev.language : undefined) });
   const v = await buildVersion(env, actor, id, f.current_version + 1, ctx, edits);
   const at = now();
   await commit(env, [
@@ -208,7 +220,7 @@ export async function getFicha(env, actor, id) {
   }
   return {
     ficha: f,
-    version: { no: v.version_no, id: v.id, reviewOk: !!v.review_ok, findings: JSON.parse(v.pv_report_json), skill: v.skill_sha256, templates: v.templates_version, generator: v.generator_version, snapshot: JSON.parse(await decryptPii(v.snapshot_enc, env)) },
+    version: { no: v.version_no, id: v.id, purpose: v.purpose, language: v.language, reviewOk: !!v.review_ok, findings: JSON.parse(v.pv_report_json), skill: v.skill_sha256, templates: v.templates_version, generator: v.generator_version, snapshot: JSON.parse(await decryptPii(v.snapshot_enc, env)) },
     messages, approvals: approvals.results, toApprove, outbox: outbox.results,
   };
 }

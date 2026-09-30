@@ -22,6 +22,21 @@ const LANG = {
     volume: /relevant volume|good volume available|volume available/i,
     subject: /^([A-Z][a-z]+|[A-Z]{2,6})( [a-z]+)* supplier$/, subjectHint: "<Commodity> supplier", optOut: /"unsubscribe"/,
   },
+  // Alemão (2026-09-30, só ficha de identificação por enquanto): mesmas proibições do PV7 e do PV10.
+  de: {
+    hello: /^Guten Tag/, conversation: /(?!)/, minutes: /20 Minuten/, linkedin: /über LinkedIn|auf LinkedIn/,
+    inTouch: /mit .* per E-Mail in Kontakt/i, breakText: /(?!)/,
+    forbidden: /\bEUR\b|€|\bUS\$|\bpreis|angebot|kostenvoranschlag|\bpartie|\bmengen?\b|lagerbestand|vorrat|lieferzeit|liefertermin|zertifi|zahlung|wettbewerb|konkurren/i,
+    apology: /entschuldig|verzeihen sie die störung|bitte leiten sie mich an den einkauf weiter/i,
+    volume: /verfügbare menge|relevante menge|menge verfügbar/i,
+    subject: /^Lieferant für [A-ZÄÖÜ][a-zäöüß]+( [a-zäöüß]+)*$/, subjectHint: "Lieferant für <Rohstoff>", optOut: /„abmelden“/,
+  },
+};
+// Pergunta da ficha de identificação: quem responde pela compra + canal profissional (A-ID1–A-ID3).
+const IDENT_ASK = {
+  "pt-BR": /respons[aá]vel pela compra[\s\S]*(indicar quem|quem responde)[\s\S]*canal/i,
+  en: /responsible for purchasing[\s\S]*who is responsible[\s\S]*channel/i,
+  de: /für den Einkauf[\s\S]*wer diesen Bereich verantwortet[\s\S]*(beruflichen Kontakt|erreiche)/i,
 };
 
 function finding(list, id, ok, detail, extra = {}) {
@@ -147,6 +162,55 @@ export function reviewSequence(raw, ctx) {
     );
   }
   // R19.13 / R21.7: endereço físico e saída em todo e-mail.
+  for (const m of raw.filter((x) => x.kind === "auto_email")) {
+    const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
+    if (!ok) finding(f, "R19.13", false, `E-mail passo ${m.step} sem endereço físico ou forma de saída.`, { step: m.step, contactId: m.contactId });
+  }
+  if (!f.some((x) => x.id === "R19.13")) finding(f, "R19.13", !!ctx.postalAddress, ctx.postalAddress ? "Endereço físico e saída em todos os e-mails." : "Endereço físico da EAG não configurado.");
+  return { ok: f.every((x) => x.ok), findings: f };
+}
+
+// Ficha para identificar o responsável (purpose identify_buyer). Destinatário é o canal geral da empresa, não pessoa:
+// PV1/PV5/PV6/PV8/PV11 (estrutura e papéis do decisor) não se aplicam; vale ID1 (pergunta certa, sem reunião nem venda),
+// ID2 (no máximo 2 e-mails, dias não seguidos, só canal geral) e as regras comuns PV2, PV3, PV4, PV7, PV9, PV10, PV12, R19.13.
+export function reviewIdentification(raw, ctx) {
+  const f = [];
+  const ownLinks = [...new Set(raw.map((m) => ctx.unsubUrl(m.contactId)))];
+  const messages = raw.map((m) => ({ ...m, body: ownLinks.reduce((b, u) => b.split(u).join(" "), m.body) }));
+  const L = LANG[ctx.language || "pt-BR"] || LANG["pt-BR"];
+  const ask = IDENT_ASK[ctx.language || "pt-BR"] || IDENT_ASK["pt-BR"];
+  for (const r of ctx.recipients) {
+    const list = messages.filter((m) => m.contactId === r.contactId && m.kind === "auto_email").sort((a, b) => a.day - b.day);
+    const e1 = list.find((m) => m.step === 1);
+    const ok1 = !!e1 && L.hello.test(e1.body) && ask.test(e1.body) && !L.minutes.test(e1.body);
+    finding(f, "ID1", ok1, ok1 ? "E-mail 1 pergunta quem responde pela compra e o canal profissional, sem pedir reunião." : "E-mail 1 não pergunta pelo responsável e pelo canal, ou já pede reunião.", { contactId: r.contactId });
+    const gaps = list.slice(1).map((m, i) => m.day - list[i].day);
+    const ok2 = r.kind === "company_channel" && list.length >= 1 && list.length <= 2 && gaps.every((g) => g >= 2);
+    finding(f, "ID2", ok2, ok2 ? "Canal geral da empresa; até 2 e-mails em dias não seguidos." : r.kind !== "company_channel" ? "Destinatário não é o canal geral da empresa." : "Mais de 2 e-mails ou em dias seguidos.", { contactId: r.contactId });
+  }
+  for (const [i, m] of messages.entries()) {
+    const links = (raw[i].body.match(URL_RE) || []).filter((u) => u !== ctx.unsubUrl(m.contactId));
+    const other = (ctx.otherCommodities || []).filter((c) => new RegExp(`(?<!\\p{L})${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\p{L})`, "iu").test(m.body));
+    if (links.length || other.length) finding(f, "PV2", false, `Passo ${m.step}: ${links.length ? "link além do descadastro" : `outra commodity citada (${other.join(", ")})`}.`, { step: m.step, contactId: m.contactId });
+  }
+  if (!f.some((x) => x.id === "PV2")) finding(f, "PV2", true, "Uma commodity, sem anexo e sem link além do descadastro.");
+  const noObjective = messages.filter((m) => !m.objective);
+  finding(f, "PV3", !noObjective.length, noObjective.length ? `${noObjective.length} passo(s) sem objetivo.` : "Objetivo de cada toque: descobrir a pessoa certa.");
+  const liar = messages.filter((m) => L.linkedin.test(m.body) && !/linkedin/i.test(ctx.recipients.find((r) => r.contactId === m.contactId)?.sourceLabel || ""));
+  finding(f, "PV4", !liar.length, liar.length ? "Texto cita LinkedIn, mas a fonte registrada do canal é outra." : "Afirmações coerentes com a fonte registrada do canal.");
+  const sale = messages.filter((m) => L.forbidden.test(m.body) || L.volume.test(m.body));
+  finding(f, "PV7", !sale.length, sale.length ? `Passo ${sale.map((m) => m.step).join(", ")} cita preço, lote, volume ou condição comercial.` : "Sem preço, lote, volume ou condição comercial.");
+  for (const m of messages.filter((x) => x.step === 1)) {
+    const ok = L.subject.test(m.subject || "") && !/[%\d]/.test(m.subject || "");
+    finding(f, "PV9", ok, ok ? `Assunto "${m.subject}".` : `Assunto "${m.subject}" fora do padrão "${L.subjectHint}".`, { contactId: m.contactId });
+  }
+  const apologies = messages.filter((m) => L.apology.test(m.body));
+  finding(f, "PV10", !apologies.length, apologies.length ? `Frase proibida no passo ${apologies.map((m) => m.step).join(", ")}.` : "Tom direto, sem pedido de desculpas.");
+  // ID0: adaptação nova da skill (A-ID1–A-ID4) — o modelo de cada idioma só vale depois da aprovação de Rogério.
+  const langName = { "pt-BR": "português", en: "inglês", de: "alemão" }[ctx.language || "pt-BR"];
+  finding(f, "ID0", ctx.translationApproved === true, ctx.translationApproved === true ? `Modelo de identificação em ${langName} (${ctx.templatesVersion}) aprovado.` : `Modelo de identificação em ${langName} (${ctx.templatesVersion}) aguardando aprovação de Rogério lado a lado com o português.`);
+  if (ctx.market !== "international") finding(f, "PV12", true, "Não se aplica (nacional).");
+  else finding(f, "PV12", !!ctx.languageGapNote, ctx.languageGapNote ? "Idioma do país e lacuna 🔴 registrados." : "Lacuna 🔴 do internacional não registrada na ficha (R28.15).");
   for (const m of raw.filter((x) => x.kind === "auto_email")) {
     const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
     if (!ok) finding(f, "R19.13", false, `E-mail passo ${m.step} sem endereço físico ou forma de saída.`, { step: m.step, contactId: m.contactId });

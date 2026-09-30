@@ -40,6 +40,7 @@ export const DEFINITIONS = {
   trade_list_retention_versions: { scopes: /^international$/, type: "integer", min: 1, max: 24, label: "Versões da lista guardadas", requiredBy: "lista internacional" },
   international_enabled: { scopes: /^international$/, type: "release", label: "Internacional liberado (T12)", requiredBy: "aprovação de fichas internacionais" },
   templates_en_approved: { scopes: /^pv-en-\d+\.\d+\.\d+$/, scopeHint: "pv-en-<versão>", type: "release", label: "Tradução em inglês aprovada por Rogério", requiredBy: "fichas em inglês (PV12)" },
+  templates_ident_approved: { scopes: /^id-(pt|en|de)-\d+\.\d+\.\d+$/, scopeHint: "id-<pt|en|de>-<versão>", type: "release", label: "Modelo de identificação do responsável aprovado por Rogério", requiredBy: "fichas de identificação (ID0)" },
 };
 
 function numberIn(v, d, integer = false) {

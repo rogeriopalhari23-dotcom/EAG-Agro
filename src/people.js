@@ -9,6 +9,7 @@ import { bodyJson, fail, str, oneOf, url, requireRole, WRITE_ROLES } from "./htt
 import { statement as s, company, commit, companyLock, auditStatement, now } from "./store.js";
 import { encryptPii, decryptPii, secretKey, identifierHash } from "./crypto.js";
 import { isSuppressed } from "./operations.js";
+import { validTimezone } from "./parameter-registry.js";
 import { impressumPeople, brasilApiCnpj, PEOPLE_REFRESH_DAYS } from "./adapters/people.js";
 import { AdapterError } from "./adapters/errors.js";
 
@@ -205,18 +206,34 @@ export async function listPeople(env, actor, companyId, deps = {}) {
     await s(env, "SELECT v.contact_id,v.verification_type,v.status FROM contact_verifications v JOIN contacts ct ON ct.id=v.contact_id WHERE v.tenant_id=? AND ct.company_id=? ORDER BY v.verified_at", actor.tenant_id, c.id).all()
   ).results;
   const confirmed = (cid, type) => { const last = verifs.filter((v) => v.contact_id === cid && v.verification_type === type).pop(); return last?.status === "confirmed"; };
-  const contacts = new Map((await s(env, "SELECT id,email_validation,phone_encrypted FROM contacts WHERE tenant_id=? AND company_id=?", actor.tenant_id, c.id).all()).results.map((r) => [r.id, r]));
+  const contactRows = (await s(env, "SELECT * FROM contacts WHERE tenant_id=? AND company_id=?", actor.tenant_id, c.id).all()).results;
+  const contacts = new Map(contactRows.map((r) => [r.id, r]));
+  // Destinatário aprovado = aprovação vigente na versão atual de alguma ficha (R18.3); aceitar contato não aprova nada.
+  const approvedIds = new Set(
+    (
+      await s(env, "SELECT DISTINCT a.contact_id FROM ficha_approvals a JOIN ficha_versions v ON v.id=a.version_id JOIN fichas f ON f.id=v.ficha_id WHERE f.tenant_id=? AND f.company_id=? AND a.status='approved' AND v.superseded_at IS NULL", actor.tenant_id, c.id).all()
+    ).results.map((r) => r.contact_id),
+  );
+  const approval = (cid) => (cid && approvedIds.has(cid) ? "destinatário aprovado para abordagem" : "sem aprovação para abordagem");
   const people = [];
   for (const r of rows) {
     const [name, title, email, phone] = await Promise.all([r.name_encrypted, r.title_encrypted, r.email_encrypted, r.phone_encrypted].map((v) => decryptPii(v, env)));
     const ct = r.contact_id ? contacts.get(r.contact_id) : null;
     const decider = ct && confirmed(ct.id, "decision_authority");
     const titleOk = ct && (decider || confirmed(ct.id, "job_title"));
+    // Quatro estados independentes (pedido de Rogério em 2026-09-30): relevância/aceite, cargo, compra e aprovação.
+    const states = {
+      relevance: r.status === "accepted" ? "contato relevante aceito" : r.status === "dismissed" ? "descartado" : "contato de compras a validar",
+      title: titleOk ? "cargo verificado" : "cargo não verificado",
+      purchase: decider ? "decisor de compras confirmado" : "responsabilidade de compra pendente",
+      approval: approval(r.contact_id),
+    };
     people.push({
       id: r.id, name, title, relevance: r.relevance, roleSuggestion: r.role_suggestion,
       source: { kind: r.source_kind, label: SOURCE_LABEL[r.source_kind], url: r.source_url, verifiedAt: r.verified_at },
       stale: r.refresh_after <= at, staleNote: r.refresh_after <= at ? "Vínculo e cargo verificados há mais que o prazo da fonte: reconfira antes de usar." : null,
-      status: r.status, contactId: r.contact_id,
+      status: r.status, contactId: r.contact_id, states,
+      purchaseEvidence: r.purchase_note ? { note: r.purchase_note, sourceUrl: r.purchase_source_url, confirms: false } : null,
       state: decider ? "decisor de compras confirmado" : titleOk ? "cargo verificado" : STATE_LABEL[r.status],
       email: email ? { value: email, scope: r.email_scope, source: r.email_source_url, validation: ct?.email_validation ?? "not_validated",
         note: r.email_scope === "personal" ? "E-mail pessoal publicado na fonte; entrega não validada." : r.email_scope === "registry" ? "E-mail do cadastro da Receita (costuma ser do contador) — não é da pessoa." : "Caixa geral da empresa — não é da pessoa." } : null,
@@ -224,8 +241,13 @@ export async function listPeople(env, actor, companyId, deps = {}) {
       dismissReason: r.dismiss_reason,
     });
   }
+  // Canais gerais publicados da empresa (não são pessoas): só servem à ficha de identificação do responsável.
+  const channels = [];
+  for (const ct of contactRows.filter((x) => x.contact_kind === "company_channel"))
+    channels.push({ contactId: ct.id, label: await decryptPii(ct.full_name_encrypted, env), email: await decryptPii(ct.email_encrypted, env), phone: await decryptPii(ct.phone_encrypted, env), source: ct.source_label, sourceUrl: ct.source_url, timezone: ct.timezone, emailValidation: ct.email_validation ?? "not_validated", approval: approval(ct.id) });
   return {
     companyId: c.id,
+    channels,
     research: research ? { at: research.researched_at, refreshAfter: research.refresh_after, stale: research.refresh_after <= at, requests: research.requests, durationMs: research.duration_ms, sources: JSON.parse(research.sources_json) } : null,
     adherence: await adherence(env, actor.tenant_id, c.id),
     people,
@@ -233,10 +255,12 @@ export async function listPeople(env, actor, companyId, deps = {}) {
       identified: people.filter((p) => p.status !== "dismissed").length,
       titleVerified: people.filter((p) => p.state === "cargo verificado" || p.state === "decisor de compras confirmado").length,
       decidersConfirmed: people.filter((p) => p.state === "decisor de compras confirmado").length,
+      acceptedRelevant: people.filter((p) => p.status === "accepted").length,
+      approvedRecipients: people.filter((p) => p.states.approval === "destinatário aprovado para abordagem").length + channels.filter((x) => x.approval === "destinatário aprovado para abordagem").length,
       emailsValidated: people.filter((p) => p.email?.validation === "valid").length,
     },
     assisted: assistedLinks(c),
-    notice: "Pessoa encontrada em fonte pública é contato a validar: cargo e poder de compra só valem depois da verificação registrada. Nenhum e-mail é deduzido do domínio; telefone publicado não autoriza WhatsApp. LinkedIn só por consulta manual.",
+    notice: "Pessoa encontrada em fonte pública é contato a validar. Aceitar um contato não confirma poder de compra nem autoriza envio: cargo e poder de compra só valem com verificação registrada, e cada destinatário precisa de ficha aprovada. Nenhum e-mail é deduzido do domínio; telefone publicado não autoriza WhatsApp. LinkedIn só por consulta manual.",
   };
 }
 
@@ -322,4 +346,53 @@ export async function addPerson(request, env, actor, rid, companyId) {
     auditStatement(env, actor, rid, "people.added", "company", c.id, { personId: id, source: kind, email: !!email, phone: !!phone }),
   ]);
   return { id };
+}
+
+// PATCH /api/companies/:id/people/:pid — indício de responsabilidade de compra (texto e fonte). Nunca confirma:
+// "decisor de compras confirmado" só por verificação decision_authority com evidência.
+export async function setPurchaseEvidence(request, env, actor, rid, companyId, pid) {
+  requireRole(actor, WRITE_ROLES);
+  await company(env, actor, companyId);
+  const r = await candidateOf(env, actor, companyId, pid);
+  const i = await bodyJson(request);
+  const note = str(i.purchaseNote, "indício de compra", 1000);
+  const sourceUrl = url(i.purchaseSourceUrl);
+  if (!sourceUrl) fail(422, "source_required", "Informe a URL da fonte do indício.");
+  await commit(env, [
+    s(env, "UPDATE person_candidates SET purchase_note=?,purchase_source_url=? WHERE id=?", note, sourceUrl, r.id),
+    auditStatement(env, actor, rid, "people.purchase_evidence", "company", companyId, { personId: r.id, previous: r.purchase_note ? "replaced" : "none" }),
+  ]);
+  return { id: r.id, confirms: false };
+}
+
+// POST /api/companies/:id/channels — canal geral publicado da empresa (info@, kontakt@). Não é pessoa: não entra como
+// decisor; só serve à ficha de identificação do responsável. E-mail só publicado, com a URL da fonte.
+export async function addChannel(request, env, actor, rid, companyId) {
+  requireRole(actor, WRITE_ROLES);
+  const c = await company(env, actor, companyId);
+  const i = await bodyJson(request);
+  const email = str(i.email, "e-mail", 320);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(422, "invalid_email", "E-mail inválido.");
+  const sourceUrl = url(i.sourceUrl);
+  if (!sourceUrl) fail(422, "source_required", "Informe a URL onde o canal está publicado.");
+  const kind = oneOf(i.sourceKind ?? "company_site", ["company_site", "directory"], "tipo de fonte");
+  const timezone = typeof i.timezone === "string" && i.timezone.trim() ? i.timezone.trim() : null;
+  if (timezone && !validTimezone(timezone)) fail(422, "timezone_invalid", "Fuso IANA inválido, ex.: Europe/Berlin.");
+  const hash = await identifierHash(env, actor.tenant_id, "email", email);
+  const dup = await s(env, "SELECT id FROM contacts WHERE tenant_id=? AND company_id=? AND email_hash=?", actor.tenant_id, c.id, hash).first();
+  if (dup) fail(409, "channel_duplicate", "Este e-mail já está registrado nesta empresa.", { contactId: dup.id });
+  const suppressed = await isSuppressed(env, actor.tenant_id, "email", email);
+  const id = crypto.randomUUID();
+  const label = kind === "company_site" ? "Canal geral publicado no site da empresa" : "Canal geral publicado em diretório";
+  await commit(env, [
+    companyLock(env, actor, c),
+    s(
+      env,
+      "INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,job_title_encrypted,email_encrypted,phone_encrypted,linkedin_url_encrypted,source_label,source_url,created_by,prospect_role,email_hash,email_validation,timezone,contact_kind) VALUES (?,?,?,?,NULL,?,?,NULL,?,?,?,'other',?,'pending',?,'company_channel')",
+      id, actor.tenant_id, c.id, await encryptPii(str(i.label ?? "Canal geral da empresa", "rótulo", 120), env), await encryptPii(email, env), await encryptPii(str(i.phone, "telefone", 50, true), env),
+      `${label} (${kind === "company_site" ? "site" : "diretório"}) — verificado em ${now().slice(0, 10)}`, sourceUrl, actor.id, hash, timezone,
+    ),
+    auditStatement(env, actor, rid, "contact.channel_added", "contact", id, { companyId: c.id, suppressed }),
+  ]);
+  return { contactId: id, suppressed };
 }

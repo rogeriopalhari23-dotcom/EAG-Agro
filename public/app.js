@@ -2536,7 +2536,23 @@ function peoplePanel(companyId) {
     const r = v.research;
     box.replaceChildren(
       text("small", v.notice),
-      text("small", `Identificadas: ${v.counts.identified} · cargo verificado: ${v.counts.titleVerified} · decisor confirmado: ${v.counts.decidersConfirmed} · e-mails validados: ${v.counts.emailsValidated}`),
+      text("small", `Identificadas: ${v.counts.identified} · aceitas: ${v.counts.acceptedRelevant} · cargo verificado: ${v.counts.titleVerified} · decisor confirmado: ${v.counts.decidersConfirmed} · aprovadas para abordagem: ${v.counts.approvedRecipients} · e-mails validados: ${v.counts.emailsValidated}`),
+      v.channels.length
+        ? el(
+            "div",
+            {},
+            text("small", "Canais gerais da empresa (não são pessoas; servem para identificar o responsável):"),
+            el("ul", {}, ...v.channels.map((ch) => el("li", {}, `${ch.email}${ch.phone ? ` · ${ch.phone}` : ""} — ${ch.approval}; e-mail ${ch.emailValidation === "valid" ? "validado" : "não validado"} `, el("a", { href: ch.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte")))),
+          )
+        : null,
+      writable() && state.searchCampaignId && v.channels.length
+        ? button("Preparar ficha de identificação do responsável", async () => {
+            const language = prompt("Idioma do texto (de, en ou pt-BR):", "de");
+            if (!language) return;
+            const r = await api("/api/fichas", "POST", { companyId, campaignId: state.searchCampaignId, purpose: "identify_buyer", language, recipients: v.channels.map((ch) => ch.contactId) });
+            notice(`Ficha de identificação criada (rascunho). Revisor: ${r.reviewOk ? "sem pendências" : r.findings.map((f) => f.detail).join(" · ")}. Nada é enviado sem a sua aprovação individual.`);
+          })
+        : null,
       !v.adherence.ok ? text("small", v.adherence.reason) : null,
       r ? text("small", `Última pesquisa: ${r.at.slice(0, 10)} (${r.requests} consultas) · ${r.sources.map((s) => `${s.kind}: ${s.status}${s.note ? ` — ${s.note}` : ""}`).join(" · ")}${r.stale ? " · prazo vencido, pode pesquisar de novo" : ` · nova pesquisa após ${r.refreshAfter.slice(0, 10)}`}`) : text("small", "Ainda não pesquisada."),
       writable() && v.adherence.ok && (!r || r.stale)
@@ -2554,9 +2570,14 @@ function peoplePanel(companyId) {
             "div",
             {},
             text("strong", `${p.name}${p.title ? ` — ${p.title}` : ""}`),
-            text("span", p.state, p.state === "decisor de compras confirmado" ? "tag" : "tag warn"),
+            // Estados independentes: aceitar não confirma compra; confirmar compra não aprova abordagem (R18.3).
+            text("span", p.states.relevance, p.status === "accepted" ? "tag" : "tag warn"),
+            text("span", p.states.purchase, p.states.purchase === "decisor de compras confirmado" ? "tag" : "tag warn"),
+            text("span", p.states.approval, p.states.approval === "destinatário aprovado para abordagem" ? "tag" : "tag warn"),
+            p.states.title === "cargo verificado" ? text("span", "cargo verificado", "tag") : null,
             p.stale ? text("span", "fonte vencida — reconferir", "tag warn") : null,
             text("small", `Por que: ${p.relevance}`),
+            p.purchaseEvidence ? el("small", {}, `Indício de responsabilidade de compra (não confirma): ${p.purchaseEvidence.note} · `, el("a", { href: p.purchaseEvidence.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte")) : null,
             el("small", {}, `Fonte: ${p.source.label} (verificado em ${p.source.verifiedAt.slice(0, 10)}) · `, el("a", { href: p.source.url, target: "_blank", rel: "noopener noreferrer" }, "abrir fonte")),
             p.email ? text("small", `E-mail: ${p.email.value} — ${p.email.note} Validação: ${p.email.validation === "valid" ? "validado" : "não validado"}.`) : text("small", "E-mail: não encontrado na fonte (não deduzir do domínio)."),
             p.phone ? text("small", `Telefone: ${p.phone.value} — ${p.phone.note}`) : null,
@@ -2583,10 +2604,24 @@ function peoplePanel(companyId) {
       ),
       details("Pesquisa assistida (você abre e registra o que confirmar)", el("ul", {}, ...v.assisted.map((l) => el("li", {}, el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label))))),
       writable() ? details("Registrar pessoa encontrada (com fonte)", personForm(companyId, load)) : null,
+      writable() ? details("Registrar canal geral publicado (info@, kontakt@)", channelForm(companyId, load)) : null,
     );
   };
   load().catch((e) => box.replaceChildren(text("small", e.message)));
   return box;
+}
+function channelForm(companyId, done) {
+  const f = (name, label, type = "text") => el("label", {}, label, el("input", { name, type }));
+  const form = el("form", {}, f("email", "E-mail publicado", "email"), f("phone", "Telefone publicado (opcional)"), f("sourceUrl", "URL onde está publicado", "url"), f("timezone", "Fuso da empresa (ex.: Europe/Berlin)"), el("button", { type: "submit" }, "Registrar canal"));
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(form));
+    for (const k of Object.keys(d)) if (!d[k]) delete d[k];
+    await api(`/api/companies/${companyId}/channels`, "POST", d);
+    form.reset();
+    await done();
+  });
+  return form;
 }
 function personForm(companyId, done) {
   const f = (name, label, type = "text") => el("label", {}, label, el("input", { name, type }));
@@ -2779,6 +2814,7 @@ async function showForeignSearch(id, preloaded) {
   const x = preloaded || (await api(`/api/foreign-searches/${id}`));
   state.searchId = x.id;
   state.searchProductId = x.commodity.productId;
+  state.searchCampaignId = x.campaign.id;
   const node = section(`${x.country.name_pt} · ${x.commodity.label || x.commodity.name}`, `Busca de empresas compradoras (SH6 ${x.commodity.hs6.join(", ")}) · porte-alvo: ${x.target.sizesLabel.join(" e ")} · ${x.status === "open" ? "aberta" : `encerrada em ${x.closedAt.slice(0, 10)}`}`);
   node.setAttribute("data-screen", "internacional");
   node.append(text("p", x.notice, "notice-fixed"), button("Voltar ao Radar", () => navigate("Internacional")));

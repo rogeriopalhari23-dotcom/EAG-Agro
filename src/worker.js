@@ -242,6 +242,10 @@ async function route(request, env, rid) {
   if (ppl && ppl[2] === "research" && method === "POST") return response(await people.researchCompany(request, env, actor, rid, ppl[1]));
   if (ppl && ppl[4] === "accept" && method === "POST") return response(await people.acceptPerson(request, env, actor, rid, ppl[1], ppl[3]), 201);
   if (ppl && ppl[4] === "dismiss" && method === "POST") return response(await people.dismissPerson(request, env, actor, rid, ppl[1], ppl[3]));
+  const ppe = path.match(/^\/api\/companies\/([^/]+)\/people\/([^/]+)$/);
+  if (ppe && ppe[2] !== "research" && method === "PATCH") return response(await people.setPurchaseEvidence(request, env, actor, rid, ppe[1], ppe[2]));
+  const chn = path.match(/^\/api\/companies\/([^/]+)\/channels$/);
+  if (chn && method === "POST") return response(await people.addChannel(request, env, actor, rid, chn[1]), 201);
   const fsp = path.match(/^\/api\/foreign-searches\/([^/]+)\/people\/research$/);
   if (fsp && method === "POST") return response(await people.researchSearchBatch(request, env, actor, rid, fsp[1]));
   const cgl = path.match(/^\/api\/companies\/([^/]+)\/gleif$/);
