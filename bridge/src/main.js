@@ -176,7 +176,7 @@ do {
 try {
   unlinkSync(stopPath);
 } catch {}
-log("stopped", { reason: "pedido de parada" });
+log("stopped", { reason: stopping ? "pedido de parada" : "ciclo único concluído" });
 deps.journal.close();
 release();
 process.exitCode = 0;

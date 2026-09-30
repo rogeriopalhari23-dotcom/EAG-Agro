@@ -6,7 +6,7 @@
 #   iniciar-ponte.ps1 -Conferir   confere também o Compass (token de serviço e assinatura)
 #   iniciar-ponte.ps1 -Validar    só confere caminhos, Node.js, dependências, configuração e segredos (não pede senha)
 #   iniciar-ponte.ps1             laço contínuo (um ciclo por minuto) — é o que a tarefa agendada executa
-param([switch]$SoCaixa, [switch]$Conferir, [switch]$UmCiclo, [switch]$Validar)
+param([switch]$SoCaixa, [switch]$Conferir, [switch]$UmCiclo, [switch]$Validar, [string]$TesteInterno, [string]$Falha)
 $ErrorActionPreference = "Stop"
 $dir = Join-Path $env:LOCALAPPDATA "eag-mail-bridge"
 New-Item -ItemType Directory -Force $dir | Out-Null
@@ -25,7 +25,7 @@ function Parar($motivo) {
 $ponte = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $config = Join-Path $dir "config.json"
 $segredos = Join-Path $dir "segredos.json"
-$interativo = $SoCaixa -or $Conferir -or $UmCiclo
+$interativo = $SoCaixa -or $Conferir -or $UmCiclo -or $TesteInterno
 
 # 1. Validação (antes de qualquer pedido de senha)
 $pacote = Join-Path $ponte "package.json"
@@ -78,19 +78,22 @@ if (-not $env:MAILBOX_PASSWORD) {
 }
 $env:BRIDGE_JOURNAL = Join-Path $dir "journal.sqlite"
 $argumentos = @("src\main.js")
-if ($SoCaixa) { $argumentos += "--mailbox-only" } elseif ($Conferir) { $argumentos += "--check" } elseif ($UmCiclo) { $argumentos += "--once" }
+# Teste interno: -Falha before_smtp|after_smtp|imap_down simula uma queda ou a caixa fora do ar (só com -UmCiclo).
+if ($Falha) { if (-not $UmCiclo -or $Falha -notin @("before_smtp", "after_smtp", "imap_down")) { Parar "-Falha só com -UmCiclo e before_smtp, after_smtp ou imap_down" }; $env:BRIDGE_FAULT = $Falha }
+if ($TesteInterno) { $argumentos = @("scripts/teste-interno.mjs", $TesteInterno) }
+elseif ($SoCaixa) { $argumentos += "--mailbox-only" } elseif ($Conferir) { $argumentos += "--check" } elseif ($UmCiclo) { $argumentos += "--once" }
 Push-Location $ponte
 $codigo = 0
 try {
   $ErrorActionPreference = "Continue" # linhas de erro do node não interrompem o registro
-  if ($SoCaixa -or $Conferir -or $UmCiclo) { & node @argumentos; $codigo = $LASTEXITCODE }
+  if ($interativo) { & node @argumentos; $codigo = $LASTEXITCODE }
   else {
     & node @argumentos 2>&1 | ForEach-Object { "$_" } | Out-File -Append -Encoding utf8 (Join-Path $dir "ponte.log")
     $codigo = $LASTEXITCODE
   }
 } finally {
   Pop-Location
-  Remove-Item Env:MAILBOX_PASSWORD, Env:BRIDGE_HMAC_KEY, Env:ACCESS_CLIENT_SECRET -ErrorAction SilentlyContinue
+  Remove-Item Env:MAILBOX_PASSWORD, Env:BRIDGE_HMAC_KEY, Env:ACCESS_CLIENT_SECRET, Env:ACCESS_CLIENT_ID, Env:BRIDGE_FAULT -ErrorAction SilentlyContinue
 }
 exit $codigo # código diferente de 0 faz a tarefa agendada reiniciar a ponte
 
