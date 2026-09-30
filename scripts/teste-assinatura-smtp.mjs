@@ -66,6 +66,16 @@ if (process.env.DRY_RUN) {
   console.log("\n" + body);
   process.exit(0);
 }
+// Confirmação explícita do destinatário interno antes de pedir a senha.
+if (!process.env.CONFIRM_INTERNAL) {
+  process.stdout.write(`Enviar UM e-mail de teste somente para ${TO} (destinatário interno do wrangler.jsonc)? Digite SIM: `);
+  const answer = await new Promise((r) => process.stdin.once("data", (d) => r(String(d).trim())));
+  process.stdin.pause();
+  if (answer !== "SIM") {
+    console.log("Cancelado. Nada foi enviado.");
+    process.exit(0);
+  }
+}
 const password = await askHidden(`Senha da caixa ${USER} (não aparece na tela): `);
 const sock = tls.connect({ host: "smtp.hostinger.com", port: 465, servername: "smtp.hostinger.com" }); // certificado verificado (padrão)
 let buf = "";

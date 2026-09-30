@@ -28,7 +28,7 @@ const PROFILE_LABEL = {
   unconfirmed: "perfil não confirmado",
 };
 // Porte ordena, não exclui (2026-09-30): micro e grande/grupo seguem candidatas, com prioridade menor.
-const ICP_LABEL = { in_icp: "prioridade — pequena/média", out_small: "micro — candidata (prioridade menor)", out_giant: "grande ou grupo — candidata (avaliar unidade, uso, autonomia e acesso)", out_trader: "trader — classificação à parte", pending_size: "porte a confirmar (pesquisável)" };
+const ICP_LABEL = { in_icp: "prioridade — pequena/média", out_small: "micro — candidata", out_giant: "grande ou grupo — candidata (avaliar unidade, uso, autonomia e acesso)", out_trader: "trader — classificação à parte", pending_size: "porte a confirmar (pesquisável)" };
 // Três níveis (mais o intermediário "compradora confirmada"): só evidência da própria empresa sobe de nível.
 // Estados distintos (pedido de Rogério em 2026-09-28): empresa encontrada, potencial compradora, importadora confirmada
 // e consumidora final confirmada. Só evidência da própria empresa, com fonte e data, sobe de estado.

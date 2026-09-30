@@ -4,7 +4,8 @@ import { statement as s, company, commit, auditStatement, now, product } from ".
 
 export const PROFILE_CLASSES = ["final_consumer_confirmed", "possible_final_consumer", "trader_distributor", "unconfirmed"];
 // Porte ordena, não exclui (decisão de Rogério em 2026-09-30, nos dois mercados): pequenas e médias consumidoras finais
-// primeiro; microempresas seguem candidatas quando o perfil mostra uso da commodity; grandes empresas e empresas de grupo
+// quando os demais critérios forem semelhantes; microempresas seguem candidatas com os mesmos critérios dos demais portes
+// (opção A de Rogério em 2026-09-30: sem condição própria para micro); grandes empresas e empresas de grupo
 // seguem candidatas, com unidade compradora, uso, autonomia de compras e acesso ao responsável como pendências da ficha;
 // traders classificados à parte (K3). Os valores gravados (out_small, out_giant) foram mantidos por compatibilidade e hoje
 // significam "micro — candidata" e "grande/grupo — candidata". Receita: 01 Micro (inclui MEI); 03 Pequeno porte; 05 Demais.
@@ -35,9 +36,9 @@ export function canHaveFicha(p) {
         note: `Grande empresa ou grupo: confirmar a unidade compradora, o uso da commodity, a autonomia de compras e o acesso ao responsável.${p.relationship_note ? ` Relacionamento prévio registrado por ${p.relationship_by} em ${p.relationship_at}.` : ""}`,
       };
     case "out_small":
-      return ["final_consumer_confirmed", "possible_final_consumer"].includes(p.profile_class)
-        ? { ok: true, note: "Microempresa: candidata com prioridade menor; aderência à commodity pelo perfil comprador." }
-        : { ok: false, reason: "Microempresa sem aderência comercial à commodity registrada no perfil comprador." };
+      // Mesmo critério de aderência dos demais portes: perfil comprador registrado (a falta de perfil já barra acima).
+      // O perfil não é promovido: "não confirmado" continua não confirmado.
+      return { ok: true, note: "Microempresa: candidata; o porte só desempata a prioridade (R14.3, R14.6)." };
     case "pending_size":
       return p.size_call_goal
         ? { ok: true, note: "Porte desconhecido: esclarecer o porte é objetivo do primeiro contato — na ligação ou na conversa aberta pelo e-mail (R14.8, revisada em 2026-09-30)." }

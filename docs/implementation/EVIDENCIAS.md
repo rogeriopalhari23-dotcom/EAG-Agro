@@ -657,3 +657,10 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
 - Migração `0028_base_do_porte.sql` (`companies.size_basis` estimado/comprovado); ponto de restauração `0000060f-00000000-000050f6-beb84e39eb6796a610c077ea14ecfc3a`; versão `61022725`.
 - Produção: objetivo "esclarecer o porte no primeiro contato" registrado nos perfis de 24grad, AMORI e BLACK & YUM; três fichas de identificação criadas (67e48b8b…, 14f46b96…, b299df74…), versão 1, alemão, modelo `id-de-1.1.0`, revisor sem pendências, estado "em aprovação" sem nenhuma aprovação. Conferido em produção: campanha em rascunho, 0 aprovações, fila de envio vazia, nenhum registro de ativação ou aprovação na auditoria.
 - Auditoria da R14.6 (sem alteração): a condição "só permitir ficha de microempresa quando o perfil registrar uso da commodity" veio da tradução, na implementação, da frase de Rogério "Microempresas continuam candidatas quando houver aderência comercial à commodity"; diverge da decisão posterior "Micro, pequenas, médias, grandes e empresas de grupos continuam elegíveis" e cria assimetria (só micro tem essa exigência). Apresentada para decisão.
+
+### 2026-09-30 — R14.6, opção A: sem condição própria para microempresa
+
+- Retirada a exigência de perfil "consumidora final confirmada ou possível" só para micro (`src/profiles.js`); todos os portes seguem os mesmos critérios de aderência (perfil comprador registrado; traders por R14.7); porte só desempata (pequenas e médias primeiro). Rótulo "micro — candidata". Spec R14.6, AT59 e registro de decisões; Constituição (linha de exceção de 30/09) sincronizadas.
+- Teste novo: microempresa e pequena, ambas com perfil "não confirmado", recebem o mesmo tratamento (ficha permitida) e o perfil continua "não confirmado" — ausência de evidência não vira consumo confirmado.
+- `scripts/teste-assinatura-smtp.mjs`: confirmação explícita ("SIM") do destinatário interno antes de pedir a senha; recusa qualquer outro destinatário. Teste ainda não executado (depende de Rogério digitar a senha no próprio terminal); fichas sem nova versão até o resultado.
+- Suíte 359 + 2; UI smoke OK.

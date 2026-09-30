@@ -34,9 +34,10 @@ test("P2-T6: regra do ICP (K1/K3) é determinística", () => {
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeBand: "small" }), "in_icp");
   assert.equal(icpStatus({ profileClass: "possible_final_consumer", sizeBand: "micro" }), "out_small");
   assert.equal(icpStatus({ profileClass: "trader_distributor", sizeBand: "small" }), "out_trader", "trader segue fora mesmo pequeno");
-  // Porte ordena, não exclui (decisão de 2026-09-30): micro com uso da commodity pode ter ficha; sem aderência, não.
+  // Opção A (2026-09-30): micro segue os mesmos critérios dos demais portes, com qualquer classificação de perfil.
   assert.equal(canHaveFicha({ icp_status: "out_small", profile_class: "possible_final_consumer" }).ok, true);
-  assert.match(canHaveFicha({ icp_status: "out_small", profile_class: "unconfirmed" }).reason, /sem aderência comercial/);
+  assert.equal(canHaveFicha({ icp_status: "out_small", profile_class: "unconfirmed" }).ok, true);
+  assert.match(canHaveFicha({ icp_status: "out_small", profile_class: "unconfirmed" }).note, /porte só desempata/);
   // Grande empresa ou grupo: candidata; a ficha leva unidade, uso, autonomia e acesso como pendências.
   assert.equal(canHaveFicha({ icp_status: "out_giant" }).ok, true);
   assert.match(canHaveFicha({ icp_status: "out_giant" }).note, /unidade compradora.*autonomia de compras.*acesso ao responsável/);
@@ -44,7 +45,7 @@ test("P2-T6: regra do ICP (K1/K3) é determinística", () => {
   assert.equal(icpStatus({ profileClass: "trader_distributor", sizeCode: "05" }), "out_trader");
   assert.equal(icpStatus({ profileClass: "final_consumer_confirmed", sizeCode: "05", isGiant: true }), "out_giant");
   assert.equal(icpStatus({ profileClass: "unconfirmed", sizeBand: "medium_plus" }), "in_icp");
-  assert.deepEqual(canHaveFicha({ icp_status: "out_small" }).ok, false, "micro sem perfil de uso da commodity");
+  assert.deepEqual(canHaveFicha({ icp_status: "out_small" }).ok, true, "micro: mesmo tratamento dos demais portes");
   assert.deepEqual(canHaveFicha(null).ok, false);
 });
 
@@ -190,4 +191,18 @@ check("P2-T6: contato com papel, hash do e-mail e validação pendente; suprimid
   const view = await ctx.api(`/api/companies/${id}`);
   assert.equal(view.data.contacts[0].prospectRole, "decision_maker");
   assert.equal(view.data.contacts[0].emailValidation, "pending");
+});
+
+check("Opção A (2026-09-30): microempresa com perfil 'não confirmado' tem o mesmo tratamento de uma pequena; o perfil não vira consumo confirmado", async (ctx) => {
+  const micro = await companyWithUnit(ctx, "01");
+  const m = await ctx.api(`/api/companies/${micro}/profiles`, "POST", { productId: "product-01", profileClass: "unconfirmed", basis: "Só atividade no cadastro" });
+  assert.equal(m.status, 200, JSON.stringify(m.data));
+  const { api, DB } = ctx;
+  const c = await api("/api/companies", "POST", { legalName: "Pequena Doces Ltda.", countryCode: "BR", registrationId: "22.333.444/0001-55", registrationIdType: "CNPJ", sourceLabel: "teste" });
+  DB.raw.prepare("INSERT INTO company_units(id,tenant_id,company_id,cnpj,size_code,source_label,consulted_at) VALUES ('u2','eag-internal',?,'22333444000155','03','teste','2026-09-23')").run(c.data.id);
+  const s = await api(`/api/companies/${c.data.id}/profiles`, "POST", { productId: "product-01", profileClass: "unconfirmed", basis: "Só atividade no cadastro" });
+  assert.deepEqual([m.data.icpStatus, s.data.icpStatus], ["out_small", "in_icp"]);
+  assert.deepEqual([m.data.ficha.ok, s.data.ficha.ok], [true, true], "mesmo tratamento: ambas podem ter ficha");
+  const cls = DB.raw.prepare("SELECT profile_class FROM buyer_profiles WHERE id=?").get(m.data.id).profile_class;
+  assert.equal(cls, "unconfirmed", "ausência de evidência não vira consumo confirmado");
 });
