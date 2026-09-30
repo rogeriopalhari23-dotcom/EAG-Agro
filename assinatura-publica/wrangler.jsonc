@@ -1,0 +1,12 @@
+// Worker só de arquivos estáticos para a assinatura de e-mail (logo original de Rogério).
+// Separado do Compass de propósito: o Compass fica inteiro atrás do Access e o bypass público cobre só /u/* (OPERACAO.md);
+// aqui não há código, banco, segredo nem rota de API — apenas o arquivo servido por HTTPS, sem login.
+// Não trocar o arquivo no mesmo caminho: um logo novo recebe um nome novo (e-mails já enviados continuam apontando para o antigo).
+// Publicar: npx wrangler deploy -c assinatura-publica/wrangler.jsonc
+{
+  "name": "eag-assinatura",
+  "compatibility_date": "2026-09-21",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": { "directory": "./public" }
+}

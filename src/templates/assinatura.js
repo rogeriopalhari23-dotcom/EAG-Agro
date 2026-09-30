@@ -5,7 +5,9 @@
 // trocado pela URL HTTPS estável do arquivo ORIGINAL (sem redesenho); enquanto houver marcador, nada é aprovado nem enviado.
 // Rodapé separado: endereço físico (R19.13) e descadastro (R21.7) — nunca dentro da assinatura.
 export const LOGO_PLACEHOLDER = "LOGO_EAG_HTTPS";
-const LOGO_URL = null; // URL HTTPS estável do logo original (preencher quando recuperado)
+// Logo original (Desktop\EAG Agro\Logotipo EAG AGRO.png, PNG 150×150, sha256 9f20a474…030d5), servido sem login pelo Worker
+// estático assinatura-publica/ (fora do Access do Compass). Exibido a 128×128 como no HTML original (mesma proporção).
+const LOGO_URL = "https://eag-assinatura.rogeriopalhari23.workers.dev/assinatura/logo-eag-agro.png";
 
 const CONFIDENTIALITY =
   "The content of this email is confidential and intended solely for the recipient specified in this message. Sharing any part of this message with third parties without the sender’s written consent is strictly prohibited. If you have received this message by mistake, please reply and proceed with its deletion so that we can ensure such an error does not occur in the future.";
@@ -88,7 +90,7 @@ export const SIGNATURE = {
   // Equivalente em texto simples para clientes sem HTML (mesmos dados, mesmo aviso).
   text: ["Rogerio Palhari", "Broker | EAG AGRO", "+55 66 99226-9615", "rogeriopalhari@eagagro.com", "www.eagagro.com", "", CONFIDENTIALITY],
   html: LOGO_URL ? HTML_TEMPLATE.replace(LOGO_PLACEHOLDER, LOGO_URL) : HTML_TEMPLATE,
-  source: "HTML fornecido por Rogério em 2026-09-30 (assinatura da Hostinger); logo original pendente de URL HTTPS estável",
+  source: "HTML fornecido por Rogério em 2026-09-30 (assinatura da Hostinger); logo original em URL HTTPS estável (2026-09-30), aguardando conferência visual",
 };
 
 // Assinatura pronta para envio: sem marcador pendente e conferida por Rogério.
