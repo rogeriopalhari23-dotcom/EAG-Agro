@@ -57,7 +57,9 @@ async function ready(ctx, { email = INTERNAL } = {}) {
   });
   const put = (key, scope, value) => api(`/api/parameters/${key}`, "PUT", { scope, value, reason: "Parâmetro do teste da ponte" });
   await put("send_timezone", "national", "America/Sao_Paulo");
-  await put("send_window", "national", { start: "00:00", end: "23:59", weekdays: [0, 1, 2, 3, 4, 5, 6] });
+  // Janela o dia todo, todos os dias (1 = segunda … 7 = domingo): o teste não depende da hora em que roda.
+  const w = await put("send_window", "national", { start: "00:00", end: "23:59", weekdays: [1, 2, 3, 4, 5, 6, 7] });
+  assert.equal(w.status, 200, JSON.stringify(w.data));
   await put("sanctions_max_age_hours", "global", 24);
   DB.raw.exec("UPDATE channels SET state='internal_test' WHERE channel='email'");
   for (const sid of ["source-ofac-sdn", "source-cgu-ceis", "source-cgu-cnep"]) {

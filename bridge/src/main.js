@@ -103,17 +103,30 @@ process.on("exit", release);
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));
 deps.journal = openJournal(cfg.journalPath);
 
-if (process.argv.includes("--check")) {
+// No Windows, process.exit() com conexões HTTP ainda fechando dispara uma asserção do Node (UV_HANDLE_CLOSING) e um
+// código de saída anormal — a tarefa agendada leria como queda. Os modos terminam de forma natural, com process.exitCode.
+const checkMode = process.argv.includes("--check");
+if (checkMode) {
   // Diagnóstico sem envio: Compass (autenticação e cursor), IMAP (leitura) e SMTP (conexão e login pela ponte).
-  const cursor = await deps.compass.call("/api/bridge/cursor");
-  log("compass_ok", { uidValidity: cursor.uidValidity, lastUid: cursor.lastUid });
-  const st = await deps.imap.status();
-  log("imap_ok", { uidValidity: st.uidValidity, messages: st.messages });
-  await deps.smtp.check();
-  log("smtp_ok", { host: cfg.smtpHost, port: cfg.smtpPort });
-  log("check_done", { note: "nenhuma mensagem enviada" });
-  process.exit(0);
-}
+  let etapa = "compass";
+  try {
+    const cursor = await deps.compass.call("/api/bridge/cursor");
+    log("compass_ok", { uidValidity: cursor.uidValidity, lastUid: cursor.lastUid });
+    etapa = "imap";
+    const st = await deps.imap.status();
+    log("imap_ok", { uidValidity: st.uidValidity, messages: st.messages });
+    etapa = "smtp";
+    await deps.smtp.check();
+    log("smtp_ok", { host: cfg.smtpHost, port: cfg.smtpPort });
+    log("check_done", { note: "nenhuma mensagem enviada" });
+    process.exitCode = 0;
+  } catch (e) {
+    log("check_failed", { etapa, status: e.status ?? null, code: e.code ?? null, message: String(e.message ?? "").slice(0, 160) });
+    process.exitCode = 1;
+  }
+  deps.journal.close();
+  release();
+} else {
 
 // Estado local para o comando "estado" (sem conteúdo, sem endereço, sem segredo).
 const statePath = join(dirname(cfg.journalPath), "estado.json");
@@ -164,4 +177,7 @@ try {
   unlinkSync(stopPath);
 } catch {}
 log("stopped", { reason: "pedido de parada" });
-process.exit(0);
+deps.journal.close();
+release();
+process.exitCode = 0;
+}

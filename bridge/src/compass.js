@@ -37,7 +37,10 @@ export function compassClient({ baseUrl, hmacKey, accessClientId, accessClientSe
       } catch {
         // resposta do Access (login) ou erro de borda: não é JSON do Compass
       }
-      if (res.status >= 300) throw new CompassError(res.status, data?.error?.code ?? "http_error", data?.error?.message ?? `HTTP ${res.status}`);
+      // Resposta que não é JSON do Compass vem do Cloudflare Access (token de serviço ausente, errado ou sem regra).
+      if (res.status >= 300 && !data?.error)
+        throw new CompassError(res.status, "access_denied", "o Cloudflare Access recusou o token de serviço (confira Client ID e Client Secret guardados)");
+      if (res.status >= 300) throw new CompassError(res.status, data.error.code, data.error.message);
       return data;
     },
   };
