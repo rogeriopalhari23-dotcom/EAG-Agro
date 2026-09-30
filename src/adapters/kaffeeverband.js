@@ -85,19 +85,25 @@ export function classifyCoffeeProfile(name, text) {
   const quote = importer ? (text.match(new RegExp(`[^.!]{0,160}(?:${RE.importer.source})[^.!]{0,160}`, "i"))?.[0] ?? null) : null;
   const base = { importStatement: quote ? quote.trim().slice(0, 300) : null, mentionsBrazil: RE.brazil.test(text) };
   const namedRoastery = /kaffeer(ö|oe)ster|r(ö|oe)sterei|roastery|kaffeemanufaktur/i.test(name);
-  const roastStrong = namedRoastery || RE.roasterStrong.test(text);
-  const roastAny = roastStrong || /röst|roast|roest/i.test(name) || /geröstet|röstung|\brösten\b|röstkaffee|frisch geröstet/i.test(text);
+  // Evidência de torra no TEXTO da empresa (o nome só orienta a triagem; decisão de 2026-09-30).
+  // Só torra em primeira pessoa protege do descarte: fabricantes de máquinas também falam em "Rösten" e "Röstung".
+  const roastSelfText = RE.roasterStrong.test(text) || /eigenen kaffee zu rösten|hauseigene[rn]? rösterei/i.test(text);
+  const roastText = roastSelfText || /geröstet|röstung|\brösten\b|röstkaffee|frisch geröstet/i.test(text);
+  const roastStrong = namedRoastery || RE.roasterStrong.test(text) || /eigenen kaffee zu rösten|hauseigene[rn]? rösterei/i.test(text);
+  const roastAny = roastStrong || /röst|roast|roest/i.test(name) || roastText;
   const supplier = RE.supplierToRoasters.test(text);
   const tradeScore = (all.match(RE.tradeWords) ?? []).length;
   const providerScore = (text.match(RE.providerWords) ?? []).length;
-  const providerSelf = /\bals (unabhängige[rn]? )?berater|\bberatungsunternehmen|\bwir beraten\b|logistikdienstleister|dienstleister für/i.exec(text);
+  const providerSelf = /\bals (unabhängige[rn]? )?berater|\bberatungsunternehmen|\bwir beraten\b|logistikdienstleister|dienstleister für|\bals handelsvertretung|lösungen renommierter maschinenbauer|hersteller(n)? im anlagenbau/i.exec(text);
   if (!text.trim()) return namedRoastery ? { ...base, role: "processor", reason: null } : { ...base, role: "empty", reason: "perfil sem texto no diretório — classificar manualmente" };
   if (importer) return { ...base, role: roastStrong && !supplier ? "processor" : "trader", reason: null };
-  const providerByName = !namedRoastery ? RE.providerName.exec(name) : null;
-  const providerByText = providerSelf ?? (providerScore >= 2 && providerScore > tradeScore && !roastAny ? RE.providerWords.exec(text) : null);
+  // Descarte automático só com evidência clara de atividade incompatível no texto (autodescrição de prestador ou
+  // predomínio de vocabulário de serviço) e sem torra própria no texto. Nome de prestador sozinho vai para triagem.
+  const providerByText = providerSelf ?? (providerScore >= 2 && providerScore > tradeScore && !roastSelfText ? RE.providerWords.exec(text) : null);
   RE.providerWords.lastIndex = 0;
-  const provider = providerByName ?? providerByText;
-  if (provider && !roastStrong) return { ...base, role: "non_buyer", reason: `perfil de prestador (${provider[0]}), não comprador de café verde` };
+  if (providerByText && !roastSelfText) return { ...base, role: "non_buyer", reason: `texto descreve prestador (${providerByText[0]}), não comprador de café verde` };
+  const nameHint = !namedRoastery && !roastSelfText ? RE.providerName.exec(name) : null;
+  if (nameHint) return { ...base, role: "unclassified", reason: `nome sugere prestador (${nameHint[0]}), mas o texto não mostra atividade incompatível — triagem manual` };
   if (roastAny && !supplier && !(RE.trader.test(all) && tradeScore >= 3 && !roastStrong)) return { ...base, role: "processor", reason: null };
   if (RE.trader.test(all) || supplier || tradeScore >= 2) return { ...base, role: "trader", reason: null };
   return { ...base, role: "unclassified", reason: "perfil sem indicação clara de torrefação, importação ou comércio — revisar" };

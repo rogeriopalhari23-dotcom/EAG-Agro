@@ -45,7 +45,13 @@ test("Kaffeeverband: lista do diretório, país pelo CEP e regras definidas ante
   assert.equal(classifyCoffeeProfile("Beispiel GmbH", "Wir sind ein Unternehmen.").role, "unclassified");
   // Correções do teste real: prestador com "Handel" no texto é descartado; torrefação sem trema; fornecer "aus unserer Rösterei" não é trader.
   assert.equal(classifyCoffeeProfile("Vollers Group GmbH", "Logistik und Lagerung für den Rohkaffeehandel in Europa.").role, "non_buyer");
-  assert.equal(classifyCoffeeProfile("Neuhaus Neotec Maschinen- und Anlagenbau GmbH", "Röstanlagen für den Handel.").role, "non_buyer");
+  // Nome sozinho não descarta (decisão de 2026-09-30): sem evidência no texto, vai para triagem.
+  const neu = classifyCoffeeProfile("Neuhaus Neotec Maschinen- und Anlagenbau GmbH", "Röstanlagen für den Handel.");
+  assert.equal(neu.role, "unclassified");
+  assert.match(neu.reason, /nome sugere prestador.*triagem manual/);
+  assert.equal(classifyCoffeeProfile("Neuhaus Neotec Maschinen- und Anlagenbau GmbH", "NEUHAUS NEOTEC gehört weltweit zu den führenden Herstellern im Anlagenbau für die Kaffeeverarbeitung. Wir bieten Maschinen für jede Röstung.").role, "non_buyer", "texto mostra atividade incompatível");
+  // Texto real da Haberland (2026-09-30): nome de prestador, mas torra própria no texto — não é descartada.
+  assert.equal(classifyCoffeeProfile("Haberland Getränkesysteme GmbH", "Seit Anfang der 2000er sind wir im Dienstleistungsgeschäft mit dem Betrieb von Verpflegungsautomaten tätig. Genau das brachte uns 2018 auf die Idee, unseren eigenen Kaffee zu rösten. Der erste Röster zog bei uns ein, wir gründeten die Marke „Moin Bohne“.").role, "processor");
   assert.equal(classifyCoffeeProfile("Panea Kaffeeroester", "Wir liefern frischen Kaffee aus unserer Rösterei an Gastronomie.").role, "processor");
   assert.equal(classifyCoffeeProfile("Schirmer Kaffee GmbH", "Wir beliefern Handel und Gastronomie mit Kaffee aus unserer Rösterei in Dortmund.").role, "processor");
   assert.equal(classifyCoffeeProfile("Röst & Pack Maschinen e.K.", "Verpackungsmaschinen für Kaffee.").role, "non_buyer");
@@ -118,7 +124,7 @@ test("Kaffeeverband/fluxo: descoberta descarta fora do país com motivo; valida�
   assert.equal(by["Importhaus Nord GmbH"].role, "trader");
   assert.equal(by["Kleine Rösterei GmbH"].role, "processor");
   assert.equal(by["Kaffee Logistik GmbH"].status, "dismissed");
-  assert.match(by["Kaffee Logistik GmbH"].dismissReason, /\[automático\] perfil de prestador/);
+  assert.match(by["Kaffee Logistik GmbH"].dismissReason, /\[automático\] texto descreve prestador/);
   assert.equal(d.counts.relevant, 2);
   assert.equal(d.counts.withImportStatement, 2);
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM research_cache").get().n, 3);

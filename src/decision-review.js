@@ -134,12 +134,16 @@ export async function getReview(env, actor, searchId) {
         : [],
       _roastStrong: !!roast,
       _roastFirst: !!first,
+      // Unidade compradora: a própria empresa diz que torra/compra no seu local (primeira pessoa), com cidade conhecida.
+      _unit: !!first && !!r.city,
     });
   }
   const consumerOk = (c) => c.role === "processor" && !NOT_CONSUMER.has(c.activity.type);
   const score = (c) =>
     (consumerOk(c) ? 3 : 0) + (c._roastStrong ? 4 : 0) + (c.activity.type === "buys_processes" ? 2 : c.activity.type === "mixed" ? 1 : 0) +
-    (c.purchaseEvidence.importStatement ? 2 : 0) + (c.contact.people.length ? 2 : 0) + (c.contact.generalEmail ? 1 : 0) + (c.size.band ? 1 : 0) - (c.group ? 1 : 0);
+    (c.purchaseEvidence.importStatement ? 2 : 0) + (c._unit ? 1 : 0) + (c.contact.people.length ? 2 : 0) + (c.contact.generalEmail ? 1 : 0);
+  // Porte só desempata (pequena/média primeiro); vínculo com grupo não reduz a prioridade (decisão de 2026-09-30).
+  const sizePref = (c) => ({ small: 0, medium: 0, medium_plus: 1 })[c.size.band] ?? (c.size.band === "micro" ? 3 : c.size.band === "giant" ? 4 : 2);
   const open = cards.filter((c) => c.status === "new");
   for (const c of open) {
     const pend = [];
@@ -158,15 +162,16 @@ export async function getReview(env, actor, searchId) {
       c._roastStrong ? `consumo declarado pela própria empresa ("${c.purchaseEvidence.consumption.text.slice(0, 90)}…")` : consumerOk(c) ? "processadora pelo diretório, sem frase própria de torra" : `atividade: ${c.activity.typeLabel ?? c.role}`,
       c.purchaseEvidence.importStatement ? "autodeclara importação" : null,
       c.contact.people.length ? `representante nomeado (${c.contact.people.map((q) => q.name).join(", ")})` : c.contact.generalEmail ? "só e-mail geral" : "sem contato lido",
-      c.group ? `grupo (${c.group.level}) reduz a prioridade, não descarta` : null,
+      c._unit ? "unidade compradora: torra no próprio local" : null,
+      c.group ? `vínculo com grupo (${c.group.level}) a avaliar — não altera a prioridade` : null,
     ].filter(Boolean).join("; ");
     c.score = score(c);
   }
-  const ranked = open.filter(consumerOk).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-  const strip = ({ _roastStrong, _roastFirst, ...c }) => c;
+  const ranked = open.filter(consumerOk).sort((a, b) => b.score - a.score || sizePref(a) - sizePref(b) || a.name.localeCompare(b.name));
+  const strip = ({ _roastStrong, _roastFirst, _unit, ...c }) => c;
   const top = ranked.slice(0, 10).map(strip);
   const reclassify = open.filter((c) => c.role === "processor" && NOT_CONSUMER.has(c.activity.type)).map(strip);
-  const restoreSuggestions = cards.filter((c) => c.status === "dismissed" && (c.dismissReason ?? "").startsWith("[automático] perfil de prestador") && (c._roastFirst || c.activity.type === "buys_processes" || c.activity.type === "mixed")).map(strip);
+  const restoreSuggestions = cards.filter((c) => c.status === "dismissed" && /^\[automático\] (perfil de prestador|texto descreve prestador)/.test(c.dismissReason ?? "") && (c._roastFirst || c.activity.type === "buys_processes" || c.activity.type === "mixed")).map(strip);
   const dismissedInvestigated = cards.filter((c) => c.status === "dismissed" && c.activity.type).map(strip);
   const unreachable = open.filter((c) => c.contact.technicalState === "inacessível a partir da Cloudflare").map((c) => ({ id: c.id, name: c.name, city: c.city, httpStatus: c.contact.httpStatus, checkedAt: c.contact.checkedAt, assisted: c.assisted }));
 

@@ -278,11 +278,14 @@ async function companyCard(env, actor, x, row, productId) {
 // Candidatas são importadoras: sem sinal próprio de importação/compra a empresa fica no grupo "importação não verificada".
 const groupOf = (card) =>
   card.buyerStatus === "found" ? "unverified" : card.profile?.class === "trader_distributor" ? "traders" : ["final_consumer_confirmed", "possible_final_consumer"].includes(card.profile?.class) ? "consumers" : "toConfirm";
+// Ordem (2026-09-30): prioridade registrada por Rogério → evidência de compra → decisor/comprador com fonte → porte só como
+// desempate (pequena/média primeiro). Vínculo com grupo não reduz a prioridade automaticamente.
+const hasBuyerContact = (c) => (c.contacts ?? []).some((k) => k.verified && ["decision_maker", "provisional_decision_maker", "influencer"].includes(k.role));
 const order = (a, b) =>
   (a.triage?.priority === "secondary" ? 1 : 0) - (b.triage?.priority === "secondary" ? 1 : 0) ||
-  (a.profile?.icpStatus === "in_icp" ? 0 : 1) - (b.profile?.icpStatus === "in_icp" ? 0 : 1) ||
-  (SIZE_RANK[a.size?.class] ?? 2) - (SIZE_RANK[b.size?.class] ?? 2) ||
   BUYER[a.buyerStatus].rank - BUYER[b.buyerStatus].rank ||
+  (hasBuyerContact(a) ? 0 : 1) - (hasBuyerContact(b) ? 0 : 1) ||
+  (SIZE_RANK[a.size?.class] ?? 2) - (SIZE_RANK[b.size?.class] ?? 2) ||
   a.name.localeCompare(b.name);
 
 // GET /api/foreign-searches/:id — resultado por empresa, cobertura, custo e rendimento.

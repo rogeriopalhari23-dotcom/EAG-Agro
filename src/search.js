@@ -301,7 +301,10 @@ export async function resumeSearch(request, env, actor, rid, id, deps = {}) {
 
 // Sem perfil registrado, o porte da fonte dá uma ordem provisória (marcada como provisória).
 const ICP_SQL = `COALESCE(icp,CASE WHEN size_code = '01' THEN 'out_small' ELSE 'pending_size' END)`;
-const ICP_RANK_SQL = `CASE ${ICP_SQL} WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 WHEN 'out_trader' THEN 4 ELSE 5 END`;
+// Ordem (decisão de 2026-09-30): aderência comercial primeiro (trader por último), depois a distância; o porte só desempata
+// (pequena/média antes de porte desconhecido, micro e grande/grupo). Porte e grupo nunca descartam.
+const ADHERENCE_SQL = `CASE ${ICP_SQL} WHEN 'out_trader' THEN 1 ELSE 0 END`;
+const SIZE_PREF_SQL = `CASE ${ICP_SQL} WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 ELSE 4 END`;
 
 export async function listCandidates(request, env, actor, id) {
   const { search } = await getSearch(env, actor, id);
@@ -319,7 +322,7 @@ export async function listCandidates(request, env, actor, id) {
          FROM search_candidates sc JOIN company_units u ON u.id=sc.unit_id JOIN companies c ON c.id=u.company_id
          WHERE sc.search_id=?)
        SELECT *, ${ICP_SQL} icp_status, icp IS NULL icp_provisional FROM base
-       ORDER BY ${order === "distance" ? byDistance : `${ICP_RANK_SQL}, ${byDistance}`} LIMIT ? OFFSET ?`,
+       ORDER BY ${order === "distance" ? byDistance : `${ADHERENCE_SQL}, ${byDistance}, ${SIZE_PREF_SQL}`} LIMIT ? OFFSET ?`,
       camp.product_id,
       id,
       limit + 1,

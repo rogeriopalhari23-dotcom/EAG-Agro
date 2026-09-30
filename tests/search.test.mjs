@@ -182,7 +182,9 @@ check("P2-T4: ordem por distância põe desconhecido no fim; ICP provisório pel
   assert.equal(d.at(-1).inside_radius, "unknown");
   assert.ok(d[0].distance_km <= d[1].distance_km);
   const icp = (await ctx.api(`/api/searches/${s.searchId}/candidates?order=icp`)).data.items;
-  assert.equal(icp.at(-1).icp_status, "out_small");
+  // Ordem de 2026-09-30: aderência → distância → porte só desempata; micro continua visível e candidata.
+  assert.ok(icp.some((x) => x.icp_status === "out_small"), "micro continua na lista");
+  assert.ok(!icp.slice(0, -1).some((x, i) => x.icp_status !== "out_trader" && icp[i + 1].icp_status !== "out_trader" && x.distance_km != null && icp[i + 1].distance_km != null && x.distance_km > icp[i + 1].distance_km), "entre não-traders, a distância manda");
   assert.ok(icp.every((x) => x.icp_provisional));
 });
 
