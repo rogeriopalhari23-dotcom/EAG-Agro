@@ -45,8 +45,9 @@ test("Identificação do responsável: canal geral com fonte vira destinatário 
   assert.equal(f.version.purpose, "identify_buyer");
   const emails = f.messages.filter((m) => m.kind === "auto_email");
   assert.deepEqual(emails.map((m) => m.day), [0, 4], "E-mail 2 no dia 4, como na skill; dias não seguidos (R19.2 item 12)");
-  assert.match(emails[0].body, /pessoa responsável pela compra de açúcar/);
-  assert.match(emails[0].body, /canal profissional/);
+  assert.match(emails[0].body, /Quem é responsável pela compra de açúcar na empresa\?/);
+  assert.match(emails[0].body, /contato profissional adequado/);
+  assert.equal(emails[1].subject, emails[0].subject, "acompanhamento sem Re:");
   assert.doesNotMatch(emails.map((m) => m.body).join("\n"), /20 minutos|preço|lote|volume/i, "sem reunião nem condição comercial");
   assert.match(emails[0].body, /Rua Exemplo, 100/);
   assert.match(emails[0].body, /"sair"/);
@@ -70,14 +71,18 @@ test("Identificação em alemão: texto com Sie, assunto e pergunta certos; revi
   const unsub = () => "https://compass.exemplo/u/abc";
   const sig = { senderName: "Rogério Palhari", postalAddress: "Al. Rio Negro, 503 — Barueri/SP, Brasil" };
   const msgs = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: [{ contactId: "c1", sourceLabel: "Canal geral publicado no site da empresa (site)" }], sig, unsub });
-  assert.equal(msgs[0].subject, "Lieferant für Rohkaffee");
-  assert.match(msgs[0].body, /^Guten Tag,\nich habe Ihre Kontaktdaten auf Ihrer Website gefunden/);
-  assert.match(msgs[0].body, /für den Einkauf von Rohkaffee zuständig ist/);
+  // Texto de Rogério (2026-09-30), palavra por palavra.
+  assert.equal(msgs[0].subject, "Zuständige Person für den Rohkaffee-Einkauf");
+  assert.equal(msgs[0].body.split("\n\nRogério Palhari — EAG Agro")[0], "Guten Tag,\n\nmein Name ist Rogério Palhari, ich bin bei EAG Agro in Brasilien tätig. Wir vermitteln Agrarrohstoffe, darunter brasilianischen Rohkaffee.\n\nWer ist in Ihrem Unternehmen für den Einkauf von Rohkaffee zuständig? Könnten Sie meine Nachricht bitte an die zuständige Person weiterleiten oder mir eine geeignete geschäftliche Kontaktadresse nennen?\n\nVielen Dank für Ihre Unterstützung.");
+  assert.equal(msgs[1].body.split("\n\nRogério Palhari — EAG Agro")[0], "Guten Tag,\n\nich komme kurz auf meine vorherige Nachricht zurück. Könnten Sie mir bitte mitteilen, an wen ich mich bezüglich des Einkaufs von Rohkaffee wenden kann?\n\nFalls Ihr Unternehmen keinen Rohkaffee einkauft, genügt ein kurzer Hinweis.\n\nVielen Dank.");
+  assert.equal(msgs[1].subject, msgs[0].subject);
   assert.match(msgs[0].body, /„abmelden“/);
   const ctx = { market: "international", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, unsubUrl: unsub, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de };
   const r = reviewIdentification(msgs, ctx);
   assert.equal(r.ok, true, JSON.stringify(r.findings));
   assert.ok(!r.findings.some((x) => /ID0|aprovação de Rogério/.test(`${x.id} ${x.detail}`)), "nenhuma aprovação extra");
+  const fakeReply = msgs.map((m, i) => (i === 1 ? { ...m, subject: `Re: ${m.subject}` } : m));
+  assert.ok(reviewIdentification(fakeReply, ctx).findings.some((x) => x.id === "PV4" && !x.ok && /Re:/.test(x.detail)), "Re: sem resposta encadeada é barrado");
   const sameDay = msgs.map((m, i) => (i === 1 ? { ...m, day: 1 } : m));
   assert.ok(reviewIdentification(sameDay, ctx).findings.some((x) => x.id === "R19.2-12" && !x.ok), "dias seguidos barrados");
   const withPrice = msgs.map((m, i) => (i === 0 ? { ...m, body: m.body.replace("Könnten Sie", "Wir haben eine Partie zum besten Preis. Könnten Sie") } : m));

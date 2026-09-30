@@ -34,9 +34,15 @@ const LANG = {
 };
 // Pergunta da ficha de identificação: quem responde pela compra + canal profissional (A-ID1–A-ID3).
 const IDENT_ASK = {
-  "pt-BR": /respons[aá]vel pela compra[\s\S]*(indicar quem|quem responde)[\s\S]*canal/i,
+  "pt-BR": /(quem é )?respons[aá]vel pela compra[\s\S]*(encaminhar|indicar)[\s\S]*(contato profissional|canal)/i,
   en: /responsible for purchasing[\s\S]*who is responsible[\s\S]*channel/i,
-  de: /für den Einkauf[\s\S]*wer diesen Bereich verantwortet[\s\S]*(beruflichen Kontakt|erreiche)/i,
+  de: /für den Einkauf von[\s\S]*zuständig[\s\S]*(weiterleiten|Kontaktadresse)/i,
+};
+// Assunto da ficha de identificação (PV9 aplicado a esta ficha, 2026-09-30): diz o objetivo do contato — encontrar o
+// responsável pela compra da commodity —, sem número nem título "criativo". Textos pt/de escritos por Rogério (id-*-1.1.0).
+const IDENT_SUBJECT = {
+  "pt-BR": { re: /^Responsável pela compra de [a-zà-ú][a-zà-ú ]*$/, hint: "Responsável pela compra de [commodity]" },
+  de: { re: /^Zuständige Person für den [A-ZÄÖÜ][a-zäöüß]+-Einkauf$/, hint: "Zuständige Person für den [Rohstoff]-Einkauf" },
 };
 
 function finding(list, id, ok, detail, extra = {}) {
@@ -202,10 +208,14 @@ export function reviewIdentification(raw, ctx) {
   finding(f, "PV4", !liar.length, liar.length ? "Texto cita LinkedIn, mas a fonte registrada do canal é outra." : "Afirmações coerentes com a fonte registrada do canal.");
   const sale = messages.filter((m) => L.forbidden.test(m.body) || L.volume.test(m.body));
   finding(f, "PV7", !sale.length, sale.length ? `Passo ${sale.map((m) => m.step).join(", ")} cita preço, lote, volume ou condição comercial.` : "Sem preço, lote, volume ou condição comercial.");
+  const subj = IDENT_SUBJECT[ctx.language || "pt-BR"] ?? { re: L.subject, hint: L.subjectHint };
   for (const m of messages.filter((x) => x.step === 1)) {
-    const ok = L.subject.test(m.subject || "") && !/[%\d]/.test(m.subject || "");
-    finding(f, "PV9", ok, ok ? `Assunto "${m.subject}".` : `Assunto "${m.subject}" fora do padrão "${L.subjectHint}".`, { contactId: m.contactId });
+    const ok = subj.re.test(m.subject || "") && !/[%\d]/.test(m.subject || "");
+    finding(f, "PV9", ok, ok ? `Assunto "${m.subject}" (objetivo do contato).` : `Assunto "${m.subject}" fora do padrão "${subj.hint}".`, { contactId: m.contactId });
   }
+  // Acompanhamento com "Re:" só se o envio for resposta real (encadeada); o envio atual não encadeia.
+  const fakeReply = messages.filter((m) => m.step > 1 && /^re:/i.test(m.subject || ""));
+  if (fakeReply.length) finding(f, "PV4", false, `Passo ${fakeReply.map((m) => m.step).join(", ")}: assunto com "Re:" sem ser resposta encadeada à primeira mensagem.`);
   const apologies = messages.filter((m) => L.apology.test(m.body));
   finding(f, "PV10", !apologies.length, apologies.length ? `Frase proibida no passo ${apologies.map((m) => m.step).join(", ")}.` : "Tom direto, sem pedido de desculpas.");
   if (ctx.market !== "international") finding(f, "PV12", true, "Não se aplica (nacional).");

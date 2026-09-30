@@ -44,6 +44,8 @@ Consolidado em 2026-09-30. **A revisão agora está no Compass:** Radar Internac
 
 ## 4. Textos (não aprovados) — canal geral publicado, dias 0 e 4
 
+> **Substituídos em 30/09/2026 pelos textos escritos por Rogério (versão 1.1.0).** Versão vigente em `RASCUNHOS-IDENTIFICACAO-DEU.md` e na tela "Revisão para decisão". A tabela abaixo é a versão anterior, mantida como histórico.
+
 | Passo | Alemão (enviado) | Português (referência) |
 | --- | --- | --- |
 | Dia 0 — assunto | Lieferant für Rohkaffee | Fornecedor café verde |

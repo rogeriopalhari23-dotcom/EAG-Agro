@@ -24,7 +24,7 @@ const companies = [
 const lines = [
   "# Revisão — ficha de identificação do responsável pela compra de café verde (Alemanha)",
   "",
-  `Gerado por \`scripts/rascunhos-identificacao.mjs\` (modelo \`${IDENT_VERSION.de}\`, revisor do sistema). **Nada foi enviado nem aprovado.** Sequência: **um destinatário** (o canal geral publicado da empresa) e **dois passos** — E-mail 1 no dia 0 e E-mail 2 no dia 4, nunca em dias seguidos (R19.2 item 12). A contagem de passos é escolha do modelo (como os E-mails 1 e 2 da skill), não exigência da Spec.`,
+  `Gerado por \`scripts/rascunhos-identificacao.mjs\` (modelo \`${IDENT_VERSION.de}\`, revisor do sistema). **Nada foi enviado nem aprovado.** Textos de Rogério (versão 1.1.0, 30/09/2026). Sequência: **um destinatário** (o canal geral publicado da empresa) e **dois passos** — dia 0 e dia 4, mesmo assunto (o envio não encadeia como resposta, então sem "Re:"). Endereço da assinatura sem confirmação registrada de Rogério (pendência).`,
   "",
   `Revisor (regras da Spec aplicáveis): ${review.findings.map((x) => `${x.id} ${x.ok ? "ok" : "falha"}`).join(" · ")}`,
   "",

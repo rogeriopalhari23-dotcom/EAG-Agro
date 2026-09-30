@@ -47,8 +47,9 @@ test("Revisão para decisão: decisões, textos lado a lado e dez candidatas a p
   assert.match(r.decisions.commercialValidation.authorizes, /Não autoriza envio/);
   assert.equal(r.decisions.r148.status, "proposta — não aplicada");
   assert.deepEqual(r.decisions.texts.steps.map((z) => z.day), [0, 4]);
-  assert.equal(r.decisions.texts.steps[0].de.subject, "Lieferant für Rohkaffee");
-  assert.equal(r.decisions.texts.steps[0].pt.subject, "Fornecedor café verde");
+  assert.equal(r.decisions.texts.steps[0].de.subject, "Zuständige Person für den Rohkaffee-Einkauf");
+  assert.equal(r.decisions.texts.steps[1].de.subject, "Zuständige Person für den Rohkaffee-Einkauf", "acompanhamento sem Re: (envio não encadeia)");
+  assert.equal(r.decisions.texts.steps[0].pt.subject, "Responsável pela compra de café verde");
   assert.equal(r.snov.configured, false);
   assert.ok(r.snov.steps.some((q) => /wrangler secret put SNOV_CLIENT_ID/.test(q)));
   assert.equal(r.top10.length, 3);

@@ -2853,6 +2853,9 @@ async function showDecisionReview(searchId) {
     panel(
       `4. Textos — ${d.texts.status}`,
       text("small", `Destinatário: ${d.texts.recipient}. Sequência: ${d.texts.steps.map((z) => `passo ${z.step} no dia ${z.day}`).join(", ")}.`),
+      d.texts.address ? text("small", `Endereço na assinatura: ${d.texts.address.value || "não configurado"} — ${d.texts.address.confirmedByRogerio ? "confirmado por Rogério" : d.texts.address.pending} Fonte: ${d.texts.address.source}`, d.texts.address.confirmedByRogerio ? "" : "tag warn") : null,
+      d.texts.followUpSubject ? text("small", d.texts.followUpSubject) : null,
+      d.texts.stops ? text("small", d.texts.stops) : null,
       ...d.texts.steps.map((z) => el("div", {}, text("strong", `Passo ${z.step} — dia ${z.day}`), table(["Alemão (enviado)", "Português (referência)"], [[z.de.subject, z.pt.subject], [pre(z.de.body), pre(z.pt.body)]]))),
     ),
     panel(

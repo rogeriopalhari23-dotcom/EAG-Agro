@@ -1,19 +1,22 @@
 # Revisão — ficha de identificação do responsável pela compra de café verde (Alemanha)
 
-Gerado por `scripts/rascunhos-identificacao.mjs` (modelo `id-de-1.0.0`, revisor do sistema). **Nada foi enviado nem aprovado.** Sequência: **um destinatário** (o canal geral publicado da empresa) e **dois passos** — E-mail 1 no dia 0 e E-mail 2 no dia 4, nunca em dias seguidos (R19.2 item 12). A contagem de passos é escolha do modelo (como os E-mails 1 e 2 da skill), não exigência da Spec.
+Gerado por `scripts/rascunhos-identificacao.mjs` (modelo `id-de-1.1.0`, revisor do sistema). **Nada foi enviado nem aprovado.** Textos de Rogério (versão 1.1.0, 30/09/2026). Sequência: **um destinatário** (o canal geral publicado da empresa) e **dois passos** — dia 0 e dia 4, mesmo assunto (o envio não encadeia como resposta, então sem "Re:"). Endereço da assinatura sem confirmação registrada de Rogério (pendência).
 
 Revisor (regras da Spec aplicáveis): PV3 ok · R19.2-12 ok · PV2 ok · PV4 ok · PV7 ok · PV9 ok · PV10 ok · PV12 ok · R19.13 ok
 
 ## E-mail 1 — dia 0
 
-Assunto: **Lieferant für Rohkaffee** — referência: **Fornecedor café verde**
+Assunto: **Zuständige Person für den Rohkaffee-Einkauf** — referência: **Responsável pela compra de café verde**
 
 | Alemão (enviado) | Português (referência) |
 | --- | --- |
-| Guten Tag, | Olá, tudo bem? |
-| ich habe Ihre Kontaktdaten auf Ihrer Website gefunden und schreibe Ihnen kurz. | Encontrei o contato de vocês no site e tomei a liberdade de enviar uma mensagem rápida. |
-| Ich bin bei EAG Agro; wir handeln mit Agrarrohstoffen, und ich möchte gern mit der Person sprechen, die bei Ihnen für den Einkauf von Rohkaffee zuständig ist. | Sou da EAG Agro; trabalhamos com commodities agrícolas e gostaria de falar com a pessoa responsável pela compra de café verde de vocês. |
-| Könnten Sie mir sagen, wer diesen Bereich verantwortet und über welchen beruflichen Kontakt ich die Person am besten erreiche? | Você poderia me indicar quem responde por essa área e qual o melhor canal profissional para falar com essa pessoa? |
+| Guten Tag, | Olá, |
+|   |   |
+| mein Name ist Rogério Palhari, ich bin bei EAG Agro in Brasilien tätig. Wir vermitteln Agrarrohstoffe, darunter brasilianischen Rohkaffee. | Meu nome é Rogério Palhari, da EAG Agro, no Brasil. Atuamos na intermediação de commodities agrícolas, incluindo café verde brasileiro. |
+|   |   |
+| Wer ist in Ihrem Unternehmen für den Einkauf von Rohkaffee zuständig? Könnten Sie meine Nachricht bitte an die zuständige Person weiterleiten oder mir eine geeignete geschäftliche Kontaktadresse nennen? | Quem é responsável pela compra de café verde na empresa? Poderia encaminhar esta mensagem à pessoa responsável ou indicar um contato profissional adequado? |
+|   |   |
+| Vielen Dank für Ihre Unterstützung. | Obrigado pela atenção. |
 |   |   |
 | Rogério Palhari — EAG Agro | Rogério Palhari — EAG Agro |
 | Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil | Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil |
@@ -21,12 +24,17 @@ Assunto: **Lieferant für Rohkaffee** — referência: **Fornecedor café verde*
 
 ## E-mail 2 — dia 4
 
-Assunto: **Re: Lieferant für Rohkaffee** — referência: **Re: Fornecedor café verde**
+Assunto: **Zuständige Person für den Rohkaffee-Einkauf** — referência: **Responsável pela compra de café verde**
 
 | Alemão (enviado) | Português (referência) |
 | --- | --- |
-| Guten Tag, | Olá, tudo bem? |
-| haben Sie meine Nachricht von vor einigen Tagen gesehen? Mir genügt ein kurzer Hinweis, wer bei Ihnen für den Einkauf von Rohkaffee zuständig ist und wie ich die Person am besten erreiche. | Chegou a ver a mensagem que enviei há alguns dias? Só preciso saber quem responde pela compra de café verde e qual o melhor canal para falar com essa pessoa. |
+| Guten Tag, | Olá, |
+|   |   |
+| ich komme kurz auf meine vorherige Nachricht zurück. Könnten Sie mir bitte mitteilen, an wen ich mich bezüglich des Einkaufs von Rohkaffee wenden kann? | Retomo brevemente minha mensagem anterior. Poderia indicar com quem devo falar sobre a compra de café verde? |
+|   |   |
+| Falls Ihr Unternehmen keinen Rohkaffee einkauft, genügt ein kurzer Hinweis. | Se a empresa não compra café verde, uma breve confirmação já ajuda. |
+|   |   |
+| Vielen Dank. | Obrigado. |
 |   |   |
 | Rogério Palhari — EAG Agro | Rogério Palhari — EAG Agro |
 | Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil | Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil |

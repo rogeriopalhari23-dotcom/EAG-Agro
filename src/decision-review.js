@@ -210,6 +210,16 @@ export async function getReview(env, actor, searchId) {
       texts: {
         status: "rascunho — não aprovado",
         recipient: "canal geral publicado no site oficial de cada empresa",
+        // Endereço físico da assinatura (R19.13): vem de docs/eag-compass-perfil.md (eagagro.com/contato), configurado em
+        // 2026-09-24 na implementação; não há confirmação registrada de Rogério. Sinalizado, sem trocar por outro.
+        address: {
+          value: env.EAG_POSTAL_ADDRESS || null,
+          confirmedByRogerio: false,
+          source: "Perfil da empresa no projeto (docs/eag-compass-perfil.md, de eagagro.com/contato), configurado em 24/09/2026 durante a implementação.",
+          pending: "Endereço sem confirmação registrada de Rogério: confirmar ou corrigir antes de aprovar a ficha (R19.13 exige endereço físico real).",
+        },
+        followUpSubject: "O acompanhamento usa o mesmo assunto, sem \"Re:\": o envio não encadeia o segundo e-mail como resposta ao primeiro.",
+        stops: "A sequência para com resposta (R20.1), descadastro (R21) ou pausa (R22), como as demais fichas.",
         steps: de.map((m, k) => ({ step: m.step, day: m.day, de: { subject: m.subject, body: m.body }, pt: { subject: pt[k].subject, body: pt[k].body } })),
       },
     },

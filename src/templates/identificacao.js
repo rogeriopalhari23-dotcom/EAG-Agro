@@ -8,7 +8,10 @@
 //  A-ID3 Sem pedido de reunião, preço, lote, volume ou condição comercial (PV7); a conversa vem na ficha do comprador.
 //  A-ID4 Alemão e inglês: tradução fiel das frases em português (PV12: idioma do país); alemão com "Sie".
 //        A aprovação do texto é a própria aprovação individual da ficha (R18.3); não há aprovação extra.
-export const IDENT_VERSION = { "pt-BR": "id-pt-1.0.0", en: "id-en-1.0.0", de: "id-de-1.0.0" };
+//  A-ID5 (2026-09-30) Textos em alemão e português escritos por Rogério (versão 1.1.0). O acompanhamento usa o mesmo
+//        assunto, sem "Re:": o envio não encadeia o segundo e-mail ao primeiro (sem In-Reply-To/References), então "Re:"
+//        diria que é resposta sem ser. O inglês continua na versão 1.0.0 (não revisado).
+export const IDENT_VERSION = { "pt-BR": "id-pt-1.1.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
 
 const COMPANY = "EAG Agro";
 // Termo de mercado da commodity em alemão (sem entrada → a ficha em alemão não é gerada).
@@ -17,12 +20,9 @@ export const commodityDisplayDe = (product) => COMMODITY_DE[product.commodity] ?
 
 const TEXT = {
   "pt-BR": {
-    subject: (c) => `Fornecedor ${c}`,
-    hello: "Olá, tudo bem?",
-    found: "Encontrei o contato de vocês no site e tomei a liberdade de enviar uma mensagem rápida.",
-    who: (c) => `Sou da ${COMPANY}; trabalhamos com commodities agrícolas e gostaria de falar com a pessoa responsável pela compra de ${c} de vocês.`,
-    ask: "Você poderia me indicar quem responde por essa área e qual o melhor canal profissional para falar com essa pessoa?",
-    follow: (c) => `Chegou a ver a mensagem que enviei há alguns dias? Só preciso saber quem responde pela compra de ${c} e qual o melhor canal para falar com essa pessoa.`,
+    subject: (c) => `Responsável pela compra de ${c}`,
+    e1: (c, s) => ["Olá,", `Meu nome é ${s.senderName}, da ${COMPANY}, no Brasil. Atuamos na intermediação de commodities agrícolas, incluindo ${c} brasileiro.`, `Quem é responsável pela compra de ${c} na empresa? Poderia encaminhar esta mensagem à pessoa responsável ou indicar um contato profissional adequado?`, "Obrigado pela atenção."],
+    e2: (c) => ["Olá,", `Retomo brevemente minha mensagem anterior. Poderia indicar com quem devo falar sobre a compra de ${c}?`, `Se a empresa não compra ${c}, uma breve confirmação já ajuda.`, "Obrigado."],
     sig: (s, u) => ["", `${s.senderName} — ${COMPANY}`, s.postalAddress, `Para não receber mais mensagens, responda "sair" ou use este link: ${u}`],
   },
   en: {
@@ -35,12 +35,10 @@ const TEXT = {
     sig: (s, u) => ["", `${s.senderName} — ${COMPANY}`, s.postalAddress, `To stop receiving these messages, reply "unsubscribe" or use this link: ${u}`],
   },
   de: {
-    subject: (c) => `Lieferant für ${c}`,
-    hello: "Guten Tag,",
-    found: "ich habe Ihre Kontaktdaten auf Ihrer Website gefunden und schreibe Ihnen kurz.",
-    who: (c) => `Ich bin bei ${COMPANY}; wir handeln mit Agrarrohstoffen, und ich möchte gern mit der Person sprechen, die bei Ihnen für den Einkauf von ${c} zuständig ist.`,
-    ask: "Könnten Sie mir sagen, wer diesen Bereich verantwortet und über welchen beruflichen Kontakt ich die Person am besten erreiche?",
-    follow: (c) => `haben Sie meine Nachricht von vor einigen Tagen gesehen? Mir genügt ein kurzer Hinweis, wer bei Ihnen für den Einkauf von ${c} zuständig ist und wie ich die Person am besten erreiche.`,
+    // Texto de Rogério para Rohkaffee; o substantivo composto vale para café verde.
+    subject: (c) => `Zuständige Person für den ${c}-Einkauf`,
+    e1: (c, s) => ["Guten Tag,", `mein Name ist ${s.senderName}, ich bin bei ${COMPANY} in Brasilien tätig. Wir vermitteln Agrarrohstoffe, darunter brasilianischen ${c}.`, `Wer ist in Ihrem Unternehmen für den Einkauf von ${c} zuständig? Könnten Sie meine Nachricht bitte an die zuständige Person weiterleiten oder mir eine geeignete geschäftliche Kontaktadresse nennen?`, "Vielen Dank für Ihre Unterstützung."],
+    e2: (c) => ["Guten Tag,", `ich komme kurz auf meine vorherige Nachricht zurück. Könnten Sie mir bitte mitteilen, an wen ich mich bezüglich des Einkaufs von ${c} wenden kann?`, `Falls Ihr Unternehmen keinen ${c} einkauft, genügt ein kurzer Hinweis.`, "Vielen Dank."],
     sig: (s, u) => ["", `${s.senderName} — ${COMPANY}`, s.postalAddress, `Wenn Sie keine weiteren Nachrichten erhalten möchten, antworten Sie mit „abmelden“ oder nutzen Sie diesen Link: ${u}`],
   },
 };
@@ -51,12 +49,13 @@ export function generateIdentification({ language = "pt-BR", commodity, recipien
   if (!t) throw new Error(`Idioma sem modelo de identificação: ${language}`);
   const out = [];
   for (const r of recipients) {
-    const fromSite = /\bsite\b|website/i.test(r.sourceLabel || "");
-    const e1 = [t.hello, ...(fromSite ? [t.found] : []), t.who(commodity), t.ask].join("\n");
-    const e2 = [t.hello, t.follow(commodity)].join("\n");
+    // Versão 1.1.0 (pt/de): parágrafos separados por linha em branco; versão 1.0.0 (en): linhas simples.
+    const e1 = t.e1 ? t.e1(commodity, sig).join("\n\n") : [t.hello, ...(/\bsite\b|website/i.test(r.sourceLabel || "") ? [t.found] : []), t.who(commodity), t.ask].join("\n");
+    const e2 = t.e2 ? t.e2(commodity).join("\n\n") : [t.hello, t.follow(commodity)].join("\n");
     const tail = t.sig(sig, unsub(r.contactId)).join("\n");
+    // Mesmo assunto no acompanhamento: o envio não encadeia como resposta real (sem In-Reply-To/References).
     out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 1, day: 0, subject: t.subject(commodity), body: `${e1}\n${tail}`, objective: "identificar o responsável pela compra e o canal profissional" });
-    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 2, day: 4, subject: `Re: ${t.subject(commodity)}`, body: `${e2}\n${tail}`, objective: "confirmar se viu e obter a indicação" });
+    out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 2, day: 4, subject: t.subject(commodity), body: `${e2}\n${tail}`, objective: "obter a indicação do responsável ou a confirmação de que não compra" });
   }
   return out;
 }
