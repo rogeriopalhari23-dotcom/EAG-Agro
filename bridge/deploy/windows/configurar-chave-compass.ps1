@@ -7,17 +7,23 @@ $dir = Join-Path $env:LOCALAPPDATA "eag-mail-bridge"
 New-Item -ItemType Directory -Force $dir | Out-Null
 $bytes = New-Object byte[] 32
 [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
-$chave = [Convert]::ToBase64String($bytes)
+# Hexadecimal: só 0-9 e a-f, nada que um pipe ou shell reescreva (em base64, um "+" chegou ao Worker como espaço).
+$chave = -join ($bytes | ForEach-Object { $_.ToString("x2") })
 $raiz = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
 Push-Location $raiz
 try {
-  # Avisos do wrangler saem no stderr; só o código de saída decide.
+  # O pipe do PowerShell 5.1 para programas externos altera o texto (codificação e quebra de linha) — a chave chegava
+  # inválida ao Worker. O Node repassa ao wrangler exatamente os bytes da chave, recebida só pela variável deste processo.
+  $env:EAG_CHAVE_NOVA = $chave
   $ErrorActionPreference = "Continue"
-  $saida = $chave | & npx.cmd wrangler secret put BRIDGE_HMAC_KEY 2>&1 | ForEach-Object { "$_" }
+  $saida = & node -e "const r=require('child_process').spawnSync('npx wrangler secret put BRIDGE_HMAC_KEY',{input:process.env.EAG_CHAVE_NOVA,shell:true,encoding:'utf8'});process.stdout.write((r.stdout||'').slice(-300)+(r.stderr||'').slice(-300));process.exit(r.status??1)" 2>&1 | ForEach-Object { "$_" }
   $ok = $LASTEXITCODE -eq 0
   $ErrorActionPreference = "Stop"
   if (-not $ok) { throw "wrangler secret put falhou: $($saida | Select-Object -Last 3)" }
-} finally { Pop-Location }
+} finally {
+  Remove-Item Env:EAG_CHAVE_NOVA -ErrorAction SilentlyContinue
+  Pop-Location
+}
 $arquivo = Join-Path $dir "segredos.json"
 $atuais = @{}
 if (Test-Path $arquivo) { (Get-Content $arquivo -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $atuais[$_.Name] = $_.Value } }

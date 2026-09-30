@@ -304,3 +304,15 @@ test("Ponte: passo enviado com atraso empurra os seguintes, mantendo os dias apr
   assert.equal(d.smtp.raws.length, 1, "atrasados não saem juntos");
   assert.equal((await runCycle(d)).reason, "interval");
 });
+
+test("Ponte: chave em hexadecimal (formato de produção) assina igual nos dois lados", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  const hex = "ab".repeat(32);
+  ctx.env.BRIDGE_HMAC_KEY = hex;
+  const compass = compassClient({ baseUrl: "http://localhost", hmacKey: hex, fetchImpl: (url, init) => worker.fetch(new Request(url, init), ctx.env) });
+  const c = await compass.call("/api/bridge/cursor");
+  assert.equal(c.mailbox, "INBOX");
+  ctx.env.BRIDGE_HMAC_KEY = "  " + hex + "\r\n"; // espaço/quebra em volta não atrapalha
+  assert.equal((await compass.call("/api/bridge/cursor")).mailbox, "INBOX");
+});

@@ -21,7 +21,10 @@ const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart
 const sha256hex = async (text) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 
 export async function signature(keyB64, method, path, ts, nonce, body) {
-  const raw = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+  // Tolera espaço, quebra de linha e BOM em volta da chave (valor gravado por ferramentas de linha de comando).
+  // Chave em hexadecimal (64 caracteres, formato gerado por configurar-chave-compass.ps1) ou base64 (testes).
+  const k = String(keyB64).replace(/[\s﻿]/g, "");
+  const raw = /^[0-9a-f]{64}$/i.test(k) ? Uint8Array.from(k.match(/../g), (h) => parseInt(h, 16)) : Uint8Array.from(atob(k), (c) => c.charCodeAt(0));
   const key = await crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${method}\n${path}\n${ts}\n${nonce}\n${await sha256hex(body)}`)));
 }
@@ -62,7 +65,16 @@ async function authenticate(request, env, path) {
     sig = request.headers.get("x-bridge-signature");
   if (!ts || !nonce || !sig || !/^[A-Za-z0-9-]{16,80}$/.test(nonce)) fail(401, "bridge_signature_required", "Assinatura da ponte ausente.");
   if (Math.abs(Date.now() - Number(ts)) > CLOCK_SKEW_MS) fail(401, "bridge_clock_skew", "Carimbo de tempo fora da janela.");
-  if (!equalHex(sig, await signature(env.BRIDGE_HMAC_KEY, request.method, path, ts, nonce, body))) fail(403, "bridge_bad_signature", "Assinatura inválida.");
+  let expected;
+  try {
+    expected = await signature(env.BRIDGE_HMAC_KEY, request.method, path, ts, nonce, body);
+  } catch {
+    // Diagnóstico sem o valor: comprimento e tipos de caractere presentes.
+    const k = String(env.BRIDGE_HMAC_KEY);
+    const kinds = [[/[A-Za-z0-9]/, "alfanum"], [/[+/=]/, "base64"], [/\s/, "espaco"], [/[^\x20-\x7e]/, "nao-ascii"], [/[^A-Za-z0-9+/=\s]/, "outros"]].filter(([r]) => r.test(k)).map(([, n]) => n);
+    fail(503, "bridge_not_configured", `Chave da ponte inválida no Compass (BRIDGE_HMAC_KEY; comprimento ${k.length}; ${kinds.join(",")}).`);
+  }
+  if (!equalHex(sig, expected)) fail(403, "bridge_bad_signature", "Assinatura inválida.");
   const at = now();
   await s(env, "DELETE FROM bridge_nonces WHERE seen_at<?", new Date(Date.now() - 86400000).toISOString()).run();
   const fresh = await s(env, "INSERT INTO bridge_nonces(nonce,seen_at) VALUES (?,?) ON CONFLICT(nonce) DO NOTHING", nonce, at).run();

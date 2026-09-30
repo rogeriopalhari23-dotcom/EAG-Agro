@@ -497,7 +497,7 @@ export default {
           error.status,
         );
       else {
-        console.error("request_failed", { requestId: rid });
+        console.error("request_failed", { requestId: rid, name: error?.name ?? null, message: String(error?.message ?? "").slice(0, 200) });
         result = response(
           {
             error: {

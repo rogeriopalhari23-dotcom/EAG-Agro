@@ -12,7 +12,14 @@ if (Test-Path $arquivo) { (Get-Content $arquivo -Raw | ConvertFrom-Json).PSObjec
 foreach ($nome in "MAILBOX_PASSWORD", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET") {
   $rotulo = @{ MAILBOX_PASSWORD = "Senha da caixa rogeriopalhari@eagagro.com"; ACCESS_CLIENT_ID = "Client ID do token de serviço (termina em .access)"; ACCESS_CLIENT_SECRET = "Client Secret do token de serviço" }[$nome]
   $valor = Read-Host -AsSecureString "$rotulo — não aparece na tela; Enter vazio mantém o atual"
-  if ($valor.Length -gt 0) { $atuais[$nome] = $valor | ConvertFrom-SecureString }
+  if ($valor.Length -gt 0) {
+    # O painel mostra "CF-Access-Client-Id: …" / "CF-Access-Client-Secret: …": aceita colar a linha inteira ou só o valor.
+    $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($valor)
+    try { $texto = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
+    if ($nome -ne "MAILBOX_PASSWORD") { $texto = ($texto -replace "^\s*CF-Access-Client-(Id|Secret)\s*:\s*", "").Trim() }
+    $atuais[$nome] = (ConvertTo-SecureString $texto -AsPlainText -Force) | ConvertFrom-SecureString
+    Remove-Variable texto
+  }
 }
 $atuais | ConvertTo-Json | Set-Content -Encoding utf8 $arquivo
 # Conferência sem exibir valores: o Client ID precisa terminar em ".access".

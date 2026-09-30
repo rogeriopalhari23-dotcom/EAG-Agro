@@ -4,7 +4,9 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 
 export function signature(keyB64, method, path, ts, nonce, body) {
   const bodyHash = createHash("sha256").update(body, "utf8").digest("hex");
-  return createHmac("sha256", Buffer.from(keyB64, "base64")).update(`${method}\n${path}\n${ts}\n${nonce}\n${bodyHash}`, "utf8").digest("hex");
+  const k = String(keyB64).trim();
+  const key = /^[0-9a-f]{64}$/i.test(k) ? Buffer.from(k, "hex") : Buffer.from(k, "base64"); // hex (padrão) ou base64
+  return createHmac("sha256", key).update(`${method}\n${path}\n${ts}\n${nonce}\n${bodyHash}`, "utf8").digest("hex");
 }
 
 export class CompassError extends Error {

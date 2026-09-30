@@ -62,7 +62,13 @@ if (Test-Path $segredos) {
   (Get-Content $segredos -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object {
     $seguro = $_.Value | ConvertTo-SecureString
     $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($seguro)
-    try { Set-Item -Path "Env:$($_.Name)" -Value ([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    try {
+      $valor = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+      # Valores guardados com o rótulo do painel ("CF-Access-Client-Id: …") também funcionam.
+      if ($_.Name -like "ACCESS_CLIENT_*") { $valor = ($valor -replace "^\s*CF-Access-Client-(Id|Secret)\s*:\s*", "").Trim() }
+      Set-Item -Path "Env:$($_.Name)" -Value $valor
+      Remove-Variable valor
+    } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
   }
 }
 if (-not $env:MAILBOX_PASSWORD) {
