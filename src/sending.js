@@ -6,6 +6,7 @@ import { statement as s, parameters, now, commit, auditStatement } from "./store
 import { decryptPii } from "./crypto.js";
 import { messageHash } from "./fichas.js";
 import { restrictionsFor } from "./restrictions.js";
+import { erasuresConsistent, redactAddresses } from "./erasure.js";
 import { unsubUrl } from "./unsub-token.js";
 import { smtpTransport } from "./adapters/mailbox.js";
 import { localDate, localParts, inWindow, addDays } from "./timezone.js";
@@ -16,7 +17,7 @@ const MAX_TEMP_ATTEMPTS = 3;
 const ADMIN = new Set(["admin"]);
 
 const log = (env, outboxId, event, detail, token = null) =>
-  s(env, "INSERT INTO send_log(id,outbox_id,event,detail,lease_token) VALUES (?,?,?,?,?)", crypto.randomUUID(), outboxId, event, detail ?? null, token);
+  s(env, "INSERT INTO send_log(id,outbox_id,event,detail,lease_token) VALUES (?,?,?,?,?)", crypto.randomUUID(), outboxId, event, redactAddresses(detail) ?? null, token);
 
 // Lease do remetente: garante um único executor por caixa, mesmo com cron sobreposto (Review Focus 3).
 async function acquireSender(env, tenant, sender, owner, at) {
@@ -146,6 +147,8 @@ async function prepareNext(env, tenant, at, owner, state, leaseMs = LEASE_MS) {
   if (sentToday >= cap) return { reason: "daily_cap" }; // 7 (teto do remetente, soma dos mercados)
   if (state.next_send_at && state.next_send_at > at) return { reason: "interval" };
   if (!(await readerHealthy(env, tenant, at))) return { reason: "reply_reader_unavailable" };
+  // D1 restaurado para antes de uma exclusão registrada no R2: nada sai até a reaplicação (R9.1).
+  if (!(await erasuresConsistent(env, tenant))) return { reason: "erasure_reapply_required" };
   const candidates = (
     await s(
       env,

@@ -29,7 +29,7 @@ const SOURCE_LABEL = {
 };
 const GENERIC_LOCAL = /^(info|kontakt|contact|office|mail|hello|hallo|service|team|post|vendas|comercial|compras|contato|sac|financeiro|admin|einkauf|verkauf|sales|shop|bestellung|orders?)$/i;
 
-async function nameHash(env, tenant, companyId, name) {
+export async function nameHash(env, tenant, companyId, name) {
   const key = await secretKey(env, "SUPPRESSION_HMAC_KEY", { name: "HMAC", hash: "SHA-256" }, ["sign"]);
   const norm = name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean).sort().join(" ");
   const d = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${tenant}:person:${companyId}:${norm}`));

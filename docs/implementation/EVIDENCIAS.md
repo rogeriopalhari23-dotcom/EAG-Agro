@@ -800,3 +800,41 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
   - `tests/exclusao-purga.test.mjs` (2 testes, "Maria Souza"/`valeverde.com.br`/`exemplo.invalid`). O primeiro rascunho checava tarefas que não tinham `contact_id` (a tarefa de resposta só guarda orientação fixa, sem PII) e por isso passava sem testar nada; foi corrigido com uma tarefa de ligação do contato e a asserção `tasks.length > 0`.
   - Limites declarados: Time Travel do D1, a caixa de e-mail (Enviados/Entrada) e o diário local da ponte ficam fora do Compass. Resultado de tarefa de resposta sem `contact_id` não é alcançado.
 - Correção de documento pedida por Rogério: a carta postal e o piloto no Brasil são **alternativas propostas**, não decisões (DECISOES-PILOTO §4).
+
+## EXCLUSAO-PURGA — revisão de resíduos, vínculos e proteção contra restauração (2026-10-01, sem publicar)
+
+- **Pedido de Rogério:** revisar os dados que ficam em aprovação, envio e tarefas de resposta; corrigir vínculos sem apagar evidências de outros contatos; testar com dados fictícios; documentar backups, caixa e ponte; impedir que uma restauração recoloque dados excluídos em uso. Sem exclusão real e sem publicação.
+- **Revisão** sobre o esquema real (75 tabelas, `PRAGMA table_info` do banco de teste migrado). Resíduos encontrados e tratados:
+  - endereço no texto SMTP (`send_log.detail` e diário local da ponte);
+  - endereço em `resolved_reason`;
+  - tarefas de resposta sem vínculo (nova coluna `tasks.inbound_id`);
+  - IDs do servidor da pessoa em `inbound_messages`;
+  - `purchase_note`, `purchase_source_url` e `source_url` da candidata;
+  - nomes no cache compartilhado do aviso legal;
+  - `contacts.source_label`.
+  
+  Sem PII: `ficha_approvals`, `message_id` gerado por nós, auditoria, jobs da Snov, reuniões.
+- **Regra do conteúdo compartilhado:** mensagem de outro remetente na conversa não é apagada e volta em `sharedRetained`; a purga individual é auditada (`POST /api/inbound/:id/purge-content`). No cache do aviso legal sai só a pessoa.
+- **Restauração:** `erasure_ledger` (D1) mais cópia em R2 gravada antes do D1. A divergência bloqueia envio (`prepareNext`) e aprovação até `POST /api/erasures/reapply`.
+- **Código:**
+  - `src/erasure.js` (novo; `changes.js` reexporta);
+  - `src/inbound.js` (`inbound_id`);
+  - `src/sending.js` (guarda e redação no `log`);
+  - `src/bridge.js` (redação);
+  - `src/fichas.js` (guarda);
+  - `src/worker.js` (2 rotas);
+  - `src/people.js` (exporta `nameHash`);
+  - `bridge/src/journal.js` (redação);
+  - `bridge/scripts/redigir-diario.mjs` (novo);
+  - migração 0032 revisada;
+  - `docs/implementation/correcoes/0032-reversao.sql`.
+- **Testes:**
+  - `tests/exclusao-purga.test.mjs`: 6 testes, dados fictícios — tarefa de resposta, conteúdo compartilhado, repetição, restauração por `VACUUM INTO`, reversão, diário.
+  - Defeito achado pelo teste de restauração e corrigido: `reapplied_at` não era gravado quando a linha não existia no banco restaurado.
+  - O teste antigo P2-T13 passou a fornecer R2, porque a exclusão agora exige o registro fora do banco.
+  - Suíte completa: 377 + 2 + 15 (ponte), 0 falhas.
+  - Compatibilidade: suíte da versão em produção (`b3935f9`) com a 0032 aplicada, 373/373, numa cópia temporária já removida.
+- **Fontes e achados:**
+  - Prazo do Time Travel conferido na documentação da Cloudflare (atualizada em 2026-04-21): 7 dias no Free e 30 no Paid. O plano da conta precisa ser confirmado.
+  - Achado fora do escopo (não corrigido): id repetido no alerta de "outra commodity" em `src/inbound.js`, registrado em `EXCLUSAO-PURGA-PLANO.md` §7.
+- **Plano e decisões:** plano de publicação e reversão em `EXCLUSAO-PURGA-PLANO.md` §5–§6, não executado. Decisões T11 pendentes no §3.

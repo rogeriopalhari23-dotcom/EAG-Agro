@@ -6,6 +6,7 @@
 // Access só de /api/bridge (audiência BRIDGE_ACCESS_AUD, regra Service Auth só para esse token) + assinatura HMAC-SHA256 do
 // corpo com carimbo de tempo e nonce de uso único. Só as rotas /api/bridge/* aceitam essa identidade.
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { redactAddresses } from "./erasure.js";
 import { fail, response } from "./http.js";
 import { accessConfig, localAuthAllowed } from "./auth.js";
 import { statement as s, now, auditStatement } from "./store.js";
@@ -113,7 +114,7 @@ export async function handleBridge(request, env, path, rid) {
     const outboxId = String(input.outboxId || ""),
       token = Number(input.leaseToken);
     if (!outboxId || !Number.isInteger(token) || !OUTCOMES.has(input.outcome)) fail(422, "invalid_result", "Resultado inválido.");
-    const detail = input.smtp ? `${input.smtp.code ?? ""} ${String(input.smtp.text ?? "").slice(0, 160)}`.trim() : input.evidence ? String(input.evidence).slice(0, 200) : null;
+    const detail = input.smtp ? redactAddresses(`${input.smtp.code ?? ""} ${String(input.smtp.text ?? "").slice(0, 160)}`.trim()) : input.evidence ? String(input.evidence).slice(0, 200) : null;
     // Integridade: o que saiu tem de ser exatamente o aprovado; divergência para o remetente.
     const row = await s(env, "SELECT message_sha256 FROM send_outbox WHERE tenant_id=? AND id=?", tenant, outboxId).first();
     if (row && input.outcome === "accepted" && input.sentSha256 !== row.message_sha256) {

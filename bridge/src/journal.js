@@ -15,7 +15,7 @@ export function openJournal(path) {
   return {
     claimed: (m) => q("INSERT OR IGNORE INTO sends(outbox_id,lease_token,message_id,sha256,state,updated_at) VALUES (?,?,?,?,'claimed',?)").run(m.outboxId, m.leaseToken, m.messageId, m.sha256, at()),
     smtpStarted: (m) => q("UPDATE sends SET state='smtp_started',updated_at=? WHERE outbox_id=? AND lease_token=? AND state='claimed'").run(at(), m.outboxId, m.leaseToken),
-    smtpDone: (m, r) => q("UPDATE sends SET state='smtp_done',outcome=?,smtp_code=?,smtp_text=?,updated_at=? WHERE outbox_id=? AND lease_token=?").run(r.kind, r.code ?? null, (r.text ?? "").slice(0, 160), at(), m.outboxId, m.leaseToken),
+    smtpDone: (m, r) => q("UPDATE sends SET state='smtp_done',outcome=?,smtp_code=?,smtp_text=?,updated_at=? WHERE outbox_id=? AND lease_token=?").run(r.kind, r.code ?? null, (r.text ?? "").slice(0, 160).replace(/[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]+\.[a-z]{2,}/gi, "[endereço]"), at(), m.outboxId, m.leaseToken),
     notSent: (m, why) => q("UPDATE sends SET state='smtp_done',outcome='not_sent',smtp_text=?,updated_at=? WHERE outbox_id=? AND lease_token=?").run(why, at(), m.outboxId, m.leaseToken),
     reported: (m) => q("UPDATE sends SET state='reported',updated_at=? WHERE outbox_id=? AND lease_token=?").run(at(), m.outboxId, m.leaseToken),
     pending: () => q("SELECT * FROM sends WHERE state IN ('claimed','smtp_started','smtp_done') ORDER BY updated_at").all(),

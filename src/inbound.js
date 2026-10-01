@@ -78,7 +78,7 @@ async function owner(env, tenant, companyId) {
 }
 
 // Pausa empresa + commodity (todas as variantes, todos os canais e contatos) e abre tarefa para Rogério (R20.1, R20.5).
-async function pauseTargets(env, tenant, targets, at, kind, note) {
+async function pauseTargets(env, tenant, targets, at, kind, note, inboundId) {
   const st = [];
   for (const t of targets) {
     st.push(
@@ -86,16 +86,16 @@ async function pauseTargets(env, tenant, targets, at, kind, note) {
       s(env, "UPDATE tasks SET status='suspended',suspended_reason='resposta recebida' WHERE tenant_id=? AND company_id=? AND commodity=? AND status='open' AND kind IN ('call_l0','call_l1','call_l2','linkedin')", tenant, t.company_id, t.commodity),
       s(
         env,
-        "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script) VALUES (?,?,?,?,?,?,?,10,?)",
-        crypto.randomUUID(), tenant, t.company_id, t.commodity, kind === "ambiguous" ? "review_ambiguous" : "reply_followup", await owner(env, tenant, t.company_id), at.slice(0, 10), note,
+        "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script,inbound_id) VALUES (?,?,?,?,?,?,?,10,?,?)",
+        crypto.randomUUID(), tenant, t.company_id, t.commodity, kind === "ambiguous" ? "review_ambiguous" : "reply_followup", await owner(env, tenant, t.company_id), at.slice(0, 10), note, inboundId,
       ),
     );
     // Outra commodity da mesma empresa: só alerta (R20.5).
     st.push(
       s(
         env,
-        "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script) SELECT ?,?,?,o.commodity,'reply_followup',?,?,1,? FROM (SELECT DISTINCT commodity FROM send_outbox WHERE tenant_id=? AND company_id=? AND commodity<>? AND status IN ('pending','waiting_sequence','temp_failed')) o",
-        crypto.randomUUID(), tenant, t.company_id, await owner(env, tenant, t.company_id), at.slice(0, 10), "A empresa respondeu sobre outra commodity; revise antes do próximo toque.", tenant, t.company_id, t.commodity,
+        "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script,inbound_id) SELECT ?,?,?,o.commodity,'reply_followup',?,?,1,?,? FROM (SELECT DISTINCT commodity FROM send_outbox WHERE tenant_id=? AND company_id=? AND commodity<>? AND status IN ('pending','waiting_sequence','temp_failed')) o",
+        crypto.randomUUID(), tenant, t.company_id, await owner(env, tenant, t.company_id), at.slice(0, 10), "A empresa respondeu sobre outra commodity; revise antes do próximo toque.", inboundId, tenant, t.company_id, t.commodity,
       ),
     );
   }
@@ -144,7 +144,7 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
           : c.priceRequest
             ? PRICE_GUIDANCE
             : "Resposta recebida: leia na caixa e defina o próximo passo.";
-    st.push(...(await pauseTargets(env, tenant, corr.targets, at, corr.correlation === "ambiguous" ? "ambiguous" : c.kind, note)));
+    st.push(...(await pauseTargets(env, tenant, corr.targets, at, corr.correlation === "ambiguous" ? "ambiguous" : c.kind, note, id)));
   }
   if (c.kind === "bounce_hard" && c.target) {
     const h = await identifierHash(env, tenant, "email", c.target);

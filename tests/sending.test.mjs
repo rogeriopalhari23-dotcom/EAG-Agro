@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { setup } from "./helpers/db.mjs";
+import { memoryR2 } from "./helpers/trade.mjs";
 import { tick, evaluateRamp } from "../src/sending.js";
 
 const DAY = "2099-01-05"; // segunda-feira
@@ -223,6 +224,7 @@ check("P2-T13: descartar empresa e excluir dados pessoais cancelam o que falta e
   const d = await ctx.api(`/api/companies/${r.companyId}/discard`, "POST", { reason: "Fora do perfil após visita" });
   assert.equal(d.status, 200);
   assert.ok(rows(ctx.DB).every((x) => x.status === "cancelled"));
+  ctx.env.FILES = memoryR2(); // a exclusão grava o registro também no R2 (proteção contra restauração)
   const del = await ctx.api(`/api/contacts/${r.dm}/delete-personal-data`, "POST", { legalBasis: "Pedido do titular por e-mail em 2099-01-05" });
   assert.equal(del.status, 200);
   const c = ctx.DB.raw.prepare("SELECT full_name_encrypted,email_encrypted,email_hash FROM contacts WHERE id=?").get(r.dm);

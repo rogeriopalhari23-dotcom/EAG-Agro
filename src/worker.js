@@ -22,6 +22,7 @@ import { handleUnsubscribe } from "./unsubscribe.js";
 import { handleBridge } from "./bridge.js";
 import * as sanctions from "./sanctions.js";
 import * as changes from "./changes.js";
+import * as erasure from "./erasure.js";
 import * as sending from "./sending.js";
 import * as inbound from "./inbound.js";
 import * as tasks from "./tasks.js";
@@ -368,6 +369,9 @@ async function route(request, env, rid) {
     return response(await emailValidation.validateCompanyContacts(request, env, actor, rid, valCo[1]));
   const disc = path.match(/^\/api\/companies\/([^/]+)\/discard$/);
   if (disc && method === "POST") return response(await changes.discardCompany(request, env, actor, rid, disc[1]));
+  if (path === "/api/erasures/reapply" && method === "POST") return response(await erasure.reapplyErasures(request, env, actor, rid));
+  const inbPurge = path.match(/^\/api\/inbound\/([^/]+)\/purge-content$/);
+  if (inbPurge && method === "POST") return response(await erasure.purgeInboundContent(request, env, actor, rid, inbPurge[1]));
   const dpd = path.match(/^\/api\/contacts\/([^/]+)\/delete-personal-data$/);
   if (dpd && method === "POST") return response(await changes.deletePersonalData(request, env, actor, rid, dpd[1]));
   const contact = path.match(/^\/api\/contacts\/([^/]+)$/);

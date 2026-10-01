@@ -12,6 +12,7 @@ import { generateSequence, commodityDisplay, SKILL_SHA256, TEMPLATES_VERSION, GE
 import { reviewSequence, reviewIdentification } from "./review.js";
 import { generateIdentification, commodityDisplayDe, IDENT_VERSION } from "./templates/identificacao.js";
 import { unsubUrl } from "./unsub-token.js";
+import { erasuresConsistent } from "./erasure.js";
 import { manualTaskStatements } from "./tasks.js";
 
 const ROLES = ["decision_maker", "influencer", "provisional_decision_maker"];
@@ -253,6 +254,7 @@ export async function approve(request, env, actor, rid, id) {
   if (!list.length) fail(422, "nothing_to_approve", "Nada a aprovar para este destinatário neste canal.");
   // Texto purgado por exclusão de dados pessoais (R23.5) nunca volta a ser aprovado.
   if (list.some((m) => m.purged_at)) fail(409, "personal_data_deleted", "Dados pessoais deste destinatário foram excluídos: o texto não pode ser aprovado.");
+  if (!(await erasuresConsistent(env, actor.tenant_id))) fail(409, "erasure_reapply_required", "O banco foi restaurado para antes de uma exclusão: reaplique as exclusões antes de aprovar.");
   // Versão gerada com outro endereço (antes da confirmação ou de uma troca) não é aprovada: gere nova versão.
   for (const m of list.filter((x) => x.kind === "auto_email"))
     if (!(await decryptPii(m.body_enc, env)).includes(env.EAG_POSTAL_ADDRESS_CONFIRMED))

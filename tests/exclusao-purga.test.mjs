@@ -1,120 +1,256 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { rmSync, readFileSync } from "node:fs";
 import { setup } from "./helpers/db.mjs";
 import { pilot, transport, at } from "./helpers/pilot.mjs";
 import { memoryR2 } from "./helpers/trade.mjs";
 import { tick } from "../src/sending.js";
 import { processMessage } from "../src/inbound.js";
 import { encryptPii, decryptPii } from "../src/crypto.js";
-import { PURGED } from "../src/changes.js";
+import { nameHash } from "../src/people.js";
+import { PURGED, redactAddresses } from "../src/erasure.js";
+import { openJournal } from "../bridge/src/journal.js";
+import { redactJournal } from "../bridge/scripts/redigir-diario.mjs";
 
-// EXCLUSAO-PURGA (R9.1, R23.5): só dados fictícios ("Maria Souza", valeverde.com.br, exemplo.invalid).
+// EXCLUSAO-PURGA (R9.1, R9.1.2, R23.5). Só dados fictícios: Maria Souza (titular que pede exclusão) e João Lima
+// (colega, outro contato da mesma empresa), domínios valeverde.com.br e exemplo.invalid.
 function check(name, fn) {
   test(name, async (t) => {
     const ctx = setup();
-    t.after(ctx.close);
+    t.after(() => ctx.close());
     await fn(ctx);
   });
 }
 const enc = (s) => new TextEncoder().encode(s);
+const MARIA = "compras@valeverde.com.br";
+const JOAO = "joao@valeverde.com.br";
+const SITE = "https://valeverde.exemplo.invalid";
+const reply = (from, mid, body, n) =>
+  `From: ${from}\r\nTo: rogeriopalhari@eagagro.com\r\nSubject: Re: Fornecedor\r\nMessage-ID: <r-${n}@valeverde.com.br>\r\nIn-Reply-To: ${mid}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${body}\r\n`;
 
 async function scenario(ctx) {
   ctx.env.FILES = memoryR2();
-  const r = await pilot(ctx);
+  const r = await pilot(ctx, { email: MARIA });
+  const DB = ctx.DB.raw;
+  DB.prepare("UPDATE companies SET website=? WHERE id=?").run(SITE, r.companyId);
+  // João: outro contato da mesma empresa, com candidata, verificação e tarefa próprias (evidências que devem ficar).
+  const joao = (await ctx.api(`/api/companies/${r.companyId}/contacts`, "POST", { fullName: "João Lima", email: JOAO, prospectRole: "influencer", sourceLabel: "site", timezone: "America/Sao_Paulo" })).data.id;
   await tick(ctx.env, "eag-internal", { transport: transport(), now: at(10) });
-  const mid = ctx.DB.raw.prepare("SELECT message_id FROM send_outbox WHERE step_no=1").get().message_id;
-  const raw = `From: Maria Souza <compras@valeverde.com.br>\r\nTo: rogeriopalhari@eagagro.com\r\nSubject: Re: Fornecedor\r\nMessage-ID: <r-1@valeverde.com.br>\r\nIn-Reply-To: ${mid}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nOi, aqui é a Maria Souza, celular 16 99999-0000.\r\n`;
-  await processMessage(ctx.env, "eag-internal", { mailbox: "INBOX", uidValidity: 7, uid: 501, bytes: enc(raw) }, at(12));
-  ctx.DB.raw
-    .prepare(
-      `INSERT INTO person_candidates(id,tenant_id,company_id,name_encrypted,name_hash,title_encrypted,role_suggestion,relevance,source_kind,source_url,verified_at,refresh_after,email_encrypted,status,contact_id,created_by)
-       VALUES ('pc-1','eag-internal',?,?,'h-maria',?,'decision_maker','compras','company_site','https://valeverde.exemplo.invalid/equipe','2099-01-01','2099-07-01',?,'accepted',?,'teste')`,
-    )
-    .run(r.companyId, await encryptPii("Maria Souza", ctx.env), await encryptPii("Compradora", ctx.env), await encryptPii("compras@valeverde.com.br", ctx.env), r.dm);
-  ctx.DB.raw
-    .prepare("INSERT INTO contact_verifications(id,tenant_id,contact_id,verification_type,status,method,source_reference,verified_by,verified_at) VALUES ('cv-1','eag-internal',?,'job_title','confirmed','site','https://linkedin.exemplo.invalid/in/maria-souza','teste','2099-01-01')")
-    .run(r.dm);
-  // Tarefa de ligação do contato (como as geradas pela ficha), com roteiro e resultado que citam a pessoa.
-  ctx.DB.raw
-    .prepare("INSERT INTO tasks(id,tenant_id,company_id,contact_id,kind,owner_id,due_date,status,script,result_json) VALUES ('tk-1','eag-internal',?,?,'call_l1','teste','2099-01-07','done','Ligar para Maria Souza','{\"nota\":\"Maria pediu retorno\"}')")
-    .run(r.companyId, r.dm);
-  return r;
+  const outboxA = DB.prepare("SELECT id,message_id FROM send_outbox WHERE contact_id=? AND step_no=1").get(r.dm);
+  // Resposta da Maria (dela) e, na mesma conversa, resposta do João (conteúdo compartilhado: é dele, cita a Maria).
+  await processMessage(ctx.env, "eag-internal", { mailbox: "INBOX", uidValidity: 7, uid: 501, bytes: enc(reply(`Maria Souza <${MARIA}>`, outboxA.message_id, "Aqui é a Maria Souza, celular 16 99999-0000.", 1)) }, at(12));
+  await processMessage(ctx.env, "eag-internal", { mailbox: "INBOX", uidValidity: 7, uid: 502, bytes: enc(reply(`João Lima <${JOAO}>`, outboxA.message_id, "Sou o João; a Maria me encaminhou.", 2)) }, at(13));
+  const inMaria = DB.prepare("SELECT id,r2_key FROM inbound_messages WHERE imap_uid=501").get();
+  const inJoao = DB.prepare("SELECT id,r2_key FROM inbound_messages WHERE imap_uid=502").get();
+  // Notas de Rogério nas tarefas de resposta (o vínculo inbound_id é o que permite separar as duas).
+  DB.prepare("UPDATE tasks SET result_json=? WHERE inbound_id=?").run('{"nota":"Maria pediu retorno na sexta"}', inMaria.id);
+  DB.prepare("UPDATE tasks SET result_json=? WHERE inbound_id=?").run('{"nota":"João quer amostra"}', inJoao.id);
+  // Candidatas, verificações e tarefas de ligação de cada um.
+  const cand = async (id, name, email, phone, contactId) =>
+    DB.prepare(
+      `INSERT INTO person_candidates(id,tenant_id,company_id,name_encrypted,name_hash,title_encrypted,role_suggestion,relevance,source_kind,source_url,verified_at,refresh_after,email_encrypted,phone_encrypted,status,contact_id,created_by,purchase_note,purchase_source_url)
+       VALUES (?,'eag-internal',?,?,?,?,'decision_maker','compras','impressum',?,'2099-01-01','2099-07-01',?,?,'accepted',?,'teste','Responde por compras de açúcar',?)`,
+    ).run(id, r.companyId, await encryptPii(name, ctx.env), await nameHash(ctx.env, "eag-internal", r.companyId, name), await encryptPii("Compras", ctx.env), `${SITE}/impressum`, await encryptPii(email, ctx.env), await encryptPii(phone, ctx.env), contactId, `${SITE}/equipe`);
+  await cand("pc-maria", "Maria Souza", MARIA, "+55 16 99999-0000", r.dm);
+  await cand("pc-joao", "João Lima", JOAO, "+55 16 98888-0000", joao);
+  for (const [id, contactId, who] of [["cv-maria", r.dm, "maria-souza"], ["cv-joao", joao, "joao-lima"]])
+    DB.prepare("INSERT INTO contact_verifications(id,tenant_id,contact_id,verification_type,status,method,source_reference,verified_by,verified_at) VALUES (?,'eag-internal',?,'job_title','confirmed','site',?,'teste','2099-01-01')").run(id, contactId, `https://linkedin.exemplo.invalid/in/${who}`);
+  for (const [id, contactId, script] of [["tk-maria", r.dm, "Ligar para Maria Souza"], ["tk-joao", joao, "Ligar para João Lima"]])
+    DB.prepare("INSERT INTO tasks(id,tenant_id,company_id,contact_id,kind,owner_id,due_date,status,script) VALUES (?,'eag-internal',?,?,'call_l1','teste','2099-01-07','open',?)").run(id, r.companyId, contactId, script);
+  // Aviso legal da empresa em cache: lista os dois (conteúdo compartilhado) e traz o e-mail da Maria e o telefone geral.
+  const payload = { status: "ok", url: `${SITE}/impressum`, people: [{ name: "Maria Souza", title: "Einkauf" }, { name: "João Lima", title: "Geschäftsführer" }], email: MARIA, phone: "+55 16 3333-0000", requests: 1 };
+  DB.prepare("INSERT INTO research_cache(source,external_id,url,checked_at,refresh_after,result_json) VALUES ('impressum',?,?,'2099-01-01','2099-07-01',?)").run(SITE, `${SITE}/impressum`, await encryptPii(JSON.stringify(payload), ctx.env));
+  // Texto de servidor com o endereço dela no registro de envio e na resolução manual.
+  DB.prepare("INSERT INTO send_log(id,outbox_id,event,detail) VALUES ('lg-1',?,'temp_failed',?)").run(outboxA.id, `451 4.2.0 <${MARIA}>: mailbox busy`);
+  DB.prepare("UPDATE send_outbox SET resolved_reason=? WHERE id=?").run(`Conferido com ${MARIA} pelo telefone`, outboxA.id);
+  return { ...r, joao, outboxA, inMaria, inJoao };
 }
+const impressum = async (ctx) => JSON.parse(await decryptPii(ctx.DB.raw.prepare("SELECT result_json FROM research_cache WHERE external_id=?").get(SITE).result_json, ctx.env));
+const erase = (ctx, id, basis = "Pedido fictício do titular em 2099-01-06") => ctx.api(`/api/contacts/${id}/delete-personal-data`, "POST", { legalBasis: basis });
 
-check("EXCLUSAO-PURGA: exclusão alcança textos congelados, mensagem no R2, tarefas, candidata e verificação; hash vai para a supressão", async (ctx) => {
+check("EXCLUSAO-PURGA: alcance completo da Maria; evidências do João intactas; resposta compartilhada só listada", async (ctx) => {
   const r = await scenario(ctx);
   const DB = ctx.DB.raw;
-  const before = DB.prepare("SELECT id,message_sha256 FROM ficha_messages WHERE contact_id=? ORDER BY step_no").all(r.dm);
+  const before = DB.prepare("SELECT id,message_sha256 FROM ficha_messages WHERE contact_id=?").all(r.dm);
   assert.ok(before.length > 0);
-  const inbound = DB.prepare("SELECT r2_key FROM inbound_messages WHERE uidvalidity=7 AND imap_uid=501").get();
-  assert.match(inbound.r2_key, /^inbound\//);
-  assert.ok(ctx.env.FILES.store.has(inbound.r2_key), "resposta guardada no R2 antes da exclusão");
+  assert.ok(ctx.env.FILES.store.has(r.inMaria.r2_key) && ctx.env.FILES.store.has(r.inJoao.r2_key));
   const hash = DB.prepare("SELECT email_hash FROM contacts WHERE id=?").get(r.dm).email_hash;
 
-  const del = await ctx.api(`/api/contacts/${r.dm}/delete-personal-data`, "POST", { legalBasis: "Pedido fictício do titular em 2099-01-06" });
+  const del = await erase(ctx, r.dm);
   assert.equal(del.status, 200, JSON.stringify(del.data));
   assert.equal(del.data.fichaMessagesPurged, before.length);
   assert.equal(del.data.inboundPurged, 1);
-  assert.equal(del.data.suppressed, true);
+  assert.deepEqual(del.data.sharedRetained, [r.inJoao.id]);
+  assert.equal(del.data.impressumCacheTrimmed, true);
+  assert.equal(del.data.sendLogRedacted, 2);
 
-  // Textos: marcador no lugar do conteúdo; identidade e hash da mensagem intactos.
-  for (const m of DB.prepare("SELECT * FROM ficha_messages WHERE contact_id=? ORDER BY step_no").all(r.dm)) {
-    assert.ok(m.purged_at);
+  // Textos congelados: marcador; identidade e hash intactos.
+  for (const m of DB.prepare("SELECT * FROM ficha_messages WHERE contact_id=?").all(r.dm)) {
     assert.equal(await decryptPii(m.body_enc, ctx.env), PURGED);
     assert.equal(m.body_html_enc, null);
     assert.equal(m.message_sha256, before.find((b) => b.id === m.id).message_sha256);
   }
-  // Mensagem recebida: conteúdo fora do R2, linha mantida sem conteúdo.
-  assert.equal(ctx.env.FILES.store.has(inbound.r2_key), false);
-  const ib = DB.prepare("SELECT r2_key,content_purged_at,classification FROM inbound_messages WHERE uidvalidity=7 AND imap_uid=501").get();
-  assert.equal(ib.r2_key, "purged");
-  assert.ok(ib.content_purged_at);
-  // Tarefas, candidata e verificação.
-  const tasks = DB.prepare("SELECT script,result_json FROM tasks WHERE contact_id=?").all(r.dm);
-  assert.ok(tasks.length > 0);
-  for (const t of tasks) {
-    assert.equal(t.script, null);
-    assert.equal(t.result_json, null);
-  }
-  const pc = DB.prepare("SELECT * FROM person_candidates WHERE id='pc-1'").get();
-  assert.equal(await decryptPii(pc.name_encrypted, ctx.env), PURGED);
-  assert.equal(pc.title_encrypted, null);
-  assert.equal(pc.email_encrypted, null);
-  assert.equal(pc.status, "dismissed");
-  assert.equal(DB.prepare("SELECT source_reference FROM contact_verifications WHERE id='cv-1'").get().source_reference, null);
-  // Supressão pelo hash (R9.1.2) e nada do titular na API da ficha.
-  assert.equal(DB.prepare("SELECT COUNT(*) n FROM suppression_entries WHERE identifier_hash=? AND channel='email'").get(hash).n, 1);
-  const view = JSON.stringify((await ctx.api(`/api/fichas/${r.fichaId}`)).data);
-  assert.doesNotMatch(view, /Maria|valeverde/i);
-  // Auditoria sem PII.
-  const audit = DB.prepare("SELECT new_value_json FROM audit_log WHERE action='contact.personal_data_deleted'").get();
-  assert.doesNotMatch(audit.new_value_json, /Maria|valeverde/i);
+  // Mensagem da Maria: fora do R2 e sem identificadores do servidor dela. A do João continua inteira.
+  assert.equal(ctx.env.FILES.store.has(r.inMaria.r2_key), false);
+  const im = DB.prepare("SELECT * FROM inbound_messages WHERE id=?").get(r.inMaria.id);
+  assert.deepEqual([im.r2_key, im.message_id, im.in_reply_to, im.references_json, !!im.content_purged_at], ["purged", null, null, "[]", true]);
+  assert.equal(im.outbox_id, r.outboxA.id, "correlação com o envio fica como evidência");
+  assert.ok(ctx.env.FILES.store.has(r.inJoao.r2_key));
+  assert.equal(DB.prepare("SELECT content_purged_at FROM inbound_messages WHERE id=?").get(r.inJoao.id).content_purged_at, null);
+  // Tarefa de resposta da Maria (pelo vínculo) limpa e cancelada; a do João mantém a nota.
+  const tm = DB.prepare("SELECT status,script,result_json FROM tasks WHERE inbound_id=? AND kind='reply_followup'").get(r.inMaria.id);
+  assert.deepEqual([tm.status, tm.script, tm.result_json], ["cancelled", null, null]);
+  assert.match(DB.prepare("SELECT result_json FROM tasks WHERE inbound_id=? AND kind='reply_followup'").get(r.inJoao.id).result_json, /amostra/);
+  // Tarefa, candidata e verificação: Maria purgadas, João intactas.
+  assert.deepEqual({ ...DB.prepare("SELECT status,script FROM tasks WHERE id='tk-maria'").get() }, { status: "cancelled", script: null });
+  assert.deepEqual({ ...DB.prepare("SELECT status,script FROM tasks WHERE id='tk-joao'").get() }, { status: "open", script: "Ligar para João Lima" });
+  const pm = DB.prepare("SELECT * FROM person_candidates WHERE id='pc-maria'").get();
+  assert.equal(await decryptPii(pm.name_encrypted, ctx.env), PURGED);
+  assert.deepEqual([pm.email_encrypted, pm.phone_encrypted, pm.purchase_note, pm.purchase_source_url, pm.source_url, pm.status], [null, null, null, null, "purged", "dismissed"]);
+  const pj = DB.prepare("SELECT * FROM person_candidates WHERE id='pc-joao'").get();
+  assert.equal(await decryptPii(pj.name_encrypted, ctx.env), "João Lima");
+  assert.equal(pj.status, "accepted");
+  assert.equal(DB.prepare("SELECT source_reference FROM contact_verifications WHERE id='cv-maria'").get().source_reference, null);
+  assert.match(DB.prepare("SELECT source_reference FROM contact_verifications WHERE id='cv-joao'").get().source_reference, /joao-lima/);
+  // Cache do aviso legal: sai só a Maria e o e-mail dela; João e o telefone geral ficam.
+  const cache = await impressum(ctx);
+  assert.deepEqual(cache.people, [{ name: "João Lima", title: "Geschäftsführer" }]);
+  assert.equal(cache.email, null);
+  assert.equal(cache.phone, "+55 16 3333-0000");
+  // Registros de envio sem o endereço; contato do João intacto; supressão e registro de exclusão.
+  assert.equal(DB.prepare("SELECT detail FROM send_log WHERE id='lg-1'").get().detail, "451 4.2.0 <[endereço]>: mailbox busy");
+  assert.equal(DB.prepare("SELECT resolved_reason FROM send_outbox WHERE id=?").get(r.outboxA.id).resolved_reason, "Conferido com [endereço] pelo telefone");
+  assert.ok(DB.prepare("SELECT email_encrypted FROM contacts WHERE id=?").get(r.joao).email_encrypted);
+  assert.match(DB.prepare("SELECT source_label FROM contacts WHERE id=?").get(r.dm).source_label, /^dados excluídos em /);
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM suppression_entries WHERE identifier_hash=?").get(hash).n, 1);
+  assert.equal(DB.prepare("SELECT email_hash FROM erasure_ledger WHERE contact_id=?").get(r.dm).email_hash, hash);
+  assert.ok(ctx.env.FILES.store.has(`erasures/eag-internal/${r.dm}.json`));
+  assert.doesNotMatch(ctx.env.FILES.store.get(`erasures/eag-internal/${r.dm}.json`), /Maria|valeverde|Pedido/);
+  // Nada da Maria na API da ficha nem na auditoria.
+  assert.doesNotMatch(JSON.stringify((await ctx.api(`/api/fichas/${r.fichaId}`)).data), /Maria|compras@/i);
+  for (const a of DB.prepare("SELECT new_value_json FROM audit_log WHERE action LIKE 'contact.personal_data%'").all()) assert.doesNotMatch(a.new_value_json, /Maria|valeverde/i);
+
+  // Conteúdo compartilhado: purga individual da resposta do João, por decisão registrada.
+  assert.equal((await ctx.api(`/api/inbound/${r.inJoao.id}/purge-content`, "POST", { reason: "curto" })).status, 422);
+  const pj2 = await ctx.api(`/api/inbound/${r.inJoao.id}/purge-content`, "POST", { reason: "Resposta cita a titular excluída (revisão de 2099-01-06)" });
+  assert.equal(pj2.status, 200);
+  assert.equal(ctx.env.FILES.store.has(r.inJoao.r2_key), false);
+  assert.equal(DB.prepare("SELECT result_json FROM tasks WHERE inbound_id=? AND kind='reply_followup'").get(r.inJoao.id).result_json, null);
+  assert.equal((await ctx.api(`/api/inbound/${r.inJoao.id}/purge-content`, "POST", { reason: "Repetição da mesma revisão" })).data.idempotent, true);
 });
 
-check("EXCLUSAO-PURGA: texto purgado não é aprovado e a imutabilidade continua para qualquer outra alteração", async (ctx) => {
+check("EXCLUSAO-PURGA: repetir o pedido não muda nada nem duplica registro; aprovação de texto purgado é recusada", async (ctx) => {
   const r = await scenario(ctx);
   const DB = ctx.DB.raw;
-  const m = DB.prepare("SELECT id FROM ficha_messages WHERE contact_id=? LIMIT 1").get(r.dm);
-  // Sem a marca de purga, nada muda (nem o corpo, nem o hash).
-  assert.throws(() => DB.prepare("UPDATE ficha_messages SET body_enc='x' WHERE id=?").run(m.id), /ficha_message_immutable/);
-  assert.throws(() => DB.prepare("UPDATE ficha_messages SET message_sha256='x',purged_at='2099-01-06' WHERE id=?").run(m.id), /ficha_message_immutable/);
-  assert.throws(() => DB.prepare("DELETE FROM ficha_messages WHERE id=?").run(m.id), /ficha_message_immutable/);
+  assert.equal((await erase(ctx, r.dm)).status, 200);
+  const again = await erase(ctx, r.dm, "Repetição fictícia do pedido");
+  assert.equal(again.status, 200);
+  assert.deepEqual(
+    [again.data.fichaMessagesPurged, again.data.inboundPurged, again.data.sendLogRedacted, again.data.impressumCacheTrimmed],
+    [0, 0, 0, false],
+  );
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM suppression_entries").get().n, 1);
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM erasure_ledger").get().n, 1);
+  assert.equal([...ctx.env.FILES.store.keys()].filter((k) => k.startsWith("erasures/")).length, 1);
+  assert.deepEqual((await impressum(ctx)).people, [{ name: "João Lima", title: "Geschäftsführer" }]);
 
-  assert.equal((await ctx.api(`/api/contacts/${r.dm}/delete-personal-data`, "POST", { legalBasis: "Pedido fictício do titular" })).status, 200);
-  // Depois da purga, a marca não pode ser refeita nem desfeita.
+  // Imutabilidade: sem a marca de purga nada muda; depois dela, nem a marca.
+  const m = DB.prepare("SELECT id FROM ficha_messages WHERE contact_id=? LIMIT 1").get(r.dm);
   assert.throws(() => DB.prepare("UPDATE ficha_messages SET purged_at=NULL WHERE id=?").run(m.id), /ficha_message_immutable/);
   assert.throws(() => DB.prepare("UPDATE ficha_messages SET body_enc='y',purged_at='2099-02-01' WHERE id=?").run(m.id), /ficha_message_immutable/);
+  assert.throws(() => DB.prepare("DELETE FROM ficha_messages WHERE id=?").run(m.id), /ficha_message_immutable/);
 
   const f = (await ctx.api(`/api/fichas/${r.fichaId}`)).data;
   const x = f.toApprove.find((a) => a.channel === "email");
   const ap = await ctx.api(`/api/fichas/${r.fichaId}/approve`, "POST", { versionNo: f.version.no, contactId: r.dm, channel: "email", messagesSha256: x?.messagesSha256 ?? "x" });
   assert.equal(ap.status, 409);
   assert.equal(ap.data.error?.code ?? ap.data.code, "personal_data_deleted");
+});
 
-  // Repetir o pedido é seguro: nada novo a purgar, supressão não duplica.
-  const again = await ctx.api(`/api/contacts/${r.dm}/delete-personal-data`, "POST", { legalBasis: "Repetição fictícia" });
-  assert.equal(again.status, 200);
-  assert.equal(again.data.fichaMessagesPurged, 0);
-  assert.equal(again.data.inboundPurged, 0);
-  assert.equal(DB.prepare("SELECT COUNT(*) n FROM suppression_entries").get().n, 1);
+check("EXCLUSAO-PURGA: restauração do D1 para antes da exclusão para envio e aprovação até a reaplicação", async (ctx) => {
+  const r = await scenario(ctx);
+  const file = join(tmpdir(), `eag-restauracao-${process.pid}-${Date.now()}.sqlite`);
+  try {
+    ctx.DB.raw.exec(`VACUUM INTO '${file.replace(/\\/g, "/")}'`); // ponto de restauração anterior à exclusão
+    assert.equal((await erase(ctx, r.dm)).status, 200);
+    // "Restauração": o D1 volta à cópia; o R2 (registro de exclusão) não volta.
+    ctx.DB.raw.close();
+    ctx.DB.raw = new DatabaseSync(file);
+    ctx.DB.raw.exec("PRAGMA foreign_keys=ON");
+    const DB = ctx.DB.raw;
+    assert.ok(DB.prepare("SELECT email_encrypted FROM contacts WHERE id=?").get(r.dm).email_encrypted, "dado excluído voltou com a restauração");
+    assert.equal((await tick(ctx.env, "eag-internal", { transport: transport(), now: at(15) })).reason, "erasure_reapply_required");
+    const f = (await ctx.api(`/api/fichas/${r.fichaId}`)).data;
+    const x = f.toApprove.find((a) => a.channel === "email");
+    const ap = await ctx.api(`/api/fichas/${r.fichaId}/approve`, "POST", { versionNo: f.version.no, contactId: r.dm, channel: "email", messagesSha256: x?.messagesSha256 ?? "x" });
+    assert.equal(ap.data.error?.code ?? ap.data.code, "erasure_reapply_required");
+
+    const re = await ctx.api("/api/erasures/reapply", "POST", {});
+    assert.equal(re.status, 200, JSON.stringify(re.data));
+    assert.equal(re.data.reapplied, 1);
+    assert.equal(re.data.consistent, true);
+    assert.equal(DB.prepare("SELECT email_encrypted FROM contacts WHERE id=?").get(r.dm).email_encrypted, null);
+    assert.ok(DB.prepare("SELECT purged_at FROM ficha_messages WHERE contact_id=? LIMIT 1").get(r.dm).purged_at);
+    assert.equal(DB.prepare("SELECT r2_key FROM inbound_messages WHERE id=?").get(r.inMaria.id).r2_key, "purged");
+    assert.ok(DB.prepare("SELECT reapplied_at FROM erasure_ledger WHERE contact_id=?").get(r.dm).reapplied_at);
+    assert.equal(DB.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='contact.personal_data_reapplied'").get().n, 1);
+    assert.notEqual((await tick(ctx.env, "eag-internal", { transport: transport(), now: at(15) })).reason, "erasure_reapply_required");
+    // Reaplicar de novo não faz nada.
+    assert.equal((await ctx.api("/api/erasures/reapply", "POST", {})).data.reapplied, 0);
+  } finally {
+    // Windows não apaga arquivo aberto: fecha a cópia e deixa um banco vazio para o encerramento do teste.
+    ctx.DB.raw.close();
+    ctx.DB.raw = new DatabaseSync(":memory:");
+    rmSync(file, { force: true });
+  }
+});
+
+check("EXCLUSAO-PURGA: texto de servidor sem endereço no registro do Worker e no diário local da ponte", async () => {
+  assert.equal(redactAddresses("550 5.1.1 <maria.souza@valeverde.com.br>: User unknown"), "550 5.1.1 <[endereço]>: User unknown");
+  assert.equal(redactAddresses("250 2.0.0 Ok: queued as 4ABC"), "250 2.0.0 Ok: queued as 4ABC");
+  assert.equal(redactAddresses(null), null);
+  const j = openJournal(":memory:");
+  const m = { outboxId: "o-1", leaseToken: 1, messageId: "<m@eagagro.com>", sha256: "h" };
+  j.claimed(m);
+  j.smtpDone(m, { kind: "perm_failed", code: 550, text: "5.1.1 <joao@valeverde.com.br> unknown" });
+  assert.equal(j.pending()[0].smtp_text, "5.1.1 <[endereço]> unknown");
+  j.close();
+});
+
+check("EXCLUSAO-PURGA: reversão da 0032 volta à imutabilidade total e mantém colunas e registro de exclusões", async (ctx) => {
+  const r = await scenario(ctx);
+  const DB = ctx.DB.raw;
+  assert.equal((await erase(ctx, r.dm)).status, 200);
+  DB.exec(readFileSync(new URL("../docs/implementation/correcoes/0032-reversao.sql", import.meta.url), "utf8"));
+  const m = DB.prepare("SELECT id FROM ficha_messages WHERE contact_id=? LIMIT 1").get(r.joao) ?? DB.prepare("SELECT id FROM ficha_messages LIMIT 1").get();
+  assert.throws(() => DB.prepare("UPDATE ficha_messages SET purged_at='2099-03-01' WHERE id=?").run(m.id), /ficha_message_immutable/);
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM erasure_ledger").get().n, 1, "a prova da exclusão não some");
+  const cols = (t) => DB.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+  assert.ok(cols("ficha_messages").includes("purged_at") && cols("tasks").includes("inbound_id"));
+  // Conteúdo purgado continua purgado.
+  assert.equal(await decryptPii(DB.prepare("SELECT body_enc FROM ficha_messages WHERE contact_id=? LIMIT 1").get(r.dm).body_enc, ctx.env), PURGED);
+});
+
+check("EXCLUSAO-PURGA: script local redige endereços já gravados no diário da ponte sem apagar linhas", async () => {
+  const file = join(tmpdir(), `eag-diario-${process.pid}-${Date.now()}.sqlite`);
+  try {
+    const j = openJournal(file);
+    j.claimed({ outboxId: "o-1", leaseToken: 1, messageId: "<m1@eagagro.com>", sha256: "h" });
+    j.claimed({ outboxId: "o-2", leaseToken: 1, messageId: "<m2@eagagro.com>", sha256: "h" });
+    j.close();
+    const raw = new DatabaseSync(file);
+    raw.prepare("UPDATE sends SET smtp_text=? WHERE outbox_id='o-1'").run("550 <maria.souza@valeverde.com.br> unknown");
+    raw.prepare("UPDATE sends SET smtp_text=? WHERE outbox_id='o-2'").run("250 Ok");
+    raw.close();
+    assert.deepEqual(redactJournal(file), { examined: 1, changed: 1 });
+    const check = new DatabaseSync(file);
+    assert.deepEqual(check.prepare("SELECT smtp_text FROM sends ORDER BY outbox_id").all().map((x) => x.smtp_text), ["550 <[endereço]> unknown", "250 Ok"]);
+    check.close();
+    assert.deepEqual(redactJournal(file), { examined: 0, changed: 0 });
+  } finally {
+    for (const suffix of ["", "-wal", "-shm"]) rmSync(file + suffix, { force: true });
+  }
 });
