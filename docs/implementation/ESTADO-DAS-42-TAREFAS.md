@@ -2,8 +2,8 @@
 
 ## Atualização de 2026-10-01 (prevalece sobre a tabela de 2026-09-24 abaixo)
 
-Fila: 46 itens — 39 `implemented`, 3 `partial` (P1-T12, P2-T15, RADAR-PESSOAS), 3 `external` (P2-T17, P3-T12,
-T11-VALIDACAO), 1 `pending` (EXCLUSAO-PURGA). Produção: Worker `b6d4b19d`; canais `planned`; nenhuma campanha ativa.
+Fila: 46 itens — 40 `implemented`, 3 `partial` (P1-T12, P2-T15, RADAR-PESSOAS), 3 `external` (P2-T17, P3-T12,
+T11-VALIDACAO). Produção: Worker `b6d4b19d`; canais `planned`; nenhuma campanha ativa.
 Detalhe e decisões: `DECISOES-PILOTO-2026-10-01.md`.
 
 | Tarefa | Mudou desde 24/09 |
@@ -16,7 +16,8 @@ Detalhe e decisões: `DECISOES-PILOTO-2026-10-01.md`.
 | Interface | Redesign aprovado e publicado |
 | SUPRESSAO-RETENCAO | Implementada e publicada (0031) |
 | T11-VALIDACAO (nova) | Proposta em `T11-POLITICA-PROPOSTA.md`; aguarda validadores |
-| EXCLUSAO-PURGA (nova) | Lacuna: exclusão não purga textos de ficha nem mensagens recebidas |
+| EXCLUSAO-PURGA (nova) | Implementada e testada com dados fictícios (migração 0032); não publicada |
+| P2-T16 Sanções | Triagem das 3 empresas alemãs em 01/10: 0 resultados; listas vencem em 24/10 |
 
 ## Registro de 2026-09-24 (histórico, mantido como estava)
 

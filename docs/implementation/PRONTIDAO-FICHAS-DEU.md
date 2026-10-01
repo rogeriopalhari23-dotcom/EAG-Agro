@@ -18,7 +18,7 @@ isso **nenhuma versão nova foi gerada**. As duas fichas continuam `in_approval`
 | Porte | `pending_size`; a ficha registra que esclarecer o porte é objetivo do primeiro contato | igual | Coerente com a regra (porte só desempata). O texto não pergunta o porte; ele entra na conversa aberta pela resposta. |
 | Janela do destinatário | Fuso `Europe/Berlin`; janela internacional 09–17, seg–sex | igual | ok. Em horário de Cuiabá: 03–11h até 25/10 (horário de verão europeu) e 04–12h depois. O PC da ponte precisa estar ligado e lendo a caixa nesse horário. |
 | Leitura das respostas | Portão R19.14 ativo (nada sai sem leitura boa nos últimos 10 min); ponte em execução contínua | igual | ok tecnicamente |
-| Triagem de sanções | **Nunca feita** para a empresa | **Nunca feita** | **Bloqueio B1.** O pré-envio segura com `compliance_unavailable`. As listas vencem em 2026-10-24. |
+| Triagem de sanções | Feita em 2026-10-01 19:36 UTC, 0 resultados | Feita, 0 resultados | ok até 24/10 (vencimento das listas). Depois disso: reimportar e refazer. |
 | Liberação internacional | Parâmetro `international_enabled:international` **ausente** | igual | **Bloqueio B2.** A aprovação recusa com `international_not_enabled` (P3-T12). |
 | Campanha | `draft` (versão 1; validação comercial do café aprovada em 2026-09-30) | igual | **Bloqueio B3:** só a ativação por Rogério. |
 | Canal | `planned` | igual | **Bloqueio B4:** liberação do canal (R26.3), decisão de Rogério. |
@@ -35,7 +35,7 @@ isso **nenhuma versão nova foi gerada**. As duas fichas continuam `in_approval`
 4. Mudar qualquer um desses itens gera versão nova e exige nova aprovação. Por isso não alterei nada.
 
 ## Bloqueios concretos, por ficha (iguais nas duas)
-- **B1:** a triagem de sanções da empresa precisa ser feita no mesmo mês do envio. É ação interna, sem custo.
+- **B1 (resolvido em 2026-10-01):** triagem feita com 0 resultados; vale até as listas vencerem em 24/10.
 - **B2:** a liberação internacional (P3-T12) precisa ser registrada por Rogério.
 - **B3:** a campanha precisa ser ativada.
 - **B4:** o canal de e-mail precisa ser liberado.

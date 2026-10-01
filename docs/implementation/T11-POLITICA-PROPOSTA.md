@@ -17,9 +17,9 @@ conforme LGPD/GDPR e política EAG".
 
 | Parte da T11 | Comprovado (com evidência) | Pendente |
 | --- | --- | --- |
-| Triagem de sanções antes do envio | Política decidida por Rogério em 2026-09-24: OFAC + CEIS + CNEP, validade de 30 dias, sem pessoas físicas, raiz de CNPJ vai para revisão (EVIDENCIAS, "Política de sanções T11"). Listas importadas em produção em 2026-09-24 e vencem em **2026-10-24**. | As 3 empresas alemãs **nunca foram triadas**: não há `screening_runs` para elas. O pré-envio as segura com `compliance_unavailable`. |
+| Triagem de sanções antes do envio | Política decidida por Rogério em 2026-09-24: OFAC + CEIS + CNEP, validade de 30 dias, sem pessoas físicas, raiz de CNPJ vai para revisão (EVIDENCIAS, "Política de sanções T11"). Listas importadas em produção em 2026-09-24 e vencem em **2026-10-24**. | Triagem das 3 empresas alemãs feita em 2026-10-01 (0 resultados); reimportar as listas antes de 24/10 se houver envio depois. |
 | Supressão pseudonimizada | Guarda só o hash do identificador, com canal, motivo, data, alcance `channel_all` e critério `until_t11_policy` (migração 0031, publicada). Acesso só do Administrador. Remoção exige motivo, base e confirmação, e fica auditada; tentativas negadas também. Reimportação não remove supressão (`tests/openclaw.test.mjs`). | Prazo de retenção, fundamento jurídico e validação. |
-| Exclusão a pedido do titular | `deletePersonalData` (Admin): apaga os campos cifrados do contato, mantém o hash, cancela fila e tarefas, audita a base legal. | Não purga os textos congelados das fichas (`ficha_messages`), as mensagens recebidas nem os snapshots, que podem conter nome ou endereço. R9.1 pede essa purga ("conteúdo, índices e referências"). Também não grava a supressão automaticamente. |
+| Exclusão a pedido do titular | `deletePersonalData` (Admin) apaga os campos do contato e, desde 2026-10-01 (EXCLUSAO-PURGA, testada com dados fictícios, ainda não publicada), também os textos congelados (marcador), a mensagem no R2, roteiros e resultados de tarefas, a candidata e a referência de verificação; grava o hash na supressão. | Publicar (autorização de Rogério). Prazos finais dependem da validação. Ficam fora do Compass: caixa de e-mail, diário da ponte e Time Travel do D1. |
 | Informação ao titular | Nada implementado. | GDPR Art. 14 (§4). |
 | Regra por país para o primeiro contato | Nada implementado. | Alemanha (§5). |
 | Validação por responsável competente | Não houve. | §3. |
@@ -64,7 +64,7 @@ Proposta: a rota já existente aceita só estes casos, com evidência anexada po
 - **Pedido de exclusão, roteiro proposto:**
   1. confirmar a identidade pelo próprio endereço;
   2. excluir os dados do contato;
-  3. **purgar também os textos congelados e as mensagens recebidas**, que hoje é uma lacuna;
+  3. **purgar também os textos congelados e as mensagens recebidas** (implementado em 2026-10-01, não publicado);
   4. manter o hash na supressão e informar a pessoa disso (DSK §5.1);
   5. responder.
 - **Exigência de prazo:** GDPR Art. 12(3), em até um mês. No Brasil, o prazo de resposta para eliminação fica para o validador confirmar.

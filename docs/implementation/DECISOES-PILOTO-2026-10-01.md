@@ -20,7 +20,7 @@ Nada foi enviado, aprovado, ativado ou contratado, e nenhum crédito da Snov foi
 | Supressões | 2 (`opt_out`, `channel_all`, `until_t11_policy`): `+ponte-link` (3b) e a Hotmail (3a), preservadas |
 | Snov | Amori e BLACK & YUM `valid` até 2026-10-31; 24grad `catchall` (não validada) |
 | Parâmetros | `email_validation_max_age_days` = 30; `sanctions_max_age_hours` = 720; janelas nacional e internacional 09–17 seg–sex; **`international_enabled` ausente** |
-| Sanções | OFAC, CEIS e CNEP importadas em 2026-09-24 (vencem em 2026-10-24); **nenhuma triagem das empresas alemãs** |
+| Sanções | OFAC, CEIS e CNEP importadas em 2026-09-24 (vencem em 2026-10-24); triagem feita em 2026-10-01 19:36 UTC: 0 resultados para Amori, BLACK & YUM e 24grad (válida enquanto as listas valerem: até 24/10) |
 | Porte | Pequena e média só desempatam; porte e grupo nunca descartam sozinhos (decisão de 2026-09-30) |
 
 ## 2. T1 contra os critérios da Spec
@@ -52,9 +52,9 @@ Nada foi enviado, aprovado, ativado ou contratado, e nenhum crédito da Snov foi
 | 2 | T11: e-mail para empresas na Alemanha | UWG §7(2) Nr. 2; BGH I ZR 218/07; DSK 2022 (T11 §5) | Parecer de advogado com prática em UWG | Rogério escolhe e consulta o advogado | Amori, BLACK & YUM e 24grad por e-mail |
 | 3 | T11: controlador e uso da marca e da caixa EAG | Assinatura e rodapé da EAG; política de privacidade da EAG não encontrada no site (404) | Perguntas do T11 §3 | Jurídico ou encarregado da EAG | Qualquer envio comercial, inclusive nacional |
 | 4 | T11: retenção da supressão e do histórico | Implementação `until_t11_policy`; DSK §5.1; LGPD Art. 15–16 | Validar o T11 §2 | Validador da EAG, depois Rogério | Validação de T11 |
-| 5 | Exclusão completa (R9.1/R23.5) | `deletePersonalData` não purga textos de fichas nem mensagens recebidas | Implementar a purga | Implementação, depois de decidido | Atender pedido de exclusão por inteiro |
+| 5 | Exclusão completa (R9.1/R23.5) | Implementada em 2026-10-01 e testada só com dados fictícios (migração 0032; `tests/exclusao-purga.test.mjs`) | Autorizar migração e deploy em produção | Rogério | Atender pedido de exclusão por inteiro em produção |
 | 6 | Informação do GDPR Art. 14 | Ausente nos textos | Definir se é exigida e qual o texto | Advogado (item 2) | Versão nova das fichas, se exigida |
-| 7 | Triagem de sanções das empresas | Nenhuma `screening_run` | Rodar a triagem antes da aprovação; reimportar as listas até 24/10 | Rogério (Admin), ação interna | Envio (pré-envio `compliance_unavailable`) |
+| 7 | Triagem de sanções das empresas | Feita em 2026-10-01 (0 resultados nas três) | Reimportar as listas antes de 24/10 se o envio for depois; refazer a triagem com as listas novas | Rogério (Admin), ação interna | Envio depois de 24/10 |
 | 8 | Liberação internacional (P3-T12) | `international_enabled` ausente; falta a primeira rotina mensal completa da Comtrade | Registrar a liberação | Rogério | Aprovação de ficha internacional |
 | 9 | Supressões do OpenClaw (R21.8/R25.2) | VPS reinstalada, sem dados acessíveis (P2-T15) | Recuperar e importar, ou registrar exceção na Spec | Rogério | Primeiro envio do piloto |
 | 10 | 24grad | `catchall`; decisor provisório pelo Impressum, sem e-mail | Nenhum e-mail ou ligação sem decisão; telefone B2B também exige interesse presumível (T11 §5.2) | Rogério | Ficha da 24grad |
@@ -62,6 +62,8 @@ Nada foi enviado, aprovado, ativado ou contratado, e nenhum crédito da Snov foi
 | 12 | Perfis e domínio (P1-T12) | Só o admin; `eagcompass.com` pendente | E-mails dos perfis; troca de DNS no hPanel do domínio pessoal | Rogério | Nada no piloto com um usuário |
 
 ## 4. Propostas para as decisões de Rogério
+
+Nenhuma destas propostas é decisão tomada. A carta postal (3) e o piloto no Brasil (9), em particular, são alternativas propostas e ficam para decisão de Rogério.
 
 1. **Canal de e-mail:**
    - **Proposta:** registrar o e-mail como `habilitado`, com a evidência do §2, **só quando houver ficha liberável**. Até lá, fica `planned`.
@@ -85,13 +87,12 @@ Nada foi enviado, aprovado, ativado ou contratado, e nenhum crédito da Snov foi
    - **Efeito:** fixa o critério hoje marcado `until_t11_policy`.
    - **Razão:** a orientação da DSK §5.1 e a LGPD Art. 10 e 37. Nenhum número foi inventado.
 6. **Exclusão completa:**
-   - **Proposta:** autorizar a implementação da purga de textos congelados e mensagens recebidas no pedido de exclusão, mantendo o hash.
-   - **Efeito:** cumpre a R9.1/R23.5.
-   - **Razão:** a lacuna foi encontrada nesta revisão.
+   - **Feito:** purga implementada e testada com dados fictícios. Cobre textos congelados (marcador cifrado, hash e identidade mantidos), mensagem no R2, roteiro e resultado das tarefas do contato, candidata, referência de verificação e supressão do hash. A aprovação de texto purgado é recusada.
+   - **Proposta:** autorizar a migração 0032 e o deploy em produção.
+   - **Limites:** cópias do Time Travel do D1 seguem recuperáveis pelo prazo do plano; a caixa de e-mail (Enviados/Entrada) e o diário local da ponte ficam fora do Compass.
 7. **Sanções:**
-   - **Proposta:** rodar a triagem das três empresas alemãs, que é interna e sem custo, só quando houver data de envio. Reimportar as listas antes de 24/10, se houver envio previsto depois disso.
-   - **Efeito:** remove o `compliance_unavailable`.
-   - **Razão:** a triagem tem validade de 30 dias e não adianta fazer cedo.
+   - **Feito:** triagem das três empresas em 2026-10-01, com 0 resultados.
+   - **Proposta:** reimportar OFAC, CEIS e CNEP antes de 24/10 se o envio for depois, e refazer a triagem.
 8. **OpenClaw:**
    - **Proposta:** registrar na Spec uma exceção datada à R21.8/R25.2: "sem base recuperável do OpenClaw (VPS reinstalada, 2026-09-24); supressões conhecidas por Rogério cadastradas manualmente antes do primeiro envio".
    - **Efeito:** destrava o primeiro envio sem fingir importação.

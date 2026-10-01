@@ -251,6 +251,8 @@ export async function approve(request, env, actor, rid, id) {
     await s(env, "SELECT * FROM ficha_messages WHERE version_id=? AND contact_id=? AND channel=? ORDER BY step_no", v.id, contactId, channel).all()
   ).results;
   if (!list.length) fail(422, "nothing_to_approve", "Nada a aprovar para este destinatário neste canal.");
+  // Texto purgado por exclusão de dados pessoais (R23.5) nunca volta a ser aprovado.
+  if (list.some((m) => m.purged_at)) fail(409, "personal_data_deleted", "Dados pessoais deste destinatário foram excluídos: o texto não pode ser aprovado.");
   // Versão gerada com outro endereço (antes da confirmação ou de uma troca) não é aprovada: gere nova versão.
   for (const m of list.filter((x) => x.kind === "auto_email"))
     if (!(await decryptPii(m.body_enc, env)).includes(env.EAG_POSTAL_ADDRESS_CONFIRMED))

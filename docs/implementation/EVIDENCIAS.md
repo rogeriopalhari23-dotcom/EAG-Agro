@@ -781,3 +781,22 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
 - `PRONTIDAO-FICHAS-DEU.md`: conferência item a item e textos congelados completos. Conteúdo inalterado desde a v2, por isso nenhuma versão nova. Bloqueios B1–B6.
 - `DECISOES-PILOTO-2026-10-01.md`: T1 contra R26.3/R26.6. Teste técnico concluído; falta a liberação operacional (R26.1) e a comercial. Tabela de 12 itens abertos e 9 propostas de decisão.
 - `sequence.json`: P2-T17 e RADAR-PESSOAS atualizados (Snov deixou de ser pendência); novas `T11-VALIDACAO` (external) e `EXCLUSAO-PURGA` (pending). Spec: nota datada sob a tabela de dependências, que fica preservada como registro de 2026-09-22. `ESTADO-DAS-42-TAREFAS.md`: seção de 2026-10-01 no topo, com a tabela de 24/09 mantida.
+
+## Triagem de sanções das empresas alemãs e EXCLUSAO-PURGA (2026-10-01, pedido de Rogério)
+
+- **Triagem (produção, interna, sem chamada externa):** `POST /api/companies/:id/screening` contra as listas importadas em 2026-09-24. Amori `948d3201…`, BLACK & YUM `30c65784…`, 24grad `d7720a41…`, às 19:36 UTC: **0 resultados** nas três. Libera o `compliance_unavailable` até as listas vencerem (2026-10-24). Nenhuma ficha aprovada, nenhuma campanha ativada, canal `planned`.
+- **EXCLUSAO-PURGA (implementado; testado só com dados fictícios; não publicado):**
+  - `migrations/0032_exclusao_purga.sql`: `ficha_messages.purged_at` e trigger de imutabilidade com uma única exceção. A purga troca o conteúdo uma vez; identidade e `message_sha256` não mudam; sem purga, ou depois dela, qualquer UPDATE ou DELETE continua abortado. Também `inbound_messages.content_purged_at`.
+  - `src/changes.js` `deletePersonalData`:
+    - apaga a mensagem no R2 antes do banco;
+    - textos de ficha recebem o marcador cifrado "[conteúdo excluído a pedido do titular]" e o HTML fica nulo;
+    - limpa roteiro e resultado das tarefas do contato;
+    - a candidata de pessoa fica `dismissed`, com nome-marcador e sem cargo, e-mail ou telefone;
+    - zera a referência de verificação;
+    - grava o hash do e-mail na supressão (`personal_data_deleted`, R9.1.2);
+    - auditoria só com contagens e base legal;
+    - pode ser repetido sem efeito novo.
+  - `src/fichas.js`: aprovação de texto purgado → 409 `personal_data_deleted`.
+  - `tests/exclusao-purga.test.mjs` (2 testes, "Maria Souza"/`valeverde.com.br`/`exemplo.invalid`). O primeiro rascunho checava tarefas que não tinham `contact_id` (a tarefa de resposta só guarda orientação fixa, sem PII) e por isso passava sem testar nada; foi corrigido com uma tarefa de ligação do contato e a asserção `tasks.length > 0`.
+  - Limites declarados: Time Travel do D1, a caixa de e-mail (Enviados/Entrada) e o diário local da ponte ficam fora do Compass. Resultado de tarefa de resposta sem `contact_id` não é alcançado.
+- Correção de documento pedida por Rogério: a carta postal e o piloto no Brasil são **alternativas propostas**, não decisões (DECISOES-PILOTO §4).

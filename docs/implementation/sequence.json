@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-01T19:27:24.217Z",
+  "updatedAt": "2026-10-01T19:39:57.472Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -835,19 +835,19 @@
     {
       "id": "EXCLUSAO-PURGA",
       "title": "Exclusão de dados pessoais alcança textos congelados, mensagens recebidas e snapshots (R9.1, R23.5)",
-      "status": "pending",
+      "status": "implemented",
       "dependsOn": [],
       "plan": "docs/eag-compass-spec.md",
       "section": "R9.1, R23.5",
       "read": [
         "src/changes.js",
         "src/fichas.js",
-        "src/inbound.js"
+        "migrations/0032_exclusao_purga.sql"
       ],
       "acceptance": "deletePersonalData purga ou substitui por marcador os campos cifrados de ficha_messages, snapshots de versão e inbound_messages do contato; mantém o hash e a supressão; auditado sem PII; testes de que nada do contato reaparece na API.",
-      "validation": "npm run check; teste de exclusão ponta a ponta",
+      "validation": "npm run check (tests/exclusao-purga.test.mjs, dados fictícios)",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Lacuna encontrada em 2026-10-01 (DECISOES-PILOTO item 5). Implementar após decisão de Rogério sobre a proposta 6; regra de retenção final depende de T11."
+      "blockedBy": "Implementado e testado só com dados fictícios em 2026-10-01 (migração 0032, deletePersonalData, guarda na aprovação). NÃO publicado: migração e deploy em produção aguardam autorização de Rogério. Prazo final de retenção depende de T11."
     }
   ]
 }
