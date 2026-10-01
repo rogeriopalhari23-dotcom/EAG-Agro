@@ -36,6 +36,9 @@ test("P1-T12: fila só com DLQ e limite, crons aprovados, R2 segurado e um ender
   assert.throws(() => validateConfig(ready({ triggers: { crons: ["* * * * *"] } })), /Cron fora/);
   assert.throws(() => validateConfig(ready({ r2_buckets: [{ binding: "FILES", bucket_name: "outro-bucket" }] })), /R2 fora/);
   assert.deepEqual(real().r2_buckets, [{ binding: "FILES", bucket_name: "eag-compass-files" }]);
+  // Mapa (2026-10-01): manifesto só dentro do prefixo mapa/ do mesmo bucket privado.
+  assert.match(real().vars.MAP_MANIFEST_KEY, /^mapa\//);
+  assert.throws(() => validateConfig(ready({ vars: { ...ready().vars, MAP_MANIFEST_KEY: "inbound/x/manifest.json" } })), /prefixo mapa/);
   assert.throws(() => validateConfig(ready({ routes: [{ pattern: "eagcompass.com/*", zone_name: "eagcompass.com" }] })), /personalizado/);
   assert.throws(() => validateConfig(ready({ workers_dev: false, routes: [] })), /Configure um endereço/);
   assert.deepEqual(validateConfig(ready({ workers_dev: false, routes: [{ pattern: "compass.exemplo.com", custom_domain: true }] })), { address: "route" });

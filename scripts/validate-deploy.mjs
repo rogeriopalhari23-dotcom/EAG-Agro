@@ -32,9 +32,12 @@ export function validateConfig(config) {
     const allowed = new Set(["*/5 * * * *", "17 2 * * *"]);
     assert.ok((config.triggers.crons || []).every((x) => allowed.has(x)), "Cron fora do aprovado");
   }
-  // R2 liberado em 2026-09-25 só para a lista mensal: um bucket, binding FILES.
+  // R2 liberado em 2026-09-25 para a lista mensal e, em 2026-10-01, para o recorte do mapa (prefixo mapa/, lido só pela
+  // rota autenticada): um bucket privado, binding FILES.
   if (config.r2_buckets)
     assert.deepEqual(config.r2_buckets.map((b) => [b.binding, b.bucket_name]), [["FILES", "eag-compass-files"]], "R2 fora do aprovado");
+  if (config.vars.MAP_MANIFEST_KEY !== undefined)
+    assert.match(config.vars.MAP_MANIFEST_KEY, /^mapa\/[a-z0-9-]+\/manifest\.json$/, "Manifesto do mapa fora do prefixo mapa/");
   return { address: onWorkersDev ? "workers.dev" : "route" };
 }
 
