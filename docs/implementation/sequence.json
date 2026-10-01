@@ -798,7 +798,7 @@
     {
       "id": "SUPRESSAO-RETENCAO",
       "title": "Supressão: remoção pelo Administrador com motivo e base e critério de retenção por registro (implementação)",
-      "status": "published",
+      "status": "implemented",
       "dependsOn": [],
       "plan": "docs/eag-compass-spec.md",
       "section": "R9.2 (matriz: Remover supressão — Administrador, com motivo e base), R21.1 (critério de retenção por registro), R9.1.1–R9.1.2",
@@ -810,7 +810,7 @@
       "acceptance": "Rota de remoção só para Administrador, exigindo motivo e base, auditada e sem apagar o histórico (registro de remoção, não exclusão silenciosa); retention_until preenchido por registro segundo o critério vigente; descadastros existentes preservados; testes de permissão (R9.2.1) e de não recontato. O critério de retenção é o aprovado em T11 — enquanto T11 não validar, a implementação usa campo explícito sem prazo automático de expiração.",
       "validation": "npm run check; testes de permissão, auditoria e preservação das supressões existentes",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Publicado em 2026-10-01 (versão a5016aff, migração 0031). Prazo e fundamento da retenção dependem de T11 (não definidos aqui).",
+      "blockedBy": "Implementado e publicado em 2026-10-01 (versão a5016aff, migração 0031). Prazo e fundamento da retenção dependem de T11 (não definidos aqui).",
       "note": "Divergência encontrada em 30/09/2026 ao conferir a implementação contra a Spec: não há rota de remoção e retention_until nunca é preenchido. Tarefa de implementação, separada da validação jurídica T11 (que define a política de retenção e a base de remoção). Nenhum descadastro real é alterado por esta tarefa sem decisão de Rogério."
     }
   ]
