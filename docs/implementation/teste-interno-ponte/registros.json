@@ -37,7 +37,18 @@
       "contato": "c8cb3b2b-6c54-442c-8901-6a3509514ebf",
       "perfil": "eb2328a3-1d27-479a-b37e-e2bbc3ad630d",
       "ficha": "19fcd6ec-4876-41ee-b41f-5a9bc27ab820"
+    },
+    "G": {
+      "destinatario": "rogeriopalhari@hotmail.com",
+      "empresa": "63f6a05a-054f-43ab-a8c1-cc9446d27c88",
+      "contato": "b758c0db-de27-4aef-9cb5-ff0493ea4ad8",
+      "perfil": "d30bf131-e399-4fc2-a8d9-128301ab8973",
+      "ficha": "908c96d6-3ba1-43bb-a4e6-771230477b94",
+      "cenario": "3a"
     }
   },
-  "encerradoEm": "2026-10-01T15:12:22.497Z"
+  "teste3a": {
+    "abertoEm": "2026-10-01T17:46:25.371Z"
+  },
+  "encerradoEm": "2026-10-01T17:51:27.355Z"
 }
