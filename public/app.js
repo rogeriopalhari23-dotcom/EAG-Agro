@@ -1634,7 +1634,7 @@ async function showCampaign(id) {
 async function suppressionView() {
   const node = section(
     "Supressão",
-    "Registre pedidos de não contato. O identificador fica protegido por HMAC; esta versão não remove supressões.",
+    "Registre pedidos de não contato. O identificador fica protegido por HMAC. Remoção só pelo Administrador, com motivo e base; prazo de retenção pendente da validação jurídica T11.",
   );
   if (writable())
     node.append(
@@ -1674,8 +1674,22 @@ async function suppressionView() {
         el(
           "div",
           { class: "row" },
-          text("strong", r.identifier_hash),
+          el("div", {}, text("strong", r.identifier_hash), text("small", `${r.created_at?.slice(0, 10) || ""} · origem ${r.source} · ${r.scope_label || r.scope}`), text("small", `Retenção: ${r.retention_label || r.retention_criterion}`)),
           text("span", r.channel + " · " + r.reason, "tag"),
+          // Remoção (R9.2): só Administrador, com motivo, base e confirmação; envios cancelados não voltam.
+          details(
+            "Remover supressão (administrador)",
+            makeForm(
+              [input("Motivo da remoção", "reason", "textarea"), input("Base da remoção (ex.: pedido expresso da pessoa, data e meio)", "basis")],
+              async (v) => {
+                if (!confirm("A pessoa volta a poder ser contatada neste canal. Envios já cancelados não voltam. Confirmar remoção?")) return;
+                await api(`/api/suppression/${r.id}/remove`, "POST", { reason: v.reason, basis: v.basis, confirm: true });
+                notice("Supressão removida e registrada no histórico.");
+                await navigate("Supressão");
+              },
+              "Remover",
+            ),
+          ),
         ),
       ),
     );
