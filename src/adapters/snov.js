@@ -43,7 +43,8 @@ export async function startVerification(env, emails, fetchImpl = fetch, nowMs = 
     fetchImpl,
     15000,
   );
-  if (status !== 200) throw httpError("Snov.io", status);
+  // A Snov.io responde 202 Accepted ao iniciar a tarefa (conferido em produção em 2026-10-01): qualquer 2xx é aceite.
+  if (status < 200 || status > 299) throw httpError("Snov.io", status);
   const hash = data?.data?.task_hash;
   if (typeof hash !== "string" || !hash) throw new AdapterError("schema", "Snov.io: tarefa sem task_hash.");
   return hash;
@@ -67,7 +68,7 @@ export async function verificationResult(env, taskHash, fetchImpl = fetch, nowMs
     fetchImpl,
     15000,
   );
-  if (status !== 200) throw httpError("Snov.io", status);
+  if (status < 200 || status > 299) throw httpError("Snov.io", status);
   if (data?.status === "not_enough_credits") throw new AdapterError("no_balance", "Snov.io: créditos insuficientes.");
   if (data?.status === "in_progress") return { done: false };
   if (data?.status !== "completed" || !Array.isArray(data.data)) throw new AdapterError("schema", "Snov.io: resultado fora do esquema.");

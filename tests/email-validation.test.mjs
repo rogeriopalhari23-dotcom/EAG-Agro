@@ -93,6 +93,30 @@ check("P2-T7: fluxo completo com estados, prazo e uma tarefa para vários contat
   assert.equal((await pollJob(ctx.env, s.jobId, { fetchImpl, now: at })).skipped, true);
 });
 
+check("Snov.io responde 202 ao iniciar: a tarefa é registrada (não é recusa nem crédito perdido) — produção, 2026-10-01", async (ctx) => {
+  const { companyId, add } = await ready(ctx);
+  const a = await add("compras@valeverde.com.br", "Ana");
+  const fetchImpl = provider({
+    "/v1/oauth/access_token": () => [200, token],
+    "/v2/email-verification/start": () => [202, started],
+    "/v2/email-verification/result": () => [200, done([r("compras@valeverde.com.br", "valid")])],
+  });
+  const { validateCompanyContacts } = await import("../src/email-validation.js");
+  const req = new Request("http://localhost/x", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  const s = await validateCompanyContacts(req, ctx.env, { id: "system-admin", tenant_id: "eag-internal", role: "admin" }, "rid", companyId, { fetchImpl });
+  assert.equal(s.started, 1);
+  assert.equal(ctx.DB.raw.prepare("SELECT task_hash FROM email_validation_jobs").get().task_hash, started.data.task_hash);
+  const fim = await pollJob(ctx.env, s.jobId, { fetchImpl, now: "2026-10-01T18:30:00.000Z" });
+  assert.deepEqual(fim.tally, { valid: 1 });
+  assert.equal(ctx.DB.raw.prepare("SELECT email_validation FROM contacts WHERE id=?").get(a).email_validation, "valid");
+  // Recusa de verdade (400) continua sendo recusa.
+  const bad = provider({ "/v1/oauth/access_token": () => [200, token], "/v2/email-verification/start": () => [400, { error: "x" }] });
+  const b = await add("outro@valeverde.com.br", "Bia");
+  const req2 = new Request("http://localhost/x", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  await assert.rejects(validateCompanyContacts(req2, ctx.env, { id: "system-admin", tenant_id: "eag-internal", role: "admin" }, "rid", companyId, { fetchImpl: bad }), /recusada \(400\)/);
+  assert.ok(b);
+});
+
 check("P2-T7: resultado que nunca conclui para depois do limite e vira 'error', sem loop infinito", async (ctx) => {
   const { add, companyId } = await ready(ctx);
   const a = await add("compras@valeverde.com.br", "Ana");
