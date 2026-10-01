@@ -176,7 +176,8 @@ test("Ponte: primeira leitura não leva o histórico da caixa ao Compass; caixa 
   // Caixa renumerada: só as recentes voltam (a nova já registrada não duplica); as antigas não entram.
   d.imap.uidValidity = 8;
   assert.equal(await readReplies(d), true);
-  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM inbound_messages").get().n, 2, "a recente entra de novo sob a nova numeração");
+  // A recente volta sob a nova numeração, mas o mesmo Message-ID já processado não gera linha nem efeito (2026-10-01).
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM inbound_messages").get().n, 1, "a recente relida não duplica");
   assert.deepEqual({ ...ctx.DB.raw.prepare("SELECT uidvalidity,last_uid FROM inbound_cursor").get() }, { uidvalidity: 8, last_uid: 6 });
   assert.equal((await d.compass.call("/api/bridge/rebase", { uidValidity: 8, highestUid: 99 }).catch((e) => e)).status, 409, "rebase sem renumeração é recusado");
   assert.equal((await d.compass.call("/api/bridge/inbound", { mailbox: "INBOX", uidValidity: 9, uid: 1, raw: "eA==" }).catch((e) => e)).status, 409, "numeração desconhecida exige rebase");

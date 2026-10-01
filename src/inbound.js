@@ -78,9 +78,15 @@ async function owner(env, tenant, companyId) {
 }
 
 // Pausa empresa + commodity (todas as variantes, todos os canais e contatos) e abre tarefa para Rogério (R20.1, R20.5).
+// Cada tarefa tem id próprio. O alerta de "outra commodity" sai uma vez por commodity da empresa que tenha envio em
+// andamento e NÃO esteja entre as pausadas por esta mensagem (uma resposta ambígua pode pausar várias da mesma empresa).
 async function pauseTargets(env, tenant, targets, at, kind, note, inboundId) {
   const st = [];
+  const paused = new Map(); // empresa -> commodities pausadas por esta mensagem
   for (const t of targets) {
+    if (!paused.has(t.company_id)) paused.set(t.company_id, new Set());
+    if (paused.get(t.company_id).has(t.commodity)) continue;
+    paused.get(t.company_id).add(t.commodity);
     st.push(
       s(env, "UPDATE send_outbox SET status='cancelled',block_reason=?,updated_at=? WHERE tenant_id=? AND company_id=? AND commodity=? AND status IN ('pending','blocked','waiting_sequence','temp_failed')", `reply_${kind}`, at, tenant, t.company_id, t.commodity),
       s(env, "UPDATE tasks SET status='suspended',suspended_reason='resposta recebida' WHERE tenant_id=? AND company_id=? AND commodity=? AND status='open' AND kind IN ('call_l0','call_l1','call_l2','linkedin')", tenant, t.company_id, t.commodity),
@@ -90,14 +96,26 @@ async function pauseTargets(env, tenant, targets, at, kind, note, inboundId) {
         crypto.randomUUID(), tenant, t.company_id, t.commodity, kind === "ambiguous" ? "review_ambiguous" : "reply_followup", await owner(env, tenant, t.company_id), at.slice(0, 10), note, inboundId,
       ),
     );
-    // Outra commodity da mesma empresa: só alerta (R20.5).
-    st.push(
-      s(
+  }
+  // Outras commodities da mesma empresa: só alerta, sem pausa (R20.5).
+  for (const [companyId, commodities] of paused) {
+    const others = (
+      await s(
         env,
-        "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script,inbound_id) SELECT ?,?,?,o.commodity,'reply_followup',?,?,1,?,? FROM (SELECT DISTINCT commodity FROM send_outbox WHERE tenant_id=? AND company_id=? AND commodity<>? AND status IN ('pending','waiting_sequence','temp_failed')) o",
-        crypto.randomUUID(), tenant, t.company_id, await owner(env, tenant, t.company_id), at.slice(0, 10), "A empresa respondeu sobre outra commodity; revise antes do próximo toque.", inboundId, tenant, t.company_id, t.commodity,
-      ),
-    );
+        `SELECT DISTINCT commodity FROM send_outbox WHERE tenant_id=? AND company_id=? AND commodity NOT IN (${[...commodities].map(() => "?").join(",")})
+           AND status IN ('pending','waiting_sequence','temp_failed') ORDER BY commodity`,
+        tenant, companyId, ...commodities,
+      ).all()
+    ).results;
+    const who = await owner(env, tenant, companyId);
+    for (const o of others)
+      st.push(
+        s(
+          env,
+          "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script,inbound_id) VALUES (?,?,?,?,'reply_followup',?,?,1,?,?)",
+          crypto.randomUUID(), tenant, companyId, o.commodity, who, at.slice(0, 10), "A empresa respondeu sobre outra commodity; revise antes do próximo toque.", inboundId,
+        ),
+      );
   }
   return st;
 }
@@ -110,6 +128,13 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
   const corr = ["human", "auto_reply", "unclassified", "unsubscribe"].includes(c.kind)
     ? await correlate(env, tenant, msg, fromHash, at)
     : { correlation: "none", targets: [] };
+  // A mesma mensagem pode voltar com outro UID (caixa renumerada, cópia entre pastas): o Message-ID já processado
+  // encerra aqui, antes de guardar conteúdo ou produzir qualquer efeito.
+  const messageId = header(msg, "message-id");
+  if (messageId) {
+    const seen = await s(env, "SELECT id FROM inbound_messages WHERE tenant_id=? AND message_id=? LIMIT 1", tenant, messageId).first();
+    if (seen) return { duplicate: true, of: seen.id };
+  }
   const id = crypto.randomUUID();
   let r2Key = "not_stored";
   // Caixa de trabalho de Rogério: só guarda o conteúdo do que interessa ao Compass (resposta ligada a um envio, bounce,
@@ -122,7 +147,7 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
   const ins = await s(
     env,
     "INSERT INTO inbound_messages(id,tenant_id,mailbox,uidvalidity,imap_uid,message_id,in_reply_to,references_json,from_hash,classification,correlation,outbox_id,company_id,commodity,r2_key,received_at,processed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(tenant_id,mailbox,uidvalidity,imap_uid) DO NOTHING",
-    id, tenant, mailbox, uidValidity, uid, header(msg, "message-id"), header(msg, "in-reply-to"),
+    id, tenant, mailbox, uidValidity, uid, messageId, header(msg, "in-reply-to"),
     JSON.stringify(messageIds(header(msg, "references"))), fromHash, c.kind, corr.correlation, corr.outboxId ?? null,
     corr.targets.length === 1 ? corr.targets[0].company_id : null, corr.targets.length === 1 ? corr.targets[0].commodity : null, r2Key, at, at,
   ).run();
