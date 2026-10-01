@@ -34,8 +34,8 @@ Conferências sem envio, no servidor: `ponte caixa` (IMAP 993 e login SMTP 587 �
 
 ## Migração (uma ponte só)
 
-1. Windows: `bridge\ponte parar` e, se existir, remover a tarefa de início automático (`instalar-tarefa.ps1 -Remover`
-   ou `Unregister-ScheduledTask`); confirmar que não há processo `node … src\main.js`.
+1. Windows: `bridge\ponte parar` e, se existir, remover a tarefa de início automático (em 01/10 não havia nenhuma;
+   `Unregister-ScheduledTask -TaskName "EAG Compass - ponte de e-mail"`); confirmar que não há processo `node … src\main.js`.
 2. Reconciliar: diário local do Windows sem pendências (`state` diferente de `reported` = 0) e Compass sem `leased`,
    `indeterminate` ou `temp_failed`. Pendência encontrada é resolvida antes de ligar a remota (nunca reenviar no escuro).
 3. Servidor: `ponte ligar` → `ponte estado` mostra leitura OK em até 1 minuto. O cursor da caixa fica no Compass, então
