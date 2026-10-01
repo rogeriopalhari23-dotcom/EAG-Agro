@@ -1,0 +1,8 @@
+# Vigia da leitura da caixa (executado pelo timer). Sem acesso a segredos.
+[Unit]
+Description=EAG Compass - ponte: vigia da leitura da caixa
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/eag-mail-bridge-vigiar
+SyslogLevelPrefix=yes

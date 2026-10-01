@@ -1,9 +1,12 @@
-# Ponte de e-mail do EAG Compass — serviço systemd (servidor independente, ex.: Hetzner CX23).
-# Segredos em /etc/eag-mail-bridge/ (root, 0600), entregues só a este serviço por LoadCredential=.
+# Ponte de e-mail do EAG Compass — serviço systemd (servidor independente Hetzner CX23).
+# Segredos em /etc/eag-mail-bridge/ (root, 0600), entregues só a este serviço por LoadCredential= (nunca em variável de
+# ambiente nem no registro). Uma instância só: o próprio processo usa trava por PID no diário.
 [Unit]
 Description=EAG Compass - ponte de e-mail (SMTP/IMAP Hostinger)
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=900
+StartLimitBurst=10
 
 [Service]
 Type=simple
@@ -16,19 +19,25 @@ LoadCredential=MAILBOX_PASSWORD:/etc/eag-mail-bridge/MAILBOX_PASSWORD
 LoadCredential=BRIDGE_HMAC_KEY:/etc/eag-mail-bridge/BRIDGE_HMAC_KEY
 LoadCredential=ACCESS_CLIENT_SECRET:/etc/eag-mail-bridge/ACCESS_CLIENT_SECRET
 ExecStart=/usr/bin/node src/main.js
+# Reinício após falha (inclui saída por erro); parada pedida (systemctl stop) termina o ciclo atual.
 Restart=always
 RestartSec=30
+TimeoutStopSec=120
+KillSignal=SIGTERM
 StateDirectory=eag-mail-bridge
+StateDirectoryMode=0700
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
+ProtectKernelModules=yes
 ProtectControlGroups=yes
-RestrictAddressFamilies=AF_INET AF_INET6
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 CapabilityBoundingSet=
 LockPersonality=yes
+MemoryMax=512M
 
 [Install]
 WantedBy=multi-user.target
