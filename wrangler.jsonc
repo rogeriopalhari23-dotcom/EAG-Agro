@@ -35,7 +35,7 @@
     // Validação de Rogério (2026-09-30): texto exato do endereço do rodapé. Sem ele (ou diferente), revisor e aprovação bloqueiam.
     "EAG_POSTAL_ADDRESS_CONFIRMED": "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil",
     // Teste interno da ponte (2026-09-30): aliases "+" entregam na mesma caixa do Gmail de Rogério (um por cenário).
-    "INTERNAL_TEST_RECIPIENTS": "rogeriopalhari23@gmail.com,rogeriopalhari23+ponte-a@gmail.com,rogeriopalhari23+ponte-b@gmail.com,rogeriopalhari23+ponte-c@gmail.com,rogeriopalhari23+ponte-link@gmail.com",
+    "INTERNAL_TEST_RECIPIENTS": "rogeriopalhari23@gmail.com,rogeriopalhari23+ponte-a@gmail.com,rogeriopalhari23+ponte-b@gmail.com,rogeriopalhari23+ponte-c@gmail.com,rogeriopalhari23+ponte-link@gmail.com,rogeriopalhari@hotmail.com",
     // MDIC lido pelo workflow mensal do GitHub (scripts/mdic-job.mjs): o fetch do Worker responde 526 porque o
     // servidor do MDIC não envia o certificado intermediário (EVIDENCIAS, 2026-09-25). O Worker cuida só da Comtrade.
     "MDIC_SOURCE": "github",

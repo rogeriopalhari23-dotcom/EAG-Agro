@@ -26,7 +26,10 @@ const api = async (path, method = "GET", body) => {
   if (r.status >= 300) throw new Error(`${method} ${path} -> ${r.status} ${JSON.stringify(j?.error ?? j).slice(0, 200)}`);
   return j.data ?? j;
 };
-const internos = ["rogeriopalhari23@gmail.com", ...Object.values(reg.casos).map((c) => c.destinatario).filter((e) => e.startsWith("rogeriopalhari23+"))];
+// Endereços internos conferidos na supressão: Gmail principal, aliases e a caixa do cenário 3a (Hotmail de Rogério,
+// autorizada só para o teste interno em 2026-10-01; nunca em campanha comercial).
+const internos = ["rogeriopalhari23@gmail.com", ...Object.values(reg.casos).map((c) => c.destinatario).filter((e) => e.startsWith("rogeriopalhari23+") || e === "rogeriopalhari@hotmail.com")];
+const hojeCuiaba = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Cuiaba" }).format(new Date());
 
 const modo = process.argv[2];
 if (modo === "supressao") {
@@ -58,6 +61,42 @@ if (modo === "supressao") {
   const x = f.toApprove.find((a) => a.channel === "email" && a.contactId === c.contato);
   if (x) await api(`/api/fichas/${c.ficha}/approve`, "POST", { versionNo: f.version.no, contactId: c.contato, channel: "email", messagesSha256: x.messagesSha256, startDate: "2026-10-01" });
   out({ ok: true, ficha: c.ficha, aprovada: !!x });
+} else if (modo === "preparar-sair") {
+  // Cenário 3a (2026-10-01): caso G com a caixa Hotmail de Rogério, autorizada só para este teste interno.
+  if (reg.casos.G) {
+    out({ ok: true, jaExiste: reg.casos.G.contato });
+  } else {
+    const email = "rogeriopalhari@hotmail.com";
+    const co = await api("/api/companies", "POST", { legalName: "TESTE INTERNO EAG G — cenário 3a, resposta sair (não é prospect)", countryCode: "BR", sourceLabel: "teste interno da ponte (2026-10-01)" });
+    await api(`/api/companies/${co.id}/profiles`, "POST", { productId: "product-06", profileClass: "possible_final_consumer", basis: "Registro de teste interno da ponte de e-mail" });
+    const p = (await api(`/api/companies/${co.id}/profiles`)).items[0];
+    await api(`/api/profiles/${p.id}`, "PATCH", { sizeCallGoal: true, expectedRevision: p.revision });
+    await api(`/api/companies/${co.id}/screening`, "POST", {});
+    const ct = await api(`/api/companies/${co.id}/contacts`, "POST", { fullName: "Rogério Teste G", email, prospectRole: "decision_maker", sourceLabel: "teste interno", timezone: "America/Cuiaba" });
+    reg.casos.G = { destinatario: email, empresa: co.id, contato: ct.id, perfil: p.id, ficha: null, cenario: "3a" };
+    save();
+    out({ ok: true, etapa: "contato criado; marcar validação interna no D1 e rodar abrir-sair", contato: ct.id });
+  }
+} else if (modo === "abrir-sair") {
+  // Reativa a campanha de teste, põe o canal em teste interno e aprova só a ficha do caso G (início hoje, Cuiabá).
+  const c = reg.casos.G;
+  if (!c) throw new Error("rode preparar-sair antes");
+  const camp = await api(`/api/campaigns/${reg.campanha}`);
+  const cc = camp.campaign ?? camp;
+  if (cc.status !== "active") await api(`/api/campaigns/${reg.campanha}/activate`, "POST", { expectedVersion: cc.version });
+  await api("/api/channels/email/state", "POST", { state: "internal_test", evidenceRef: "Teste interno 3a (sair) com a caixa Hotmail autorizada por Rogério em 01/10/2026" });
+  if (!c.ficha) {
+    const f = await api("/api/fichas", "POST", { companyId: c.empresa, campaignId: reg.campanha, recipients: [c.contato] });
+    c.ficha = f.id;
+    save();
+  }
+  const f = await api(`/api/fichas/${c.ficha}`);
+  const x = f.toApprove.find((a) => a.channel === "email" && a.contactId === c.contato);
+  if (x) await api(`/api/fichas/${c.ficha}/approve`, "POST", { versionNo: f.version.no, contactId: c.contato, channel: "email", messagesSha256: x.messagesSha256, startDate: hojeCuiaba() });
+  delete reg.encerradoEm;
+  reg.teste3a = { abertoEm: new Date().toISOString() };
+  save();
+  out({ ok: true, campanha: "ativa", canal: "internal_test", ficha: c.ficha, aprovada: !!x, inicio: hojeCuiaba() });
 } else if (modo === "encerrar") {
   // Descarta as fichas de teste (cancela a fila), encerra a campanha de teste e devolve o canal ao estado anterior.
   const res = { fichas: {} };
@@ -89,6 +128,6 @@ if (modo === "supressao") {
   const ch = await api("/api/channels");
   out({ campanha: (camp.campaign ?? camp).status, canal: (Array.isArray(ch) ? ch : ch.items).find((x) => x.channel === "email")?.state });
 } else {
-  console.log("Modos: supressao | criar-caso-link | ficha-link | encerrar | reabrir-canal | estado");
+  console.log("Modos: supressao | criar-caso-link | ficha-link | preparar-sair | abrir-sair | encerrar | reabrir-canal | estado");
   process.exitCode = 2;
 }
