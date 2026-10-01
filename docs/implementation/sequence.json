@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-09-30T22:55:15.373Z",
+  "updatedAt": "2026-10-01T19:27:24.217Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -537,7 +537,7 @@
       "acceptance": "Teste interno T1, reputação/limites/retencão, interrupção de emergência; liberação expressa dos canais.",
       "validation": "npm run check; acrescentar testes dos critérios deste item",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Teste interno da ponte concluído em 2026-09-30/2026-10-01: cenários 1, 2, 3a, 3b, 4, 5, 6, 7 e 8 aprovados (3a com a caixa Hotmail autorizada só para o teste). Canal email em planned. Liberação depende de Snov e da decisão expressa de Rogério (R26.3); campanhas comerciais desligadas."
+      "blockedBy": "Teste técnico do T1 concluído (2026-09-30/2026-10-01): cenários 1, 2, 3a, 3b, 4, 5, 6, 7 e 8 aprovados; critérios do R26.3 conferidos em DECISOES-PILOTO-2026-10-01.md §2. Snov configurada e validada (Amori e BLACK & YUM valid até 2026-10-31; 24grad catch-all). Canal email em planned. Falta só a liberação operacional (R26.1: habilitado com data, responsável e teste) por decisão expressa de Rogério; liberação comercial depende ainda de T11, triagem de sanções, P3-T12 e OpenClaw (DECISOES-PILOTO §3)."
     },
     {
       "id": "P2-T18",
@@ -793,7 +793,7 @@
       "acceptance": "Até 3 pessoas por empresa aderente, com fonte, data e motivo; estados a validar / cargo verificado / decisor confirmado; e-mail e telefone separados; sem LinkedIn automatizado; reaproveitamento por prazo.",
       "validation": "npm run check (tests/people.test.mjs); teste real 48 empresas DE + 3 CNPJs de Franca/SP",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Uso em produção depende de Rogério aceitar candidatas na busca (produção sem empresas em 2026-09-28); descoberta nacional bloqueada (chave Casa dos Dados ausente; dados abertos da Receita lentos/bloqueados fora do Brasil); validação de e-mail depende da chave Snov. Próxima ação: aceitar as candidatas da Alemanha e rodar o lote de pessoas."
+      "blockedBy": "Snov configurada e validada em 2026-10-01 (3 créditos; 2 valid, 1 catch-all). Pessoas da Alemanha aceitas e fichas de identificação criadas (24grad, Amori, BLACK & YUM). Restante: descoberta nacional bloqueada (chave Casa dos Dados ausente; dados abertos da Receita lentos/bloqueados fora do Brasil). Próxima ação: decisão do escopo do piloto nacional e da chave (DECISOES-PILOTO-2026-10-01.md item 11)."
     },
     {
       "id": "SUPRESSAO-RETENCAO",
@@ -812,6 +812,42 @@
       "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": "Implementado e publicado em 2026-10-01 (versão a5016aff, migração 0031). Prazo e fundamento da retenção dependem de T11 (não definidos aqui).",
       "note": "Divergência encontrada em 30/09/2026 ao conferir a implementação contra a Spec: não há rota de remoção e retention_until nunca é preenchido. Tarefa de implementação, separada da validação jurídica T11 (que define a política de retenção e a base de remoção). Nenhum descadastro real é alterado por esta tarefa sem decisão de Rogério."
+    },
+    {
+      "id": "T11-VALIDACAO",
+      "title": "T11: validação da política de ciclo de vida e do primeiro contato por país (portão humano e jurídico)",
+      "status": "external",
+      "dependsOn": [
+        "SUPRESSAO-RETENCAO",
+        "P2-T16"
+      ],
+      "plan": "docs/implementation/T11-POLITICA-PROPOSTA.md",
+      "section": "§1–§5",
+      "read": [
+        "docs/implementation/T11-POLITICA-PROPOSTA.md",
+        "docs/implementation/DECISOES-PILOTO-2026-10-01.md"
+      ],
+      "acceptance": "Controlador definido; política de retenção da supressão e do histórico, remoção administrativa, acesso e exclusão validadas por responsável competente; regra do primeiro contato por e-mail na Alemanha (UWG §7) decidida com parecer; texto do GDPR Art. 14 definido se exigido. Fixture local não conta.",
+      "validation": "Registro do parecer/decisão em EVIDENCIAS.md; depois, testes das regras que mudarem",
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Proposta escrita em 2026-10-01 (sanções já decididas em 2026-09-24). Aguarda: jurídico/encarregado da EAG (controlador, marca, caixa, política, transferência internacional) e advogado de UWG/DSGVO (e-mail B2B na Alemanha, Art. 14, Art. 27). Nenhuma consulta paga sem OK de Rogério."
+    },
+    {
+      "id": "EXCLUSAO-PURGA",
+      "title": "Exclusão de dados pessoais alcança textos congelados, mensagens recebidas e snapshots (R9.1, R23.5)",
+      "status": "pending",
+      "dependsOn": [],
+      "plan": "docs/eag-compass-spec.md",
+      "section": "R9.1, R23.5",
+      "read": [
+        "src/changes.js",
+        "src/fichas.js",
+        "src/inbound.js"
+      ],
+      "acceptance": "deletePersonalData purga ou substitui por marcador os campos cifrados de ficha_messages, snapshots de versão e inbound_messages do contato; mantém o hash e a supressão; auditado sem PII; testes de que nada do contato reaparece na API.",
+      "validation": "npm run check; teste de exclusão ponta a ponta",
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Lacuna encontrada em 2026-10-01 (DECISOES-PILOTO item 5). Implementar após decisão de Rogério sobre a proposta 6; regra de retenção final depende de T11."
     }
   ]
 }

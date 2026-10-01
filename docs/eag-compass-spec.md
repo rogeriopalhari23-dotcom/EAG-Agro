@@ -61,6 +61,8 @@ Estado das dependências na data desta Spec — **nenhuma integração externa f
 | T11 | Compliance pré-envio e política de ciclo de vida | Não validado com responsável competente | Antes de contatos reais da Etapa 1 |
 | T12 | `/prospeccao-vendas` | Versão 1.0.0 do curso EAG Agro (SHA-256 `33bd093f…9dd8`) **lida nesta sessão** e registrada no T12 rev. 3; PV1–PV12 e R28 especificados. Conflitos K1–K6 decididos em 2026-09-22. Gerador, revisor e amostras não implementados. A v1.0 anterior (`94544246…acd0`) foi substituída. | Antes da primeira ficha do piloto |
 
+**Atualização de estado (2026-10-01; a tabela acima fica como registro de 2026-09-22):** T1 — teste técnico pela ponte concluído com endereços internos (cenários 1, 2, 3a, 3b, 4–8; critérios do R26.3 conferidos em `implementation/DECISOES-PILOTO-2026-10-01.md` §2); canal segue `planejado` até a liberação expressa de Rogério (R26.1). T11 — política de sanções decidida em 2026-09-24; retenção, exclusão e primeiro contato por país em proposta (`implementation/T11-POLITICA-PROPOSTA.md`), **não validados**; e-mail a empresas na Alemanha sem consentimento prévio fica sem aprovação até parecer (UWG §7(2) Nr. 2). Liberação internacional (tarefa P3-T12, parâmetro `international_enabled`) não registrada.
+
 ---
 
 ## 1. Glossário

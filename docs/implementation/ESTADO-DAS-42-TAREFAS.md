@@ -1,4 +1,25 @@
-# Estado das 42 tarefas — 2026-09-24 (reconciliado)
+# Estado das tarefas
+
+## Atualização de 2026-10-01 (prevalece sobre a tabela de 2026-09-24 abaixo)
+
+Fila: 46 itens — 39 `implemented`, 3 `partial` (P1-T12, P2-T15, RADAR-PESSOAS), 3 `external` (P2-T17, P3-T12,
+T11-VALIDACAO), 1 `pending` (EXCLUSAO-PURGA). Produção: Worker `b6d4b19d`; canais `planned`; nenhuma campanha ativa.
+Detalhe e decisões: `DECISOES-PILOTO-2026-10-01.md`.
+
+| Tarefa | Mudou desde 24/09 |
+| --- | --- |
+| P2-T7 Snov | Validação real: chaves no Worker, correção do 202, 3 créditos (Amori e BLACK & YUM `valid` até 31/10; 24grad `catchall`); validade de 30 dias publicada |
+| P2-T10/T11 Envio e respostas | Desbloqueados pela **ponte local** no PC de Rogério (P19 emendada); Worker não fala SMTP/IMAP |
+| **P2-T17 Canais e T1** | **Teste técnico concluído** (cenários 1, 2, 3a, 3b, 4–8). Falta só a liberação operacional por Rogério; comercial depende de T11, sanções, P3-T12 e OpenClaw |
+| P2-T12 Descadastro | Comprovado ponta a ponta (link one-click e resposta "sair"/„abmelden“) |
+| P3 Internacional | R2 habilitado (bucket privado `eag-compass-files`); `international_enabled` ainda ausente (P3-T12) |
+| Interface | Redesign aprovado e publicado |
+| SUPRESSAO-RETENCAO | Implementada e publicada (0031) |
+| T11-VALIDACAO (nova) | Proposta em `T11-POLITICA-PROPOSTA.md`; aguarda validadores |
+| EXCLUSAO-PURGA (nova) | Lacuna: exclusão não purga textos de ficha nem mensagens recebidas |
+
+## Registro de 2026-09-24 (histórico, mantido como estava)
+
 
 Fonte da verdade da fila: `docs/implementation/sequence.json` (`npm run next`). Evidências: `docs/implementation/EVIDENCIAS.md`.
 Branch `v2-revisao-2`, sincronizada com o GitHub; CI (Ubuntu e Windows) verde. `npm run check`: 313 testes + 2 workerd/D1; UI smoke com 13 telas.
