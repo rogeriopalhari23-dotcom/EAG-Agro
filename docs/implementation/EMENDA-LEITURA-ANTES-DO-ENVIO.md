@@ -1,8 +1,9 @@
-# Emenda pendente: leitura das respostas antes do envio (2026-10-01)
+# Emenda: leitura das respostas antes do envio (aprovada em 2026-10-01)
 
-Situação: **comportamento implementado e publicado; texto documental ainda não aprovado.** Este documento só descreve o que
-existe e propõe a redação que falta. Nenhuma decisão aprovada foi alterada; a Constituição e a Spec continuam como estão
-até a sua aprovação.
+Situação: **aprovada por Rogério em 2026-10-01 e aplicada no mesmo dia, depois do encerramento do teste interno** (Constituição:
+linha da exceção P19 e linha de status; Spec: R19.14, AT76, R26.3, linha de status "Revisão pós-aprovação 5" e rastreabilidade
+do objetivo 5). Nada além do texto abaixo foi alterado. A aprovação não autoriza campanhas comerciais nem dispensa os
+critérios de aceite do T1.
 
 ## 1. O que está implementado (código atual; publicado, versão em produção 9054e359)
 
@@ -25,20 +26,21 @@ até a sua aprovação.
 - **Spec:** não há requisito nem teste de aceitação para "sem leitura recente das respostas, nenhum envio". A regra existe só no
   código e na proposta da ponte (`PONTE-EMAIL-PROPOSTA.md`, seção 6).
 
-## 3. Texto proposto (para sua aprovação; não aplicado)
+## 3. Texto aprovado e aplicado (2026-10-01)
 
 **Constituição — substituir, na linha da exceção P19, só a frase do transporte:**
 
 > transporte SMTP pela caixa do remetente na Hostinger (`rogeriopalhari@eagagro.com`), executado por uma **ponte local no
 > computador de Rogério** (SMTP 465 e IMAP 993), porque Workers não alcançam os servidores da Hostinger (decisão de 2026-09-30,
 > opção B). A ponte recebe do Worker apenas mensagens congeladas e aprovadas, autenticada por token de serviço do Access e
-> assinatura HMAC; o Worker continua dono de fila, verificação pré-envio, idempotência, supressão e registro.
+> assinatura HMAC. O Worker continua dono de fila, verificação pré-envio, idempotência, supressão e registro; só o transporte é
+> externo.
 
-O restante da linha (justificativa, risco do §12, gatilho de reabertura, data) permanece igual, com a data da emenda acrescentada.
+O restante da linha (justificativa, risco do §12, gatilho de reabertura) permanece igual; a coluna de data passou a "2026-09-22; emenda do transporte (ponte local) aprovada por Rogério em 2026-10-01".
 
 **Spec — novo requisito em R19 (depois de R19.13):**
 
-> **R19.14:** SE a última leitura bem-sucedida da caixa de respostas tiver mais de 10 minutos, ou se a última leitura tiver
+> **R19.14 (leitura das respostas antes do envio, emenda aprovada em 2026-10-01):** SE a última leitura bem-sucedida da caixa de respostas tiver mais de 10 minutos, ou se a última leitura tiver
 > falhado, ENTÃO nenhum e-mail DEVE ser enviado; o envio só volta depois de uma leitura bem-sucedida em que as respostas lidas
 > já tenham sido processadas (R20).
 
@@ -46,7 +48,9 @@ O restante da linha (justificativa, risco do §12, gatilho de reabertura, data) 
 
 > | AT76 | R19.14 | DADO a última leitura boa há mais de 10 minutos, ou um erro de leitura informado depois dela, QUANDO há passo aprovado na janela, ENTÃO nada é enviado e o motivo registrado é "leitura de respostas indisponível"; após uma leitura boa, o envio volta respeitando intervalo e teto. |
 
-**Spec — R26.3 (T1):** acrescentar ao fim "…e mecanismo de descadastro de R21.10, **pela ponte de e-mail**".
+**Spec — R26.3 (T1):**
+
+> **R26.3:** E-mail só DEVE passar a `habilitado` após T1 comprovado com endereços internos, **pela ponte de e-mail**: envio, estados, recebimento, correlação de resposta, **leitura das respostas antes do envio (R19.14)**, autenticação do domínio e mecanismo de descadastro de R21.10.
 
 ## 4. O que não muda
 
