@@ -57,6 +57,38 @@ test("P2-T11: classificação — ausência, bounce, descadastro, alerta do prov
   assert.equal(classify(parseMessage(reply({ body: "Me manda a tabela de preço?" }))).priceRequest, true);
 });
 
+// Notificação do LinkedIn como as 5 lidas no teste interno de 2026-10-01 (Message-ID *.prod.linkedin.com, sem In-Reply-To),
+// com os cabeçalhos públicos que o LinkedIn usa em notificações; corpo com "Unsubscribe" logo no início (pior caso).
+const LINKEDIN_HEADERS = "List-Unsubscribe: <https://www.linkedin.com/e/v2?e=x>\r\nX-LinkedIn-Class: EMAIL-DEFAULT\r\nX-LinkedIn-Template: notification_digest\r\nFeedback-ID: notif:linkedin\r\n";
+const linkedin = ({ from = "LinkedIn <notifications-noreply@linkedin.com>", extra = LINKEDIN_HEADERS, body = "Unsubscribe\r\nVocê tem 3 novas notificações." } = {}) =>
+  `From: ${from}\r\nTo: rogeriopalhari@eagagro.com\r\nSubject: Você apareceu em 5 pesquisas\r\nMessage-ID: <1087327553.${Math.random()}@lva2-app66003.prod.linkedin.com>\r\n${extra}Content-Type: text/plain; charset=utf-8\r\n\r\n${body}\r\n`;
+
+test("Notificação automática (LinkedIn e envio em massa) não é resposta humana nem pedido de saída (2026-10-01)", () => {
+  assert.equal(classify(parseMessage(linkedin())).kind, "auto_reply");
+  assert.equal(classify(parseMessage(linkedin({ extra: "X-LinkedIn-Class: INMAIL\r\n", from: "Fulano via LinkedIn <messages-noreply@linkedin.com>", body: "Olá, vi seu perfil" }))).kind, "auto_reply");
+  assert.equal(classify(parseMessage(linkedin({ extra: "List-Unsubscribe: <mailto:u@lista.com>\r\n", from: "Boletim <boletim@agro.com.br>", body: "Novidades" }))).kind, "auto_reply");
+  assert.equal(classify(parseMessage(reply({ extra: "Precedence: bulk\r\n" }))).kind, "auto_reply");
+  assert.equal(classify(parseMessage(reply({ extra: "List-Id: <compras.lista.com>\r\n" }))).kind, "auto_reply");
+  assert.equal(classify(parseMessage(reply({ from: "No Reply <no-reply@portal.com>" }))).kind, "auto_reply");
+  // Respostas reais continuam como antes.
+  assert.equal(classify(parseMessage(reply({ inReplyTo: "<ob-1@eagagro.com>" }))).kind, "human");
+  assert.equal(classify(parseMessage(reply({ inReplyTo: "<ob-1@eagagro.com>", extra: "List-Unsubscribe: <mailto:x@valeverde.com.br>\r\n" }))).kind, "human", "resposta na thread com List-Unsubscribe do provedor dela segue humana");
+  assert.equal(classify(parseMessage(reply({ body: "Oi Rogério, podemos falar amanhã?" }))).kind, "human");
+  assert.equal(classify(parseMessage(reply({ inReplyTo: "<ob-1@eagagro.com>", body: "sair" }))).kind, "unsubscribe");
+  assert.equal(classify(parseMessage(reply({ body: "abmelden" }))).kind, "unsubscribe");
+});
+
+check("Notificação do LinkedIn durante uma sequência: sem pausa, tarefa, supressão nem conteúdo guardado (2026-10-01)", async (ctx) => {
+  await sentFirst(ctx);
+  const out = await deliver(ctx, linkedin());
+  assert.deepEqual({ c: out.classification, k: out.correlation }, { c: "auto_reply", k: "none" });
+  assert.deepEqual(statuses(ctx.DB), ["1:accepted", "2:pending", "3:pending", "4:pending"]);
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM tasks").get().n, 0);
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM suppression_entries").get().n, 0);
+  const row = ctx.DB.raw.prepare("SELECT company_id,outbox_id,r2_key FROM inbound_messages").get();
+  assert.deepEqual({ ...row }, { company_id: null, outbox_id: null, r2_key: "not_stored" });
+});
+
 check("P2-T11: resposta na thread pausa empresa+commodity em todos os passos e abre tarefa (AT29)", async (ctx) => {
   const r = await sentFirst(ctx);
   const out = await deliver(ctx, reply({ inReplyTo: r.mid }));

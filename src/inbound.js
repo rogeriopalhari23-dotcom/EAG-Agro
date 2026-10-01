@@ -12,6 +12,19 @@ const PRICE_RE = /pre[çc]o|tabela|cota[çc][ãa]o|apresenta[çc][ãa]o|proposta
 const AUTO_SUBJECT = /^(resposta autom[áa]tica|automatic reply|auto[- ]?reply|out of office|aus[êe]ncia|f[ée]rias|ooo\b|abwesenheit|automatische antwort)/i;
 const PROVIDER_ALERT = /suspens|bloque|limit|spam|abuse|abuso|blacklist|violation|viola[çc][ãa]o/i;
 const LOOKBACK_DAYS = 60;
+// Notificação automática em massa (2026-10-01, notificações do LinkedIn lidas como "human" no teste interno): cabeçalhos
+// de lista/envio em massa (RFC 2369/2919, Precedence), remetente "no-reply" ou cabeçalhos próprios do LinkedIn. Resposta
+// de pessoa ao nosso e-mail não traz esses cabeçalhos; quem traz In-Reply-To/References continua avaliado normalmente,
+// salvo Precedence/List-Id explícitos.
+const NOREPLY_FROM = /^(no[-_.]?reply|do[-_.]?not[-_.]?reply|notifications?(-noreply)?|messages-noreply|invitations|mailer-daemon)@/i;
+function bulkNotification(msg, from) {
+  const precedence = (header(msg, "precedence") || "").toLowerCase();
+  if (/^(bulk|list|junk|auto_reply)$/.test(precedence) || header(msg, "list-id")) return true;
+  if ([...msg.headers.keys()].some((k) => k.toLowerCase().startsWith("x-linkedin"))) return true;
+  if (from && NOREPLY_FROM.test(from)) return true;
+  const threaded = header(msg, "in-reply-to") || header(msg, "references");
+  return !threaded && !!header(msg, "list-unsubscribe");
+}
 // Orientação fixa quando o comprador pede preço/tabela (R28.13; skill: nada de preço antes da reunião).
 export const PRICE_GUIDANCE =
   "Pedido de preço, tabela ou apresentação: responda pessoalmente propondo a conversa de 20–30 minutos para entender volume, especificação e prazo antes de qualquer valor (a /prospeccao-vendas não envia preço nem proposta antes da reunião).";
@@ -25,7 +38,7 @@ export function classify(msg, mailboxUser) {
   }
   if (from && /@(.+\.)?hostinger\.com$/i.test(from) && PROVIDER_ALERT.test(`${subject} ${msg.text}`)) return { kind: "provider_alert", from };
   const auto = header(msg, "auto-submitted");
-  if ((auto && auto.toLowerCase() !== "no") || header(msg, "x-autoreply") || header(msg, "x-autorespond") || AUTO_SUBJECT.test(subject))
+  if ((auto && auto.toLowerCase() !== "no") || header(msg, "x-autoreply") || header(msg, "x-autorespond") || AUTO_SUBJECT.test(subject) || bulkNotification(msg, from))
     return { kind: "auto_reply", from };
   if (!from || (mailboxUser && from === mailboxUser.toLowerCase())) return { kind: "unclassified", from };
   // Só as primeiras linhas escritas (sem citação) contam para "sair".
