@@ -1,58 +1,58 @@
-# Mapa de fundo do Radar Nacional — proposta (30/09/2026)
+# Mapa de fundo do Radar Nacional (implementado em 2026-10-01, branch `redesign-ui`, não publicado)
 
-Situação atual (branch `redesign-ui`): mapa esquemático em SVG (centro, círculo do raio, posição relativa das unidades),
-sem mapa de fundo, porque a política de segurança só aceita imagens da própria origem (`img-src 'self' data:`).
-Esta proposta **não foi implementada**; depende da sua decisão.
+Aprovado por Rogério em 2026-10-01 ("implementar o mapa Protomaps na branch de redesign; gravar o recorte no R2 existente").
 
-## Recomendação: Protomaps (OpenStreetMap) hospedado na própria conta Cloudflare
+## O que foi feito
 
-| Item | Proposta |
+| Item | Situação |
 | --- | --- |
-| Provedor dos dados | Mapa base Protomaps (derivado do OpenStreetMap), recorte do Brasil em um arquivo `.pmtiles` |
-| Onde fica | Bucket R2 da sua conta Cloudflare, servido pelo próprio Worker do Compass (mesma origem) |
-| Biblioteca | MapLibre GL JS + `pmtiles` (JavaScript), arquivos copiados para `public/mapa/` (sem CDN) |
-| Estilo, fontes e ícones | Estilo "light" do Protomaps e os arquivos de fontes/ícones (`basemaps-assets`), também em `public/mapa/` |
-| Atribuição obrigatória | "© OpenStreetMap" visível no canto do mapa, com link para openstreetmap.org/copyright (licença ODbL); sugerido "Protomaps © OpenStreetMap" |
-| Custo | Previsto US$ 0: o R2 inclui 10 GB de armazenamento, 10 milhões de leituras por mês e saída gratuita. Acima disso: US$ 0,015 por GB/mês e US$ 0,36 por milhão de leituras |
-| Contrato/chave | Nenhum. Sem conta em terceiros, sem chave exposta no navegador, sem rastreamento de quem consulta |
+| Recorte | Protomaps Basemap, build diário 2026-09-29 (v4.15.2), Brasil (`bbox -74.1,-33.9,-34.7,5.4`), zoom 0–12 |
+| Tamanho medido | 755.882.552 bytes (≈ 0,76 GB); `pmtiles verify` sem erro; SHA-256 `170af15b…5dde`. Medidas antes do envio: z10 = 149 MB, z11 = 314 MB, z12 = 755 MB (escolhido: nível de cidade e estradas para raios de 5 a 1.500 km) |
+| Onde está | Bucket existente `eag-compass-files`, prefixo `mapa/brasil-20260929-z12/` (3 partes de até 300 MB, porque o upload pelo Wrangler aceita até 315 MB por objeto, + `manifest.json`). Partes conferidas por hash depois do envio |
+| Proteção | Bucket continua **privado**: `r2.dev` desativado e nenhum domínio próprio ligado (conferido em 2026-10-01). O mapa só sai pela rota autenticada `GET /api/mapa/brasil.pmtiles` (mesma sessão/Access do Compass), somente leitura, por faixa de bytes (`Range`), até 8 MB por pedido, apenas chaves `mapa/` listadas no manifesto |
+| Biblioteca | MapLibre GL JS 6.11.2, PMTiles 4.5.0 e camadas `@protomaps/basemaps` 5.7.2, servidos pela própria origem em `public/mapa/` (gerados por `scripts/vendor-map.mjs`) |
+| Fontes e ícones | Noto Sans Regular/Medium/Italic em PBF (OFL 1.1) e ícones "light" v4 (derivados de tangrams/icons, MIT), locais |
+| Atribuição | "Protomaps © OpenStreetMap" sempre visível no canto do mapa, com link para openstreetmap.org/copyright (exigência ODbL); `public/mapa/ATRIBUICAO.txt` lista dados, estilo e bibliotecas |
+| Licenças | ODbL 1.0 (dados OSM), Natural Earth (domínio público), estilo Protomaps CC0, MapLibre BSD-3, PMTiles BSD-3, @protomaps/basemaps BSD-3, fflate MIT, Noto Sans OFL, ícones MIT — textos em `public/mapa/` e conferidos em `scripts/validate-site.mjs` |
 
-Tamanho do arquivo: o planeta inteiro tem ~120 GB (zoom 0–15). Para um raio de 50 a 300 km basta o Brasil até o zoom
-11 ou 12; o tamanho exato deve ser medido no recorte (`pmtiles extract … --bbox=<Brasil> --maxzoom=12 --dry-run`) antes do
-envio. A expectativa é ficar dentro dos 10 GB gratuitos; se não ficar, reduz-se o zoom máximo.
+## Política de segurança (CSP)
 
-## Alteração mínima na política de segurança
+Única mudança: `img-src 'self' data:` → `img-src 'self' data: blob:` (em `src/http.js` e `public/_headers`). O MapLibre monta
+imagens de ícones e rótulos como `blob:` gerados no próprio navegador. Nenhum domínio externo foi liberado. O worker do
+MapLibre é carregado da própria origem (`setWorkerUrl`), coberto por `script-src 'self'` — sem `worker-src blob:` e sem
+`unsafe-eval`. Teste: nenhuma violação de CSP e nenhuma requisição a outra origem durante o uso do mapa.
 
-Uma só mudança: acrescentar `blob:` em `img-src` (o MapLibre monta ícones e rótulos como imagens `blob:` geradas no
-próprio navegador; nada é baixado de fora).
+## Custos (documentação oficial da Cloudflare, consultada em 2026-10-01)
 
-```
-antes:  img-src 'self' data:
-depois: img-src 'self' data: blob:
-```
+| Recurso | Franquia | Preço acima | Uso previsto |
+| --- | --- | --- | --- |
+| R2 armazenamento (Standard) | 10 GB-mês por mês | US$ 0,015 por GB-mês | ≈ 0,82 GB no bucket (0,76 do mapa + 0,06 já existentes) |
+| R2 Classe B (leituras) | 10 milhões por mês | US$ 0,36 por milhão | 1 leitura por pedido de faixa (2 quando cruza partes); no teste, 6 a 10 pedidos por abertura do mapa |
+| R2 Classe A (escritas) | 1 milhão por mês | US$ 4,50 por milhão | 4 escritas no envio inicial |
+| R2 saída | sem cobrança | — | — |
+| Workers, pedidos | Paid: 10 milhões/mês incluídos; Free: 100 mil/dia | Paid: US$ 0,30 por milhão | cada pedido de faixa passa pelo Worker (arquivos de `public/mapa` são estáticos: gratuitos e ilimitados) |
+| Workers, CPU | Paid: 30 milhões de ms/mês | US$ 0,02 por milhão de ms | cópia de bytes; poucos ms por pedido |
 
-Nenhum domínio externo é liberado. Os ladrilhos chegam por `fetch` à mesma origem (`connect-src 'self'` já permite).
-O processamento em segundo plano do MapLibre usa o arquivo de worker servido pela própria origem (`setWorkerUrl`),
-coberto por `script-src 'self'` — sem `worker-src blob:` e sem `unsafe-eval`. A mudança vale nos dois lugares em que a
-política é definida hoje: `src/http.js` e `public/_headers`.
+Estimativa, **não garantia**: com uso pessoal (dezenas de aberturas do mapa por dia, algumas centenas de pedidos de faixa), o
+consumo fica muito abaixo das franquias. Custo zero **não é garantido**: depende do plano da conta (não conferido por API nesta
+sessão), do uso de outras aplicações na mesma conta (as franquias do R2 e do Workers são por conta) e de mudanças de preço.
+Acompanhar no painel da Cloudflare (R2 › Métricas e Workers › Uso). Fontes: [R2 pricing](https://developers.cloudflare.com/r2/pricing/),
+[Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [limites de upload do R2](https://developers.cloudflare.com/r2/objects/upload-objects/).
 
-## Passos de implementação (quando aprovado)
+## Atualização do recorte
 
-1. Baixar o build diário do Protomaps e recortar o Brasil (`pmtiles extract`), conferindo o hash BLAKE3 publicado.
-2. Enviar o arquivo a um bucket R2 (novo ou prefixo `mapa/` em um existente) — exige sua autorização de escrita na conta.
-3. Rota `GET /mapa/brasil.pmtiles` no Worker, com suporte a `Range`, somente leitura, atrás do mesmo Access do painel.
-4. Copiar MapLibre, `pmtiles`, estilo, fontes e ícones para `public/mapa/` com as licenças (BSD-3, BSD-3, ODbL/CC0, OFL),
-   e registrar as licenças na validação do site (`scripts/validate-site.mjs`).
-5. Trocar o SVG pelo mapa no Radar Nacional mantendo os mesmos sinais: centro, círculo do raio, ponto cheio = endereço,
-   ponto vazado = centro do município (estimado). O SVG continua como alternativa sem WebGL.
-6. Testes: política de segurança sem domínio externo, atribuição visível, nenhuma requisição a outra origem durante o
-   carregamento do mapa (Playwright), 390 px sem rolagem horizontal.
+1. `pmtiles extract https://build.protomaps.com/<AAAAMMDD>.pmtiles brasil-<AAAAMMDD>-z12.pmtiles --bbox=-74.1,-33.9,-34.7,5.4 --maxzoom=12`
+2. `pmtiles verify`, dividir em partes de 300 MB, gerar `manifest.json` (tamanhos, SHA-256, fonte, atribuição).
+3. Enviar com `wrangler r2 object put eag-compass-files/mapa/brasil-<AAAAMMDD>-z12/<parte> --file=… --remote`.
+4. Trocar `MAP_MANIFEST_KEY` em `wrangler.jsonc`; apagar o prefixo antigo só depois de conferir o novo.
 
-## Alternativa considerada e não recomendada: MapTiler Cloud
+## Comportamento na tela
 
-O plano gratuito é só para uso não comercial e exige o logotipo MapTiler; o uso comercial começa no plano Flex (US$ 25/mês).
-Exigiria liberar `api.maptiler.com` em `connect-src`/`img-src`, expor uma chave no navegador e enviar a um terceiro
-cada área consultada. Por isso não é recomendada aqui.
+Radar Nacional › resultado: mapa com fundo real, círculo tracejado do raio, centro da busca, compradores (ponto cheio = endereço
+da unidade; vazado = centro do município, estimativa), zoom por botões, roda/pinça (no celular, dois dedos para não prender a
+rolagem), escala métrica. Clique ou toque num comprador mostra nome, cidade, distância e precisão, com "Abrir" para o painel
+da empresa. Sem WebGL, sem recorte configurado (ex.: ambiente local) ou com falha de carga, o esquema em SVG continua no lugar.
 
-Fontes: [Protomaps — downloads](https://docs.protomaps.com/basemaps/downloads), [Protomaps — licença dos dados](https://github.com/protomaps/basemaps/blob/main/LICENSE_DATA.md),
-[OSMF — diretrizes de atribuição](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines), [MapLibre — CSP](https://github.com/maplibre/maplibre-gl-js/blob/main/docs/guides/v5-to-v6-migration-guide.md),
-[preços R2](https://egresscost.com/cloudflare/), [termos MapTiler Cloud](https://www.maptiler.com/terms/cloud/).
+Validado por `tests/ui-map.mjs` em 1440 px e 390 px (Chrome, WebGL por software): atribuição visível, raio e compradores
+desenhados, ladrilhos carregados, zoom, clique abrindo a empresa, sem rolagem horizontal, sem violação de CSP e sem requisição
+externa. A rota tem testes de faixa entre partes, limites e exigência de sessão (`tests/map-tiles.test.mjs`).

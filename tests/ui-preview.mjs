@@ -111,6 +111,10 @@ for (const [i, [name, ibge, city, lat, lon, prec, , size]] of units.entries()) {
 DB.raw.prepare("INSERT INTO searches(id,tenant_id,campaign_id,version,origin_ibge,origin_lat,origin_lon,origin_precision,radius_km,cnae_codes_json,source_versions_json,status,candidates_count,request_key,created_by) VALUES ('prev-s1','eag-internal',?,1,3551702,?,?,'municipality_centroid',100,'[]','{}','complete',?,'previa','system-admin')").run(campaign, origin.lat, origin.lon, units.length);
 units.forEach(([, , , , , prec, dist], i) => DB.raw.prepare("INSERT INTO search_candidates(search_id,unit_id,distance_km,distance_basis,inside_radius) VALUES ('prev-s1',?,?,?,?)").run(unitIds[i], dist, prec === "address" ? "address" : "municipality_centroid", prec === "address" ? "confirmed" : "estimated"));
 
+// Controles com algum conteúdo (dados de teste em memória).
+await api("/api/pauses", "POST", { scope: "company", scopeRef: companyIds[0], reason: "Prévia: empresa pediu retorno em novembro (teste)" });
+await api("/api/suppression", "POST", { channel: "email", value: "descadastro@exemplo.invalid", reason: "opt_out" });
+
 // Internacional: lista mensal simulada, análise da Alemanha, seleção de café e busca de empresas com uma candidata.
 keepCountries(DB, ["DEU", "USA", "CHN"]);
 await tradeParams(api, { period_default_months: 12 });
@@ -210,8 +214,17 @@ async function shots(width, height, suffix) {
   await page.getByRole("tab", { name: "Envios" }).click();
   await page.getByRole("heading", { name: "Envios", exact: true }).waitFor();
   await snap("abordagem-envios");
+  await page.getByRole("tab", { name: "Tarefas" }).click();
+  await page.getByRole("heading", { name: "Tarefas", exact: true }).waitFor();
+  await snap("abordagem-tarefas");
   await nav("Configurações");
   await snap("configuracoes");
+  for (const [label, file] of [["Campanhas", "campanhas"], ["Catálogo", "catalogo"], ["Parâmetros", "parametros"], ["Pausas", "pausas"], ["Supressão", "supressao"], ["Lista mensal", "lista-mensal"]]) {
+    await nav("Configurações");
+    await page.locator(".settings-list button").filter({ has: page.locator("strong", { hasText: new RegExp(`^${label}$`) }) }).click();
+    await page.getByRole("heading", { name: label, exact: true }).waitFor();
+    await snap(file);
+  }
   await page.close();
 }
 // Interface antiga (só para as capturas "antes"): menu de 13 itens, telas pelos nomes antigos.
@@ -260,6 +273,8 @@ async function shotsBefore(width, height, suffix) {
     for (const s of ["Nova demanda", "Registrar evidência", "Cadastrar contato"]) await page.locator("summary", { hasText: new RegExp(`^${s}$`) }).first().click();
     await snap("empresa-formularios");
   });
+  for (const [label, file] of [["Envios", "abordagem-envios"], ["Tarefas", "abordagem-tarefas"], ["Campanhas", "campanhas"], ["Catálogo", "catalogo"], ["Parâmetros", "parametros"], ["Pausas", "pausas"], ["Supressão", "supressao"], ["Lista mensal", "lista-mensal"]])
+    await step(file, async () => (await nav(label), await page.getByRole("heading", { name: label, exact: true }).waitFor(), await snap(file)));
   await step("ficha", async () => {
     await nav("Fichas");
     await page.locator(".row").filter({ hasText: "Doces Ribeirão" }).getByRole("button", { name: "Abrir" }).click();

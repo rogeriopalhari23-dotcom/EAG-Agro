@@ -165,7 +165,7 @@ try {
   await page
     .locator(".row")
     .filter({ hasText: "ICUMSA 45" })
-    .getByRole("button", { name: "Detalhes" })
+    .getByRole("button", { name: "Abrir" })
     .click();
   await page.getByRole("heading", { name: "ICUMSA 45", exact: true }).waitFor();
   await page.locator("summary", { hasText: "Cadastrar código" }).click();
@@ -197,7 +197,7 @@ try {
   await page
     .locator(".row")
     .filter({ hasText: "Açúcar interior UI" })
-    .getByRole("button", { name: "Detalhes" })
+    .getByRole("button", { name: "Abrir" })
     .click();
   await page.locator("summary", { hasText: "Editar ICP" }).click();
   const icpForm = form("Editar ICP");
@@ -217,7 +217,7 @@ try {
     assert.equal(await page.locator("#content .error").filter({ visible: true }).count(), 0, label);
   }
   await nav("Envios");
-  await page.getByText("Teste interno", { exact: true }).waitFor();
+  await page.getByText(/^Teste interno: só destinatários internos/).waitFor();
   await page.locator(".row").filter({ hasText: "Doces Vale Verde" }).first().waitFor();
   await nav("Fichas");
   await page.locator(".row").filter({ hasText: "Doces Vale Verde" }).getByRole("button", { name: /^(Abrir|Revisar e aprovar)$/ }).click();

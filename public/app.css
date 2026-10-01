@@ -1406,3 +1406,18 @@ details.group > summary small {
     height: 340px;
   }
 }
+
+/* Configurações agrupadas */
+.settings-group {
+  display: grid;
+  gap: 8px;
+}
+.settings-group > h2 {
+  font-size: 16px;
+}
+.settings-group + .settings-group {
+  margin-top: 12px;
+}
+.settings-list button > small.tag {
+  justify-self: start;
+}

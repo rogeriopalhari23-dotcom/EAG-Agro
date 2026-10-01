@@ -281,16 +281,27 @@ async function abordagemView(tab) {
 // Configurações: cadastros e regras que não fazem parte do trabalho diário.
 async function settingsView() {
   const node = section("Configurações", "Cadastros, regras e controles da operação. O trabalho diário fica nos radares, em Empresas e em Abordagem.");
-  const items = [
-    ["Campanhas", "Commodity, cidade de origem e cliente ideal de cada busca; ativação."],
-    ["Catálogo", "Produtos, identidade e códigos NCM/HS."],
-    ["Setores e CNAE", "Setores usuários ligados às subclasses CNAE da busca nacional."],
-    ["Lista mensal", "Rotina mensal de países importadores e fontes (MDIC, Comtrade)."],
-    ["Parâmetros", "Raios, janelas e limites de envio, prazos."],
-    ["Pausas", "Pausas de empresa, campanha, commodity ou da operação."],
-    ["Supressão", "Descadastros e endereços que não podem receber contato."],
-  ];
-  node.append(el("div", { class: "settings-list" }, ...items.map(([name, desc]) => el("button", { type: "button", onclick: () => navigate(name) }, text("strong", name), text("span", desc)))));
+  const group = (title, hint, items) =>
+    el(
+      "section",
+      { class: "settings-group" },
+      text("h2", title),
+      text("p", hint, "muted"),
+      el("div", { class: "settings-list" }, ...items.map(([name, desc, tag]) => el("button", { type: "button", onclick: () => navigate(name) }, text("strong", name), text("span", desc), tag ? text("small", tag, "tag") : null))),
+    );
+  node.append(
+    group("Preparação das buscas", "Usado ao montar campanhas e radares.", [
+      ["Campanhas", "Commodity, cidade de origem e cliente ideal de cada busca; ativação."],
+      ["Catálogo", "Produtos, identidade e códigos NCM/HS."],
+      ["Setores e CNAE", "Setores usuários ligados às subclasses CNAE da busca nacional."],
+    ]),
+    group("Controles e administração", "Mudanças aqui afetam toda a operação; cada uma pede motivo e fica no histórico.", [
+      ["Pausas", "Pausas de empresa, campanha, commodity ou da operação."],
+      ["Supressão", "Descadastros e endereços que não podem receber contato.", admin() ? null : "consulta restrita"],
+      ["Parâmetros", "Raios, janelas e limites de envio, prazos.", "administrador"],
+      ["Lista mensal", "Rotina mensal de países importadores e fontes (MDIC, Comtrade)."],
+    ]),
+  );
   return node;
 }
 
@@ -1620,16 +1631,16 @@ async function catalogView() {
             : p.identity_status === "confirmed"
               ? "Identificado"
               : "Identidade pendente",
-          "tag",
+          !p.active ? "tag" : p.identity_status === "confirmed" ? "tag ok" : "tag warn",
         ),
-        button("Detalhes", () => showProduct(p.id)),
+        button("Abrir", () => showProduct(p.id)),
       ),
     ),
   );
   if (admin())
     node.append(
       details(
-        "Cadastrar produto",
+        "Cadastrar produto (administrador)",
         makeForm(
           [
             input("Commodity (identificador, ex.: soy_meal)", "commodity"),
@@ -1863,8 +1874,12 @@ async function parametersView() {
       "Parâmetros",
       "Valores versionados. Parâmetro sem valor aprovado fica pendente e bloqueia a função que depende dele.",
     );
+  const show = (v) => (typeof v === "object" && v !== null ? (Array.isArray(v) ? v.join(", ") : Object.entries(v).map(([k, x]) => `${k}: ${Array.isArray(x) ? x.join(", ") : typeof x === "object" && x !== null ? JSON.stringify(x) : x}`).join(" · ")) : String(v));
+  const defs = [...d.definitions].sort((a, b) => (a.configuredScopes.length ? 1 : 0) - (b.configuredScopes.length ? 1 : 0));
+  const pendingCount = defs.filter((x) => !x.configuredScopes.length).length;
+  if (pendingCount) node.append(el("div", { class: "callout warn" }, text("p", `${pendingCount} parâmetro(s) sem valor aprovado: a função que depende de cada um fica bloqueada até a decisão.`)));
   node.append(
-    rows(d.definitions, (def) => {
+    rows(defs, (def) => {
       const configured = def.configuredScopes.map((scope) => [
         scope,
         d.parameters[`${def.key}:${scope}`],
@@ -1876,19 +1891,17 @@ async function parametersView() {
           "div",
           {},
           text("strong", def.label),
-          text("small", `${def.key} · escopo ${def.scope} · usado em ${def.requiredBy}`),
-          ...configured.map(([scope, value]) =>
-            text("small", `${scope}: ${JSON.stringify(value)}`),
-          ),
+          ...configured.map(([scope, value]) => text("small", `${scope}: ${show(value)}`)),
+          text("small", `Usado em ${def.requiredBy} · ${def.key}`),
         ),
-        text("span", configured.length ? "Com valor" : "Pendente", "tag"),
+        text("span", configured.length ? "Com valor" : "Pendente", configured.length ? "tag ok" : "tag warn"),
       );
     }),
   );
   if (state.actor.role === "admin")
     node.append(
       details(
-        "Alterar parâmetro",
+        "Alterar parâmetro (administrador)",
         makeForm(
           [
             select(
@@ -1947,113 +1960,84 @@ function listPager(node, data, view) {
   );
 }
 async function campaignView() {
-  const d = await api(
-      `/api/campaigns?limit=50&offset=${state.listOffsets.Campanhas || 0}`,
-    ),
-    node = section(
-      "Campanhas",
-      "Campanhas organizam produto, mercado e cliente ideal. Ativar não inicia busca nem envio nesta versão.",
-    );
+  const d = await api(`/api/campaigns?limit=50&offset=${state.listOffsets.Campanhas || 0}`),
+    node = section("Campanhas", "Cada campanha reúne produto, mercado e cliente ideal. Ativar libera a busca; nenhum envio sai sem ficha aprovada.");
+  const STATUS_TAG = { active: "tag ok", waiting: "tag warn", paused: "tag warn", draft: "tag", ended: "tag" };
   node.append(
-    rows(d.items, (c) =>
-      el(
-        "div",
-        { class: "row" },
-        el(
-          "div",
-          {},
-          text("strong", c.name),
-          text(
-            "small",
-            `${c.market === "national" ? c.origin_city + "/" + c.origin_uf + " · " + c.radius_km + " km" : c.country_code} · v${c.version}`,
+    d.items.length
+      ? rows(d.items, (c) =>
+          el(
+            "div",
+            { class: "row" },
+            el("div", {}, text("strong", c.name), text("small", `${c.market === "national" ? `Nacional · ${c.origin_city}/${c.origin_uf} · ${c.radius_km} km` : `Internacional · ${c.country_code}`} · versão ${c.version}`)),
+            text("span", statusLabels[c.status], STATUS_TAG[c.status] || "tag"),
+            button("Abrir", () => showCampaign(c.id)),
+            moreMenu(
+              "Mais ações",
+              approver() && c.status !== "active"
+                ? button("Ativar", async () => {
+                    const r = await api(`/api/campaigns/${c.id}/activate`, "POST", { expectedVersion: c.version });
+                    notice(r.campaign.status === "waiting" ? "Campanha em espera: duas commodities já estão ativas neste mercado." : "Campanha ativada.");
+                    await navigate("Campanhas");
+                  })
+                : null,
+              c.status === "active" && writable()
+                ? button("Pausar", async () => {
+                    await api(`/api/campaigns/${c.id}`, "PATCH", { expectedVersion: c.version, status: "paused" });
+                    await navigate("Campanhas");
+                  })
+                : null,
+            ),
           ),
-        ),
-        text("span", statusLabels[c.status], "tag"),
-        button("Detalhes", () => showCampaign(c.id)),
-        approver() && c.status !== "active"
-          ? button("Ativar", async () => {
-              const r = await api(`/api/campaigns/${c.id}/activate`, "POST", {
-                expectedVersion: c.version,
-              });
-              notice(
-                r.campaign.status === "waiting"
-                  ? "Campanha em espera: duas commodities já estão ativas neste mercado."
-                  : "Campanha ativada.",
-              );
-              await navigate("Campanhas");
-            })
-          : null,
-        c.status === "active" && writable()
-          ? button("Pausar", async () => {
-              await api(`/api/campaigns/${c.id}`, "PATCH", {
-                expectedVersion: c.version,
-                status: "paused",
-              });
-              await navigate("Campanhas");
-            })
-          : null,
-      ),
-    ),
+        )
+      : text("p", "Nenhuma campanha ainda. Crie a primeira abaixo.", "empty"),
   );
   listPager(node, d, "Campanhas");
-  if (writable())
-    node.append(
-      details(
-        "Criar campanha",
-        makeForm(
-          [
-            input("Nome", "name"),
-            productSelect(),
-            marketSelect("national"),
-            input("Cidade de origem nacional", "originCity", "text", "", false),
-            input("UF nacional", "originUf", "text", "", false),
-            select("Raio nacional", "radiusKm", [
-              5,
-              ...Array.from({ length: 15 }, (_, i) => (i + 1) * 100),
-            ]),
-            input(
-              "País internacional (código de 2 letras)",
-              "countryCode",
-              "text",
-              "",
-              false,
-            ),
+  if (writable()) {
+    const market = marketSelect("national");
+    const national = { group: "Origem nacional", hint: "Cidade do fornecedor e raio da busca de compradores.", fields: [input("Cidade de origem nacional", "originCity", "text", "", false), input("UF nacional", "originUf", "text", "", false), select("Raio nacional", "radiusKm", [5, ...Array.from({ length: 15 }, (_, i) => (i + 1) * 100)].map((k) => [k, `${k} km`]))] };
+    const foreign = { group: "País (internacional)", fields: [input("País internacional (código de 2 letras)", "countryCode", "text", "", false)] };
+    const form = makeForm(
+      [
+        { group: "Produto e mercado", fields: [input("Nome", "name"), productSelect(), market] },
+        national,
+        foreign,
+        {
+          group: "Cliente ideal",
+          fields: [
             input("Setores usuários, separados por vírgula", "userSectors"),
-            select("Porte alvo", "sizeTarget", [
-              ["small_plus", "Pequeno ou maior"],
-              ["medium", "Médio"],
-              ["medium_plus", "Médio ou maior"],
-            ]),
+            select("Porte alvo", "sizeTarget", [["small_plus", "Pequeno ou maior"], ["medium", "Médio"], ["medium_plus", "Médio ou maior"]]),
             input("Região do cliente ideal", "region"),
             input("Cargo decisor", "decisionRole"),
             input("Cargo influenciador", "influencerRole"),
-            input("Dores de suprimento", "supplyPains", "textarea", "", false),
           ],
-          async (v) => {
-            await api("/api/campaigns", "POST", {
-              ...v,
-              radiusKm: Number(v.radiusKm),
-              icp: {
-                userSectors: v.userSectors
-                  .split(",")
-                  .map((x) => x.trim())
-                  .filter(Boolean),
-                sizeTarget: v.sizeTarget,
-                region: v.region,
-                decisionRole: v.decisionRole,
-                influencerRole: v.influencerRole,
-                supplyPains: v.supplyPains,
-              },
-            });
-            notice("Campanha criada como rascunho.");
-            await navigate("Campanhas");
-          },
-          "Criar campanha",
-        ),
-      ),
+        },
+        { group: "Dores de suprimento (opcional)", collapsed: true, fields: [input("Dores de suprimento", "supplyPains", "textarea", "", false)] },
+      ],
+      async (v) => {
+        await api("/api/campaigns", "POST", {
+          ...v,
+          radiusKm: Number(v.radiusKm),
+          icp: { userSectors: v.userSectors.split(",").map((x) => x.trim()).filter(Boolean), sizeTarget: v.sizeTarget, region: v.region, decisionRole: v.decisionRole, influencerRole: v.influencerRole, supplyPains: v.supplyPains },
+        });
+        notice("Campanha criada como rascunho.");
+        await navigate("Campanhas");
+      },
+      "Criar campanha",
     );
+    // Só o bloco do mercado escolhido fica visível.
+    const [, natBox, forBox] = form.querySelectorAll("fieldset");
+    const sync = () => {
+      natBox.hidden = market.control.value !== "national";
+      forBox.hidden = market.control.value === "national";
+    };
+    market.control.addEventListener("change", sync);
+    sync();
+    node.append(details("Criar campanha", form));
+  }
   return node;
 }
+
 async function showCampaign(id) {
   const [d, hist] = await Promise.all([
       api(`/api/campaigns/${id}`),
@@ -2206,89 +2190,77 @@ async function showCampaign(id) {
     );
   showScreen(node);
 }
+const SUPPRESSION_REASON = { opt_out: "Pedido de descadastro", manual_request: "Pedido recebido manualmente", hard_bounce: "Falha definitiva de entrega", legacy_import: "Registro legado" };
+const SUPPRESSION_SOURCE = { link: "link de descadastro", reply: "resposta", manual: "registro manual", openclaw: "importação", bounce: "falha de entrega" };
+const CHANNEL_NAME = { email: "E-mail", phone: "Telefone", linkedin: "LinkedIn" };
 async function suppressionView() {
-  const node = section(
-    "Supressão",
-    "Registre pedidos de não contato. O identificador fica protegido por HMAC; esta versão não remove supressões.",
-  );
-  if (writable())
-    node.append(
-      makeForm(
-        [
-          select("Canal", "channel", [
-            ["email", "E-mail"],
-            ["phone", "Telefone"],
-            ["linkedin", "LinkedIn"],
-          ]),
-          input("E-mail, telefone internacional ou URL do perfil", "value"),
-          select("Motivo", "reason", [
-            ["opt_out", "Pedido de descadastro"],
-            ["manual_request", "Pedido recebido manualmente"],
-            ["hard_bounce", "Falha definitiva de entrega"],
-            ["legacy_import", "Registro legado"],
-          ]),
-        ],
-        async (v) => {
-          const r = await api("/api/suppression", "POST", v);
-          notice(
-            r.created
-              ? "Supressão registrada."
-              : "Identificador já estava suprimido.",
-          );
-          await navigate("Supressão");
-        },
-        "Registrar supressão",
-      ),
-    );
+  const node = section("Supressão", "Quem pediu para não ser contatado. O endereço é guardado só como código protegido (HMAC) e bloqueia qualquer envio a ele.");
+  node.append(el("div", { class: "callout" }, text("p", "Esta versão não remove supressões. Os descadastros reais ficam preservados; a regra de retenção por registro está pendente (tarefa SUPRESSAO-RETENCAO).")));
   if (state.actor.role === "admin") {
-    const d = await api(
-      `/api/suppression?limit=50&offset=${state.listOffsets["Supressão"] || 0}`,
-    );
+    const d = await api(`/api/suppression?limit=50&offset=${state.listOffsets["Supressão"] || 0}`);
     node.append(
-      rows(d.items, (r) =>
-        el(
-          "div",
-          { class: "row" },
-          text("strong", r.identifier_hash),
-          text("span", r.channel + " · " + r.reason, "tag"),
-        ),
+      panel(
+        `Registros (${d.total ?? d.items.length})`,
+        d.items.length
+          ? rows(d.items, (r) =>
+              el(
+                "div",
+                { class: "row" },
+                el("div", {}, text("strong", `${CHANNEL_NAME[r.channel] || r.channel} · ${SUPPRESSION_REASON[r.reason] || r.reason}`), text("small", `${r.created_at ? fmtDate(r.created_at) : ""}${r.source ? ` · ${SUPPRESSION_SOURCE[r.source] || r.source}` : ""} · código ${String(r.identifier_hash).slice(0, 12)}…`)),
+                text("span", "Bloqueado", "tag warn"),
+              ),
+            )
+          : text("p", "Nenhuma supressão registrada.", "empty"),
       ),
     );
     listPager(node, d, "Supressão");
-  }
+  } else node.append(text("p", "A lista é visível só para administradores. Você pode registrar um pedido abaixo.", "muted"));
+  if (writable())
+    node.append(
+      details(
+        "Registrar supressão",
+        makeForm(
+          [
+            select("Canal", "channel", [["email", "E-mail"], ["phone", "Telefone"], ["linkedin", "LinkedIn"]]),
+            input("E-mail, telefone internacional ou URL do perfil", "value"),
+            select("Motivo", "reason", Object.entries(SUPPRESSION_REASON)),
+          ],
+          async (v) => {
+            const r = await api("/api/suppression", "POST", v);
+            notice(r.created ? "Supressão registrada." : "Identificador já estava suprimido.");
+            await navigate("Supressão");
+          },
+          "Registrar supressão",
+        ),
+      ),
+    );
   return node;
 }
+const PAUSE_SCOPE = { operation: "Toda a operação", company: "Empresa", campaign: "Campanha", commodity: "Commodity", offer: "Oferta" };
 async function pausesView() {
-  const d = await api(
-      `/api/pauses?limit=50&offset=${state.listOffsets.Pausas || 0}`,
-    ),
-    node = section(
-      "Pausas",
-      "Registro de pausas por escopo. A integração com o agendador será feita antes de habilitar envios.",
-    );
-  node.append(
-    rows(d.items, (p) =>
-      el(
-        "div",
-        { class: "row" },
-        el(
-          "div",
-          {},
-          text("strong", p.scope + " · " + (p.scope_ref || "Toda operação")),
-          text("small", p.reason),
-        ),
-        text("span", p.resumed_at ? "Retomada" : "Em pausa", "tag"),
-        !p.resumed_at && writable()
-          ? button("Retomar", async () => {
-              const reason = window.prompt("Motivo da retomada:");
-              if (!reason) return;
-              await api(`/api/pauses/${p.id}/resume`, "POST", { reason });
+  const d = await api(`/api/pauses?limit=50&offset=${state.listOffsets.Pausas || 0}`),
+    node = section("Pausas", "Uma pausa impede envios e tarefas no escopo indicado até ser retomada, com motivo.");
+  const active = d.items.filter((p) => !p.resumed_at),
+    past = d.items.filter((p) => p.resumed_at);
+  const row = (p) =>
+    el(
+      "div",
+      { class: "row" },
+      el("div", {}, text("strong", `${PAUSE_SCOPE[p.scope] || p.scope}${p.scope_ref ? ` · ${p.scope_ref}` : ""}`), text("small", p.reason), text("small", p.resumed_at ? `Retomada em ${fmtDate(p.resumed_at)}${p.resume_reason ? ` · ${p.resume_reason}` : ""}` : `Desde ${fmtDate(p.created_at)}`)),
+      text("span", p.resumed_at ? "Retomada" : "Em pausa", p.resumed_at ? "tag" : "tag warn"),
+      !p.resumed_at && writable()
+        ? details(
+            "Retomar",
+            makeForm([input("Motivo da retomada", "reason")], async (v) => {
+              await api(`/api/pauses/${p.id}/resume`, "POST", v);
+              notice("Pausa retomada.");
               await navigate("Pausas");
-            })
-          : null,
-      ),
-    ),
-  );
+            }, "Retomar"),
+          )
+        : null,
+    );
+  node.append(panel(`Em pausa (${active.length})`, active.length ? rows(active, row) : text("p", "Nenhuma pausa ativa.", "empty")));
+  if (past.length) node.append(details(`Histórico (${past.length})`, rows(past, row)));
   listPager(node, d, "Pausas");
   if (writable())
     node.append(
@@ -2296,20 +2268,8 @@ async function pausesView() {
         "Registrar pausa",
         makeForm(
           [
-            select(
-              "Escopo",
-              "scope",
-              approver()
-                ? ["operation", "company", "campaign", "commodity"]
-                : ["company", "campaign", "commodity"],
-            ),
-            input(
-              "Identificador do escopo (vazio para operação)",
-              "scopeRef",
-              "text",
-              "",
-              false,
-            ),
+            select("Escopo", "scope", (approver() ? ["operation", "company", "campaign", "commodity"] : ["company", "campaign", "commodity"]).map((k) => [k, PAUSE_SCOPE[k]])),
+            input("Identificador do escopo (vazio para operação)", "scopeRef", "text", "", false),
             input("Motivo", "reason", "textarea"),
           ],
           async (v) => {
@@ -2322,6 +2282,7 @@ async function pausesView() {
     );
   return node;
 }
+
 // ---------- Piloto nacional (P2-T18): Radar, Fichas, Envios, Tarefas e painéis da empresa ----------
 const pilotLabels = {
   in_icp: "No ICP",
@@ -2654,86 +2615,127 @@ async function showFicha(id) {
 // Envios: rampa, teto, próximo horário, fila e bloqueios; respostas recebidas.
 async function enviosView() {
   const [t, inbound] = await Promise.all([api("/api/sending/today"), api("/api/inbound?limit=30")]);
-  const node = section("Envios", "Um e-mail por vez, no horário comercial do destinatário. Indeterminado só volta com decisão registrada.");
+  const node = section("Envios", "Um e-mail por vez, no horário comercial do destinatário. Nada sai sem ficha aprovada.");
+  const channelText = { planned: "Planejado: nenhum envio comercial", internal_test: "Teste interno: só destinatários internos", enabled: "Liberado" }[t.channel] || lbl(t.channel);
+  const item = (k, v, extra) => el("div", {}, text("span", k, "k"), text("strong", v), extra ? text("small", extra) : null);
   node.append(
-    kv([
-      ["Canal de e-mail", lbl(t.channel)],
-      ["Degrau da rampa", `${t.rampStep + 1}`],
-      ["Enviados hoje / teto", `${t.sentToday} / ${t.dailyCap ?? "sem parâmetro"}`],
-      ["Próximo envio a partir de", t.nextSendAt || "agora, dentro da janela"],
-      ["Parada automática", t.stopped ? `${t.stopped.reason} (${t.stopped.at})` : "Não"],
-    ]),
-  );
-  node.append(
-    panel(
-      "Fila",
-      rows(t.queue, (o) =>
-        el(
-          "div",
-          { class: "row" },
-          el("div", {}, text("strong", o.legal_name), text("small", `Passo ${o.step_no} · ${o.planned_date}${o.block_reason ? " · motivo: " + o.block_reason : ""}`)),
-          text("span", lbl(o.status), "tag"),
-          o.status === "indeterminate" && admin()
-            ? button("Resolver", async () => {
-                const outcome = prompt('Resultado conferido na caixa: digite "sent" (saiu), "not_sent" (não saiu) ou "cancel".');
-                if (!["sent", "not_sent", "cancel"].includes(outcome)) return;
-                const reason = prompt("Evidência (ex.: conferido na pasta Enviados):");
-                if (!reason) return;
-                await api(`/api/sending/outbox/${o.id}/resolve`, "POST", { outcome, reason });
-                await navigate("Envios");
-              })
-            : null,
-        ),
-      ),
+    el(
+      "div",
+      { class: "company-summary" },
+      item("Canal de e-mail", channelText),
+      item("Hoje", `${t.sentToday} enviado(s)`, `teto ${t.dailyCap ?? "sem parâmetro"} · degrau ${t.rampStep + 1} da rampa`),
+      item("Próximo envio", t.nextSendAt ? fmtDate(t.nextSendAt) : "Agora, dentro da janela"),
+      item("Parada automática", t.stopped ? "Ativa" : "Não", t.stopped ? null : "Para sozinha se a leitura das respostas falhar."),
     ),
+  );
+  if (t.stopped) node.append(el("div", { class: "callout warn" }, el("p", {}, text("strong", "Envios parados. "), `${t.stopped.reason} (${fmtDate(t.stopped.at)})`)));
+  // Fila: o que precisa de decisão primeiro; agendados depois.
+  const attention = t.queue.filter((o) => ["indeterminate", "blocked", "perm_failed"].includes(o.status));
+  const scheduled = t.queue.filter((o) => !attention.includes(o));
+  const row = (o) =>
+    el(
+      "div",
+      { class: "row" },
+      el("div", {}, text("strong", o.legal_name), text("small", `Passo ${o.step_no} · ${o.planned_date}`), o.block_reason ? text("small", `Motivo: ${o.block_reason}`) : null),
+      text("span", lbl(o.status), ["indeterminate", "blocked", "perm_failed"].includes(o.status) ? "tag warn" : o.status === "accepted" ? "tag ok" : "tag"),
+      // Resolver indeterminado é decisão de administrador, com evidência; fica recolhido no próprio item.
+      o.status === "indeterminate" && admin()
+        ? details(
+            "Resolver (administrador)",
+            makeForm(
+              [
+                select("Resultado conferido na caixa", "outcome", [["sent", "Saiu (está em Enviados)"], ["not_sent", "Não saiu"], ["cancel", "Cancelar este passo"]]),
+                input("Evidência (ex.: conferido na pasta Enviados)", "reason"),
+              ],
+              async (v) => {
+                await api(`/api/sending/outbox/${o.id}/resolve`, "POST", v);
+                notice("Decisão registrada.");
+                await navigate("Envios");
+              },
+              "Registrar decisão",
+            ),
+          )
+        : null,
+    );
+  node.append(
+    panel(`Precisa de decisão (${attention.length})`, attention.length ? rows(attention, row) : text("p", "Nada parado. Indeterminado só volta com decisão registrada.", "muted")),
+    panel(`Agendados (${scheduled.length})`, scheduled.length ? rows(scheduled, row) : text("p", "Nenhum envio agendado. Os envios aparecem aqui depois que uma ficha é aprovada.", "empty")),
+  );
+  const classText = { human: "Resposta de pessoa", auto_reply: "Resposta automática", bounce_hard: "Falha definitiva", bounce_soft: "Falha temporária", unsubscribe: "Descadastro", provider_alert: "Alerta do provedor", unclassified: "A classificar" };
+  node.append(
     panel(
-      "Respostas recebidas",
-      rows(inbound.items, (m) => el("div", { class: "row" }, el("div", {}, text("strong", m.legal_name || "Remetente sem empresa ligada"), text("small", `${m.received_at} · ${m.correlation}`)), text("span", m.classification, "tag"))),
+      `Respostas recebidas (${inbound.items.length})`,
+      inbound.items.length
+        ? rows(inbound.items, (m) =>
+            el(
+              "div",
+              { class: "row" },
+              el("div", {}, text("strong", m.legal_name || "Remetente sem empresa ligada"), text("small", `${fmtDate(m.received_at)} · ${m.correlation}`)),
+              text("span", classText[m.classification] || m.classification, m.classification === "human" ? "tag ok" : ["unsubscribe", "bounce_hard"].includes(m.classification) ? "tag warn" : "tag"),
+            ),
+          )
+        : text("p", "Nenhuma resposta registrada.", "empty"),
     ),
   );
   return node;
 }
 
-// Tarefas: roteiros da skill, bloqueios e as três perguntas da Level 2.
+// Tarefas: o que vence hoje primeiro; bloqueadas à parte, com o motivo. Roteiro e registro ficam no próprio item.
+const TASK_KIND = { call_l0: "Ligação (nível 0)", call_l1: "Ligação (nível 1)", call_l2: "Ligação (nível 2)", linkedin: "LinkedIn", reply_followup: "Responder", meeting_confirm: "Confirmar reunião", return_suggested: "Retorno sugerido", provider_alert: "Alerta do provedor", review_ambiguous: "Revisar resposta" };
 async function tarefasView() {
-  const d = await api(`/api/tasks?until=${new Date().toISOString().slice(0, 10)}&limit=100`);
+  const today = new Date().toISOString().slice(0, 10);
+  const d = await api(`/api/tasks?until=${today}&limit=100`);
   const node = section("Tarefas", "Respostas e confirmações primeiro; ligações começam pelos leads mais fracos. Tarefa bloqueada não é concluída.");
-  node.append(
-    rows(d.items, (t) => {
-      const box = el(
+  const blocked = d.items.filter((t) => t.blocked?.length);
+  const open = d.items.filter((t) => !t.blocked?.length);
+  const card = (t) => {
+    const box = el(
+      "div",
+      { class: "row task" },
+      el(
         "div",
-        { class: "row task" },
-        el("div", {}, text("strong", `${t.legal_name} · ${t.kind}`), text("small", `Vence em ${t.due_date}${t.blocked?.length ? " · bloqueada: " + t.blocked.join(", ") : ""}`)),
-      );
-      if (t.script) box.append(details("Roteiro", el("pre", { class: "message" }, t.script)));
-      if (writable() && !t.blocked?.length)
-        box.append(
-          details(
-            "Registrar resultado",
-            makeForm(
-              [
-                select("Resultado", "outcome", [["done", "Feito"], ["no_answer", "Não atendeu"], ["not_reached", "Não falei com a pessoa"], ["wrong_contact", "Contato errado"]]),
-                select("Compra de usina ou trading?", "buyingChannel", [["", "Não perguntado"], ["usina", "Usina"], ["trading", "Trading"], ["ambos", "Ambos"]]),
-                select("Spot ou contrato?", "modality", [["", "Não perguntado"], ["spot", "Spot"], ["contrato", "Contrato"], ["ambos", "Ambos"]]),
-                input("Consumo mensal (t)", "monthlyVolumeT", "number", "", false),
-                input("Nota", "note", "textarea", "", false),
-              ],
-              async (v) => {
-                const answers = {};
-                if (v.buyingChannel) answers.buyingChannel = v.buyingChannel;
-                if (v.modality) answers.modality = v.modality;
-                if (v.monthlyVolumeT) answers.monthlyVolumeT = Number(v.monthlyVolumeT);
-                await api(`/api/tasks/${t.id}/complete`, "POST", { outcome: v.outcome, note: v.note || undefined, answers });
-                notice("Tarefa registrada.");
-                await navigate("Tarefas");
+        {},
+        text("strong", t.legal_name),
+        el("div", { class: "tags" }, text("span", TASK_KIND[t.kind] || t.kind, "tag"), text("span", t.due_date < today ? `Atrasada (${t.due_date})` : `Vence ${t.due_date === today ? "hoje" : t.due_date}`, t.due_date < today ? "tag warn" : "tag")),
+        t.blocked?.length ? text("small", `Bloqueada: ${t.blocked.join(", ")}`) : null,
+      ),
+    );
+    if (t.script) box.append(details("Roteiro", el("pre", { class: "message" }, t.script)));
+    if (writable() && !t.blocked?.length)
+      box.append(
+        details(
+          "Registrar resultado",
+          makeForm(
+            [
+              select("Resultado", "outcome", [["done", "Feito"], ["no_answer", "Não atendeu"], ["not_reached", "Não falei com a pessoa"], ["wrong_contact", "Contato errado"]]),
+              {
+                group: "Respostas da conversa (opcional)",
+                collapsed: true,
+                fields: [
+                  select("Compra de usina ou trading?", "buyingChannel", [["", "Não perguntado"], ["usina", "Usina"], ["trading", "Trading"], ["ambos", "Ambos"]]),
+                  select("Spot ou contrato?", "modality", [["", "Não perguntado"], ["spot", "Spot"], ["contrato", "Contrato"], ["ambos", "Ambos"]]),
+                  input("Consumo mensal (t)", "monthlyVolumeT", "number", "", false),
+                ],
               },
-              "Registrar",
-            ),
+              input("Nota", "note", "textarea", "", false),
+            ],
+            async (v) => {
+              const answers = {};
+              if (v.buyingChannel) answers.buyingChannel = v.buyingChannel;
+              if (v.modality) answers.modality = v.modality;
+              if (v.monthlyVolumeT) answers.monthlyVolumeT = Number(v.monthlyVolumeT);
+              await api(`/api/tasks/${t.id}/complete`, "POST", { outcome: v.outcome, note: v.note || undefined, answers });
+              notice("Tarefa registrada.");
+              await navigate("Tarefas");
+            },
+            "Registrar",
           ),
-        );
-      return box;
-    }),
-  );
+        ),
+      );
+    return box;
+  };
+  node.append(panel(`Para fazer (${open.length})`, open.length ? rows(open, card) : text("p", "Nenhuma tarefa para hoje.", "empty")));
+  if (blocked.length) node.append(details(`Bloqueadas (${blocked.length}) — aguardam a condição indicada`, rows(blocked, card)));
   return node;
 }
 

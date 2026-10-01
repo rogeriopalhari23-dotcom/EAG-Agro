@@ -93,9 +93,32 @@ Capturas em `fase2/antes/` (interface original, mesmos dados de teste) e `fase2/
 
 Validação: `npm run check` (363 + 2), `tests/ui-smoke.mjs`, `tests/ui-keyboard.mjs`, `tests/ui-preview.mjs` (25 telas, sem erro de console e sem rolagem horizontal). Teste novo: filtros da lista de empresas (`tests/api.test.mjs`).
 
+## Fase 3 (01/10/2026)
+
+Capturas em `fase3/antes/` (interface original) e `fase3/depois/`, desktop e 390 px.
+
+- **Mapa real no Radar Nacional**: Protomaps/OpenStreetMap a partir do R2 privado; detalhes, licenças, CSP e custos em
+  [MAPA.md](MAPA.md). Capturas `radar-mapa-*` e `radar-mapa-ponto-*`.
+- **Envios**: resumo (canal com o significado do estado, hoje/teto/rampa, próximo envio, parada automática); fila dividida
+  em "Precisa de decisão" e "Agendados"; resolver indeterminado virou formulário recolhido "(administrador)" com evidência, no
+  lugar das caixas de diálogo; respostas com classificação em português.
+- **Tarefas**: "Para fazer" com tipo e vencimento (atrasada destacada); bloqueadas recolhidas com o motivo; as perguntas da
+  conversa ficam num grupo opcional do registro.
+- **Configurações**: dois grupos — "Preparação das buscas" (Campanhas, Catálogo, Setores e CNAE) e "Controles e
+  administração" (Pausas, Supressão, Parâmetros, Lista mensal), com marcação do que é de administrador.
+- **Campanhas**: linha com mercado e estado colorido; "Abrir" e "Mais ações" (Ativar/Pausar); criação em grupos, mostrando só
+  a origem nacional ou o país conforme o mercado.
+- **Parâmetros**: pendentes primeiro com aviso, valores legíveis (sem JSON cru), alteração recolhida "(administrador)".
+- **Pausas**: ativas primeiro, histórico recolhido, retomada por formulário com motivo, escopos em português.
+- **Supressão**: aviso de que esta versão não remove supressões (tarefa SUPRESSAO-RETENCAO); registros com canal, motivo,
+  data e origem (código protegido abreviado); registrar recolhido.
+- **Catálogo**: estado com cor, "Abrir"; cadastro marcado "(administrador)".
+
+Validação: `npm run check` (366 + 2), `tests/ui-smoke.mjs`, `tests/ui-keyboard.mjs`, `tests/ui-map.mjs`,
+`tests/ui-preview.mjs` (antes e depois, sem erro de console e sem rolagem horizontal).
+
 ## O que ainda precisa melhorar
 
-- Mapa de fundo: decisão pendente (ver MAPA.md).
 - Tema escuro não incluído (pedido: tema claro).
-- Telas de Configurações (Campanhas, Catálogo, Parâmetros, Pausas, Supressão) e Tarefas/Envios ganharam o tema, mas não foram recompostas.
-- Ícones: nenhum (só texto); se desejado, adotar uma família única depois.
+- Parâmetros: lista longa; agrupar por área (envio, gate, lista internacional) se desejado.
+- Ícones: nenhum (só texto).
