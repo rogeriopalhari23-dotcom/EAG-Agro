@@ -38,6 +38,7 @@ import * as people from "./people.js";
 import * as decisionReview from "./decision-review.js";
 import * as integrations from "./integrations.js";
 import { handleQueue } from "./queue.js";
+import { mapInfo, mapTiles } from "./map-tiles.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
@@ -72,6 +73,9 @@ async function route(request, env, rid) {
         sanctionsImport: false,
       },
     });
+  // Mapa de fundo (somente leitura, autenticado): manifesto e leitura por faixa do recorte no R2 privado.
+  if (path === "/api/mapa" && method === "GET") return mapInfo(env);
+  if (path === "/api/mapa/brasil.pmtiles" && ["GET", "HEAD"].includes(method)) return mapTiles(request, env);
   if (path === "/api/dashboard" && method === "GET") {
     const [pipeline, exceptions] = await env.DB.batch([
       s(

@@ -38,7 +38,9 @@
     "INTERNAL_TEST_RECIPIENTS": "rogeriopalhari23@gmail.com,rogeriopalhari23+ponte-a@gmail.com,rogeriopalhari23+ponte-b@gmail.com,rogeriopalhari23+ponte-c@gmail.com,rogeriopalhari23+ponte-link@gmail.com",
     // MDIC lido pelo workflow mensal do GitHub (scripts/mdic-job.mjs): o fetch do Worker responde 526 porque o
     // servidor do MDIC não envia o certificado intermediário (EVIDENCIAS, 2026-09-25). O Worker cuida só da Comtrade.
-    "MDIC_SOURCE": "github"
+    "MDIC_SOURCE": "github",
+    // Mapa de fundo (redesign, 2026-10-01): manifesto do recorte Protomaps no R2 privado (prefixo mapa/).
+    "MAP_MANIFEST_KEY": "mapa/brasil-20260929-z12/manifest.json"
   },
   "assets": {
     "directory": "./dist",

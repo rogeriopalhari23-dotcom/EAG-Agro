@@ -7,4 +7,5 @@ await mkdir(dist, { recursive: true });
 for (const file of ["index.html", "app.js", "app.css", "_headers"])
   await cp(resolve(root, "public", file), resolve(dist, file));
 await cp(resolve(root, "public", "fonts"), resolve(dist, "fonts"), { recursive: true });
+await cp(resolve(root, "public", "mapa"), resolve(dist, "mapa"), { recursive: true });
 console.log("Build concluído: somente arquivos públicos.");

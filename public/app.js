@@ -440,7 +440,7 @@ function radarMap(search, items) {
     placed++;
   }
   const noPos = items.length - placed;
-  return el(
+  const wrap = el(
     "div",
     { class: "map-wrap" },
     text("strong", "Mapa"),
@@ -448,7 +448,118 @@ function radarMap(search, items) {
     el("div", { class: "map-legend" }, el("span", {}, el("i", { class: "dot-origin" }), "centro da busca"), el("span", {}, el("i", { class: "dot-exact" }), "endereço da unidade"), el("span", {}, el("i", { class: "dot-est" }), "centro do município (estimativa)")),
     text("small", `Círculo tracejado: ${search.radius_km} km; interno: ${Math.round(search.radius_km / 2)} km. Esquema sem mapa de fundo.${noPos ? ` ${noPos} desta página sem posição conhecida (fora do mapa).` : ""}`, "muted"),
   );
+  // Troca o esquema pelo mapa real quando disponível; qualquer falha mantém o esquema.
+  upgradeToRealMap(wrap, search, items).catch((e) => console.warn("mapa indisponível:", e.message));
+  return wrap;
 }
+
+// Mapa de fundo real (Protomaps/OpenStreetMap, servido pela própria origem e lido do R2 privado pela rota /api/mapa).
+// Sem WebGL, sem recorte configurado ou com falha de carga, o esquema em SVG continua no lugar.
+let mapLibs = null;
+function loadMapLibs() {
+  mapLibs ||= (async () => {
+    if (!document.querySelector('link[href="/mapa/maplibre-gl.css"]')) document.head.append(el("link", { rel: "stylesheet", href: "/mapa/maplibre-gl.css" }));
+    const [ml, base] = await Promise.all([import("/mapa/maplibre-gl.mjs"), import("/mapa/mapa-base.mjs")]);
+    // Worker na própria origem: dispensa "blob:" em worker-src (coberto por script-src 'self').
+    ml.setWorkerUrl(new URL("/mapa/maplibre-gl-worker.mjs", location.origin).href);
+    ml.addProtocol("pmtiles", new base.Protocol().tile);
+    return { ml, base };
+  })().catch((e) => {
+    mapLibs = null;
+    throw e;
+  });
+  return mapLibs;
+}
+let mapInfoCache = null;
+function webglAvailable() {
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+// Círculo do raio como polígono (geodésico simples; suficiente para a escala do Radar).
+function radiusRing(lat0, lon0, km, steps = 96) {
+  const ring = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * 2 * Math.PI;
+    ring.push([lon0 + (km * Math.sin(a)) / (111.32 * Math.cos((lat0 * Math.PI) / 180)), lat0 + (km * Math.cos(a)) / 110.57]);
+  }
+  return ring;
+}
+async function upgradeToRealMap(wrap, search, items) {
+  if (!webglAvailable()) return;
+  mapInfoCache ||= api("/api/mapa").catch(() => ({ available: false }));
+  const info = await mapInfoCache;
+  if (!info.available) return;
+  const { ml, base } = await loadMapLibs();
+  const box = el("div", { class: "map-canvas", role: "region", "aria-label": `Mapa: ${items.length} compradores em até ${search.radius_km} km do centro da busca` });
+  const sketch = wrap.querySelector("svg");
+  sketch.replaceWith(box);
+  wrap.classList.add("real");
+  const ring = radiusRing(search.origin_lat, search.origin_lon, search.radius_km);
+  const lons = ring.map((p) => p[0]),
+    lats = ring.map((p) => p[1]);
+  const map = new ml.Map({
+    container: box,
+    style: {
+      version: 8,
+      glyphs: `${location.origin}/mapa/fonts/{fontstack}/{range}.pbf`,
+      sprite: `${location.origin}/mapa/sprites/light`,
+      sources: { protomaps: { type: "vector", url: `pmtiles://${location.origin}${info.url}`, attribution: '<a href="https://protomaps.com" target="_blank" rel="noopener noreferrer">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>' } },
+      layers: base.layers("protomaps", base.namedFlavor("light"), { lang: "pt" }),
+    },
+    bounds: [
+      [Math.min(...lons), Math.min(...lats)],
+      [Math.max(...lons), Math.max(...lats)],
+    ],
+    fitBoundsOptions: { padding: 16 },
+    maxZoom: 15,
+    attributionControl: false,
+    cooperativeGestures: matchMedia("(max-width: 860px)").matches,
+  });
+  map.addControl(new ml.NavigationControl({ showCompass: false }), "top-right");
+  map.addControl(new ml.ScaleControl({ unit: "metric" }), "bottom-left");
+  map.addControl(new ml.AttributionControl({ compact: false }), "bottom-right");
+  const points = items
+    .filter((x) => x.lat != null && x.lon != null)
+    .map((x) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [x.lon, x.lat] },
+      properties: { id: x.company_id, name: x.trade_name || x.legal_name, exact: !!(x.geo_precision && !/munic/.test(String(x.geo_precision))), dist: x.distance_km == null ? "distância desconhecida" : `${x.distance_km.toFixed(1)} km`, city: `${x.municipality_name || "—"}/${x.uf || "—"}` },
+    }));
+  map.on("load", () => {
+    map.addSource("raio", { type: "geojson", data: { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} } });
+    map.addLayer({ id: "raio-fill", type: "fill", source: "raio", paint: { "fill-color": "#1d7a43", "fill-opacity": 0.06 } });
+    map.addLayer({ id: "raio-line", type: "line", source: "raio", paint: { "line-color": "#1d7a43", "line-width": 1.6, "line-dasharray": [3, 2] } });
+    map.addSource("centro", { type: "geojson", data: { type: "Feature", geometry: { type: "Point", coordinates: [search.origin_lon, search.origin_lat] }, properties: {} } });
+    map.addLayer({ id: "centro", type: "circle", source: "centro", paint: { "circle-radius": 6, "circle-color": "#17231c", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
+    map.addSource("compradores", { type: "geojson", data: { type: "FeatureCollection", features: points } });
+    map.addLayer({
+      id: "compradores",
+      type: "circle",
+      source: "compradores",
+      paint: { "circle-radius": 6.5, "circle-color": ["case", ["get", "exact"], "#1d7a43", "#ffffff"], "circle-stroke-color": "#1d7a43", "circle-stroke-width": 2 },
+    });
+    map.on("mouseenter", "compradores", () => (map.getCanvas().style.cursor = "pointer"));
+    map.on("mouseleave", "compradores", () => (map.getCanvas().style.cursor = ""));
+    map.on("click", "compradores", (e) => {
+      const p = e.features[0].properties;
+      new ml.Popup({ closeButton: true, maxWidth: "260px" })
+        .setLngLat(e.features[0].geometry.coordinates)
+        .setDOMContent(el("div", { class: "map-pop" }, text("strong", p.name), text("small", `${p.city} · ${p.dist} · ${p.exact ? "endereço da unidade" : "centro do município (estimativa)"}`), p.id ? button("Abrir", () => openCompanyPanel(p.id, p.name), true) : null))
+        .addTo(map);
+    });
+    box.dataset.ready = "true";
+    box.mapInstance = map; // usado pelos testes de interface (clique num comprador)
+  });
+  map.on("error", (e) => console.warn("mapa:", e.error?.message || e));
+  const note = wrap.querySelector("small.muted");
+  const noPos = items.length - points.length;
+  if (note) note.textContent = `Círculo tracejado: ${search.radius_km} km. Toque ou clique num ponto para ver a empresa.${noPos ? ` ${noPos} desta página sem posição conhecida (fora do mapa).` : ""}`;
+}
+
 
 async function showSearch(id, order = "icp", offset = 0) {
   const [d, c] = await Promise.all([api(`/api/searches/${id}`), api(`/api/searches/${id}/candidates?order=${order}&limit=50&offset=${offset}`)]);

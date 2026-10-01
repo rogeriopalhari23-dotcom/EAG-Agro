@@ -1375,3 +1375,34 @@ details.group > summary small {
 .button-link:hover {
   background: var(--sunken);
 }
+
+/* Mapa de fundo real (MapLibre + Protomaps). */
+.map-canvas {
+  width: 100%;
+  height: 440px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--sunken);
+}
+.map-pop {
+  display: grid;
+  gap: 6px;
+  font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  color: var(--text);
+}
+.map-pop small {
+  color: var(--muted);
+}
+.map-pop button {
+  justify-self: start;
+  min-height: 36px;
+}
+.map-canvas .maplibregl-ctrl-attrib {
+  font-size: 11px;
+}
+@media (max-width: 860px) {
+  .map-canvas {
+    height: 340px;
+  }
+}

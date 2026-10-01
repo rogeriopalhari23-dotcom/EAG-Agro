@@ -1,0 +1,6 @@
+Mapa de fundo do EAG Compass
+Dados: © OpenStreetMap (colaboradores), Open Database License 1.0 — https://www.openstreetmap.org/copyright
+Ladrilhos: Protomaps Basemap (obra produzida a partir do OpenStreetMap; também Natural Earth, domínio público) — https://protomaps.com
+Estilo visual: Protomaps (CC0). Ícones: derivados de tangrams/icons (MIT). Fontes: Noto Sans (SIL OFL 1.1).
+Bibliotecas: MapLibre GL JS (BSD-3), PMTiles (BSD-3), fflate (MIT), @protomaps/basemaps (BSD-3).
+Atribuição exibida no mapa: "Protomaps © OpenStreetMap".

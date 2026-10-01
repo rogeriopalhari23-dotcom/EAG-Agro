@@ -9,7 +9,15 @@ assert.deepEqual((await readdir(resolve(root, "dist"))).sort(), [
   "app.js",
   "fonts",
   "index.html",
+  "mapa",
 ]);
+// Mapa de fundo: bibliotecas, fontes e ícones locais, cada um com a licença; atribuição do OpenStreetMap presente.
+const mapa = await readdir(resolve(root, "dist/mapa"));
+for (const f of ["maplibre-gl.mjs", "maplibre-gl-shared.mjs", "maplibre-gl-worker.mjs", "maplibre-gl.css", "mapa-base.mjs", "LICENSE-maplibre-gl.txt", "LICENSE-pmtiles.txt", "LICENSE-protomaps-basemaps.txt", "LICENSE-fflate.txt", "ATRIBUICAO.txt", "fonts", "sprites"])
+  assert.ok(mapa.includes(f), `Mapa sem ${f}`);
+assert.ok((await readdir(resolve(root, "dist/mapa/fonts"))).includes("OFL.txt"), "Fontes do mapa sem licença OFL");
+assert.ok((await readdir(resolve(root, "dist/mapa/sprites"))).includes("LICENSE-tangrams-icons.txt"), "Ícones do mapa sem licença");
+assert.match(await readFile(resolve(root, "dist/mapa/ATRIBUICAO.txt"), "utf8"), /© OpenStreetMap/);
 // Fontes: só woff2 e licenças; toda fonte citada no CSS precisa existir.
 const fonts = await readdir(resolve(root, "dist/fonts"));
 assert.ok(fonts.every((f) => /^[a-z0-9-]+\.woff2$|^LICENSE-[a-z0-9-]+\.txt$/.test(f)));

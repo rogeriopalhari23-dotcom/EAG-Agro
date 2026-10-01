@@ -7,27 +7,55 @@ import { readFile, mkdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { setup } from "./helpers/db.mjs";
 import { pilot } from "./helpers/pilot.mjs";
-import { sources, keepCountries, tradeParams, driver } from "./helpers/trade.mjs";
+import { sources, keepCountries, tradeParams, driver, memoryR2 } from "./helpers/trade.mjs";
+import { open } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import worker from "../src/worker.js";
+import { securityHeaders } from "../src/http.js";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.EAG_PLAYWRIGHT_PATH || "playwright");
 const out = process.argv[2] || "review-output/depois";
 await mkdir(out, { recursive: true });
 const ctx = setup();
-const types = { html: "text/html", js: "text/javascript", css: "text/css", woff2: "font/woff2" };
+const types = { html: "text/html", js: "text/javascript", mjs: "text/javascript", css: "text/css", woff2: "font/woff2", json: "application/json", png: "image/png", pbf: "application/x-protobuf", txt: "text/plain" };
 ctx.env.ASSETS = {
   async fetch(request) {
-    let path = new URL(request.url).pathname;
+    let path = decodeURIComponent(new URL(request.url).pathname);
     if (path === "/") path = "/index.html";
     try {
       const file = process.env.PREVIEW_PUBLIC ? process.env.PREVIEW_PUBLIC + path : new URL("../public" + path, import.meta.url);
-      return new Response(await readFile(file), { headers: { "content-type": types[path.split(".").pop()] || "application/octet-stream" } });
+      return new Response(await readFile(file), { headers: { ...securityHeaders, "content-type": types[path.split(".").pop()] || "application/octet-stream" } }); // mesma política de segurança da produção
     } catch {
       return new Response("Not found", { status: 404 });
     }
   },
 };
+// Mapa de fundo real na prévia: as mesmas partes enviadas ao R2, lidas do disco (PREVIEW_MAP_DIR; padrão C:/Users/Roger/eag-mapa).
+const mapDir = process.env.PREVIEW_MAP_DIR || "C:/Users/Roger/eag-mapa";
+if (existsSync(`${mapDir}/manifest.json`)) {
+  const inner = memoryR2();
+  const prefix = "mapa/brasil-20260929-z12/";
+  ctx.env.MAP_MANIFEST_KEY = `${prefix}manifest.json`;
+  ctx.env.FILES = {
+    ...inner,
+    async get(key, opts = {}) {
+      if (!key.startsWith(prefix)) return inner.get(key, opts);
+      const file = `${mapDir}/${key.slice(prefix.length)}`;
+      if (!existsSync(file)) return null;
+      const fh = await open(file);
+      try {
+        const size = (await fh.stat()).size;
+        const { offset = 0, length = size - offset } = opts.range || {};
+        const buf = Buffer.alloc(length);
+        await fh.read(buf, 0, length, offset);
+        return { arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), json: async () => JSON.parse(buf.toString("utf8")), text: async () => buf.toString("utf8") };
+      } finally {
+        await fh.close();
+      }
+    },
+  };
+}
 const server = createServer(async (req, res) => {
   const chunks = [];
   for await (const c of req) chunks.push(c);
