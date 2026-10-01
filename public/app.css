@@ -632,11 +632,20 @@ form {
 }
 .demand-field {
   display: grid;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface-2);
+  grid-template-columns: minmax(0, 2fr) minmax(150px, 1fr);
+  align-items: end;
+  gap: 10px 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.demand-field.has-unit {
+  grid-template-columns: minmax(0, 1.3fr) minmax(90px, 0.7fr) minmax(150px, 1fr);
+}
+.demand-field > .source {
+  grid-column: 1 / -1;
+}
+.demand-field > [hidden] {
+  display: none;
 }
 .data-grid {
   display: grid;
@@ -1112,4 +1121,257 @@ details.more {
   .row > button {
     justify-self: start;
   }
+}
+
+/* ===== Fase 2: ficha, formulários da empresa, filtros, análise do país, revisão para decisão ===== */
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.panel-head h2 {
+  font-size: 16px;
+}
+.panel-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.checklist,
+.plain-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checklist li {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  align-items: start;
+  gap: 10px;
+}
+.checklist li > .tag {
+  justify-content: center;
+}
+.checklist li > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+.checklist small {
+  color: var(--muted);
+}
+.plain-list li {
+  font-size: var(--type-sm);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.approve {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* Formulários agrupados */
+fieldset.group {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+fieldset.group > legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-weight: 600;
+  font-size: var(--type-sm);
+}
+details.group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 14px;
+  background: var(--surface);
+}
+details.group[open] {
+  padding-bottom: 14px;
+}
+details.group > summary {
+  padding: 12px 0;
+  font-weight: 600;
+  font-size: var(--type-sm);
+}
+details.group > summary small {
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.field-row:first-of-type {
+  border-top: 0;
+}
+.field-row .field-name {
+  grid-column: 1 / -1;
+  font-weight: 500;
+  font-size: var(--type-sm);
+}
+.field-row .field-source {
+  grid-column: 1 / -1;
+}
+.field-row .field-source[hidden] {
+  display: none;
+}
+.form-hint {
+  font-size: var(--type-sm);
+  color: var(--muted);
+}
+
+/* Filtros */
+.filter-bar {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
+  align-items: end;
+  gap: 10px 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.filter-bar .toolbar {
+  margin: 0;
+}
+.result-count {
+  font-size: var(--type-sm);
+  color: var(--muted);
+}
+
+/* Seleção de commodity */
+.pick-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.pick-list label {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+  font-weight: 400;
+}
+.pick-list label:first-child {
+  border-top: 0;
+}
+.pick-list label:hover {
+  background: var(--sunken);
+}
+.pick-list label:has(input:checked) {
+  background: var(--accent-soft);
+}
+.pick-list label small {
+  grid-column: 2 / -1;
+  color: var(--muted);
+}
+.pick-list .num {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--type-sm);
+  text-align: right;
+}
+.sticky-action {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 -4px 16px rgba(20, 40, 28, 0.06);
+}
+
+/* Revisão para decisão */
+.decision-list {
+  display: grid;
+  gap: 0;
+}
+.decision-list {
+  gap: 8px;
+}
+.decision-list > details > summary {
+  padding: 12px 14px;
+}
+.decision-list > details > summary .n {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  color: var(--muted);
+  min-width: 1.2em;
+}
+.decision-list > details > summary strong {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+.decision-list > details > summary .tag {
+  white-space: normal;
+  text-align: right;
+}
+.decision-list > details > div {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 860px) {
+  .filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .filter-bar > label:first-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 440px) {
+  .demand-field,
+  .demand-field.has-unit {
+    grid-template-columns: 1fr;
+  }
+  .filter-bar {
+    padding: 12px;
+  }
+  .filter-bar > .toolbar {
+    grid-column: 1 / -1;
+  }
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+  .decision-list > details > summary {
+    flex-wrap: wrap;
+  }
+}
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--type-sm);
+  font-weight: 500;
+}
+.button-link:hover {
+  background: var(--sunken);
 }

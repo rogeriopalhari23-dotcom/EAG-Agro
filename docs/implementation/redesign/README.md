@@ -66,10 +66,36 @@ no celular (≤ 860 px). Fontes Roboto e Barlow removidas.
 - `tests/ui-preview.mjs`: capturas de 11 telas em desktop e celular, sem rolagem horizontal e sem erros no console.
 - `tests/ui-keyboard.mjs`: atalho "Pular para o conteúdo", navegação, foco visível, painel lateral (Esc), abas, menu no celular.
 
+## Fase 2 (30/09/2026)
+
+Capturas em `fase2/antes/` (interface original, mesmos dados de teste) e `fase2/depois/`, desktop e 390 px.
+
+- **Ficha para aprovação**: resumo (situação, aprovações x de y, finalidade e idioma, revisor); lista "Antes de aprovar"
+  com as condições que o servidor confere (revisor, ficha aberta, campanha ativa e sem mudança, canal de e-mail) e o
+  motivo de cada pendência; um bloco por destinatário e canal com estado (aguardando/aprovado/invalidado), fuso visível,
+  primeira mensagem aberta, aviso de fuso não confirmado e a frase "a aprovação vale exatamente para os N textos acima
+  (versão X)". Gerar nova versão, Adiar e Descartar foram para "Outras ações". O servidor continua sendo quem decide.
+- **Formulários da empresa**: demanda em grupos (Produto e volume aberto; Entrega, Pagamento, Comprador e compliance
+  recolhidos com "x de y preenchidos"); a fonte só aparece quando o campo deixa de ser "Não confirmado". Evidência: a
+  categoria explica o que conta como prova e filtra o tipo (rótulos em português); produto e mercado só para prova de
+  compra; data do fato e validação recolhidas. Contato: "Quem é", "Como falar" (e-mail e fuso com sugestões) e "Outros
+  canais" recolhido.
+- **Empresas**: filtros por etapa, país (Brasil/exterior), contato (com/sem) e perfil ICP; aplicam ao escolher, valem na
+  paginação e na exportação; linha com etapa, perfil e contato; "Abrir" usa o painel lateral. Backend: parâmetros de
+  leitura em `GET /api/companies` (`country`, `contact`, `profile`) e colunas `contacts_count`, `profile_class`, `icp_status`.
+- **Análise do país**: etapas País › Escolher commodity › Buscar empresas; commodities como lista marcável (linha
+  inteira clicável, valor à direita, "no catálogo EAG"); barra fixa com o que está marcado e "Escolher commodity".
+- **Revisão para decisão**: cinco decisões numeradas com estado em texto (verde só quando o servidor diz aprovada/
+  configurada), conteúdo completo ao abrir; candidatas em linhas compactas com recomendação, porte, contato e "por que e o
+  que falta"; reclassificação e sites inacessíveis recolhidos.
+- **Resumo da empresa**: se já existe ficha aguardando aprovação, a pendência principal passa a ser "Revisar e aprovar".
+- **Mapa**: proposta em [MAPA.md](MAPA.md) (Protomaps/OpenStreetMap no R2 da própria conta; CSP: só `blob:` em `img-src`). Não implementado.
+
+Validação: `npm run check` (363 + 2), `tests/ui-smoke.mjs`, `tests/ui-keyboard.mjs`, `tests/ui-preview.mjs` (25 telas, sem erro de console e sem rolagem horizontal). Teste novo: filtros da lista de empresas (`tests/api.test.mjs`).
+
 ## O que ainda precisa melhorar
 
-- Página da empresa: os formulários internos (demanda, evidência, contato) mantêm o desenho antigo; merecem revisão campo a campo.
-- Mapa: sem mapa de fundo por política de segurança; decidir se vale liberar um provedor de ladrilhos.
-- Lista de Empresas: ainda sem filtros por etapa/pendência.
-- Revisão para decisão, análise do país e ficha: ganharam o tema, mas não foram recompostas.
+- Mapa de fundo: decisão pendente (ver MAPA.md).
 - Tema escuro não incluído (pedido: tema claro).
+- Telas de Configurações (Campanhas, Catálogo, Parâmetros, Pausas, Supressão) e Tarefas/Envios ganharam o tema, mas não foram recompostas.
+- Ícones: nenhum (só texto); se desejado, adotar uma família única depois.

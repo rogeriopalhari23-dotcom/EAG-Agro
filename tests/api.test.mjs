@@ -115,6 +115,25 @@ check("Paginação expõe total e próxima página", async ({ api }) => {
   assert.equal(r.data.nextOffset, 1);
   assert.equal((await api("/api/companies?limit=-1")).status, 422);
 });
+check("Filtros da lista de empresas: país, contato e perfil (somente leitura)", async ({ api }) => {
+  const br = await create(api);
+  const de = (await api("/api/companies", "POST", { legalName: "Rösterei Teste", countryCode: "DE", sourceLabel: "Fonte" })).data.id;
+  const k = await api(`/api/companies/${de}/contacts`, "POST", { fullName: "Anna Teste", sourceLabel: "Site", prospectRole: "other" });
+  assert.ok(k.status < 300, JSON.stringify(k.data));
+  const ids = async (q) => (await api(`/api/companies?${q}`)).data.companies.map((c) => c.id);
+  assert.deepEqual(await ids("country=BR"), [br]);
+  assert.deepEqual(await ids("country=exterior"), [de]);
+  assert.deepEqual(await ids("contact=com"), [de]);
+  assert.deepEqual(await ids("contact=sem"), [br]);
+  assert.equal((await ids("profile=sem")).length, 2);
+  assert.deepEqual(await ids("profile=in_icp"), []);
+  assert.deepEqual(await ids("country=exterior&contact=sem"), []);
+  const listed = (await api("/api/companies?country=exterior")).data;
+  assert.equal(listed.total, 1);
+  assert.equal(listed.companies[0].contacts_count, 1);
+  assert.equal(listed.companies[0].icp_status, null);
+  assert.equal((await api("/api/companies?profile=qualquer")).status, 422);
+});
 check("Um campo confirmado não produz completude 100%", async ({ api }) => {
   const id = await create(api);
   const r = await api(

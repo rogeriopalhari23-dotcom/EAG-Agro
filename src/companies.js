@@ -36,6 +36,18 @@ export async function listCompanies(request, env, actor) {
     where.push("c.pipeline_status=?");
     args.push(p.get("status"));
   }
+  const country = p.get("country");
+  if (country === "BR") where.push("c.country_code='BR'");
+  else if (country === "exterior") where.push("c.country_code<>'BR'");
+  const contact = p.get("contact");
+  if (contact === "com") where.push("EXISTS (SELECT 1 FROM contacts k WHERE k.tenant_id=c.tenant_id AND k.company_id=c.id)");
+  else if (contact === "sem") where.push("NOT EXISTS (SELECT 1 FROM contacts k WHERE k.tenant_id=c.tenant_id AND k.company_id=c.id)");
+  const profile = p.get("profile");
+  if (profile === "sem") where.push("NOT EXISTS (SELECT 1 FROM buyer_profiles b WHERE b.tenant_id=c.tenant_id AND b.company_id=c.id)");
+  else if (profile) {
+    where.push("EXISTS (SELECT 1 FROM buyer_profiles b WHERE b.tenant_id=c.tenant_id AND b.company_id=c.id AND b.icp_status=?)");
+    args.push(oneOf(profile, ["in_icp", "out_small", "out_giant", "out_trader", "pending_size"], "perfil"));
+  }
   if (p.get("q")) {
     where.push(
       "(c.legal_name LIKE ? ESCAPE '\\' OR c.registration_id LIKE ? ESCAPE '\\')",
@@ -47,7 +59,7 @@ export async function listCompanies(request, env, actor) {
   const [rows, count] = await env.DB.batch([
     s(
       env,
-      `SELECT c.*,d.id demand_id,d.commodity,d.market,d.completeness,d.version demand_version FROM companies c LEFT JOIN demands d ON d.id=(SELECT id FROM demands WHERE tenant_id=c.tenant_id AND company_id=c.id ORDER BY updated_at DESC,rowid DESC LIMIT 1) WHERE ${where.join(" AND ")} ORDER BY c.updated_at DESC,c.id LIMIT ? OFFSET ?`,
+      `SELECT c.*,d.id demand_id,d.commodity,d.market,d.completeness,d.version demand_version,(SELECT COUNT(*) FROM contacts k WHERE k.tenant_id=c.tenant_id AND k.company_id=c.id) contacts_count,(SELECT b.profile_class FROM buyer_profiles b WHERE b.tenant_id=c.tenant_id AND b.company_id=c.id ORDER BY b.updated_at DESC LIMIT 1) profile_class,(SELECT b.icp_status FROM buyer_profiles b WHERE b.tenant_id=c.tenant_id AND b.company_id=c.id ORDER BY b.updated_at DESC LIMIT 1) icp_status FROM companies c LEFT JOIN demands d ON d.id=(SELECT id FROM demands WHERE tenant_id=c.tenant_id AND company_id=c.id ORDER BY updated_at DESC,rowid DESC LIMIT 1) WHERE ${where.join(" AND ")} ORDER BY c.updated_at DESC,c.id LIMIT ? OFFSET ?`,
       ...args,
       limit,
       offset,

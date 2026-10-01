@@ -100,12 +100,21 @@ function select(label, name, options, value) {
   return { node: el("label", {}, label, control), control };
 }
 function makeForm(fields, onSubmit, label = "Salvar") {
-  const form = el("form"),
-    grid = el("div", { class: "form-grid" });
-  for (const f of fields) grid.append(f.node);
+  const form = el("form");
+  let grid = null;
+  for (const f of fields) {
+    if (f.group) {
+      grid = null;
+      const body = [f.hint ? text("p", f.hint, "form-hint") : null, el("div", { class: "form-grid" }, ...f.fields.map((x) => x.node))];
+      form.append(f.collapsed ? el("details", { class: "group" }, el("summary", {}, f.group), ...body) : el("fieldset", { class: "group" }, el("legend", {}, f.group), ...body));
+    } else {
+      if (!grid) form.append((grid = el("div", { class: "form-grid" })));
+      grid.append(f.node);
+    }
+  }
   const error = el("p", { class: "error", hidden: "" }),
     submit = el("button", { type: "submit", class: "primary" }, label);
-  form.append(grid, error, el("div", { class: "toolbar" }, submit));
+  form.append(error, el("div", { class: "toolbar" }, submit));
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     submit.disabled = true;
@@ -597,32 +606,47 @@ async function navigate(view = state.view) {
       $("content").setAttribute("aria-busy", "false");
   }
 }
+// Filtros da lista de Empresas: parâmetros de consulta (somente leitura), preservados na paginação e na exportação.
+function companyQuery() {
+  const f = state.companyFilters || {};
+  const q = new URLSearchParams({ q: state.search || "" });
+  for (const k of ["status", "country", "contact", "profile"]) if (f[k]) q.set(k, f[k]);
+  return q.toString();
+}
 async function companiesView() {
-  const d = await api(
-      `/api/companies?limit=25&offset=${state.offset}&q=${encodeURIComponent(state.search)}`,
+  const f = (state.companyFilters ||= {});
+  const d = await api(`/api/companies?limit=25&offset=${state.offset}&${companyQuery()}`),
+    filtered = !!(state.search || Object.values(f).some(Boolean)),
+    node = section("Empresas", "Fontes e confirmações ficam no histórico de cada empresa.");
+  const apply = async (v) => {
+    state.search = v.q || "";
+    state.companyFilters = { status: v.status, country: v.country, contact: v.contact, profile: v.profile };
+    state.offset = 0;
+    await navigate("Empresas");
+  };
+  const fields = [
+    input("Buscar empresa ou registro", "q", "search", state.search, false),
+    select("Etapa", "status", [["", "Todas"], ...Object.keys(statusLabels).slice(0, 8).map((k) => [k, statusLabels[k]])], f.status || ""),
+    select("País", "country", [["", "Todos"], ["BR", "Brasil"], ["exterior", "Exterior"]], f.country || ""),
+    select("Contato", "contact", [["", "Todos"], ["com", "Com contato"], ["sem", "Sem contato"]], f.contact || ""),
+    select("Perfil (ICP)", "profile", [["", "Todos"], ["in_icp", "No ICP"], ["pending_size", "Porte pendente"], ["out_trader", "Fora: trader"], ["out_small", "Fora: pequena"], ["out_giant", "Fora: gigante"], ["sem", "Sem perfil"]], f.profile || ""),
+  ];
+  const bar = el("form", { class: "filter-bar", role: "search", "aria-label": "Filtrar empresas" }, ...fields.map((x) => x.node));
+  // Selecionar um filtro já aplica; a busca por texto aplica com Enter ou "Filtrar".
+  for (const x of fields.slice(1)) x.control.addEventListener("change", () => bar.requestSubmit());
+  bar.append(
+    el(
+      "div",
+      { class: "toolbar" },
+      el("button", { type: "submit", class: "primary" }, "Filtrar"),
+      filtered ? button("Limpar", () => apply({})) : null,
     ),
-    node = section(
-      "Empresas",
-      `${d.total} empresas cadastradas. Fontes e confirmações ficam no histórico de cada empresa.`,
-    );
-  const search = input(
-    "Buscar empresa ou registro",
-    "q",
-    "search",
-    state.search,
-    false,
   );
-  node.append(
-    makeForm(
-      [search],
-      async (v) => {
-        state.search = v.q;
-        state.offset = 0;
-        await navigate("Empresas");
-      },
-      "Buscar",
-    ),
-  );
+  bar.addEventListener("submit", (e) => {
+    e.preventDefault();
+    safe(() => apply(Object.fromEntries(new FormData(bar))));
+  });
+  node.append(bar, text("p", filtered ? `${d.total} empresa(s) com estes filtros.` : `${d.total} empresa(s) cadastradas.`, "result-count"));
   if (writable())
     node.append(
       details(
@@ -657,28 +681,30 @@ async function companiesView() {
         ),
       ),
     );
+  const ICP_TAG = { in_icp: ["No ICP", "tag ok"], pending_size: ["Porte pendente", "tag warn"], out_trader: ["Fora: trader", "tag"], out_small: ["Fora: pequena", "tag"], out_giant: ["Fora: gigante", "tag"] };
   node.append(
-    rows(d.companies, (c) =>
-      el(
-        "div",
-        { class: "row" },
-        el(
-          "div",
-          {},
-          text("strong", c.legal_name),
-          text(
-            "small",
-            `${c.country_code} · ${c.commodity || "Demanda pendente"} · ${c.market === "national" ? "Nacional" : c.market === "international" ? "Internacional" : "Mercado pendente"}`,
+    d.companies.length
+      ? rows(d.companies, (c) =>
+          el(
+            "div",
+            { class: "row" },
+            el(
+              "div",
+              {},
+              text("strong", c.legal_name),
+              el(
+                "div",
+                { class: "tags" },
+                text("span", statusLabels[c.pipeline_status] || c.pipeline_status, "tag"),
+                c.icp_status ? text("span", ...ICP_TAG[c.icp_status]) : text("span", "Sem perfil", "tag warn"),
+                text("span", c.contacts_count ? `${c.contacts_count} contato(s)` : "Sem contato", c.contacts_count ? "tag" : "tag warn"),
+              ),
+              text("small", `${c.country_code} · ${c.commodity || "Demanda pendente"} · ${c.market === "national" ? "Nacional" : c.market === "international" ? "Internacional" : "Mercado pendente"}${c.profile_class ? ` · ${lbl(c.profile_class)}` : ""}`),
+            ),
+            button("Abrir", () => openCompanyPanel(c.id, c.legal_name)),
           ),
-        ),
-        text(
-          "span",
-          statusLabels[c.pipeline_status] || c.pipeline_status,
-          "tag",
-        ),
-        button("Abrir", () => showCompany(c.id)),
-      ),
-    ),
+        )
+      : el("div", { class: "empty" }, filtered ? "Nenhuma empresa com estes filtros. " : "Nenhuma empresa cadastrada ainda. ", filtered ? button("Limpar filtros", () => apply({})) : null),
   );
   node.append(
     el(
@@ -711,7 +737,7 @@ async function exportCompanies() {
     items = [];
   do {
     const d = await api(
-      `/api/companies?limit=100&offset=${offset}&q=${encodeURIComponent(state.search)}`,
+      `/api/companies?limit=100&offset=${offset}&${companyQuery()}`,
     );
     items.push(...d.companies);
     offset = d.nextOffset;
@@ -760,6 +786,85 @@ const fieldDefinitions = [
   ["delivery_condition", "Condição de entrega nacional"],
   ["logistics_confirmed", "Entrega viável confirmada?", "boolean"],
 ];
+// Evidência: o que conta como prova depende da categoria; o tipo é filtrado por ela.
+const EVIDENCE_TYPES = {
+  business: [
+    ["customs_record", "Registro aduaneiro"],
+    ["bill_of_lading", "Conhecimento de embarque"],
+    ["commercial_document", "Documento comercial (fatura, contrato)"],
+    ["company_document", "Documento publicado pela empresa"],
+    ["public_nominal_record", "Registro público nominal"],
+  ],
+  market: [["market_aggregate", "Dado agregado de mercado"]],
+  commercial_signal: [["commercial_signal", "Sinal comercial"]],
+};
+const EVIDENCE_HINT = {
+  business: "Prova de compra: documento que liga esta empresa à compra do produto. Informe produto e mercado.",
+  market: "Mercado agregado: dado do país ou do setor. Não prova que esta empresa compra.",
+  commercial_signal: "Sinal comercial: indício (anúncio, vaga, notícia). Não confirma compra.",
+};
+function evidenceForm(companyId) {
+  const category = select("Categoria", "category", [
+    ["business", "Prova de compra"],
+    ["market", "Mercado agregado"],
+    ["commercial_signal", "Sinal comercial"],
+  ]);
+  const type = select("Tipo de evidência", "evidenceType", EVIDENCE_TYPES.business);
+  const product = productSelect();
+  const market = marketSelect("national");
+  const hint = text("p", EVIDENCE_HINT.business, "form-hint");
+  const sync = () => {
+    const k = category.control.value;
+    type.control.replaceChildren(...EVIDENCE_TYPES[k].map(([v, l]) => el("option", { value: v }, l)));
+    hint.textContent = EVIDENCE_HINT[k];
+    product.node.hidden = market.node.hidden = k !== "business";
+  };
+  category.control.addEventListener("change", sync);
+  const form = makeForm(
+    [
+      { group: "O que foi encontrado", fields: [category, type, product, market] },
+      {
+        group: "Fonte",
+        fields: [input("Referência do documento", "reference"), input("URL da fonte", "sourceUrl", "url", "", false), input("Data da consulta", "consultedAt", "date", new Date().toISOString().slice(0, 10))],
+      },
+      {
+        group: "Data do fato e validação",
+        collapsed: true,
+        fields: [
+          input("Data do fato", "factDate", "date", "", false),
+          select("Validação", "validationStatus", [
+            ["pending", "Pendente"],
+            ["valid", "Validada"],
+            ["invalid", "Inválida"],
+            ["conflicting", "Conflitante"],
+          ]),
+        ],
+      },
+    ],
+    async (v) => {
+      await api(`/api/companies/${companyId}/evidence`, "POST", v);
+      await showCompany(companyId);
+    },
+    "Registrar evidência",
+  );
+  form.querySelector("fieldset")?.insertBefore(hint, form.querySelector("fieldset .form-grid"));
+  return form;
+}
+// Fuso: lista curta dos mais comuns, aceitando qualquer fuso IANA digitado.
+function timezoneInput() {
+  const f = input("Fuso confirmado do contato (ex.: America/Sao_Paulo) — sem ele o envio espera", "timezone", "text", "", false);
+  f.control.setAttribute("list", "tz-list");
+  f.node.append(
+    el("datalist", { id: "tz-list" }, ...["America/Sao_Paulo", "America/Cuiaba", "America/Manaus", "America/Belem", "America/Recife", "America/Porto_Velho", "America/Rio_Branco", "Europe/Berlin", "Europe/Lisbon", "Europe/Madrid", "Europe/Paris", "Europe/London", "America/New_York", "Asia/Shanghai"].map((z) => el("option", { value: z }))),
+  );
+  return f;
+}
+const DEMAND_GROUPS = [
+  ["Produto e volume", ["product", "specification", "packaging", "volume_per_operation", "operations_per_year", "modality"]],
+  ["Entrega", ["destination_country", "delivery_location", "incoterm", "required_date", "delivery_condition", "logistics_confirmed"]],
+  ["Pagamento", ["payment_method", "payment_term", "payment_guarantee"]],
+  ["Comprador e compliance", ["final_buyer", "decision_maker", "buyer_profile", "company_registry_status", "compliance_restrictions"]],
+];
 function demandForm(companyId, d, existing = []) {
   const form = el("form"),
     header = el("div", { class: "form-grid" }),
@@ -770,12 +875,15 @@ function demandForm(companyId, d, existing = []) {
   header.append(product.node, market.node);
   form.append(
     header,
-    text(
-      "p",
-      "Marque como confirmado somente com valor e fonte. Campos omitidos permanecem pendentes.",
-      "muted",
-    ),
+    text("p", "Preencha o que já sabe. Marque \"Confirmado\" só com valor e fonte; o que ficar em branco continua como pendência da empresa.", "form-hint"),
   );
+  // Campos agrupados por assunto: produto e volume sempre visíveis; o resto recolhido, com contagem de confirmados.
+  const groups = DEMAND_GROUPS.map(([title, keys], i) => {
+    const box = i === 0 ? el("fieldset", { class: "group" }, el("legend", {}, title)) : el("details", { class: "group" }, el("summary", {}, title, el("small")));
+    form.append(box);
+    return { title, keys, box };
+  });
+  const groupOf = (key) => (groups.find((g) => g.keys.includes(key)) || groups[groups.length - 1]).box;
   const editors = fieldDefinitions.map(([key, label, type]) => {
     const old = existing.find((f) => f.field_key === key),
       value = old?.value_json ? JSON.parse(old.value_json) : "";
@@ -863,15 +971,12 @@ function demandForm(companyId, d, existing = []) {
             value?.unit || "MT",
           )
         : null;
-    const row = el(
-      "div",
-      { class: "demand-field" },
-      edit.node,
-      status.node,
-      unit?.node || text("span", ""),
-      source.node,
-    );
-    form.append(row);
+    const row = el("div", { class: unit ? "demand-field has-unit" : "demand-field" }, edit.node, unit?.node, status.node, source.node);
+    // A fonte só aparece quando o campo deixa de ser "Não confirmado" (ou já tem fonte registrada).
+    const syncSource = () => (source.node.hidden = status.control.value === "not_confirmed" && !source.control.value);
+    status.control.addEventListener("change", syncSource);
+    syncSource();
+    groupOf(key).append(row);
     return {
       key,
       type,
@@ -882,6 +987,11 @@ function demandForm(companyId, d, existing = []) {
       unit: unit?.control,
     };
   });
+  for (const g of groups.slice(1)) {
+    const done = editors.filter((x) => g.keys.includes(x.key) && x.status.value !== "not_confirmed").length;
+    g.box.querySelector("summary small").textContent = `${done} de ${g.keys.length} preenchidos`;
+    if (done) g.box.open = true;
+  }
   const condition = select(
       "Esta demanda exige comprador final?",
       "finalRequired",
@@ -995,6 +1105,11 @@ function companySummary(data, goTab) {
   else if (!profile.ficha?.ok) (pending = profile.ficha?.reason || "Perfil ainda não permite ficha."), (action = ["Ver perfil e evidências", "evidencias"]);
   else if (!contacts.length) (pending = "Falta um contato com fonte (pessoa de compras ou canal geral publicado)."), (action = ["Encontrar contatos", "contatos"]);
   else if (!decisor && !channel) (pending = "Responsável por compras não identificado."), (action = ["Encontrar responsável", "contatos"]);
+  else if (data.openFichas?.some((f) => f.status === "in_approval")) {
+    const f = data.openFichas.find((x) => x.status === "in_approval");
+    pending = "Ficha aguardando sua aprovação; nada é enviado antes dela.";
+    action = ["Revisar e aprovar", () => showFicha(f.id)];
+  } else if (data.openFichas?.length) (pending = `Ficha ${lbl(data.openFichas[0].status).toLowerCase()}; acompanhe os envios em Abordagem.`), (action = ["Abrir ficha", () => showFicha(data.openFichas[0].id)]);
   else (pending = "Pronta para preparar a ficha; o envio só acontece após aprovação individual."), (action = ["Preparar ficha", "ficha"]);
   const item = (k, v, extra) => el("div", {}, text("span", k, "k"), text("strong", v), extra ? text("small", extra) : null);
   return el(
@@ -1005,7 +1120,7 @@ function companySummary(data, goTab) {
     item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
     item("Contato e responsável", contact),
     item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`),
-    el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), button(action[0], () => goTab(action[1]), true)),
+    el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), button(action[0], () => (typeof action[1] === "function" ? (document.querySelector("dialog.drawer")?.close(), action[1]()) : goTab(action[1])), true)),
   );
 }
 function organizeCompany(node, data) {
@@ -1139,46 +1254,7 @@ async function companyNode(id, offset = 0, inDrawer = false) {
     node.append(
       details(
         "Registrar evidência",
-        makeForm(
-          [
-            select("Categoria", "category", [
-              ["business", "Prova de compra"],
-              ["market", "Mercado agregado"],
-              ["commercial_signal", "Sinal comercial"],
-            ]),
-            select("Tipo de evidência", "evidenceType", [
-              "company_document",
-              "public_nominal_record",
-              "commercial_document",
-              "customs_record",
-              "bill_of_lading",
-              "market_aggregate",
-              "commercial_signal",
-            ]),
-            productSelect(),
-            marketSelect("national"),
-            input("Referência do documento", "reference"),
-            input("URL da fonte", "sourceUrl", "url", "", false),
-            input("Data do fato", "factDate", "date", "", false),
-            input(
-              "Data da consulta",
-              "consultedAt",
-              "date",
-              new Date().toISOString().slice(0, 10),
-            ),
-            select("Validação", "validationStatus", [
-              ["pending", "Pendente"],
-              ["valid", "Validada"],
-              ["invalid", "Inválida"],
-              ["conflicting", "Conflitante"],
-            ]),
-          ],
-          async (v) => {
-            await api(`/api/companies/${id}/evidence`, "POST", v);
-            await showCompany(id);
-          },
-          "Registrar evidência",
-        ),
+        evidenceForm(id),
       ),
     );
   node.append(
@@ -1218,14 +1294,21 @@ async function companyNode(id, offset = 0, inDrawer = false) {
         "Cadastrar contato",
         makeForm(
           [
-            input("Nome", "fullName"),
-            input("Cargo", "jobTitle", "text", "", false),
-            input("E-mail", "email", "email", "", false),
-            input("Telefone", "phone", "text", "", false),
-            input("LinkedIn", "linkedinUrl", "url", "", false),
-            select("Papel na prospecção", "prospectRole", ["decision_maker", "influencer", "provisional_decision_maker", "other"].map((k) => [k, lbl(k)])),
-            input("Fuso confirmado do contato (ex.: America/Sao_Paulo) — sem ele o envio espera", "timezone", "text", "", false),
-            input("Fonte do contato (ex.: LinkedIn, site)", "sourceLabel"),
+            {
+              group: "Quem é",
+              fields: [
+                input("Nome", "fullName"),
+                input("Cargo", "jobTitle", "text", "", false),
+                select("Papel na prospecção", "prospectRole", ["decision_maker", "influencer", "provisional_decision_maker", "other"].map((k) => [k, lbl(k)])),
+                input("Fonte do contato (ex.: LinkedIn, site)", "sourceLabel"),
+              ],
+            },
+            {
+              group: "Como falar",
+              hint: "O e-mail é validado à parte. Sem fuso confirmado o envio espera (horário comercial do destinatário).",
+              fields: [input("E-mail", "email", "email", "", false), timezoneInput()],
+            },
+            { group: "Outros canais (opcional)", collapsed: true, fields: [input("Telefone", "phone", "text", "", false), input("LinkedIn", "linkedinUrl", "url", "", false)] },
           ],
           async (v) => {
             await api(`/api/companies/${id}/contacts`, "POST", v);
@@ -1370,6 +1453,8 @@ async function companyNode(id, offset = 0, inDrawer = false) {
           : null,
       ),
     );
+  // Ficha já existente muda a pendência principal (revisar/aprovar em vez de preparar outra).
+  data.openFichas = (await api("/api/fichas?limit=100").catch(() => ({ items: [] }))).items.filter((f) => f.company_id === id && f.status !== "discarded");
   return organizeCompany(node, data);
 }
 async function showCompany(id, offset = 0) {
@@ -2326,71 +2411,132 @@ async function fichasView() {
 async function showFicha(id) {
   const d = await api(`/api/fichas/${id}`);
   const v = d.version;
-  const company = await api(`/api/companies/${d.ficha.company_id}`);
-  const who = (cid) => {
-    const c = company.contacts.find((x) => x.id === cid);
-    const r = v.snapshot.recipients.find((x) => x.contactId === cid);
-    return `${c?.fullName || cid.slice(0, 8)} (${lbl(r?.role)}${r?.targetFlag ? ", cargo fora do alvo" : ""})`;
-  };
-  const node = section(`Ficha · ${company.company.legal_name} · versão ${v.no}`, `${lbl(d.ficha.status)} · skill ${v.skill.slice(0, 8)}… · modelos ${v.templates}`);
-  node.append(button("Voltar às fichas", () => navigate("Fichas")));
+  // Campanha e canal só antecipam os motivos de recusa; a conferência que vale é a do servidor ao aprovar.
+  const [company, camp, sending] = await Promise.all([
+    api(`/api/companies/${d.ficha.company_id}`),
+    api(`/api/campaigns/${d.ficha.campaign_id}`).catch(() => null),
+    api("/api/sending/today").catch(() => null),
+  ]);
+  const contactOf = (cid) => company.contacts.find((x) => x.id === cid);
+  const recipientOf = (cid) => v.snapshot.recipients.find((x) => x.contactId === cid);
+  const channelName = (ch) => (ch === "email" ? "E-mail" : ch === "call" ? "Ligações" : "LinkedIn");
+  const open = !["discarded", "deferred"].includes(d.ficha.status);
+  const approvedGroups = d.toApprove.filter((g) => d.approvals.some((a) => a.contact_id === g.contactId && a.channel === g.channel && a.status === "approved")).length;
   const bad = v.findings.filter((x) => !x.ok);
+  const node = section("Ficha para aprovação", `${company.company.legal_name} · versão ${v.no}`);
   node.append(
-    panel(
-      "Revisor PV",
-      bad.length ? rows(bad, (x) => el("div", { class: "row" }, text("strong", x.id), text("span", x.detail, "error"))) : text("p", "Sem violações.", "success"),
-      v.snapshot.fichaNote ? text("p", v.snapshot.fichaNote, "muted") : null,
+    el(
+      "div",
+      { class: "toolbar" },
+      button("Voltar às fichas", () => navigate("Fichas")),
+      button("Abrir empresa", () => openCompanyPanel(d.ficha.company_id, company.company.legal_name)),
+      writable() && d.ficha.status !== "discarded"
+        ? moreMenu(
+            "Outras ações",
+            button("Gerar nova versão", async () => {
+              const r = await api(`/api/fichas/${id}/versions`, "POST", { expectedRowVersion: d.ficha.row_version });
+              notice(r.reviewOk ? "Nova versão sem violações." : "Nova versão com violações do revisor.");
+              await showFicha(id);
+            }),
+            button("Adiar", async () => {
+              const reason = prompt("Motivo do adiamento:");
+              if (!reason) return;
+              await api(`/api/fichas/${id}/defer`, "POST", { reason });
+              await showFicha(id);
+            }),
+            approver()
+              ? button("Descartar", async () => {
+                  const reason = prompt("Motivo do descarte:");
+                  if (!reason) return;
+                  await api(`/api/fichas/${id}/discard`, "POST", { reason });
+                  await showFicha(id);
+                })
+              : null,
+          )
+        : null,
     ),
   );
+  const item = (k, val, extra) => el("div", {}, text("span", k, "k"), text("strong", val), extra ? text("small", extra) : null);
+  node.append(
+    el(
+      "div",
+      { class: "company-summary" },
+      item("Situação", lbl(d.ficha.status), d.ficha.status_reason || null),
+      item("Aprovações", `${approvedGroups} de ${d.toApprove.length}`, "Cada destinatário e canal é aprovado à parte."),
+      item("Finalidade e idioma", `${v.purpose === "identify_buyer" ? "Identificar o responsável" : "Reunião com o comprador"} · ${String(v.language || "").toUpperCase()}`),
+      item("Revisor PV", bad.length ? `${bad.length} violação(ões)` : "Sem violações", `modelos ${v.templates}`),
+    ),
+  );
+  // Condições que o servidor confere na aprovação, na ordem em que costumam faltar.
+  const c = camp?.campaign;
+  const checks = [
+    ["Revisor PV sem violações", v.reviewOk, "Corrija os textos e gere nova versão."],
+    ["Ficha aberta", open, `Ficha ${lbl(d.ficha.status).toLowerCase()}.`],
+    c ? ["Campanha ativa", c.status === "active", `Campanha "${c.name}": ${lbl(c.status).toLowerCase()}. Ative em Configurações › Campanhas.`] : null,
+    c && v.snapshot.campaignVersion !== undefined ? ["Campanha sem mudança desde esta versão", v.snapshot.campaignVersion === c.version, "A campanha mudou: gere nova versão da ficha."] : null,
+    sending && d.toApprove.some((g) => g.channel === "email") ? ["Canal de e-mail liberado", sending.channel !== "planned", "Canal ainda planejado: o teste interno precisa ser liberado antes."] : null,
+  ].filter(Boolean);
+  const missing = checks.filter(([, ok]) => !ok);
+  node.append(
+    panel(
+      "Antes de aprovar",
+      el("ul", { class: "checklist" }, ...checks.map(([label, ok, why]) => el("li", {}, text("span", ok ? "ok" : "pendente", ok ? "tag ok" : "tag warn"), el("span", {}, label, !ok ? text("small", why) : null)))),
+      text("p", missing.length ? "A aprovação será recusada enquanto houver pendência. O fuso de cada destinatário aparece no bloco dele." : "O servidor confere tudo de novo no momento da aprovação.", "muted"),
+    ),
+  );
+  const pv = panel("Revisor PV");
+  if (bad.length) pv.append(el("div", { class: "callout warn" }, text("p", "Violações encontradas: esta versão não pode ser aprovada."), el("ul", {}, ...bad.map((x) => el("li", {}, text("strong", x.id), ` ${x.detail}`)))));
+  else pv.append(text("p", "Sem violações nos textos desta versão.", "success"));
+  if (v.snapshot.fichaNote) pv.append(el("div", { class: "callout" }, text("p", v.snapshot.fichaNote)));
+  pv.append(details(`Regras conferidas (${v.findings.length})`, el("ul", { class: "plain-list" }, ...v.findings.map((x) => el("li", {}, `${x.ok ? "ok" : "violação"} · ${x.id}${x.detail ? ` — ${x.detail}` : ""}`)))));
+  node.append(pv);
   for (const g of d.toApprove) {
     const msgs = d.messages.filter((m) => m.contactId === g.contactId && m.channel === g.channel);
     const approved = d.approvals.find((a) => a.contact_id === g.contactId && a.channel === g.channel);
-    const box = panel(`${g.channel === "email" ? "E-mail" : g.channel === "call" ? "Ligações" : "LinkedIn"} · ${who(g.contactId)}`);
-    for (const m of msgs)
-      box.append(details(`Dia ${m.day} · passo ${m.step}${m.subject ? " · " + m.subject : ""}`, el("pre", { class: "message" }, m.body)));
-    if (approved) box.append(text("p", `${approved.status === "approved" ? "Aprovado" : "Aprovação invalidada"} por ${approved.approved_by} em ${approved.approved_at}`, "tag"));
-    else if (approver() && v.reviewOk)
+    const k = contactOf(g.contactId);
+    const r = recipientOf(g.contactId);
+    const box = el(
+      "section",
+      { class: "panel" },
+      el(
+        "div",
+        { class: "panel-head" },
+        el("div", {}, text("h2", `${channelName(g.channel)} · ${k?.fullName || g.contactId.slice(0, 8)}`), text("small", `${lbl(r?.role)}${k?.jobTitle ? ` · ${k.jobTitle}` : ""}${r?.targetFlag ? " · cargo fora do alvo" : ""} · ${k?.timezone ? `fuso ${k.timezone}` : "fuso não confirmado"}`, "muted")),
+        approved
+          ? text("span", approved.status === "approved" ? "Aprovado" : "Aprovação invalidada", approved.status === "approved" ? "tag ok" : "tag bad")
+          : text("span", "Aguardando aprovação", "tag warn"),
+      ),
+    );
+    msgs.forEach((m, i) => {
+      const msg = details(`Dia ${m.day} · passo ${m.step}${m.subject ? " · " + m.subject : ""}`, el("pre", { class: "message" }, m.body));
+      if (i === 0 && !approved) msg.open = true;
+      box.append(msg);
+    });
+    if (approved) box.append(text("p", `${approved.status === "approved" ? "Aprovado" : "Aprovação invalidada"} por ${approved.approved_by} em ${fmtDate(approved.approved_at)}`, "muted"));
+    else if (approver() && v.reviewOk) {
+      if (!k?.timezone) box.append(el("div", { class: "callout warn" }, text("p", "Fuso do destinatário não confirmado: a aprovação será recusada. Confirme o fuso no contato (empresa › Contatos e pessoas).")));
       box.append(
-        makeForm(
-          [input("Início da cadência (segunda-feira, AAAA-MM-DD)", "startDate", "date", "", false)],
-          async (x) => {
-            await api(`/api/fichas/${id}/approve`, "POST", { versionNo: v.no, contactId: g.contactId, channel: g.channel, messagesSha256: g.messagesSha256, startDate: x.startDate || undefined });
-            notice("Aprovado.");
-            await showFicha(id);
-          },
-          "Aprovar este destinatário neste canal",
+        el(
+          "div",
+          { class: "approve" },
+          text("p", `A aprovação vale exatamente para ${msgs.length === 1 ? "o texto acima" : `os ${msgs.length} textos acima`} (versão ${v.no}). Qualquer mudança gera nova versão e pede nova aprovação; no envio nada é regenerado.`, "muted"),
+          makeForm(
+            [input("Início da cadência (segunda-feira, AAAA-MM-DD)", "startDate", "date", "", false)],
+            async (x) => {
+              await api(`/api/fichas/${id}/approve`, "POST", { versionNo: v.no, contactId: g.contactId, channel: g.channel, messagesSha256: g.messagesSha256, startDate: x.startDate || undefined });
+              notice("Aprovado.");
+              await showFicha(id);
+            },
+            "Aprovar este destinatário neste canal",
+          ),
         ),
       );
+    }
     node.append(box);
   }
   if (d.outbox.length)
-    node.append(panel("Envios desta ficha", rows(d.outbox, (o) => el("div", { class: "row" }, text("strong", `Passo ${o.step_no} · ${o.planned_date}`), text("span", `${lbl(o.status)}${o.block_reason ? " · " + o.block_reason : ""}`, "tag")))));
-  if (writable() && !["discarded"].includes(d.ficha.status))
-    node.append(
-      el(
-        "div",
-        { class: "toolbar" },
-        button("Gerar nova versão", async () => {
-          const r = await api(`/api/fichas/${id}/versions`, "POST", { expectedRowVersion: d.ficha.row_version });
-          notice(r.reviewOk ? "Nova versão sem violações." : "Nova versão com violações do revisor.");
-          await showFicha(id);
-        }),
-        button("Adiar", async () => {
-          const reason = prompt("Motivo do adiamento:");
-          if (!reason) return;
-          await api(`/api/fichas/${id}/defer`, "POST", { reason });
-          await showFicha(id);
-        }),
-        approver()
-          ? button("Descartar", async () => {
-              const reason = prompt("Motivo do descarte:");
-              if (!reason) return;
-              await api(`/api/fichas/${id}/discard`, "POST", { reason });
-              await showFicha(id);
-            })
-          : null,
-      ),
-    );
+    node.append(panel("Envios desta ficha", rows(d.outbox, (o) => el("div", { class: "row" }, el("div", {}, text("strong", `Passo ${o.step_no} · ${o.planned_date}`), o.block_reason ? text("small", o.block_reason) : null), text("span", lbl(o.status), "tag")))));
+  node.append(details("Dados técnicos da versão", kv([["Skill", v.skill], ["Modelos", v.templates], ["Gerador", v.generator], ["Criada por", d.ficha.created_by]])));
   showScreen(node);
 }
 
@@ -2632,7 +2778,12 @@ async function showAnalysis(id, preloaded) {
     `${a.summary.purchaseIdentified ? "Há importações de commodities agrícolas do Brasil identificadas." : "Nenhuma importação agrícola do Brasil identificada nas fontes."} Período de ${a.periodMonths} meses${a.reused ? " · análise já registrada, reaproveitada (mesma lista)" : ""}${a.reproduced ? "" : " · a lista usada não confere mais: gere nova análise"}`,
   );
   node.setAttribute("data-screen", "internacional");
-  node.append(text("p", a.notice, "notice-fixed"), button("Voltar aos países", () => navigate("Internacional")));
+  // Onde a pessoa está no fluxo: país → commodity → busca de empresas.
+  node.append(
+    el("div", { class: "toolbar" }, button("Voltar aos países", () => navigate("Radar Internacional"))),
+    el("ol", { class: "flow", "aria-label": "Etapas" }, el("li", {}, `País: ${a.country.name_pt}`), el("li", { "aria-current": "step" }, text("strong", "Escolher commodity")), el("li", {}, "Buscar empresas")),
+    text("p", a.notice, "notice-fixed"),
+  );
   node.append(
     el(
       "div",
@@ -2642,11 +2793,21 @@ async function showAnalysis(id, preloaded) {
     ),
   );
   const chosen = new Map();
+  const count = text("span", "Nenhuma commodity marcada.", "muted");
+  const boxes = [];
+  const sync = () => {
+    for (const b of boxes) b.el.checked = chosen.has(b.hs6);
+    count.textContent = chosen.size ? `${chosen.size} commodity(ies) marcada(s): ${[...chosen.keys()].join(", ")}` : "Nenhuma commodity marcada.";
+  };
   const pick = (r) => {
     if (!(r.purchaseIdentified && approver())) return null;
     const box = el("input", { type: "checkbox", "aria-label": `Selecionar ${r.hs6}` });
+    boxes.push({ el: box, hs6: r.hs6 });
     box.checked = chosen.has(r.hs6);
-    box.addEventListener("change", () => (box.checked ? chosen.set(r.hs6, r) : chosen.delete(r.hs6)));
+    box.addEventListener("change", () => {
+      box.checked ? chosen.set(r.hs6, r) : chosen.delete(r.hs6);
+      sync();
+    });
     return box;
   };
   // Commodities com compra identificada, da maior para a menor (MDIC, depois Comtrade origem Brasil).
@@ -2657,23 +2818,21 @@ async function showAnalysis(id, preloaded) {
   node.append(
     panel(
       "Commodities com compra do Brasil identificada",
+      text("p", approver() ? "Marque as commodities que a EAG quer oferecer neste país. Valores do período; o dado do país não prova que uma empresa específica importa." : "Valores do período; o dado do país não prova que uma empresa específica importa.", "muted"),
       top.length
         ? el(
             "div",
-            { class: "rows" },
+            { class: "pick-list" },
             ...top.map((r) =>
               el(
-                "div",
-                { class: "row" },
-                pick(r),
-                el(
-                  "div",
-                  {},
-                  text("strong", `${r.hs6} · ${r.name || "sem nome"}`),
-                  text(
-                    "small",
-                    `MDIC: ${r.mdic ? `${usd(r.mdic.fobUsd)} FOB, última ocorrência ${r.mdic.lastOccurrence}` : "—"} · Comtrade: ${r.comtrade?.latest ? `${r.comtrade.latest.year}, Brasil ${usd(r.comtrade.latest.brazilUsd)}` : "—"}${r.catalog.confirmed.length ? ` · catálogo EAG: ${r.catalog.confirmed.map((c) => c.variant).join(", ")}` : ""}`,
-                  ),
+                approver() ? "label" : "div",
+                {},
+                pick(r) || el("span"),
+                el("span", {}, text("strong", `${r.name || "sem nome"}`), " ", text("span", r.hs6, "muted"), r.catalog.confirmed.length ? el("span", {}, " ", text("span", "no catálogo EAG", "tag ok")) : null),
+                text("span", r.mdic ? usd(r.mdic.fobUsd) : r.comtrade?.latest ? usd(r.comtrade.latest.brazilUsd) : "—", "num"),
+                text(
+                  "small",
+                  `MDIC: ${r.mdic ? `${usd(r.mdic.fobUsd)} FOB, última ocorrência ${r.mdic.lastOccurrence}` : "—"} · Comtrade: ${r.comtrade?.latest ? `${r.comtrade.latest.year}, Brasil ${usd(r.comtrade.latest.brazilUsd)}` : "—"}${r.catalog.confirmed.length ? ` · catálogo EAG: ${r.catalog.confirmed.map((c) => c.variant).join(", ")}` : ""}`,
                 ),
               ),
             ),
@@ -2744,10 +2903,14 @@ async function showAnalysis(id, preloaded) {
         },
         "Registrar seleção",
       );
-      node.append(panel("Commodity escolhida", f, out));
+      node.querySelector(".chosen-panel")?.remove();
+      const box = panel("Commodity escolhida", text("p", "Confira o produto do catálogo de cada linha. Linhas com o mesmo produto viram uma campanha só, em rascunho.", "muted"), f, out);
+      box.classList.add("chosen-panel");
+      node.append(box);
       f.scrollIntoView({ block: "nearest" });
     }, true);
-    node.append(el("div", { class: "toolbar" }, choose));
+    // Ação fixa no rodapé: mostra o que está marcado e leva ao próximo passo.
+    node.insertBefore(el("div", { class: "sticky-action" }, count, choose), node.lastElementChild);
   }
   showScreen(node);
 }
@@ -3142,14 +3305,18 @@ async function showDecisionReview(searchId) {
   const d = r.decisions;
   const node = section("Revisão para decisão", `Busca ${r.search.country} · SH6 ${r.search.hs6.join(", ")}${r.search.campaign ? ` · campanha ${r.search.campaign.name} (${r.search.campaign.status})` : ""}`);
   node.setAttribute("data-screen", "internacional");
-  const table = (head, rows) => el("table", {}, el("thead", {}, el("tr", {}, ...head.map((h) => el("th", {}, h)))), el("tbody", {}, ...rows.map((cells) => el("tr", {}, ...cells.map((c) => el("td", {}, c ?? "—"))))));
+  const table = (head, rows) => el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, el("tr", {}, ...head.map((h) => el("th", {}, h)))), el("tbody", {}, ...rows.map((cells) => el("tr", {}, ...cells.map((c) => el("td", {}, c ?? "—")))))));
   const pre = (s) => el("pre", { class: "message" }, s);
   const link = (l) => el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer" }, l.label);
-  node.append(
-    text("p", r.notice, "notice-fixed"),
-    button("Voltar à busca", () => showForeignSearch(searchId)),
-    panel(
-      `1. Validação comercial (${d.commercialValidation.rule}) — ${d.commercialValidation.status}`,
+  // Estado de cada decisão em texto; verde só quando a própria resposta do servidor diz aprovado/confirmado/configurado.
+  const done = (s) => /aprovad|confirmad|configurad/i.test(String(s || "")) && !/pendente|não /i.test(String(s || ""));
+  const tagFor = (s) => text("span", s || "proposta", done(s) ? "tag ok" : "tag warn");
+  const decision = (n, title, status, ...body) => el("details", {}, el("summary", {}, text("span", String(n), "n"), text("strong", title), tagFor(status)), el("div", {}, ...body));
+  const decisions = [
+    decision(
+      1,
+      `Validação comercial (${d.commercialValidation.rule})`,
+      d.commercialValidation.status,
       text("p", "Frase a confirmar:"),
       pre(d.commercialValidation.phrase),
       text("small", `Por que é pedida: ${d.commercialValidation.why}`),
@@ -3157,8 +3324,10 @@ async function showDecisionReview(searchId) {
       el("div", {}, text("small", "Já cumprido:"), el("ul", {}, ...d.commercialValidation.met.map((m) => el("li", {}, m)))),
       el("div", {}, text("small", "Continua pendente depois dela:"), el("ul", {}, ...d.commercialValidation.stillPending.map((m) => el("li", {}, m)))),
     ),
-    panel(
-      `2. Porte — referência ${d.sizeReference.status || "proposta"}`,
+    decision(
+      2,
+      "Referência de porte",
+      d.sizeReference.status || "proposta",
       text("p", d.sizeReference.current),
       text("small", d.sizeReference.proposal),
       table(["Categoria", "Efetivo (UTA)", "Faturamento", "Balanço"], d.sizeReference.table.map((z) => [z.category, z.staff, z.turnover, z.balance])),
@@ -3167,50 +3336,67 @@ async function showDecisionReview(searchId) {
       d.sizeReference.source ? text("small", `Fonte: ${d.sizeReference.source}`) : null,
       text("small", d.sizeReference.estimatedVsProven),
     ),
-    panel(`3. R14.8 — ${d.r148.status}`, pre(d.r148.current), d.r148.proposed ? el("div", {}, text("small", "Proposta:"), pre(d.r148.proposed)) : null),
-    panel(
-      `4. Textos — ${d.texts.status}`,
+    decision(3, "Regra R14.8", d.r148.status, pre(d.r148.current), d.r148.proposed ? el("div", {}, text("small", "Proposta:"), pre(d.r148.proposed)) : null),
+    decision(
+      4,
+      "Textos da abordagem",
+      d.texts.status,
       text("small", `Destinatário: ${d.texts.recipient}. Sequência: ${d.texts.steps.map((z) => `passo ${z.step} no dia ${z.day}`).join(", ")}.`),
-      d.texts.address ? text("small", `Endereço na assinatura: ${d.texts.address.value || "não configurado"} — ${d.texts.address.confirmedByRogerio ? "confirmado por Rogério" : d.texts.address.pending} Fonte: ${d.texts.address.source}`, d.texts.address.confirmedByRogerio ? "" : "tag warn") : null,
+      d.texts.address ? el("div", { class: d.texts.address.confirmedByRogerio ? "callout" : "callout warn" }, text("p", `Endereço no rodapé: ${d.texts.address.value || "não configurado"} — ${d.texts.address.confirmedByRogerio ? "confirmado por Rogério" : d.texts.address.pending} Fonte: ${d.texts.address.source}`)) : null,
       d.texts.followUpSubject ? text("small", d.texts.followUpSubject) : null,
       d.texts.stops ? text("small", d.texts.stops) : null,
-      ...d.texts.steps.map((z) => el("div", {}, text("strong", `Passo ${z.step} — dia ${z.day}`), table(["Alemão (enviado)", "Português (referência)"], [[z.de.subject, z.pt.subject], [pre(z.de.body), pre(z.pt.body)]]))),
+      ...d.texts.steps.map((z) => details(`Passo ${z.step} — dia ${z.day}: ${z.de.subject}`, table(["Alemão (enviado)", "Português (referência)"], [[z.de.subject, z.pt.subject], [pre(z.de.body), pre(z.pt.body)]]))),
     ),
-    panel(
-      `5. Dez candidatas mais promissoras (de ${r.counts.consumers} consumidoras; ${r.counts.traders} traders à parte)`,
-      table(
-        ["Empresa", "Atividade", "Compra/consumo", "Porte", "Contato", "Pendências", "Recomendação"],
-        r.top10.map((c) => [
-          el("div", {}, text("strong", c.name), text("small", c.city || ""), el("a", { href: c.profileUrl, target: "_blank", rel: "noopener noreferrer" }, "perfil")),
-          c.activity.typeLabel ? `${c.activity.typeLabel} — ${c.activity.evidence}` : c.activity.summary,
-          [c.purchaseEvidence.consumption ? `Consumo (texto próprio): "${c.purchaseEvidence.consumption.text}"` : null, c.purchaseEvidence.importStatement ? `Autodeclara importação (${c.purchaseEvidence.importStatement.brazil})` : null].filter(Boolean).join(" · ") || "sem frase própria",
-          c.size.band ? `${c.size.band} (${c.size.kind})` : c.size.note,
-          `${c.contact.technicalState}${c.contact.people.length ? ` · ${c.contact.people.map((q) => `${q.name} (${q.title})`).join("; ")}` : ""}${c.contact.generalEmail ? ` · ${c.contact.generalEmail}` : ""}`,
-          el("ul", {}, ...c.pending.map((q) => el("li", {}, q))),
-          el("div", {}, text("strong", c.recommendation), text("small", c.rationale)),
-        ]),
+    decision(5, "Verificador de e-mail (Snov)", r.snov.configured ? "configurado" : "pendente", text("small", r.snov.note), el("ol", {}, ...r.snov.steps.map((q) => el("li", {}, q)))),
+  ];
+  const pendingCount = decisions.filter((x) => x.querySelector("summary .tag.warn")).length;
+  node.append(
+    el("div", { class: "toolbar" }, button("Voltar à busca", () => showForeignSearch(searchId))),
+    text("p", r.notice, "notice-fixed"),
+    panel(`Decisões (${pendingCount ? `${pendingCount} aguardando você` : "todas registradas"})`, text("p", "Abra cada item para ver a proposta completa, a fonte e o que ela autoriza. Nada aqui é aprovado automaticamente.", "muted"), el("div", { class: "decision-list" }, ...decisions)),
+  );
+  const top = panel(
+    `Candidatas mais promissoras (${r.top10.length} de ${r.counts.consumers} consumidoras; ${r.counts.traders} traders à parte)`,
+    text("p", "Aceitar é decisão sua, na lista de descoberta da busca. Esta tela não aceita nenhuma candidata.", "muted"),
+    !r.top10.length ? text("p", "Nenhuma consumidora final ou processadora com sinal próprio de compra ainda. Valide as empresas encontradas na busca.", "empty") :
+    rows(r.top10, (c) =>
+      el(
+        "div",
+        { class: "row" },
+        el(
+          "div",
+          {},
+          text("strong", c.name),
+          el("div", { class: "tags" }, text("span", c.recommendation, /^Aceitar/.test(c.recommendation) ? "tag ok" : "tag"), c.size.band ? text("span", `${c.size.band} (${c.size.kind})`, "tag") : text("span", "porte a confirmar", "tag warn")),
+          text("small", `${c.city ? `${c.city} · ` : ""}${c.activity.typeLabel ? `${c.activity.typeLabel} — ${c.activity.evidence}` : c.activity.summary}`),
+          text("small", `Compra/consumo: ${[c.purchaseEvidence.consumption ? `"${c.purchaseEvidence.consumption.text}"` : null, c.purchaseEvidence.importStatement ? `autodeclara importação (${c.purchaseEvidence.importStatement.brazil})` : null].filter(Boolean).join(" · ") || "sem frase própria"}`),
+          text("small", `Contato: ${c.contact.technicalState}${c.contact.people.length ? ` · ${c.contact.people.map((q) => `${q.name} (${q.title})`).join("; ")}` : ""}${c.contact.generalEmail ? ` · ${c.contact.generalEmail}` : ""}`),
+        ),
+        c.profileUrl ? el("a", { href: c.profileUrl, target: "_blank", rel: "noopener noreferrer", class: "button-link" }, "Perfil na fonte") : null,
+        details(`Por que e o que falta (${c.pending.length})`, el("div", {}, text("p", c.rationale), el("ul", {}, ...c.pending.map((q) => el("li", {}, q))))),
       ),
-      text("small", "Aceitar é decisão sua, na aba de descoberta da busca. Esta tela não aceita nenhuma candidata."),
-    ),
-    panel(
-      "6. Classificação a revisar — prestadora × processadora que compra",
-      r.reclassify.length
-        ? table(["Empresa", "Atividade investigada", "Evidência", "Grupo"], r.reclassify.map((c) => [c.name, c.activity.typeLabel, el("span", {}, c.activity.evidence || "—", " ", c.activity.sourceUrl ? link({ url: c.activity.sourceUrl, label: "fonte" }) : ""), c.group ? `${c.group.level}: ${c.group.note}` : "—"]))
-        : text("small", "Nenhuma."),
-      r.restoreSuggestions.length ? el("div", {}, text("strong", "Descartes automáticos a reconsiderar (texto próprio indica compra):"), table(["Empresa", "Motivo do descarte", "Evidência"], r.restoreSuggestions.map((c) => [c.name, c.dismissReason, c.purchaseEvidence.consumption?.text || c.activity.evidence || "—"]))) : null,
-      r.dismissedInvestigated.length ? el("div", {}, text("small", "Descartadas com atividade investigada:"), el("ul", {}, ...r.dismissedInvestigated.map((c) => el("li", {}, `${c.name}: ${c.activity.typeLabel}${c.group ? ` · grupo (${c.group.level})` : ""}`)))) : null,
-    ),
-    panel(
-      `7. Sites inacessíveis à Cloudflare (${r.unreachable.length}) — estado técnico, não ausência de empresa ou contato`,
-      ...r.unreachable.map((u) => details(`${u.name}${u.city ? ` · ${u.city}` : ""} (${u.httpStatus ? `HTTP ${u.httpStatus}` : "sem resposta"}, ${(u.checkedAt || "").slice(0, 10)})`, el("ul", {}, ...u.assisted.map((l) => el("li", {}, link(l)))))),
-    ),
-    panel(
-      `8. Snov (verificador de e-mail) — ${r.snov.configured ? "configurado" : "pendente"}`,
-      text("small", r.snov.note),
-      el("ol", {}, ...r.snov.steps.map((q) => el("li", {}, q))),
     ),
   );
-  $("content").replaceChildren(node);
+  node.append(top);
+  node.append(
+    details(
+      `Classificação a revisar — prestadora × processadora que compra (${r.reclassify.length})`,
+      el(
+        "div",
+        { class: "rows" },
+        r.reclassify.length
+          ? table(["Empresa", "Atividade investigada", "Evidência", "Grupo"], r.reclassify.map((c) => [c.name, c.activity.typeLabel, el("span", {}, c.activity.evidence || "—", " ", c.activity.sourceUrl ? link({ url: c.activity.sourceUrl, label: "fonte" }) : ""), c.group ? `${c.group.level}: ${c.group.note}` : "—"]))
+          : text("small", "Nenhuma."),
+        r.restoreSuggestions.length ? el("div", {}, text("strong", "Descartes automáticos a reconsiderar (texto próprio indica compra):"), table(["Empresa", "Motivo do descarte", "Evidência"], r.restoreSuggestions.map((c) => [c.name, c.dismissReason, c.purchaseEvidence.consumption?.text || c.activity.evidence || "—"]))) : null,
+        r.dismissedInvestigated.length ? el("div", {}, text("small", "Descartadas com atividade investigada:"), el("ul", {}, ...r.dismissedInvestigated.map((c) => el("li", {}, `${c.name}: ${c.activity.typeLabel}${c.group ? ` · grupo (${c.group.level})` : ""}`)))) : null,
+      ),
+    ),
+    details(
+      `Sites inacessíveis à Cloudflare (${r.unreachable.length}) — estado técnico, não ausência de empresa ou contato`,
+      el("div", { class: "rows" }, ...(r.unreachable.length ? r.unreachable.map((u) => details(`${u.name}${u.city ? ` · ${u.city}` : ""} (${u.httpStatus ? `HTTP ${u.httpStatus}` : "sem resposta"}, ${(u.checkedAt || "").slice(0, 10)})`, el("ul", {}, ...u.assisted.map((l) => el("li", {}, link(l)))))) : [text("small", "Nenhum.")])),
+    ),
+  );
+  showScreen(node);
 }
 
 async function showForeignSearch(id, preloaded) {
