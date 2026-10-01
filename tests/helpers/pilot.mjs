@@ -27,6 +27,7 @@ export async function pilot(ctx, { email = "compras@valeverde.com.br", internal 
     await put("send_timezone", "national", "America/Sao_Paulo");
     await put("send_window", "national", { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] });
     await put("sanctions_max_age_hours", "global", 24);
+    await put("email_validation_max_age_days", "email", 30); // decisão de 2026-10-01
     DB.raw.exec("UPDATE channels SET state='internal_test' WHERE channel='email'");
     for (const sid of ["source-ofac-sdn", "source-cgu-ceis", "source-cgu-cnep"]) {
       const v = await api(`/api/sanctions/sources/${sid}/versions`, "POST", { contentHash: createHash("sha256").update(sid).digest("hex"), recordCount: 1, downloadedAt: new Date().toISOString() });
@@ -45,7 +46,8 @@ export async function pilot(ctx, { email = "compras@valeverde.com.br", internal 
   await api(`/api/companies/${co.data.id}/profiles`, "POST", { productId, profileClass: "possible_final_consumer", basis: "CNAE" });
   await api(`/api/companies/${co.data.id}/screening`, "POST", {});
   const dm = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Maria Souza", email, prospectRole: "decision_maker", sourceLabel: "site", timezone: "America/Sao_Paulo" })).data.id;
-  if (validated) DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(dm);
+  // Validação feita 4 dias antes de DAY (dentro dos 30 dias aprovados em 2026-10-01).
+  if (validated) DB.raw.prepare("UPDATE contacts SET email_validation='valid',email_validated_at='2099-01-01T12:00:00.000Z' WHERE id=?").run(dm);
   const { id } = (await api("/api/fichas", "POST", { companyId: co.data.id, campaignId, recipients: [dm] })).data;
   const f = (await api(`/api/fichas/${id}`)).data;
   const x = f.toApprove.find((a) => a.channel === "email");

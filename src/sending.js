@@ -80,7 +80,16 @@ export async function preSendCheck(env, row, ctx) {
   // mercados; sem fuso confirmado, o envio fica em espera (nunca cai no fuso do mercado).
   if (!contact.timezone) return { skip: "timezone_pending" };
   if (contact.email_validation !== "valid") return { skip: "email_not_validated" }; // 11
-  if (contact.email_validation_expires_at && contact.email_validation_expires_at <= ctx.at) return { skip: "email_validation_expired" };
+  // Validade (decisão de Rogério em 2026-10-01: 30 dias): vale o vencimento gravado; sem ele, data da validação + parâmetro.
+  // Sem data de validação ou sem parâmetro aprovado, o envio espera. Vencido espera nova verificação pedida por alguém:
+  // nada aqui consome crédito do provedor.
+  {
+    const expires =
+      contact.email_validation_expires_at ||
+      (contact.email_validated_at && Number.isInteger(ctx.validationDays) ? new Date(Date.parse(contact.email_validated_at) + ctx.validationDays * 86400000).toISOString() : null);
+    if (!expires) return { skip: contact.email_validated_at ? "email_validation_age_parameter_missing" : "email_validation_date_missing" };
+    if (expires <= ctx.at) return { skip: "email_validation_expired" };
+  }
   const email = await decryptPii(contact.email_encrypted, env);
   if (!email) return { block: "email_missing" };
   const channel = await s(env, "SELECT state FROM channels WHERE tenant_id=? AND channel='email'", row.tenant_id).first(); // 10
@@ -147,7 +156,7 @@ async function prepareNext(env, tenant, at, owner, state, leaseMs = LEASE_MS) {
     ).all()
   ).results;
   for (const row of candidates) {
-    const check = await preSendCheck(env, row, { at, nationalTz, campaignId: row.campaign_id, market: row.market, internationalEnabled });
+    const check = await preSendCheck(env, row, { at, nationalTz, campaignId: row.campaign_id, market: row.market, internationalEnabled, validationDays: p["email_validation_max_age_days:email"] });
     if (check.cancel || check.block) {
       await env.DB.batch([
         s(env, "UPDATE send_outbox SET status=?,block_reason=?,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')", check.cancel ? "cancelled" : "blocked", check.cancel || check.block, at, row.id),

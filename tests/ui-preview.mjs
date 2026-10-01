@@ -118,7 +118,7 @@ for (const [i, [name, ibge, city, lat, lon, prec, , size]] of units.entries()) {
   await api(`/api/companies/${cid}/profiles`, "POST", { productId: "product-06", profileClass: "possible_final_consumer", basis: "CNAE 1093-7/01 (teste)" });
   await api(`/api/companies/${cid}/screening`, "POST", {});
   const dm = (await api(`/api/companies/${cid}/contacts`, "POST", { fullName: "João Lima (teste)", email: "compras@exemplo.invalid", jobTitle: "Comprador", prospectRole: "decision_maker", sourceLabel: "site (teste)", timezone: "America/Sao_Paulo" })).data.id;
-  DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(dm);
+  DB.raw.prepare("UPDATE contacts SET email_validation='valid',email_validated_at='2026-10-01T12:00:00.000Z' WHERE id=?").run(dm);
   const fr = await api("/api/fichas", "POST", { companyId: cid, campaignId: campaign, recipients: [dm] });
   if (fr.status >= 300) throw new Error("ficha da prévia: " + JSON.stringify(fr.data));
 }

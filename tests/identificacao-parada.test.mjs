@@ -16,7 +16,7 @@ async function identification(ctx) {
   await api(`/api/companies/${co.data.id}/profiles`, "POST", { productId: "product-06", profileClass: "possible_final_consumer", basis: "CNAE" });
   await api(`/api/companies/${co.data.id}/screening`, "POST", {});
   const ch = (await api(`/api/companies/${co.data.id}/channels`, "POST", { email: "contato@serraazul.com.br", sourceUrl: "https://serraazul.com.br/contato", timezone: "America/Sao_Paulo" })).data.contactId;
-  DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(ch);
+  DB.raw.prepare("UPDATE contacts SET email_validation='valid',email_validated_at='2099-01-01T12:00:00.000Z' WHERE id=?").run(ch);
   ctx.env.INTERNAL_TEST_RECIPIENTS = `${ctx.env.INTERNAL_TEST_RECIPIENTS},contato@serraazul.com.br`;
   const { id } = (await api("/api/fichas", "POST", { companyId: co.data.id, campaignId: base.campaignId, purpose: "identify_buyer", recipients: [ch] })).data;
   const f = (await api(`/api/fichas/${id}`)).data;

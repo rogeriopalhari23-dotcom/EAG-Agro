@@ -61,6 +61,7 @@ async function ready(ctx, { email = INTERNAL } = {}) {
   const w = await put("send_window", "national", { start: "00:00", end: "23:59", weekdays: [1, 2, 3, 4, 5, 6, 7] });
   assert.equal(w.status, 200, JSON.stringify(w.data));
   await put("sanctions_max_age_hours", "global", 24);
+  await put("email_validation_max_age_days", "email", 30); // decisão de 2026-10-01
   DB.raw.exec("UPDATE channels SET state='internal_test' WHERE channel='email'");
   for (const sid of ["source-ofac-sdn", "source-cgu-ceis", "source-cgu-cnep"]) {
     const v = await api(`/api/sanctions/sources/${sid}/versions`, "POST", { contentHash: createHash("sha256").update(sid).digest("hex"), recordCount: 1, downloadedAt: new Date().toISOString() });
@@ -77,7 +78,7 @@ async function ready(ctx, { email = INTERNAL } = {}) {
   await api(`/api/companies/${co.data.id}/profiles`, "POST", { productId: "product-06", profileClass: "possible_final_consumer", basis: "CNAE" });
   await api(`/api/companies/${co.data.id}/screening`, "POST", {});
   const dm = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Maria Souza", email, prospectRole: "decision_maker", sourceLabel: "site", timezone: "America/Sao_Paulo" })).data.id;
-  DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(dm);
+  DB.raw.prepare("UPDATE contacts SET email_validation='valid',email_validated_at=? WHERE id=?").run(new Date(Date.now() - 86400000).toISOString(), dm);
   const { id } = (await api("/api/fichas", "POST", { companyId: co.data.id, campaignId: camp.data.id, recipients: [dm] })).data;
   const f = (await api(`/api/fichas/${id}`)).data;
   const x = f.toApprove.find((a) => a.channel === "email");

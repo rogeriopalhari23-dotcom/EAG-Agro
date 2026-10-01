@@ -35,7 +35,7 @@ async function world(t, { country = "JP", language = "en", email = TOKYO, tz = "
   await api(`/api/companies/${id}/size`, "PATCH", { sizeBand: "medium", source: "Site: 120 funcionários" });
   await api(`/api/companies/${id}/screening`, "POST", {});
   const dm = (await api(`/api/companies/${id}/contacts`, "POST", { fullName: "Haruto Tanaka", email, prospectRole: "decision_maker", sourceLabel: "LinkedIn" })).data.id;
-  DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(dm);
+  DB.raw.prepare("UPDATE contacts SET email_validation='valid',email_validated_at='2099-01-01T12:00:00.000Z' WHERE id=?").run(dm);
   return { ...ctx, companyId: id, dm, tz };
 }
 const release = (api, key, scope) => api(`/api/parameters/${key}`, "PUT", { scope, value: { enabled: true, evidenceRef: "docs/eag-compass-t1-validacao.md#liberacao" }, reason: "Liberação registrada no teste" });

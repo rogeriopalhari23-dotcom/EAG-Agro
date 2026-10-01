@@ -24,6 +24,7 @@ async function ready(ctx, { email = "compras@valeverde.com.br", internal = true,
   await put("send_timezone", "national", "America/Sao_Paulo");
   await put("send_window", "national", { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] });
   await put("sanctions_max_age_hours", "global", 24);
+  await put("email_validation_max_age_days", "email", 30); // decisão de 2026-10-01
   DB.raw.exec("UPDATE channels SET state='internal_test' WHERE channel='email'");
   for (const sid of ["source-ofac-sdn", "source-cgu-ceis", "source-cgu-cnep"]) {
     const v = await api(`/api/sanctions/sources/${sid}/versions`, "POST", { contentHash: createHash("sha256").update(sid).digest("hex"), recordCount: 1, downloadedAt: new Date().toISOString() });
@@ -40,7 +41,7 @@ async function ready(ctx, { email = "compras@valeverde.com.br", internal = true,
   await api(`/api/companies/${co.data.id}/profiles`, "POST", { productId: "product-06", profileClass: "possible_final_consumer", basis: "CNAE" });
   await api(`/api/companies/${co.data.id}/screening`, "POST", {});
   const dm = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Maria Souza", email, prospectRole: "decision_maker", sourceLabel: "site", timezone: "America/Sao_Paulo" })).data.id;
-  if (validated) DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(dm);
+  if (validated) DB.raw.prepare("UPDATE contacts SET email_validation='valid',email_validated_at='2099-01-01T12:00:00.000Z' WHERE id=?").run(dm);
   const { id } = (await api("/api/fichas", "POST", { companyId: co.data.id, campaignId: camp.data.id, recipients: [dm] })).data;
   const f = (await api(`/api/fichas/${id}`)).data;
   const x = f.toApprove.find((a) => a.channel === "email");
@@ -81,6 +82,39 @@ check("P2-T10: um envio por execução; intervalo e passo futuro respeitados", a
   assert.equal((await tick(ctx.env, "eag-internal", { transport: t, now: at(10, 5) })).reason, "interval");
   assert.equal((await tick(ctx.env, "eag-internal", { transport: t, now: at(11) })).reason, "nothing_eligible");
   assert.equal(t.sent.length, 1);
+});
+
+check("Validade de 30 dias do valid da Snov (2026-10-01): vencido espera nova verificação sem consumir crédito; sem data ou sem parâmetro também espera", async (ctx) => {
+  const { dm } = await ready(ctx);
+  const calls = [];
+  ctx.env.SNOV_CLIENT_ID = "id";
+  ctx.env.SNOV_CLIENT_SECRET = "segredo";
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => (calls.push(String(url)), realFetch(url, init));
+  try {
+    const t = transport();
+    const reason = async () => {
+      await tick(ctx.env, "eag-internal", { transport: t, now: at(10) });
+      return ctx.DB.raw.prepare("SELECT block_reason FROM send_outbox WHERE step_no=1").get().block_reason;
+    };
+    // Validado há 31 dias (sem vencimento gravado): vence pela data + parâmetro.
+    ctx.DB.raw.prepare("UPDATE contacts SET email_validated_at='2098-12-05T09:00:00.000Z',email_validation_expires_at=NULL WHERE id=?").run(dm);
+    assert.equal(await reason(), "email_validation_expired");
+    // Vencimento gravado no passado também segura.
+    ctx.DB.raw.prepare("UPDATE contacts SET email_validated_at='2099-01-01T12:00:00.000Z',email_validation_expires_at='2099-01-04T00:00:00.000Z' WHERE id=?").run(dm);
+    assert.equal(await reason(), "email_validation_expired");
+    // Sem data de validação: espera.
+    ctx.DB.raw.prepare("UPDATE contacts SET email_validated_at=NULL,email_validation_expires_at=NULL WHERE id=?").run(dm);
+    assert.equal(await reason(), "email_validation_date_missing");
+    // Sem parâmetro aprovado: espera.
+    ctx.DB.raw.prepare("UPDATE contacts SET email_validated_at='2099-01-01T12:00:00.000Z' WHERE id=?").run(dm);
+    ctx.DB.raw.exec("DELETE FROM parameters WHERE parameter_key='email_validation_max_age_days'");
+    assert.equal(await reason(), "email_validation_age_parameter_missing");
+    assert.equal(t.sent.length, 0, "nada sai");
+    assert.equal(calls.filter((u) => u.includes("snov.io")).length, 0, "vencimento não dispara verificação nem consome crédito");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 check("P2-T10: execuções sobrepostas não enviam duas vezes (lease do remetente)", async (ctx) => {
@@ -127,7 +161,7 @@ check("P2-T10: e-mail não validado e compliance indisponível seguram o envio (
   await tick(ctx.env, "eag-internal", { transport: t, now: at(10) });
   assert.equal(t.sent.length, 0);
   assert.equal(rows(ctx.DB)[0].block_reason, "email_not_validated");
-  ctx.DB.raw.exec("UPDATE contacts SET email_validation='valid'");
+  ctx.DB.raw.exec("UPDATE contacts SET email_validation='valid',email_validated_at='2099-01-01T12:00:00.000Z'");
   ctx.DB.raw.exec("DELETE FROM screening_matches; DELETE FROM screening_runs");
   await tick(ctx.env, "eag-internal", { transport: t, now: at(10) });
   assert.equal(t.sent.length, 0);
