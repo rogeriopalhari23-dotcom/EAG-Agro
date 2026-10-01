@@ -98,3 +98,11 @@ export async function identifierHash(env, tenant, channel, value) {
     .map((x) => x.toString(16).padStart(2, "0"))
     .join("");
 }
+
+// Chave da mensagem recebida (HMAC do Message-ID): reconhece a mesma mensagem relida com outro UID, inclusive depois
+// da purga, que apaga o Message-ID em claro (EXCLUSAO-PURGA).
+export async function messageKey(env, tenant, messageId) {
+  const key = await secretKey(env, "SUPPRESSION_HMAC_KEY", { name: "HMAC", hash: "SHA-256" }, ["sign"]);
+  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${tenant}:message-id:${String(messageId).trim()}`));
+  return [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}

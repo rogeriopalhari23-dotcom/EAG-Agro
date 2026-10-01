@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-01T20:06:28.654Z",
+  "updatedAt": "2026-10-01T20:35:58.480Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -843,12 +843,13 @@
         "src/erasure.js",
         "src/inbound.js",
         "migrations/0032_exclusao_purga.sql",
+        "docs/implementation/correcoes/0032-vinculo-tarefas-resposta.sql",
         "docs/implementation/EXCLUSAO-PURGA-PLANO.md"
       ],
       "acceptance": "Exclusão alcança contato, textos congelados (marcador, hash mantido), mensagens recebidas da pessoa (R2 e IDs), tarefas do contato e as abertas pelas mensagens dela (tasks.inbound_id), candidata, verificação, parte dela no cache do aviso legal e endereços em send_log/resolved_reason; preserva evidências de outros contatos (resposta compartilhada só listada, purga individual auditada); grava supressão e registro de exclusão (D1 + R2); restauração do D1 bloqueia envio e aprovação até POST /api/erasures/reapply; repetição sem efeito novo.",
-      "validation": "npm run check (tests/exclusao-purga.test.mjs, 6 testes com dados fictícios); suíte da versão em produção sobre o esquema 0032 (373/373)",
+      "validation": "npm run check (tests/exclusao-purga.test.mjs, 9 testes, e tests/resposta-multicommodity.test.mjs, dados fictícios); suíte da versão em produção sobre a 0032 final (373/373)",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Implementado e testado só com dados fictícios (2026-10-01). NÃO publicado: plano de migração, conferências e reversão em EXCLUSAO-PURGA-PLANO.md aguardam autorização de Rogério. Decisões T11 pendentes: guarda das exportações do D1, da caixa de e-mail e do diário da ponte; prazo do Time Travel aceito como limite."
+      "blockedBy": "Implementado e testado só com dados fictícios (2026-10-01). NÃO publicado: plano final em EXCLUSAO-PURGA-PLANO.md §4 aguarda autorização de Rogério. Decisões T11 pendentes no §2 (nenhum dado residual dado como aceito). Plano do D1 (janela do Time Travel 7 ou 30 dias) não confirmado pela API: conferir no painel (§3)."
     }
   ]
 }

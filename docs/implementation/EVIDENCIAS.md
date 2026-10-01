@@ -838,3 +838,29 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
   - Prazo do Time Travel conferido na documentação da Cloudflare (atualizada em 2026-04-21): 7 dias no Free e 30 no Paid. O plano da conta precisa ser confirmado.
   - Achado fora do escopo (não corrigido): id repetido no alerta de "outra commodity" em `src/inbound.js`, registrado em `EXCLUSAO-PURGA-PLANO.md` §7.
 - **Plano e decisões:** plano de publicação e reversão em `EXCLUSAO-PURGA-PLANO.md` §5–§6, não executado. Decisões T11 pendentes no §3.
+
+## Respostas com várias commodities corrigidas e EXCLUSAO-PURGA finalizada (2026-10-01, sem publicar)
+
+- **Correção de respostas (commit separado `1b9fd59`):**
+  - `pauseTargets` dá um id por tarefa e um alerta por commodity da empresa ainda em andamento fora das pausadas (R20.1, R20.5). Antes, um único id no `INSERT…SELECT` derrubava o lote (`UNIQUE constraint failed: tasks.id`, reproduzido com o código anterior) e nem pausa nem tarefa eram gravadas.
+  - O mesmo Message-ID já processado (outro UID ou caixa renumerada) não produz efeito.
+  - Teste `tests/resposta-multicommodity.test.mjs`: empresa com açúcar, milho e etanol; resposta na thread e resposta ambígua; repetição com o mesmo UID e com outra numeração.
+  - A terceira campanha é ativada direto no banco no teste, porque a regra limita 2 commodities ativas por mercado.
+  - O teste da ponte "caixa renumerada" passou a esperar 1 linha (relida não duplica), em vez de 2.
+- **EXCLUSAO-PURGA:**
+  - `inbound_messages.message_key` (HMAC do Message-ID, índice) na 0032: a deduplicação continua depois da purga. Testado: mensagem relida após a exclusão não volta ao R2 nem abre tarefa.
+  - A purga das tarefas passou a considerar todas as mensagens da pessoa, inclusive já purgadas, para alcançar uma tarefa ligada à mão depois.
+  - Tarefas antigas: `correcoes/0032-vinculo-tarefas-resposta.sql` liga só com candidata única e audita.
+    - Ambíguas: `GET /api/tasks/reply-review` e `POST /api/tasks/:id/link-inbound`.
+    - A exclusão informa `replyTasksToReview`.
+    - Prévia só leitura em produção: 2 tarefas, 1 candidata cada.
+  - 9 testes de exclusão, todos com dados fictícios.
+  - Dados que permanecem documentados com motivo, acesso e decisão T11 pendente (`EXCLUSAO-PURGA-PLANO.md` §2), sem classificação de "aceito".
+- **Plano do D1:** não confirmado.
+  - `wrangler whoami` e `d1 info` não mostram o plano; `GET /accounts/{id}/subscriptions` falhou por autenticação (token sem leitura de cobrança); `workers/account-settings` = `standard`, que existe nos dois planos.
+  - `time-travel info --timestamp` de 7 dias e 7 horas atrás devolveu o bookmark inicial: é indício, não prova.
+  - Onde conferir: painel → Workers & Pages → Plans, ou Manage Account → Billing → Subscriptions.
+- **Verificação:**
+  - suíte completa 384 + 2 + 15 (ponte), 0 falhas;
+  - suíte da versão em produção (`b3935f9`) com a 0032 final aplicada: 373/373, numa cópia temporária já removida.
+- **Fora desta etapa:** nada publicado, nenhuma purga real, nenhum backup ou registro local apagado; canal `planned`, campanhas inativas.

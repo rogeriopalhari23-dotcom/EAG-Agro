@@ -52,7 +52,7 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
 
   const [messages, own, shared, candidates, logs, resolved, company] = await env.DB.batch([
     s(env, "SELECT m.id,m.subject_enc FROM ficha_messages m JOIN ficha_versions v ON v.id=m.version_id JOIN fichas f ON f.id=v.ficha_id WHERE f.tenant_id=? AND m.contact_id=? AND m.purged_at IS NULL", tenant, contactId),
-    s(env, "SELECT id,r2_key FROM inbound_messages WHERE tenant_id=? AND ? IS NOT NULL AND from_hash=? AND content_purged_at IS NULL", tenant, hash, hash),
+    s(env, "SELECT id,r2_key,content_purged_at FROM inbound_messages WHERE tenant_id=? AND ? IS NOT NULL AND from_hash=?", tenant, hash, hash),
     s(
       env,
       `SELECT id FROM inbound_messages WHERE tenant_id=? AND content_purged_at IS NULL AND (from_hash IS NULL OR from_hash IS NOT ?)
@@ -64,7 +64,10 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
     s(env, "SELECT id,resolved_reason FROM send_outbox WHERE tenant_id=? AND contact_id=? AND resolved_reason LIKE '%@%'", tenant, contactId),
     s(env, "SELECT co.id,co.website FROM companies co JOIN contacts ct ON ct.company_id=co.id WHERE ct.tenant_id=? AND ct.id=?", tenant, contactId),
   ]);
-  const ownIds = own.results.map((m) => m.id);
+  // Todas as mensagens dela alcançam as tarefas (inclusive ligadas à mão depois de uma purga); só as ainda com
+  // conteúdo são purgadas de novo.
+  const allOwnIds = own.results.map((m) => m.id);
+  const ownIds = own.results.filter((m) => !m.content_purged_at).map((m) => m.id);
 
   // Parte da pessoa no cache do aviso legal da empresa (conteúdo compartilhado): sai só ela; os demais nomes ficam.
   let impressum = null;
@@ -91,7 +94,7 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
   // R2 primeiro: a cópia do registro de exclusão (sem PII) e a remoção do conteúdo recebido. Se o banco falhar depois,
   // o R2 já acusa a exclusão e o envio fica parado até a reaplicação terminar a purga.
   if (!reapply) await env.FILES.put(ledgerKey(tenant, contactId), JSON.stringify({ contactId, emailHash: hash, erasedAt: at, requestId: rid }));
-  const stored = own.results.map((m) => m.r2_key).filter((k) => k && k.startsWith("inbound/"));
+  const stored = own.results.filter((m) => !m.content_purged_at).map((m) => m.r2_key).filter((k) => k && k.startsWith("inbound/"));
   if (stored.length) await env.FILES.delete(stored);
 
   const marker = await encryptPii(PURGED, env);
@@ -110,8 +113,8 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
       `UPDATE tasks SET status=CASE WHEN status IN ('open','suspended') THEN 'cancelled' ELSE status END,
          suspended_reason=CASE WHEN status IN ('open','suspended') THEN 'dados pessoais excluídos' ELSE suspended_reason END,
          script=NULL,result_json=NULL
-       WHERE tenant_id=? AND (contact_id=? ${ownIds.length ? `OR inbound_id IN (${ph(ownIds)})` : ""})`,
-      tenant, contactId, ...ownIds,
+       WHERE tenant_id=? AND (contact_id=? ${allOwnIds.length ? `OR inbound_id IN (${ph(allOwnIds)})` : ""})`,
+      tenant, contactId, ...allOwnIds,
     ),
     s(
       env,
@@ -134,7 +137,11 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
       tenant, contactId, hash, reapply ? (erasedAt ?? at) : at, rid, reapply ? at : null,
     ),
   );
+  const pendingReview = company.results[0]
+    ? (await s(env, `SELECT COUNT(*) n FROM tasks WHERE tenant_id=? AND company_id=? AND inbound_id IS NULL AND kind IN ${REPLY_KINDS}`, tenant, company.results[0].id).first()).n
+    : 0;
   const counts = {
+    replyTasksToReview: pendingReview,
     fichaMessagesPurged: messages.results.length,
     inboundPurged: ownIds.length,
     sendLogRedacted: logs.results.length + resolved.results.length,
@@ -194,4 +201,45 @@ export async function reapplyErasures(request, env, actor, rid) {
     done.push({ contactId: id, ...r });
   }
   return { reapplied: done.length, items: done, consistent: await erasuresConsistent(env, actor.tenant_id) };
+}
+
+// Tarefas de resposta sem vínculo com a mensagem (anteriores à 0032 e não ligadas pela correção por falta de evidência
+// inequívoca). Para cada uma, as mensagens candidatas da mesma empresa no mesmo dia e as ambíguas do dia — sem PII.
+const REPLY_KINDS = "('reply_followup','review_ambiguous')";
+export async function replyTasksForReview(env, actor) {
+  requireRole(actor, ADMIN);
+  const rows = (await s(env, `SELECT id,company_id,commodity,kind,due_date,status FROM tasks WHERE tenant_id=? AND inbound_id IS NULL AND kind IN ${REPLY_KINDS} ORDER BY due_date,id`, actor.tenant_id).all()).results;
+  const items = [];
+  for (const t of rows) {
+    const candidates = (
+      await s(
+        env,
+        `SELECT id,classification,correlation,company_id,commodity,received_at FROM inbound_messages WHERE tenant_id=? AND substr(processed_at,1,10)=?
+           AND classification IN ('human','auto_reply','unclassified','unsubscribe') AND correlation<>'none' AND (company_id=? OR company_id IS NULL)
+         ORDER BY received_at`,
+        actor.tenant_id, t.due_date, t.company_id,
+      ).all()
+    ).results;
+    items.push({ task: t, candidates });
+  }
+  return { items, rule: "Ligação automática só com uma única mensagem da mesma empresa no dia; o resto é decisão manual." };
+}
+
+// Ligação manual decidida pelo Administrador (com motivo), auditada; nunca troca um vínculo existente.
+export async function linkTaskToInbound(request, env, actor, rid, taskId) {
+  requireRole(actor, ADMIN);
+  const i = await bodyJson(request);
+  const reason = str(i.reason, "motivo", 500);
+  if (reason.length < 10) fail(422, "reason_required", "Descreva a evidência da ligação (mínimo 10 caracteres).");
+  const inboundId = str(i.inboundId, "mensagem", 80);
+  const t = await s(env, `SELECT id,inbound_id,company_id FROM tasks WHERE tenant_id=? AND id=? AND kind IN ${REPLY_KINDS}`, actor.tenant_id, taskId).first();
+  if (!t) fail(404, "task_not_found", "Tarefa de resposta não encontrada.");
+  if (t.inbound_id) fail(409, "task_already_linked", "A tarefa já está ligada a uma mensagem.");
+  const m = await s(env, "SELECT id FROM inbound_messages WHERE tenant_id=? AND id=?", actor.tenant_id, inboundId).first();
+  if (!m) fail(404, "inbound_not_found", "Mensagem não encontrada.");
+  await commit(env, [
+    s(env, "UPDATE tasks SET inbound_id=? WHERE id=? AND inbound_id IS NULL", m.id, t.id),
+    auditStatement(env, actor, rid, "task.inbound_linked", "task", t.id, { inboundId: m.id, manual: true, reason }),
+  ]);
+  return { id: t.id, inboundId: m.id };
 }

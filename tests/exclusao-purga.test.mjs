@@ -254,3 +254,68 @@ check("EXCLUSAO-PURGA: script local redige endereços já gravados no diário da
     for (const suffix of ["", "-wal", "-shm"]) rmSync(file + suffix, { force: true });
   }
 });
+
+// Tarefas de resposta "anteriores à 0032": sem inbound_id, como estariam em produção antes da migração.
+const legacy = (DB) => DB.exec("UPDATE tasks SET inbound_id=NULL WHERE kind IN ('reply_followup','review_ambiguous')");
+const linkSql = () => readFileSync(new URL("../docs/implementation/correcoes/0032-vinculo-tarefas-resposta.sql", import.meta.url), "utf8");
+
+check("EXCLUSAO-PURGA: tarefas antigas ligadas só com evidência inequívoca (uma mensagem da empresa no dia)", async (ctx) => {
+  const r = await scenario(ctx);
+  const DB = ctx.DB.raw;
+  // Respostas em dias diferentes: cada tarefa tem uma única candidata.
+  DB.prepare("UPDATE inbound_messages SET processed_at='2099-01-06T12:00:00.000Z' WHERE id=?").run(r.inJoao.id);
+  DB.prepare("UPDATE tasks SET due_date='2099-01-06' WHERE inbound_id=?").run(r.inJoao.id);
+  const expected = Object.fromEntries(DB.prepare("SELECT id,inbound_id FROM tasks WHERE inbound_id IS NOT NULL").all().map((x) => [x.id, x.inbound_id]));
+  assert.ok(Object.keys(expected).length >= 2);
+  legacy(DB);
+  DB.exec(linkSql());
+  for (const [taskId, inboundId] of Object.entries(expected)) assert.equal(DB.prepare("SELECT inbound_id FROM tasks WHERE id=?").get(taskId).inbound_id, inboundId);
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM audit_log WHERE request_id='vinculo-tarefas-0032'").get().n, Object.keys(expected).length);
+  assert.equal((await ctx.api("/api/tasks/reply-review")).data.items.length, 0);
+  // Rodar de novo não liga nada a mais nem duplica a auditoria.
+  DB.exec(linkSql());
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM audit_log WHERE request_id='vinculo-tarefas-0032'").get().n, Object.keys(expected).length);
+  // A exclusão da Maria alcança a tarefa dela pelo vínculo e não a do João.
+  const del = await erase(ctx, r.dm);
+  assert.equal(del.data.replyTasksToReview, 0);
+  assert.equal(DB.prepare("SELECT result_json FROM tasks WHERE inbound_id=? AND kind='reply_followup'").get(r.inMaria.id).result_json, null);
+  assert.match(DB.prepare("SELECT result_json FROM tasks WHERE inbound_id=? AND kind='reply_followup'").get(r.inJoao.id).result_json, /amostra/);
+});
+
+check("EXCLUSAO-PURGA: tarefas antigas ambíguas ficam para revisão manual; exclusão informa e só alcança depois da ligação", async (ctx) => {
+  const r = await scenario(ctx);
+  const DB = ctx.DB.raw;
+  legacy(DB);
+  DB.exec(linkSql()); // Maria e João responderam no mesmo dia: duas candidatas por tarefa
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM tasks WHERE inbound_id IS NOT NULL").get().n, 0, "nada ligado sem evidência inequívoca");
+  const review = (await ctx.api("/api/tasks/reply-review")).data.items;
+  assert.ok(review.length >= 2 && review.every((x) => x.candidates.length === 2));
+  assert.doesNotMatch(JSON.stringify(review), /Maria|valeverde|compras@/i, "revisão sem PII");
+
+  const del = await erase(ctx, r.dm);
+  assert.equal(del.data.replyTasksToReview, review.length, "a exclusão avisa o que ficou sem alcance");
+  const mariaTask = DB.prepare("SELECT id FROM tasks WHERE kind='reply_followup' AND result_json LIKE '%Maria%'").get();
+  assert.ok(mariaTask, "sem vínculo, a nota não foi apagada automaticamente");
+
+  // Decisão manual: liga à mensagem da Maria; repetir o pedido de exclusão alcança a tarefa.
+  assert.equal((await ctx.api(`/api/tasks/${mariaTask.id}/link-inbound`, "POST", { inboundId: r.inMaria.id, reason: "curto" })).status, 422);
+  const ln = await ctx.api(`/api/tasks/${mariaTask.id}/link-inbound`, "POST", { inboundId: r.inMaria.id, reason: "Nota cita a resposta da Maria (conferido na tarefa)" });
+  assert.equal(ln.status, 200);
+  assert.equal((await ctx.api(`/api/tasks/${mariaTask.id}/link-inbound`, "POST", { inboundId: r.inJoao.id, reason: "Tentativa de trocar o vínculo" })).status, 409);
+  assert.equal((await erase(ctx, r.dm, "Repetição após a ligação manual")).status, 200);
+  assert.equal(DB.prepare("SELECT result_json FROM tasks WHERE id=?").get(mariaTask.id).result_json, null);
+  assert.match(DB.prepare("SELECT result_json FROM tasks WHERE kind='reply_followup' AND result_json LIKE '%amostra%'").get().result_json, /João/);
+});
+
+check("EXCLUSAO-PURGA: mensagem da pessoa relida depois da purga é reconhecida e não volta ao R2 nem gera tarefa", async (ctx) => {
+  const r = await scenario(ctx);
+  const DB = ctx.DB.raw;
+  assert.equal((await erase(ctx, r.dm)).status, 200);
+  const before = DB.prepare("SELECT COUNT(*) n FROM tasks").get().n;
+  const raw = reply(`Maria Souza <${MARIA}>`, r.outboxA.message_id, "Aqui é a Maria Souza, celular 16 99999-0000.", 1);
+  const again = await processMessage(ctx.env, "eag-internal", { mailbox: "INBOX", uidValidity: 9, uid: 77, bytes: enc(raw) }, at(16));
+  assert.equal(again.duplicate, true);
+  assert.equal(again.of, r.inMaria.id);
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM tasks").get().n, before);
+  assert.equal([...ctx.env.FILES.store.keys()].some((k) => k.startsWith("inbound/9/")), false);
+});

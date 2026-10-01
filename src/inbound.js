@@ -2,7 +2,7 @@
 // Chave estável (caixa + UIDVALIDITY + UID); correlação por Message-ID e, sem thread, pelo remetente;
 // ambígua mantém pausa de todos os envolvidos; nenhuma resposta automática é enviada (R19.9).
 import { statement as s, now } from "./store.js";
-import { identifierHash } from "./crypto.js";
+import { identifierHash, messageKey } from "./crypto.js";
 import { parseMessage, header, addressOf, messageIds } from "./mime.js";
 import { imapClient } from "./adapters/imap.js";
 
@@ -130,9 +130,11 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
     : { correlation: "none", targets: [] };
   // A mesma mensagem pode voltar com outro UID (caixa renumerada, cópia entre pastas): o Message-ID já processado
   // encerra aqui, antes de guardar conteúdo ou produzir qualquer efeito.
+  // A chave (HMAC do Message-ID) continua depois da purga; message_id cobre linhas anteriores à migração 0032.
   const messageId = header(msg, "message-id");
+  const mKey = messageId ? await messageKey(env, tenant, messageId) : null;
   if (messageId) {
-    const seen = await s(env, "SELECT id FROM inbound_messages WHERE tenant_id=? AND message_id=? LIMIT 1", tenant, messageId).first();
+    const seen = await s(env, "SELECT id FROM inbound_messages WHERE tenant_id=? AND (message_key=? OR message_id=?) LIMIT 1", tenant, mKey, messageId).first();
     if (seen) return { duplicate: true, of: seen.id };
   }
   const id = crypto.randomUUID();
@@ -146,10 +148,10 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
   }
   const ins = await s(
     env,
-    "INSERT INTO inbound_messages(id,tenant_id,mailbox,uidvalidity,imap_uid,message_id,in_reply_to,references_json,from_hash,classification,correlation,outbox_id,company_id,commodity,r2_key,received_at,processed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(tenant_id,mailbox,uidvalidity,imap_uid) DO NOTHING",
+    "INSERT INTO inbound_messages(id,tenant_id,mailbox,uidvalidity,imap_uid,message_id,in_reply_to,references_json,from_hash,classification,correlation,outbox_id,company_id,commodity,r2_key,received_at,processed_at,message_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(tenant_id,mailbox,uidvalidity,imap_uid) DO NOTHING",
     id, tenant, mailbox, uidValidity, uid, messageId, header(msg, "in-reply-to"),
     JSON.stringify(messageIds(header(msg, "references"))), fromHash, c.kind, corr.correlation, corr.outboxId ?? null,
-    corr.targets.length === 1 ? corr.targets[0].company_id : null, corr.targets.length === 1 ? corr.targets[0].commodity : null, r2Key, at, at,
+    corr.targets.length === 1 ? corr.targets[0].company_id : null, corr.targets.length === 1 ? corr.targets[0].commodity : null, r2Key, at, at, mKey,
   ).run();
   if (!ins.meta.changes) return { duplicate: true };
   const st = [];

@@ -1,138 +1,135 @@
-# EXCLUSAO-PURGA — alcance, limitações, migração 0032 e reversão (2026-10-01)
+# EXCLUSAO-PURGA — alcance, dados que permanecem, migração 0032, publicação e reversão
 
-**Estado:**
+**Estado (2026-10-01):**
 - Implementado e testado só com dados fictícios.
 - **Não publicado.**
-- Nenhuma exclusão real foi executada.
+- Nenhuma exclusão real foi executada; nenhum backup ou registro local foi apagado.
 
 **Requisitos:** R9.1, R9.1.1, R9.1.2, R21.5, R23.5.
 
-**Retenção:** prazos e fundamentos dependem da T11 (`T11-POLITICA-PROPOSTA.md`). Este documento não fixa nenhum.
+**Retenção:** prazos e fundamentos são decisão da T11 (`T11-POLITICA-PROPOSTA.md`). Este documento não fixa nenhum.
 
-## 1. Revisão dos dados que permaneciam (consulta ao esquema real, 75 tabelas)
-
-| Onde | O que havia | Dado pessoal? | Tratamento agora |
-| --- | --- | --- | --- |
-| `ficha_approvals` | contato, canal, hash dos textos aprovados, quem aprovou, data | Não (id e hash) | Fica: é a evidência da aprovação |
-| `send_outbox` | `email_hash`, `message_id` gerado por nós (`<ob-<id>@eagagro.com>`), estados | Pseudonimizado | Fica: é a evidência do envio |
-| `send_outbox.resolved_reason` | Texto livre de Rogério ao resolver um indeterminado | **Pode ter o endereço** | Endereço → "[endereço]" nas linhas do contato; o texto restante fica |
-| `send_log.detail` | Texto do servidor SMTP, até 160 caracteres | **Pode ter o endereço** (ex.: "550 5.1.1 <x@y> unknown") | Antes: na exclusão, endereço redigido nas linhas do contato. Agora: não entra mais em nenhuma linha nova (Worker e ponte) |
-| `tasks` de resposta (`reply_followup`, `review_ambiguous`) | Orientação fixa no roteiro; a nota de Rogério em `result_json`; **sem contato e sem envio vinculados** | A nota pode citar a pessoa | **Vínculo corrigido:** `tasks.inbound_id`. A purga alcança a tarefa aberta pela mensagem da pessoa; a de outro remetente fica |
-| `inbound_messages` | `from_hash`; `message_id`, `in_reply_to` e `references` do servidor dela; arquivo `.eml` no R2 | Sim (arquivo); IDs do servidor dela | Arquivo apagado; IDs anulados; classificação, correlação e datas ficam |
-| `person_candidates` | Nome, cargo, e-mail e telefone cifrados; `purchase_note` e `purchase_source_url`; `source_url` | Sim | Tudo anulado ou com marcador; `name_hash` fica (impede recadastrar a pessoa); status `dismissed` |
-| `research_cache` (Impressum) | Nomes de todas as pessoas do aviso legal da empresa, cifrados | **Compartilhado** | Sai só a pessoa (comparação por `name_hash`) e o e-mail ou telefone dela; os demais ficam |
-| `contacts.source_label` | Texto livre da origem | Pode citar a pessoa | Trocado por "dados excluídos em AAAA-MM-DD" |
-| `contact_verifications.source_reference` | Endereço da fonte (pode ser perfil) | Sim | Anulado |
-| `ficha_versions.snapshot_enc` | Contato, papel, hash, fuso e `targetFlag` (categoria derivada do cargo) | Pseudonimizado; **compartilhado pela versão** | Fica (limitação §3). Não traz nome nem e-mail |
-| `audit_log` | Ações sobre contatos | Não: só ids, papéis e indicadores (conferido em `companies.js`, `people.js`, `tasks.js`) | Fica |
-| `email_validation_jobs` | Lista de ids, `task_hash`, erro da Snov (texto fixo do adaptador) | Não | Fica |
-| `meetings` | Contato, data, canal | Não (id) | Fica |
-| `evidence`, `demand_fields`, `search_candidate_checks` | Notas e referências por **empresa** | Podem citar a pessoa em texto livre | Não alcançado automaticamente (limitação §3) |
-
-## 2. Alcance final da exclusão (`POST /api/contacts/:id/delete-personal-data`, só Administrador)
+## 1. Alcance da exclusão (`POST /api/contacts/:id/delete-personal-data`, só Administrador)
 
 1. **Contato:** nome, cargo, e-mail, telefone, LinkedIn, nota e origem apagados. `email_hash`, papel e fuso ficam.
-2. **Textos congelados das fichas dele:** o conteúdo vira marcador cifrado e o HTML fica nulo. Identidade e `message_sha256` ficam iguais. A aprovação de texto purgado é recusada (`personal_data_deleted`).
-3. **Mensagens recebidas dele (`from_hash`):** o arquivo sai do R2, os IDs do servidor são anulados e a linha fica sem conteúdo.
-4. **Tarefas:**
-   - as do contato: roteiro e resultado limpos; abertas ou suspensas passam a canceladas;
-   - as abertas por mensagens dele (`inbound_id`): mesmo tratamento.
-5. **Candidata de pessoa, verificação e parte dele no cache do aviso legal.**
-6. **Endereço redigido** em `send_log` e `resolved_reason` dos envios dele.
-7. **Envios pendentes** cancelados (`personal_data_deleted`).
-8. **Supressão** do hash do e-mail (`personal_data_deleted`, R9.1.2), sem duplicar.
-9. **Registro de exclusão:** `erasure_ledger` no D1 (sem PII) e a cópia `erasures/<tenant>/<contato>.json` no R2. A cópia é gravada **antes** do D1.
-10. **Auditoria:** só contagens e base legal.
-11. **Repetição:** pode ser repetido sem efeito novo. Testado: zero purgas novas, um único registro e uma única supressão.
+2. **Textos congelados das fichas dele:** viram marcador cifrado; identidade e `message_sha256` ficam iguais. A aprovação de texto purgado é recusada.
+3. **Mensagens recebidas dele (`from_hash`):**
+   - o arquivo sai do R2;
+   - `message_id`, `in_reply_to` e `references` são anulados;
+   - fica `message_key` (HMAC do Message-ID), para a mesma mensagem relida com outro UID ser reconhecida e não voltar ao R2 nem abrir tarefa.
+4. **Tarefas:** as do contato e as abertas por **qualquer** mensagem dele (`tasks.inbound_id`) têm roteiro e resultado limpos; as abertas ou suspensas passam a canceladas.
+5. **Outros registros:**
+   - candidata de pessoa: nome-marcador, sem cargo, e-mail, telefone, nota de compra e fontes;
+   - referência de verificação anulada;
+   - a parte dele no cache do aviso legal (Impressum) da empresa;
+   - endereço redigido em `send_log.detail` e `resolved_reason`.
+6. **Envios pendentes** cancelados; **supressão** do hash do e-mail (R9.1.2).
+7. **Registro de exclusão:** `erasure_ledger` no D1 e uma cópia no R2, sem PII, gravada antes do D1.
+8. **Resposta da rota:**
+   - contagens;
+   - `sharedRetained`: mensagens de **outros** remetentes na conversa, que não são apagadas;
+   - `replyTasksToReview`: tarefas de resposta da empresa ainda sem vínculo.
+9. **Repetição:** pode ser repetida sem efeito novo; depois de uma ligação manual, a repetição alcança a tarefa ligada.
 
-**Conteúdo compartilhado.** Uma resposta de **outro remetente** na conversa da pessoa (ex.: o colega que responde citando-a):
-- é do colega, e **não é apagada** automaticamente;
-- volta em `sharedRetained` para Rogério revisar;
-- se precisar, há a purga individual `POST /api/inbound/:id/purge-content`, com motivo de 10 ou mais caracteres e auditada.
+**Conteúdo de outros contatos:** nunca é apagado automaticamente.
+- Uma resposta de colega na mesma conversa só é purgada por decisão individual (`POST /api/inbound/:id/purge-content`, motivo de 10 ou mais caracteres, auditada).
+- No cache do aviso legal sai só a pessoa.
 
-O mesmo vale para o cache do aviso legal: sai só a pessoa.
+**Tarefas de resposta anteriores à 0032** (sem vínculo):
+- `correcoes/0032-vinculo-tarefas-resposta.sql` liga só quando há **exatamente uma** mensagem candidata (mesma empresa, tipo que abre tarefa, mesmo dia). Cada vínculo é auditado.
+- As demais aparecem em `GET /api/tasks/reply-review`, com as candidatas e sem PII, e são ligadas à mão por `POST /api/tasks/:id/link-inbound`, com motivo e auditoria; um vínculo existente nunca é trocado.
+- **Produção hoje** (consulta só leitura, 2026-10-01 20:2x UTC): 2 tarefas de resposta (teste interno), cada uma com 1 candidata. Ambas seriam ligadas e nenhuma iria para revisão.
 
-**Testes:** `tests/exclusao-purga.test.mjs`, 6 testes, dados fictícios.
-1. Alcance completo da titular e evidências do colega intactas, incluindo a tarefa de resposta de cada um e a resposta compartilhada.
-2. Repetição do pedido e imutabilidade.
-3. Restauração do D1 (cópia `VACUUM INTO`), bloqueio e reaplicação.
-4. Redação de endereço no Worker e no diário da ponte.
-5. Reversão da 0032.
-6. Redação do diário já gravado.
+**Testes:** `tests/exclusao-purga.test.mjs`, 9 testes, dados fictícios.
+1. Alcance completo e evidências do colega intactas.
+2. Repetição e imutabilidade.
+3. Restauração do D1 com bloqueio e reaplicação.
+4. Redação no Worker e no diário da ponte.
+5. Reversão.
+6. Diário já gravado.
+7. Vínculo inequívoco das tarefas antigas.
+8. Tarefas ambíguas para revisão, com exclusão repetida após a ligação.
+9. Mensagem relida depois da purga.
 
-O teste 3 encontrou um defeito: a reaplicação não marcava `reapplied_at` quando o banco restaurado nem tinha a linha. Já está corrigido.
+## 2. Dados que permanecem depois de uma exclusão — nada aqui foi "aceito"; cada item espera decisão
 
-## 3. Limitações que continuam
+| Dado que permanece | Por quê | Quem pode acessar | Decisão T11 que falta |
+| --- | --- | --- | --- |
+| `email_hash` no contato, na supressão e no registro de exclusão | Não voltar a contatar (R9.1.2) e refazer a exclusão após restauração | Administrador (Compass) e o titular da conta Cloudflare | Prazo de retenção do identificador de supressão e do registro de exclusão (T11 §2.1–2.2) |
+| `message_key` (HMAC do Message-ID) das mensagens dela | Impedir que a mesma mensagem relida volte a ser guardada ou abra tarefa | Idem | Mesmo prazo do identificador de supressão, ou outro |
+| Retrato da versão da ficha (`ficha_versions.snapshot_enc`): id do contato, hash, papel, fuso e `targetFlag` (categoria derivada do cargo) | Imutável e compartilhado pelos destinatários da versão; prova do que foi aprovado | Perfis que abrem a ficha (hoje só Rogério, Administrador) e o titular da conta Cloudflare | Guardar como evidência da aprovação, e por quanto tempo; ou exigir purga do `targetFlag` |
+| Linhas de envio e aprovação (`send_outbox`, `ficha_approvals`, `send_log` sem endereço) e da mensagem recebida sem conteúdo | Evidência de que houve envio, aprovação e resposta (auditoria, R19) | Idem | Prazo de guarda da evidência operacional |
+| Notas livres por empresa que citem a pessoa pelo nome (`evidence`, `demand_fields`, verificações de busca, texto restante de `resolved_reason`) | Não têm vínculo com o contato; não dá para achar sem ler | Perfis com acesso à empresa (hoje só Rogério) | Se a exclusão exige revisão manual dessas notas e quem a faz |
+| Respostas de outros remetentes na conversa (`sharedRetained`) | São dados de outra pessoa | Administrador | Critério para purgar uma resposta de terceiro que cite o titular |
+| Tarefas de resposta sem vínculo (quando houver) | Sem evidência inequívoca da mensagem | Administrador | Nenhuma de política: decisão manual caso a caso (rota de ligação) |
+| **Time Travel do D1** (estado anterior à exclusão) | Recurso da plataforma; um ponto não pode ser apagado | O titular da conta Cloudflare (Rogério) | Aceitar a janela do plano como limite técnico e informá-la ao titular dos dados? (§3) |
+| **Exportações locais do D1** (`C:\Users\Roger\eag-compass-backups\`), feitas antes de migrações | Ponto de volta de migração | Usuário Windows de Rogério | Prazo de guarda das exportações; nenhuma foi apagada |
+| **Caixa `rogeriopalhari@eagagro.com`** (Entrada, Enviados, Lixeira) e cópias da Hostinger | Fora do Compass; a caixa é da EAG | Rogério e os administradores da caixa na EAG/Hostinger | Jurídico da EAG: guarda da caixa corporativa e quem atende a exclusão nela |
+| **Diário local da ponte** (`%LOCALAPPDATA%\eag-mail-bridge\journal.sqlite`): id do envio, `Message-ID` nosso, hash, estado e texto SMTP (sem endereço depois do script) | Impede reenvio depois de queda | Usuário Windows de Rogério | Prazo de guarda do diário |
+| **Registro de execução da ponte** (`ponte.log`): sem endereço e sem conteúdo por desenho | Diagnóstico | Usuário Windows de Rogério | Rotação ou prazo |
 
-1. **Cópias de recuperação do D1 (Time Travel):** guardam o estado anterior pelo prazo do plano. Segundo a documentação da Cloudflare (atualizada em 2026-04-21), são 7 dias no Workers Free e 30 dias no Workers Paid; o plano da conta precisa ser confirmado no painel. Não há como apagar um ponto do Time Travel. A exclusão só some das cópias quando o prazo vence. **Decisão T11:** aceitar esse prazo como limite técnico e informá-lo ao titular?
-2. **Exportações locais do D1** (`C:\Users\Roger\eag-compass-backups\`), feitas antes de migrações, contêm PII. **Procedimento proposto:**
-   - depois de cada exclusão real, apagar as exportações anteriores a ela que não forem mais necessárias;
-   - registrar quais foram mantidas e por quê.
-   
-   **Decisão T11:** prazo de guarda das exportações.
-3. **Caixa de e-mail `rogeriopalhari@eagagro.com`:** Entrada e Enviados guardam as mensagens originais. A caixa é da EAG; Rogério não administra a infraestrutura dela.
-   - **Procedimento proposto:** Rogério procura pelo endereço e apaga as mensagens da pessoa em Entrada, Enviados e Lixeira, depois esvazia a Lixeira.
-   - Cópias de segurança da Hostinger ou da EAG ficam fora do alcance dele.
-   - **Decisão T11 / jurídico da EAG:** a caixa corporativa tem guarda própria ou retenção legal? Quem atende a exclusão nela?
-4. **Diário local da ponte** (`%LOCALAPPDATA%\eag-mail-bridge\journal.sqlite`):
-   - guarda id do envio, `Message-ID`, hash, estado e o texto SMTP;
-   - as linhas novas entram sem endereço;
-   - as antigas são redigidas com `bridge\scripts\redigir-diario.mjs`, com a ponte parada (§5, passo 9).
-   
-   **Decisão T11:** por quanto tempo guardar o diário. Ele só serve para impedir reenvio depois de queda.
-5. **Registro de execução da ponte** (`ponte.log`): por desenho, sem endereço e sem conteúdo. Mensagens de erro de conexão (até 120–160 caracteres) vêm do servidor e não costumam ter endereço. **Decisão T11:** rotação ou guarda.
-6. **Retrato da versão** (`ficha_versions.snapshot_enc`): continua com id, hash, papel, fuso e `targetFlag` da pessoa. É pseudonimizado e compartilhado pela versão, e a versão é imutável.
-7. **Notas livres por empresa** (`evidence`, `demand_fields`, verificações de busca, `resolved_reason` sem o endereço) podem citar a pessoa pelo nome. Não há vínculo com o contato; a revisão é manual no pedido de exclusão.
-8. **Tarefas de resposta anteriores à 0032** não têm `inbound_id`. Em produção só existem as do teste interno, com endereços internos.
-9. **Restauração para antes da própria 0032:** sem `erasure_ledger`, envio e aprovação falham com erro (falha fechada), e não com liberação. Nesse caso, reaplicar a migração e depois a reaplicação.
-10. **Se o R2 perder a cópia** do registro de exclusão, a guarda não detecta a restauração daquela exclusão. O R2 não tem versão e a cópia não é apagada por nenhuma rota.
+## 3. Plano do D1 e janela do Time Travel
 
-## 4. Restauração: como impedir que dados excluídos voltem a ser usados
+- **Fonte da regra:** documentação da Cloudflare (`developers.cloudflare.com/d1/reference/time-travel/`, atualizada em 2026-04-21): 7 dias no Workers Free e 30 dias no Workers Paid.
+- **O que deu para conferir pela conta (2026-10-01):**
+  - `wrangler whoami` e `wrangler d1 info` não mostram o plano;
+  - a API `GET /accounts/{id}/subscriptions` recusou por permissão (o token só tem leitura de conta, não de cobrança);
+  - `workers/account-settings` mostra `default_usage_model: standard`, que existe nos dois planos.
+  - **O plano não está confirmado.**
+- **Indício, não prova:** `wrangler d1 time-travel info eag_compass --timestamp=2026-09-24T13:28:57Z` (7 dias e 7 horas antes) devolveu o bookmark inicial `00000000-…`. O comando pode só converter a data em bookmark sem validar a retenção, por isso não fecha a questão.
+- **Onde conferir:**
+  - painel da Cloudflare, conta "Rogeriopalhari23@gmail.com's Account" → **Workers & Pages** → aba **Plans** (ou **Compute (Workers) → Plans**): aparece "Workers Free" ou "Workers Paid";
+  - alternativa: **Manage Account → Billing → Subscriptions**, que lista "Workers Paid" quando contratado.
+- **O plano define:**
+  - por quanto tempo um dado excluído continua recuperável por restauração (7 ou 30 dias);
+  - a janela de volta do passo 2 do §4.
 
-- **Detecção automática:** cada envio (`prepareNext`, usado pela ponte e pelo caminho direto) e cada aprovação comparam as cópias no R2 com o `erasure_ledger` do D1. Faltou alguma no D1 → envio `erasure_reapply_required` e aprovação 409. Testado com restauração real de arquivo.
-- **Procedimento depois de qualquer restauração do D1:**
-  1. parar a ponte;
-  2. restaurar;
-  3. `POST /api/erasures/reapply` (Administrador): refaz cada exclusão que faltar, com auditoria `contact.personal_data_reapplied`, e responde `consistent: true`;
-  4. conferir `GET /api/session` e um envio de teste interno;
-  5. religar a ponte.
-- **Enquanto a reaplicação não roda,** a tela ainda mostra os dados que voltaram. Por isso o passo 3 vem logo após a restauração.
+## 4. Plano final de publicação (para autorização; nada executado)
 
-## 5. Plano de publicação (para autorização; nada disto foi executado)
+**Commits a publicar** (`git log b3935f9..HEAD` em `v2-revisao-2`; código em produção = `b3935f9`, Worker `b6d4b19d`):
+- `ab723e9` purga inicial: textos, R2, tarefas, candidatas, documentos T11;
+- `c3c2bd1` resíduos de envio e respostas, conteúdo compartilhado, proteção contra restauração;
+- `1b9fd59` **correção de respostas com várias commodities** (commit separado);
+- o commit final desta entrega (EXCLUSAO-PURGA finalizada e este plano), indicado no relatório e conferido no passo 1.
 
-**Pré-condições:**
-- branch `v2-revisao-2` com o commit desta entrega enviado ao GitHub;
-- `npm run check` verde;
-- canal `planned`;
-- ponte em execução.
+**Compatibilidade:** a suíte da versão em produção (`b3935f9`) passou com a 0032 aplicada (conferência repetida com a versão final da 0032 — ver EVIDENCIAS). Por isso a ordem é migração, depois deploy, e a volta só do código é segura.
 
-**Compatibilidade comprovada:** a suíte da versão em produção (`b3935f9`, Worker `b6d4b19d`) passou **373 de 373** com a 0032 aplicada, numa cópia temporária. Por isso a ordem é **migração primeiro, deploy depois**, e a volta só do código é segura.
-
-| # | Passo (PowerShell, `C:\Users\Roger\eag-compass`) | Conferência |
+| # | Passo (PowerShell em `C:\Users\Roger\eag-compass`) | Conferência esperada |
 | --- | --- | --- |
-| 1 | `git status -sb` e `git log --oneline -1` | branch e commit esperados, árvore limpa |
-| 2 | `npx wrangler d1 time-travel info eag_compass` | anotar o bookmark atual (ponto de volta) |
-| 3 | `npx wrangler d1 export eag_compass --remote --output C:\Users\Roger\eag-compass-backups\d1-antes-0032-<data>.sql` | arquivo criado. Contém PII: guardar conforme a decisão T11 do §3.2 |
-| 4 | `npx wrangler d1 migrations list eag_compass --remote` | só a 0032 pendente |
-| 5 | `npx wrangler d1 migrations apply eag_compass --remote` | sucesso |
-| 6 | `npx wrangler d1 execute eag_compass --remote --command "SELECT sql FROM sqlite_master WHERE name IN ('ficha_messages_immutable','erasure_ledger')"` e `PRAGMA table_info(tasks)` | trigger novo, tabela criada, coluna `inbound_id` |
-| 7 | `npx wrangler deploy` e depois `npx wrangler deployments list` | nova versão ativa |
-| 8 | Conferências só de leitura: ficha da Amori abre igual; `GET /api/integrations`; ciclo da ponte com `nothing_due` (e não `erasure_reapply_required`); canal `planned` | sem mudança de comportamento |
-| 9 | Ponte (código do diário): `bridge\ponte parar` → `git pull` já feito → `node bridge\scripts\redigir-diario.mjs "$env:LOCALAPPDATA\eag-mail-bridge\journal.sqlite"` → `bridge\ponte iniciar` → `bridge\ponte estado` | ponte lendo; resultado `{examined, changed}` registrado |
+| 1 | `git fetch; git status -sb; git log --oneline b3935f9..origin/v2-revisao-2` | árvore limpa; exatamente os commits acima |
+| 2 | `npm run check` | tudo verde |
+| 3 | `npx wrangler d1 time-travel info eag_compass` | anotar o bookmark (ponto de volta) |
+| 4 | `npx wrangler d1 export eag_compass --remote --output C:\Users\Roger\eag-compass-backups\d1-antes-0032-<data>.sql` | arquivo criado; contém PII; guarda conforme a decisão T11 |
+| 5 | `npx wrangler d1 migrations list eag_compass --remote` | só a `0032_exclusao_purga.sql` pendente |
+| 6 | `npx wrangler d1 migrations apply eag_compass --remote` | sucesso |
+| 7 | `npx wrangler d1 execute eag_compass --remote --command "SELECT name FROM sqlite_master WHERE name IN ('ficha_messages_immutable','erasure_ledger','idx_inbound_message_key')"` | as três linhas |
+| 8 | `npx wrangler d1 execute eag_compass --remote --file docs\implementation\correcoes\0032-vinculo-tarefas-resposta.sql` | depois: `SELECT COUNT(*) FROM tasks WHERE inbound_id IS NOT NULL AND kind='reply_followup'` = 2; auditoria `vinculo-tarefas-0032` = 2 |
+| 9 | `npx wrangler deploy` e `npx wrangler deployments list` | nova versão ativa; anotar o id |
+| 10 | Conferências só de leitura: `GET /api/tasks/reply-review` (0 itens); ficha da Amori abre igual; `GET /api/integrations`; próximo ciclo da ponte com `nothing_due` (e não `erasure_reapply_required`); canal `planned`; nenhuma campanha ativa | sem mudança de comportamento |
+| 11 | **Ponte Windows** (só redação do diário): `bridge\ponte parar` → `git pull` → `node bridge\scripts\redigir-diario.mjs "$env:LOCALAPPDATA\eag-mail-bridge\journal.sqlite"` → `bridge\ponte iniciar` → `bridge\ponte estado` | ponte lendo; anotar `{examined, changed}`; nenhuma linha apagada |
 
-Nenhum passo exclui dado real: a rota de exclusão só roda quando Rogério pedir, por um pedido real.
+Nenhum passo exclui dado real. A rota de exclusão só roda num pedido real, por decisão de Rogério.
 
-## 6. Reversão
+## 5. Reversão
 
-- **Só o código** (problema no Worker): `npx wrangler rollback b6d4b19d-a56b-402e-b78f-e7394a395ecd`. É seguro com a 0032 aplicada, como comprovado acima.
-- **Esquema:** `docs/implementation/correcoes/0032-reversao.sql`, junto com a volta do código. Testado.
+- **Só o código:** `npx wrangler rollback b6d4b19d-a56b-402e-b78f-e7394a395ecd`. É seguro com a 0032 aplicada: o código antigo não usa as colunas novas.
+  - Efeito colateral a conhecer: sem o código novo, a resposta com 3 ou mais commodities volta a falhar como antes de `1b9fd59`.
+- **Esquema:** `docs/implementation/correcoes/0032-reversao.sql`, com o código anterior. Testado.
   - O que volta: a imutabilidade total dos textos.
-  - O que fica: as colunas novas, que ficam inertes (`tasks.inbound_id` tem chave estrangeira e o SQLite não remove essa coluna), e o `erasure_ledger`, que é a prova das exclusões.
-- **Último recurso:** Time Travel para o bookmark do passo 2 (`npx wrangler d1 time-travel restore eag_compass --bookmark=<bookmark>`). Isso apaga tudo o que foi gravado depois.
-  - Se já houver exclusão real depois da 0032, a guarda bloqueia o envio até a reaplicação; para isso, a versão nova do código precisa estar no ar.
-  - Purgas executadas não são desfeitas por nenhuma reversão.
-- **Ponte:** a mudança do diário é só redação de texto. Voltar o arquivo `bridge/src/journal.js` e reiniciar.
+  - O que fica e não interfere: as colunas novas (`tasks.inbound_id` tem chave estrangeira e o SQLite não a remove) e o índice da `message_key`.
+  - `erasure_ledger` não é apagado, porque é a prova das exclusões.
+  - Os vínculos do passo 8 ficam: são inofensivos para o código anterior.
+- **Último recurso:** `npx wrangler d1 time-travel restore eag_compass --bookmark=<bookmark do passo 3>`. Apaga tudo o que foi gravado depois.
+  - Se houver exclusão real depois da 0032, mantenha o código novo no ar: a guarda bloqueia envio e aprovação até `POST /api/erasures/reapply`.
+- **Ponte:** voltar `bridge/src/journal.js` ao commit anterior e reiniciar. O script não apaga linhas; só troca endereço por "[endereço]".
+- **Purgas executadas não são desfeitas** por nenhuma reversão.
 
-## 7. Achado fora do escopo (não corrigido)
+## 6. Depois de qualquer restauração do D1
 
-`src/inbound.js`, alerta de "outra commodity": o `INSERT … SELECT` usa um único `crypto.randomUUID()` para todas as linhas. Se a empresa tiver duas ou mais outras commodities com envio pendente, a segunda linha repete a chave e o lote inteiro da resposta falha: pausa e tarefa não são gravadas. Proposta: gerar o id no SQL (`lower(hex(randomblob(16)))`) e testar o caso. Aguarda decisão para entrar como tarefa própria.
+1. Parar a ponte.
+2. Restaurar.
+3. Rodar `POST /api/erasures/reapply` (Administrador); confirmar `consistent: true`.
+4. Conferir `GET /api/tasks/reply-review`.
+5. Religar a ponte.
+
+Enquanto a reaplicação não roda, envio e aprovação ficam bloqueados (`erasure_reapply_required`), mas a tela mostra os dados que voltaram.

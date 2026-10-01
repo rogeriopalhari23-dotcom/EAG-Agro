@@ -19,10 +19,16 @@ BEGIN SELECT RAISE(ABORT, 'ficha_message_immutable'); END;
 -- Mensagem recebida da pessoa: o arquivo no R2 é apagado; a linha fica (classificação, correlação, datas) sem conteúdo
 -- e sem os identificadores de mensagem do servidor dela.
 ALTER TABLE inbound_messages ADD COLUMN content_purged_at TEXT;
+-- Chave da mensagem (HMAC do Message-ID, sem PII em claro): a mesma resposta relida com outro UID é reconhecida mesmo
+-- depois da purga, que apaga o Message-ID. Linhas anteriores a esta migração ficam sem chave (o código também confere
+-- o message_id em claro enquanto ele existir).
+ALTER TABLE inbound_messages ADD COLUMN message_key TEXT;
+CREATE INDEX idx_inbound_message_key ON inbound_messages(tenant_id, message_key);
 
 -- Tarefa aberta por uma mensagem recebida (resposta, ambígua, outra commodity) passa a apontar para a mensagem: é o
 -- vínculo que permite purgar a nota de Rogério sobre a resposta da pessoa sem tocar nas tarefas de outros remetentes.
--- Tarefas anteriores a esta migração ficam sem vínculo (limitação registrada no plano).
+-- Tarefas anteriores a esta migração: vínculo só com evidência inequívoca (correcoes/0032-vinculo-tarefas-resposta.sql);
+-- as demais ficam em GET /api/tasks/reply-review para decisão manual.
 ALTER TABLE tasks ADD COLUMN inbound_id TEXT REFERENCES inbound_messages(id);
 
 -- Registro das exclusões executadas, sem PII (só o id do contato e o hash do e-mail). Uma cópia de cada linha vai para
