@@ -48,7 +48,45 @@ if (modo === "claim") {
   out({ cenario: "carimbo de tempo de 10 minutos atrás", ...(await raw("/api/bridge/cursor", { ts: String(Date.now() - 600000) })) });
   out({ cenario: "sem assinatura", ...(await raw("/api/bridge/cursor", { sign: false })) });
   out({ cenario: "sem token do Access", ...(await raw("/api/bridge/cursor", { access: false })) });
+} else if (modo === "cabecalhos") {
+  // Somente leitura (2026-10-01): cabeçalhos técnicos das mensagens da INBOX numa faixa de UIDs, para conferir a
+  // classificação de notificações automáticas. Não imprime corpo, assunto nem endereço (só o domínio do remetente).
+  const { ImapFlow } = await import("imapflow");
+  const faixa = process.argv[3] || "1430:1437";
+  const nomes = ["from", "message-id", "in-reply-to", "auto-submitted", "precedence", "list-id", "list-unsubscribe", "feedback-id", "x-auto-response-suppress", "return-path"];
+  const c = new ImapFlow({ host: env.IMAP_HOST || "imap.hostinger.com", port: Number(env.IMAP_PORT || 993), secure: true, auth: { user: env.MAILBOX_USER, pass: env.MAILBOX_PASSWORD }, logger: false, tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" } });
+  await c.connect();
+  const lock = await c.getMailboxLock("INBOX", { readOnly: true });
+  try {
+    for await (const m of c.fetch(faixa, { uid: true, headers: true }, { uid: true })) {
+      const linhas = m.headers.toString("utf8").replace(/\r?\n[ \t]+/g, " ").split(/\r?\n/);
+      const h = {};
+      for (const l of linhas) {
+        const i = l.indexOf(":");
+        if (i < 1) continue;
+        const k = l.slice(0, i).trim().toLowerCase();
+        if (nomes.includes(k) || k.startsWith("x-linkedin")) h[k] = l.slice(i + 1).trim();
+      }
+      const dominio = (v) => (/@([^>\s]+)/.exec(v || "")?.[1] || null);
+      out({
+        uid: m.uid,
+        fromDomain: dominio(h.from),
+        messageIdDomain: dominio(h["message-id"]),
+        inReplyTo: !!h["in-reply-to"],
+        autoSubmitted: h["auto-submitted"] ?? null,
+        precedence: h.precedence ?? null,
+        listId: h["list-id"] ? dominio(h["list-id"].replace(/^.*</, "<").replace(/</, "@")) || h["list-id"].slice(0, 60) : null,
+        listUnsubscribe: !!h["list-unsubscribe"],
+        feedbackId: !!h["feedback-id"],
+        returnPathDomain: dominio(h["return-path"]),
+        linkedin: Object.fromEntries(Object.entries(h).filter(([k]) => k.startsWith("x-linkedin")).map(([k, v]) => [k, v.slice(0, 40)])),
+      });
+    }
+  } finally {
+    lock.release();
+    await c.logout();
+  }
 } else {
-  console.log("Modos: claim | seguranca");
+  console.log("Modos: claim | seguranca | bloquear | cabecalhos [faixa de UIDs]");
   process.exitCode = 2;
 }

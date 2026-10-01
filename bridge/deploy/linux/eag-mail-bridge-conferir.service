@@ -1,0 +1,24 @@
+# Conferência completa (Compass com token do Access e assinatura, IMAP e login SMTP), sem enviar: `ponte conferir`.
+[Unit]
+Description=EAG Compass - ponte: conferência completa (sem envio)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=eagbridge
+Group=eagbridge
+WorkingDirectory=/opt/eag-mail-bridge/bridge
+EnvironmentFile=/etc/eag-mail-bridge/config.env
+Environment=BRIDGE_JOURNAL=/var/lib/eag-mail-bridge/conferencia.sqlite
+LoadCredential=MAILBOX_PASSWORD:/etc/eag-mail-bridge/MAILBOX_PASSWORD
+LoadCredential=BRIDGE_HMAC_KEY:/etc/eag-mail-bridge/BRIDGE_HMAC_KEY
+LoadCredential=ACCESS_CLIENT_SECRET:/etc/eag-mail-bridge/ACCESS_CLIENT_SECRET
+ExecStart=/usr/bin/node src/main.js --check
+StateDirectory=eag-mail-bridge
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=

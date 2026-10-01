@@ -554,14 +554,68 @@ export async function isSuppressed(env, tenant, channel, value) {
     channel,
   ).first());
 }
+// Critério de retenção por registro (R21.1). Só existe o critério provisório até a validação jurídica T11: nenhum prazo
+// ou fundamento é inventado e nada expira sozinho.
+export const RETENTION_CRITERIA = {
+  until_t11_policy: "Mantido para não recontatar (R9.1.2) até a política de retenção da validação jurídica T11; sem prazo nem expiração automática.",
+};
+export const SUPPRESSION_SCOPES = { channel_all: "Identificador no canal inteiro: todas as empresas, campanhas e commodities." };
+const maskHash = (h) => `hmac:${h.slice(0, 4)}…${h.slice(-4)}`;
 export async function listSuppression(request, env, actor) {
   requireRole(actor, new Set(["admin"]));
   const result = await listRecords(request, env, actor, "suppression_entries");
   result.items = result.items.map((r) => ({
     ...r,
-    identifier_hash: `hmac:${r.identifier_hash.slice(0, 4)}…${r.identifier_hash.slice(-4)}`,
+    identifier_hash: maskHash(r.identifier_hash),
+    scope_label: SUPPRESSION_SCOPES[r.scope] ?? r.scope,
+    retention_label: RETENTION_CRITERIA[r.retention_criterion] ?? r.retention_criterion,
   }));
   return result;
+}
+export async function listSuppressionRemovals(request, env, actor) {
+  requireRole(actor, new Set(["admin"]));
+  const result = await listRecords(request, env, actor, "suppression_removals");
+  result.items = result.items.map((r) => ({ ...r, identifier_hash: maskHash(r.identifier_hash) }));
+  return result;
+}
+// Remover supressão (R9.2: só Administrador, com motivo e base). Tentativa sem permissão é negada e registrada
+// (R9.2.1). O registro sai da lista ativa e vai para suppression_removals com o histórico; envios cancelados não voltam.
+export async function removeSuppression(request, env, actor, rid, id) {
+  if (actor.role !== "admin") {
+    await s(
+      env,
+      "INSERT INTO audit_log(id,tenant_id,actor_id,actor_role,action,entity_type,entity_id,reason,request_id) VALUES (?,?,?,?,'suppression.remove_denied','suppression',?,?,?)",
+      crypto.randomUUID(), actor.tenant_id, actor.id, actor.role, id, "perfil sem permissão (R9.2)", rid,
+    ).run();
+    fail(403, "forbidden", "Só o Administrador remove supressão.");
+  }
+  const i = await bodyJson(request);
+  const reason = str(i.reason, "motivo", 500);
+  const basis = str(i.basis, "base", 500);
+  if (reason.trim().length < 10) fail(422, "reason_too_short", "Descreva o motivo da remoção (ao menos 10 caracteres).");
+  if (basis.trim().length < 5) fail(422, "basis_required", "Informe a base da remoção (ex.: pedido expresso da pessoa, com data e meio).");
+  if (i.confirm !== true) fail(422, "confirm_required", "Confirme a remoção: a pessoa volta a poder ser contatada neste canal.");
+  const e = await s(env, "SELECT * FROM suppression_entries WHERE tenant_id=? AND id=?", actor.tenant_id, id).first();
+  if (!e) fail(404, "suppression_not_found", "Supressão não encontrada (ou já removida).");
+  const removalId = crypto.randomUUID();
+  const r = await commit(env, [
+    s(
+      env,
+      "INSERT INTO suppression_removals(id,tenant_id,entry_id,identifier_hash,channel,reason,source,scope,retention_criterion,entry_created_by,entry_created_at,removed_by,removal_reason,removal_basis,request_id) SELECT ?,tenant_id,id,identifier_hash,channel,reason,source,scope,retention_criterion,created_by,created_at,?,?,?,? FROM suppression_entries WHERE tenant_id=? AND id=?",
+      removalId, actor.id, reason.trim(), basis.trim(), rid, actor.tenant_id, id,
+    ),
+    s(env, "DELETE FROM suppression_entries WHERE tenant_id=? AND id=? AND EXISTS (SELECT 1 FROM suppression_removals WHERE id=?)", actor.tenant_id, id, removalId),
+    s(
+      env,
+      "INSERT INTO audit_log(id,tenant_id,actor_id,actor_role,action,entity_type,entity_id,old_value_json,new_value_json,reason,request_id) SELECT ?,?,?,?,'suppression.removed','suppression',?,?,?,?,? WHERE changes()>0",
+      crypto.randomUUID(), actor.tenant_id, actor.id, actor.role, id,
+      JSON.stringify({ channel: e.channel, reason: e.reason, source: e.source, scope: e.scope, retentionCriterion: e.retention_criterion, createdAt: e.created_at }),
+      JSON.stringify({ removed: true, removalId, basis: basis.trim() }),
+      reason.trim(), rid,
+    ),
+  ]);
+  if (!r[1].meta.changes) fail(409, "suppression_changed", "A supressão mudou durante a remoção; recarregue.");
+  return { removed: true, removalId, note: "Envios cancelados pela supressão continuam cancelados; nada é reenviado." };
 }
 export async function createPause(request, env, actor, rid) {
   requireRole(actor, WRITE_ROLES);

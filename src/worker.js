@@ -442,6 +442,10 @@ async function route(request, env, rid) {
     if (method === "POST")
       return response(await operations.suppress(request, env, actor, rid));
   }
+  // Remoção administrativa de supressão (R9.2) e histórico das remoções (SUPRESSAO-RETENCAO, 2026-10-01).
+  if (path === "/api/suppression/removals" && method === "GET") return response(await operations.listSuppressionRemovals(request, env, actor));
+  const supRemove = path.match(/^\/api\/suppression\/([^/]+)\/remove$/);
+  if (supRemove && method === "POST") return response(await operations.removeSuppression(request, env, actor, rid, supRemove[1]));
   if (path === "/api/pauses") {
     if (method === "GET")
       return response(
