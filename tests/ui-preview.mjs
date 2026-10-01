@@ -2,16 +2,22 @@
 // semeia dados de TESTE (empresas fictícias do ambiente de teste, nunca produção) e captura as telas em desktop e 390 px.
 // Uso: EAG_PLAYWRIGHT_PATH=<playwright> EAG_CHROMIUM_EXECUTABLE=<chrome> node tests/ui-preview.mjs [pasta-de-saída]
 // "Antes": PREVIEW_PUBLIC=<pasta public da interface antiga> PREVIEW_MODE=antes — mesmos dados, navegação da interface antiga.
+// Backend publicado: PREVIEW_BACKEND=<raiz de outra cópia do repositório, ex.: C:/Users/Roger/eag-compass> usa o Worker,
+// as migrações e os ajudantes de teste dessa cópia (a branch publicada) com as telas desta branch; o mapa continua vindo daqui.
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { setup } from "./helpers/db.mjs";
-import { pilot } from "./helpers/pilot.mjs";
-import { sources, keepCountries, tradeParams, driver, memoryR2 } from "./helpers/trade.mjs";
+import { pathToFileURL } from "node:url";
 import { open } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import worker from "../src/worker.js";
-import { securityHeaders } from "../src/http.js";
+import { mapInfo, mapTiles } from "../src/map-tiles.js";
+
+const backendRoot = process.env.PREVIEW_BACKEND ? pathToFileURL(process.env.PREVIEW_BACKEND.replace(/[\\/]?$/, "/")) : new URL("../", import.meta.url);
+const { setup } = await import(new URL("tests/helpers/db.mjs", backendRoot));
+const { pilot } = await import(new URL("tests/helpers/pilot.mjs", backendRoot));
+const { sources, keepCountries, tradeParams, driver, memoryR2 } = await import(new URL("tests/helpers/trade.mjs", backendRoot));
+const worker = (await import(new URL("src/worker.js", backendRoot))).default;
+const { securityHeaders } = await import(new URL("src/http.js", backendRoot));
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.EAG_PLAYWRIGHT_PATH || "playwright");
@@ -60,6 +66,14 @@ const server = createServer(async (req, res) => {
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const body = Buffer.concat(chunks);
+  // Mapa: rota desta branch (o backend publicado ainda não tem o mapa). Fora isso, tudo vai ao Worker escolhido.
+  const pathOnly = req.url.split("?")[0];
+  if (pathOnly === "/api/mapa" || pathOnly === "/api/mapa/brasil.pmtiles") {
+    const mreq = new Request(`http://127.0.0.1${req.url}`, { method: req.method, headers: req.headers });
+    const mr = pathOnly === "/api/mapa" ? await mapInfo(ctx.env) : await mapTiles(mreq, ctx.env).catch((e) => new Response(JSON.stringify({ error: e.code }), { status: e.status || 500 }));
+    res.writeHead(mr.status, Object.fromEntries(mr.headers));
+    return res.end(Buffer.from(await mr.arrayBuffer()));
+  }
   const r = await worker.fetch(new Request(`http://127.0.0.1:${server.address().port}${req.url}`, { method: req.method, headers: req.headers, body: body.length ? body : undefined }), ctx.env);
   res.writeHead(r.status, Object.fromEntries(r.headers));
   res.end(Buffer.from(await r.arrayBuffer()));
@@ -224,6 +238,25 @@ async function shots(width, height, suffix) {
     await page.locator(".settings-list button").filter({ has: page.locator("strong", { hasText: new RegExp(`^${label}$`) }) }).click();
     await page.getByRole("heading", { name: label, exact: true }).waitFor();
     await snap(file);
+  }
+  // Remoção administrativa de supressão (só com o backend publicado, que tem a rota): formulário, recusa sem
+  // confirmação e histórico.
+  if ((await page.evaluate(() => fetch("/api/suppression/removals").then((r) => r.status))) === 200) {
+    // Cada tamanho de tela remove um registro próprio (fictício), para o histórico ter conteúdo nas duas capturas.
+    await page.evaluate((s) => fetch("/api/suppression", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ channel: "email", value: `previa-${s}@exemplo.invalid`, reason: "manual_request" }) }), suffix);
+    await nav("Configurações");
+    await page.locator(".settings-list button").filter({ has: page.locator("strong", { hasText: /^Supressão$/ }) }).click();
+    await page.getByRole("heading", { name: "Supressão", exact: true }).waitFor();
+    const row = page.locator(".row").filter({ has: page.locator("summary", { hasText: "Remover (administrador)" }) }).first();
+    await row.locator("summary", { hasText: "Remover (administrador)" }).click();
+    await row.getByLabel(/Motivo da remoção/).fill("Pessoa pediu para voltar a receber contato (teste da prévia)");
+    await row.getByLabel(/Base da remoção/).fill("E-mail da pessoa em 01/10/2026 (teste)");
+    await snap("supressao-remocao-formulario");
+    await row.locator("input[name=confirm]").check();
+    await row.getByRole("button", { name: "Remover supressão" }).click();
+    await page.getByText("Supressão removida e registrada no histórico.").waitFor();
+    await page.locator("summary", { hasText: /^Histórico de remoções \(\d+\)/ }).click();
+    await snap("supressao-historico");
   }
   await page.close();
 }

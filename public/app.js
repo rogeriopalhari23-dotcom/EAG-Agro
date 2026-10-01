@@ -2195,26 +2195,82 @@ const SUPPRESSION_SOURCE = { link: "link de descadastro", reply: "resposta", man
 const CHANNEL_NAME = { email: "E-mail", phone: "Telefone", linkedin: "LinkedIn" };
 async function suppressionView() {
   const node = section("Supressão", "Quem pediu para não ser contatado. O endereço é guardado só como código protegido (HMAC) e bloqueia qualquer envio a ele.");
-  node.append(el("div", { class: "callout" }, text("p", "Esta versão não remove supressões. Os descadastros reais ficam preservados; a regra de retenção por registro está pendente (tarefa SUPRESSAO-RETENCAO).")));
+  node.append(
+    el(
+      "div",
+      { class: "callout" },
+      text("p", "Retenção: cada registro fica mantido para não recontatar até a política da validação jurídica T11 — sem prazo e sem expiração automática. Remoção só pelo Administrador, com motivo e base; envios já cancelados não voltam."),
+    ),
+  );
   if (state.actor.role === "admin") {
-    const d = await api(`/api/suppression?limit=50&offset=${state.listOffsets["Supressão"] || 0}`);
+    const [d, removals] = await Promise.all([
+      api(`/api/suppression?limit=50&offset=${state.listOffsets["Supressão"] || 0}`),
+      api("/api/suppression/removals?limit=50").catch(() => null),
+    ]);
+    const removeForm = (r) => {
+      const ack = el("input", { type: "checkbox", name: "confirm", required: "" });
+      const form = makeForm(
+        [
+          input("Motivo da remoção (ao menos 10 caracteres)", "reason", "textarea"),
+          input("Base da remoção (ex.: pedido expresso da pessoa, com data e meio)", "basis"),
+          { node: el("label", { class: "check" }, ack, "Entendo que esta pessoa volta a poder ser contatada neste canal e que envios cancelados não voltam."), control: ack },
+        ],
+        async (v) => {
+          await api(`/api/suppression/${r.id}/remove`, "POST", { reason: v.reason, basis: v.basis, confirm: v.confirm === "on" });
+          notice("Supressão removida e registrada no histórico.");
+          await navigate("Supressão");
+        },
+        "Remover supressão",
+      );
+      return details("Remover (administrador)", form);
+    };
     node.append(
       panel(
-        `Registros (${d.total ?? d.items.length})`,
+        `Registros ativos (${d.total ?? d.items.length})`,
         d.items.length
           ? rows(d.items, (r) =>
               el(
                 "div",
                 { class: "row" },
-                el("div", {}, text("strong", `${CHANNEL_NAME[r.channel] || r.channel} · ${SUPPRESSION_REASON[r.reason] || r.reason}`), text("small", `${r.created_at ? fmtDate(r.created_at) : ""}${r.source ? ` · ${SUPPRESSION_SOURCE[r.source] || r.source}` : ""} · código ${String(r.identifier_hash).slice(0, 12)}…`)),
+                el(
+                  "div",
+                  {},
+                  text("strong", `${CHANNEL_NAME[r.channel] || r.channel} · ${SUPPRESSION_REASON[r.reason] || r.reason}`),
+                  text("small", `${r.created_at ? fmtDate(r.created_at) : ""}${r.source ? ` · ${SUPPRESSION_SOURCE[r.source] || r.source}` : ""} · código ${String(r.identifier_hash).slice(0, 12)}…`),
+                  text("small", `Alcance: ${r.scope_label || "canal inteiro"} · Retenção: ${r.retention_label || "até a política de T11"}`),
+                ),
                 text("span", "Bloqueado", "tag warn"),
+                removeForm(r),
               ),
             )
           : text("p", "Nenhuma supressão registrada.", "empty"),
       ),
     );
     listPager(node, d, "Supressão");
-  } else node.append(text("p", "A lista é visível só para administradores. Você pode registrar um pedido abaixo.", "muted"));
+    if (removals)
+      node.append(
+        details(
+          `Histórico de remoções (${removals.items.length})`,
+          removals.items.length
+            ? rows(removals.items, (x) =>
+                el(
+                  "div",
+                  { class: "row" },
+                  el(
+                    "div",
+                    {},
+                    text("strong", `${CHANNEL_NAME[x.channel] || x.channel} · ${SUPPRESSION_REASON[x.reason] || x.reason} · removida em ${fmtDate(x.removed_at)}`),
+                    text("small", `Motivo: ${x.removal_reason}`),
+                    text("small", `Base: ${x.removal_basis}`),
+                    text("small", `Por ${x.removed_by === "system-admin" || /^user-/.test(x.removed_by) ? "Administrador" : x.removed_by} · registrada em ${fmtDate(x.entry_created_at)} · código ${String(x.identifier_hash).slice(0, 12)}…`),
+                  ),
+                  text("span", "Removida", "tag"),
+                ),
+              )
+            : text("p", "Nenhuma remoção registrada.", "empty"),
+        ),
+      );
+  } else node.append(text("p", "A lista e o histórico são visíveis só para administradores. Você pode registrar um pedido abaixo.", "muted"));
   if (writable())
     node.append(
       details(
@@ -2236,6 +2292,7 @@ async function suppressionView() {
     );
   return node;
 }
+
 const PAUSE_SCOPE = { operation: "Toda a operação", company: "Empresa", campaign: "Campanha", commodity: "Commodity", offer: "Oferta" };
 async function pausesView() {
   const d = await api(`/api/pauses?limit=50&offset=${state.listOffsets.Pausas || 0}`),
