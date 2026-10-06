@@ -32,7 +32,8 @@ switch ($Comando) {
   "parar" {
     Disable-ScheduledTask -TaskName $tarefa -ErrorAction SilentlyContinue | Out-Null
     $p = Processo
-    if (-not $p) { Write-Host "A ponte não está rodando. Início automático desligado."; break }
+    # Encerra também o supervisor que pode estar aguardando para reiniciar a ponte depois de uma queda.
+    if (-not $p) { Stop-ScheduledTask -TaskName $tarefa -ErrorAction SilentlyContinue; Write-Host "A ponte não está rodando. Início automático desligado."; break }
     New-Item -ItemType File -Force (Join-Path $dir "parar") | Out-Null
     Write-Host "Pedido de parada enviado; aguardando o fim do ciclo (até 2 minutos)..."
     if (-not $p.WaitForExit(120000)) { Write-Host "Não parou a tempo; encerrando o processo."; Stop-Process -Id $p.Id -Force }

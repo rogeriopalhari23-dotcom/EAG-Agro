@@ -88,8 +88,25 @@ try {
   $ErrorActionPreference = "Continue" # linhas de erro do node não interrompem o registro
   if ($interativo) { & node @argumentos; $codigo = $LASTEXITCODE }
   else {
-    & node @argumentos 2>&1 | ForEach-Object { "$_" } | Out-File -Append -Encoding utf8 (Join-Path $dir "ponte.log")
-    $codigo = $LASTEXITCODE
+    # Supervisão: o "reiniciar se falhar" da tarefa agendada só vale quando a tarefa não consegue iniciar — não quando o
+    # processo da ponte termina com erro (constatado em 06/10/2026). Por isso o reinício fica aqui: saída com erro →
+    # registra e reinicia em 60 s; saída 0 (parada pedida) ou tarefa desligada por "ponte parar" → encerra.
+    $registro = Join-Path $dir "ponte.log"
+    $tentativa = 0
+    while ($true) {
+      & node @argumentos 2>&1 | ForEach-Object { "$_" } | Out-File -Append -Encoding utf8 $registro
+      $codigo = $LASTEXITCODE
+      if ($codigo -eq 0) { break }
+      $tarefa = Get-ScheduledTask -TaskName "EAG Compass - ponte de e-mail" -ErrorAction SilentlyContinue
+      if ($tarefa -and $tarefa.State -eq "Disabled") { break }
+      if (Test-Path (Join-Path $dir "parar")) { break }
+      $tentativa++
+      $espera = if ($env:BRIDGE_RESTART_SECONDS) { [int]$env:BRIDGE_RESTART_SECONDS } else { 60 }
+      ('{{"at":"{0}","event":"supervisor_restart","exitCode":{1},"attempt":{2},"inSeconds":{3}}}' -f (Get-Date).ToUniversalTime().ToString("o"), $codigo, $tentativa, $espera) |
+        Out-File -Append -Encoding utf8 $registro
+      Start-Sleep -Seconds $espera
+      if ((Get-ScheduledTask -TaskName "EAG Compass - ponte de e-mail" -ErrorAction SilentlyContinue).State -eq "Disabled") { break }
+    }
   }
 } finally {
   Pop-Location

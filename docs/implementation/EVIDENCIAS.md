@@ -1096,3 +1096,36 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
   - Testes: `tasks.test.mjs` com casos novos; suíte completa com 403 aprovados e 0 falhas.
   - **Não publicado.**
 - **Buscas específicas:** nenhum canal oficial de compra de milho para a Cargill Uberlândia nem para a São Martinho Boa Vista. O telefone da Boa Vista fica como pendência explícita.
+
+### Publicação, cadastro em produção e recuperação da ponte (2026-10-06)
+
+**Versões, separadas:**
+
+| Componente | Versão |
+|---|---|
+| Worker publicado | **770334ac-f855-4fc3-ae7f-66e85b902ce9**, do commit 5a062cd, via `npm run deploy` (check com 403 aprovados e 0 falhas, `validate-deploy`, skill 33bd093f…). Nenhuma migração pendente ("No migrations to apply") |
+| Scripts locais da ponte (Windows, fora do Worker) | commit cb05b4c (ouvinte de `error` no IMAP) mais o commit deste registro (supervisor, gatilho de reserva e `ponte parar`). Testes da ponte: 16 aprovados; o teste novo falha sem a correção |
+
+**Cadastro em produção:**
+- Aplicado pelo script documentado, depois do login de Rogério no Access e de conferir que não havia registro (0 empresas nas 4 raízes).
+- Resultado: 4 empresas (1 por CNPJ), 4 evidências pendentes, 6 pessoas "a validar" (`to_validate`), 1 canal geral (Cimilho), 4 perfis "possível consumidor final" com porte pendente e 4 tarefas `call_l0` abertas.
+- Conferência com o pacote: fonte e URL iguais; o roteiro começa pelo da skill e termina com o trecho da unidade e suas pendências.
+- Tela de produção conferida por captura (Cargill Uberlândia): resumo, pessoas a validar, próxima ação e roteiro.
+- As 4 ligações aparecem em Abordagem → Tarefas como **bloqueadas** (`compliance_unavailable`, sem triagem de sanções dessas empresas) e aguardam também a T11.
+- Canal de e-mail `planned`; campanhas: 1 rascunho e 1 encerrada (nenhuma ativa); outbox sem envio pendente (5 aceitos e 19 cancelados, anteriores).
+
+**Ponte: queda e divergência corrigida:**
+- A ponte caiu às 14:25 UTC: ECONNRESET no AUTHENTICATE, com `error` sem ouvinte. Não reiniciou: o "reiniciar se falhar" da tarefa agendada só vale quando a tarefa não consegue iniciar. A OPERACAO afirmava reinício a cada 1 min e foi corrigida.
+
+**Verificações da recuperação (só o observado):**
+
+| # | Verificação | Resultado |
+|---|---|---|
+| 1 | Supervisor | **Comprovada.** Node derrubado à força às 13:23:43 (Cuiabá); `supervisor_restart` registrado (exitCode -1); ponte de volta às 13:24:53 (PID 11252), com leitura OK e sem envio |
+| 2 | Gatilho de reserva | **Comprovada.** Supervisor e node derrubados às 13:25:09; a tarefa iniciou pelo gatilho de 15 min às 13:38:38; leitura OK às 13:38:57 (PID 15576) |
+| 3 | Sem duas instâncias | **Comprovada no nível da tarefa.** Novo início da tarefa pedido às 13:39:30 com a ponte rodando; às 13:39:49 havia 1 supervisor (13980) e 1 ponte (15576). A trava por PID do `main.js` não foi exercitada separadamente nesta rodada |
+| 4 | `ponte parar` | **Comprovada.** Parada às 13:40:00; às 13:42:06, nenhum processo, tarefa desligada e nenhum `supervisor_restart` |
+
+- Uma leitura feita por monitor contou o próprio processo do monitor como supervisor e foi descartada; valem as leituras diretas acima.
+- **Estado final:** ponte iniciada às 13:42:19 (PID 6724); leitura OK às 13:42:26, `nothing_due`, 0 envios.
+- **Nada foi feito em contato, envio, Snov, ficha ou campanha.** O bloqueio da T11 segue.

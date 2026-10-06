@@ -11,12 +11,12 @@
 - nenhum telefonema nem mensagem;
 - nenhum representante legal tratado como comprador.
 
-## 1. Situação no Compass (atualizada em 06/10/2026, rodada 3)
+## 1. Situação no Compass (atualizada em 06/10/2026, produção)
 
 | Ambiente | Situação |
 |---|---|
 | **Local** (`npm run dev`, http://127.0.0.1:8787, D1 local `eag-compass-db`) | **Cadastrado e conferido** pela API |
-| **Produção** (eag-compass-production) | **Não cadastrado.** A leitura do D1 de produção confirmou zero empresas com as 4 raízes. A gravação exige sessão do Cloudflare Access, que segue ausente ("Unable to find token") |
+| **Produção** (eag-compass-production) | **Cadastrado e conferido em 06/10/2026**, depois da publicação da versão 770334ac-f855-4fc3-ae7f-66e85b902ce9 (commit 5a062cd). Mesmo conteúdo do ambiente local; 1 empresa por CNPJ; fonte e roteiro iguais ao pacote |
 
 **O que foi gravado no ambiente local, por empresa:**
 - 1 empresa, cadastrada pelo CNPJ da unidade;

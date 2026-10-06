@@ -132,7 +132,12 @@ Até a decisão: canal de e-mail segue `planned`; não grave `MAILBOX_PASSWORD` 
 
 - **Estado:**
   - a ponte roda continuamente no PC de Rogério;
-  - a tarefa "EAG Compass - ponte de e-mail" inicia ao entrar no Windows (usuário `ROGERIONOTE\Roger`) e reinicia a cada 1 min se cair (até 999 vezes), sem limite de tempo, também na bateria;
+  - a tarefa "EAG Compass - ponte de e-mail" inicia ao entrar no Windows (usuário `ROGERIONOTE\Roger`), sem limite de tempo, também na bateria;
+  - **reinício após queda (corrigido em 2026-10-06):** o "reiniciar a cada 1 min se falhar" da tarefa agendada só vale quando a tarefa não consegue *iniciar*, não quando a ponte termina com erro. Em 06/10 a ponte caiu às 11:25 (Cuiabá) e ficou parada até o reinício manual. Agora:
+    - o supervisor (`iniciar-ponte.ps1`) reinicia a ponte 60 s depois de qualquer saída com erro e registra `supervisor_restart` em `ponte.log`. Saída normal ou `ponte parar` encerram sem reiniciar;
+    - um gatilho de reserva tenta iniciar a tarefa a cada 15 min, cobrindo a queda do próprio supervisor. Com "ignorar nova instância", não duplica a ponte;
+    - `ponte parar` desliga a tarefa, e com ela os dois mecanismos;
+    - validação de 06/10/2026: reinício pelo supervisor (70 s), pelo gatilho de reserva, sem segunda instância e parada respeitada (detalhes em EVIDENCIAS.md). Os scripts da ponte rodam deste repositório; não fazem parte da versão do Worker;
   - cada ciclo (60–70 s) lê a caixa e só pede envio de passo aprovado com canal liberado. Com o canal `planned`, nada sai.
 - **Configuração:** `%LOCALAPPDATA%\eag-mail-bridge\config.json`, com `SMTP_PORT`, `MAILBOX_USER` e `COMPASS_URL`.
   - O prazo do teste interno (`BRIDGE_TEST_DEADLINE = 2026-10-01T21:00:00Z`) foi **removido** em 2026-10-06 por decisão de Rogério: ele parava a ponte e a caixa ficou sem leitura de 01/10 21:00 UTC a 06/10.
