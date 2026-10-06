@@ -332,3 +332,21 @@ test("Ponte: trava local desliga o canal (nunca liga) e segura a fila", async (t
   assert.equal((await d.compass.call("/api/bridge/lockdown", {})).previous, "planned", "idempotente");
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='bridge.lockdown'").get().n, 2);
 });
+
+test("Ponte: erro emitido pela conexão IMAP depois de conectar não derruba o processo", async () => {
+  const { EventEmitter } = await import("node:events");
+  const { imapClient } = await import("../src/mail.js");
+  // Como em 06/10/2026: a conexão cai (ECONNRESET) e o cliente emite "error" fora de qualquer promessa.
+  class FakeImap extends EventEmitter {
+    async connect() {
+      setImmediate(() => this.emit("error", Object.assign(new Error("Connection not available"), { code: "NoConnection" })));
+    }
+    async status() {
+      await new Promise((r) => setTimeout(r, 20));
+      throw Object.assign(new Error("Connection not available"), { code: "NoConnection" });
+    }
+    async logout() {}
+  }
+  const imap = imapClient({ host: "h", port: 993, user: "x", pass: "y", ImapClass: FakeImap });
+  await assert.rejects(imap.status());
+});

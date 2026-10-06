@@ -87,9 +87,12 @@ export function smtpClient({ host, port, user, pass, Connection = SMTPConnection
   };
 }
 
-export function imapClient({ host, port, user, pass }) {
+export function imapClient({ host, port, user, pass, ImapClass = ImapFlow }) {
   const open = async () => {
-    const c = new ImapFlow({ host, port: Number(port), secure: true, auth: { user, pass }, logger: false, tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" } });
+    const c = new ImapClass({ host, port: Number(port), secure: true, auth: { user, pass }, logger: false, tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" } });
+    // Sem ouvinte, um 'error' emitido (ex.: ECONNRESET no AUTHENTICATE) derruba o processo da ponte (06/10/2026).
+    // Os erros já chegam pelas promessas rejeitadas, que o ciclo registra como read_failed.
+    c.on("error", () => {});
     await c.connect();
     return c;
   };
