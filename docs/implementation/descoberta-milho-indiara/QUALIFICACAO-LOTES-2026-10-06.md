@@ -1,96 +1,75 @@
-# Qualificação dos lotes: milho GMO, Indiara/GO, 300 km (06/10/2026)
+# Qualificação para decisão: milho GMO, Indiara/GO, 300 km (06/10/2026, revisão 2)
 
 **Situação:** nenhuma candidata foi aceita, cadastrada ou contatada. O aceite é de Rogério, candidata a candidata.
 - Nenhuma pessoa pesquisada.
 - Nenhum crédito Snov consumido.
 - Nenhum e-mail validado.
-- Milho GMO: **a confirmar** em todas.
+- Milho GMO: **a confirmar** em todas, salvo restrição registrada numa linha ou unidade.
 
-**Reaproveitamento:**
-- cache da BrasilAPI (361 CNPJs);
-- evidências da rodada 1;
-- cadastro MAPA.
+**Fontes desta revisão:**
+- Reaproveita o material já coletado: cache da BrasilAPI (361 CNPJs), evidências, cadastro MAPA e páginas públicas da Receita de 08–09/2026.
+- **Consultas à BrasilAPI suspensas:** ela respondeu HTTP 429 (limite de taxa) e só volta a ser usada quando o limite cair.
 
-Novas consultas: só fontes públicas (sites das empresas, licenças, Receita via páginas públicas). A BrasilAPI recusou novas consultas por limite de taxa (HTTP 429), por isso o endereço da Receita veio de páginas públicas que reproduzem a base de 08–09/2026.
+**O que mudou na revisão 2:**
+- Idade da empresa é só informação, não critério.
+- Endereço residencial, atividade com animais de estimação ou falta de site não descartam candidatas: viram pendência.
+- Divergência de CNPJ, endereço ou distância fica "a conciliar".
+- JBS Aruanã segue como evidência histórica própria, **sem** ser unida à JBJ: o endereço comum não comprova identidade nem sucessão da unidade.
 
-**Como ler a coluna "Vínculo":**
+**Como ler as colunas:**
 
-| Valor | Significado |
-|---|---|
-| **confirmado** | Uma fonte liga a evidência à unidade pelo CNPJ, por um cadastro oficial com o nome da unidade, ou pelo mesmo endereço completo |
-| **sugerido** | Só nome e município batem |
-
-**Como ler a coluna "km":**
-
-| Valor | Origem |
-|---|---|
-| "coordenada oficial" | Publicada em licença |
-| "coordenada de mapa" | Diretório de mapas, não oficial |
-| "centroide" | Estimativa pelo centro do município |
-
-## Lote 1: evidência específica de milho (8 candidatas; 2 rebaixadas)
-
-| # | Unidade | CNPJ da unidade (vínculo) | km (precisão) | Evidência de milho [fonte, data] | O que a evidência **não** prova | Porte | Restrição GMO | Próximo ponto a confirmar |
-|---|---|---|---|---|---|---|---|---|
-| 1 | Cargill — complexo de Uberlândia/MG | 60.498.706/0134-88 (**confirmado**: CNPJ, endereço e coordenada no parecer) | 256,5 (coordenada oficial) | Planta de milho com capacidade de 60 mil t/mês; milho "fornecido por fazendeiros, cooperativas e corretores" [Parecer SUPRAM TM 0138312/2021, 25/01/2021] | Capacidade não é consumo. Operação 2025–26 sem fonte recente; a licença vale 8 anos | Demais | nenhuma registrada | Operação atual; registro MAPA MG0001937 (CNPJ mascarado) a conciliar |
-| 2 | São Martinho — Usina Boa Vista, Quirinópolis/GO | 51.466.860/0062-78 (**confirmado**: Receita "Fazenda Boa Vista", CNAE álcool, e MAPA) | 151,4 (centroide) | 495 mil t de milho previstas na safra 2026/27 [RPAnews, 27/05/2026] | Compra de terceiros não declarada | Demais | nenhuma registrada | Origem do milho (compra x própria) |
-| 3 | Cargill Bioenergia — Usina São Francisco, Quirinópolis/GO | 10.249.419/0002-16 (**confirmado**: Receita "USF Usina São Francisco" e MAPA) | 151,4 (centroide) | Cana e milho em 2025/26; maceração de 600 mil t/ano; DDG e óleo [STG News, 01/09/2026; Globo Rural, 11/06/2025] | Compra de terceiros não declarada | Demais | nenhuma registrada | Origem do milho |
-| 4 | Rei do Milho Alimentos, Inhumas/GO | 05.574.242/0001-02 (**confirmado**: endereço do site = Receita) | 106,5 (coordenada de mapa) | Moagem de milho (creme, sêmola, grits, fubá, gérmen) [reidomilho.com.br, 06/10/2026] | Compra de terceiros não declarada | Demais | nenhuma registrada | **Recuperação judicial** na razão social: risco de crédito |
-| 5 | Caramuru — complexo de Itumbiara/GO | sugerido: 00.080.671/0001-00 (matriz publicada pela empresa); há filiais 0032-06 e 0033-97 no mesmo complexo | 142,4 (centroide) | Processamento de milho de 24 mil t/mês na unidade [caramuru.com, página sem data, 06/10/2026] | Qual CNPJ opera a fábrica; compra de terceiros | Demais (matriz) | **linha não transgênica declarada**: restrição dessa linha, não de toda a operação | CNPJ da fábrica de milho; se há linha que aceita GMO |
-| 6 | Gem Alimentos — usina de etanol de milho, Acreúna/GO | sugerido: 25.006.271/0001-85 (Receita com CNAE álcool e óleo de milho; a fonte não traz CNPJ) | 48,2 (centroide) | Autorização ANP para etanol de milho, até 120 mil L/dia [DOU de 23/02/2023, via Empreender em Goiás e JornalCana] | Operação atual (fonte de 2023); compra de terceiros | Demais | nenhuma registrada | Operação 2025–26 e CNPJ da usina (ficha ANP) |
-| 7 | BRF/MBRF — fábrica de rações de Rio Verde/GO | sugerido: 01.838.723/0172-83 (único registro BRF de ração no MAPA em Rio Verde) | 129,2 (centroide) | Ração com milho e sorgo locais [Folha, 23/06/2014; dado de 2007] | Uso atual de milho: fonte antiga. A unidade opera em 2026 [AgFeed, 21/02/2026] | Demais | nenhuma registrada | Fonte recente de compra de milho; CNPJ da fábrica |
-| 8 | Grupo JBJ — confinamento Fazenda Colorado, Aruanã/GO | sugerido: 15.689.716/0022-40 "JBJ Nutrição Animal" (MAPA; GO-530 km 30) | 284,1 (centroide; **conferir**) | Mais de 1.000 t de ração/dia [Curta Mais, 05/01/2026] | "Parte significativa do milho" é **produção própria**: não prova compra de terceiros | Demais (CNPJ sugerido) | nenhuma registrada | Quanto do milho é comprado; distância real (GO-530) |
-
-**Rebaixadas:**
-
-| Candidata | Antes | Agora | Motivo |
-|---|---|---|---|
-| Usina Rio Verde | evidência específica | indício | O site diz "etanol de grãos", e grãos não comprovam milho |
-| JBS Aruanã | evidência específica | histórica | A fonte é de 2014. O CNPJ JBS Confinamento "Fazenda Planura" segue ativo na GO-530 km 30, onde a JBJ registra no MAPA uma fábrica de ração. Provável sobreposição com a linha 8, a conciliar |
-
-## Lote ME/EPP: 8 candidatas
-
-**Critérios:**
-- consumidora potencial no MAPA, com ração ou concentrado;
-- CNAE principal 1066-0 ou 1064-3;
-- ativa na Receita;
-- município da Receita igual ao do MAPA;
-- endereço industrial ou rural;
-- aberta há pelo menos 10 anos;
-- distância menor que 270 km, salvo a Cimilho.
-
-**Busca de evidência:** fontes da própria empresa primeiro (site), depois diretórios. Avaliações de terceiros contam só como indício.
-
-| # | Unidade | CNPJ | km (precisão) | Evidência de milho [fonte, data] | Porte | Restrição GMO | Próximo ponto a confirmar |
-|---|---|---|---|---|---|---|---|
-| 1 | **Cimilho** — Rua Grécia, 1000, Tibery, Uberlândia/MG | 19.980.044/0001-53 (site = Receita) | 268,1 (centroide; **conferir**) | **Específica, fonte própria:** fabrica derivados de milho para ração e indústria; vende milho em grão; armazena grãos [cimilho.com.br, 06/10/2026] | EPP | nenhuma registrada | Se compra milho de terceiros (o site fala em "fornecedores", sem detalhar). Também revende grão, então é processadora e comerciante |
-| 2 | Rural Forte Nutrição Animal — Distrito Agroindustrial, Pontalina/GO | 06.026.372/0001-73 | 68,5 (coordenada de mapa) | Nenhuma: fábrica de ração desde 2003, sem fonte própria encontrada | EPP | — | Uso e compra de milho; site ou canal oficial |
-| 3 | Sociagro Nutrição Animal — Paraúna/GO | 08.769.542/0001-35 | 54,4 (coordenada de mapa) ou 72,8 (centroide) | Nenhuma: fábrica de ração desde 2007 | EPP | — | O endereço diverge (Receita na Rua Tegucigalpa; mapa na GO-320) |
-| 4 | Nutrir Ind. e Com. de Rações — Itaberaí/GO | 26.899.864/0001-80 | 123,8 (centroide) | Nenhuma: fábrica desde 1991; CNAEs secundários de amidos e moagem | EPP | — | O endereço diverge (Rua VA-14 x Av. Goiás 3827C); uso de milho |
-| 5 | Super-Bovi Nutrição Animal — Parque Industrial, Goianápolis/GO | 19.091.828/0001-20 | 121,5 (centroide) | Nenhuma: fábrica desde 2013, estabelecimento único | EPP | — | Uso de milho |
-| 6 | Ração Ituiutaba — Av. Paranaíba, 2671, Ituiutaba/MG | 71.054.894/0001-40 | 205,9 (centroide) | Indício de terceiro: avaliação de cliente de 2018 cita "milho e sorgo em grão e moídos" à venda | EPP | — | Fonte própria; se fabrica ou só revende |
-| 7 | Rações VR — Setor Agroindustrial, Orizona/GO | 07.611.367/0001-90 | 177,0 (coordenada de mapa) | Indício de terceiro: avaliação de 2021 diz que "fabrica rações para gado, porcos e galinhas" | EPP | — | Uso de milho |
-| 8 | Ração da Fazenda — Av. Nilza Risso, Brasinópolis, Cristianópolis/GO | 04.018.126/0001-44 | 134,0 (centroide) | Nenhuma: fábrica desde 2000 | EPP | — | Uso de milho |
-
-**Retiradas na conferência:**
-
-| Candidata | Motivo |
-|---|---|
-| Camaru (Itumbiara) | Endereço no centro da cidade e diretório que indica ração para animais de estimação |
-| Rações Garantido (Trindade) | Endereço residencial |
-| Casa do Milho (Araguari) | Atacadista de cereais. Há dois CNPJs com esse nome, e um deles é de carnes; os endereços divergem |
-| Rações 2 Irmãos (Uberlândia) | Perto do limite e sem fonte própria |
-
-## Comparação dos dois lotes
-
-| | Lote 1 | Lote ME/EPP |
+| Coluna | Valor | Significado |
 |---|---|---|
-| Evidência específica de milho | 8 de 8 (fontes de 2021 a 2026, algumas antigas) | 1 de 8 (Cimilho) |
-| CNPJ da unidade confirmado | 4 | 8 pelo cadastro. É a própria matriz, mas não há evidência a vincular, salvo na Cimilho |
-| Compra de terceiros comprovada | 1 (Cargill Uberlândia) | 0 |
-| Distância por coordenada | 2 (1 oficial, 1 de mapa) | 3 de mapa |
-| Restrição GMO registrada | Caramuru (linha) | nenhuma |
-| Principal risco | Fontes antigas; produção própria (JBJ); recuperação judicial (Rei do Milho) | Falta de qualquer fonte própria; endereços divergentes |
+| Vínculo | **confirmado** | Uma fonte liga a evidência à unidade pelo CNPJ, por um cadastro oficial com o nome da unidade, ou pelo mesmo endereço completo |
+| Vínculo | **sugerido** | Só nome e município batem; fica a conciliar |
+| km | "coordenada oficial" | Publicada em licença |
+| km | "coordenada de mapa" | Diretório de mapas, não oficial |
+| km | "centroide" | Estimativa pelo centro do município. A partir de 270 km, conferir |
+
+## Lista curta para decisão
+
+### 1. Compra de milho de terceiros comprovada
+
+| Unidade | CNPJ (vínculo) | km (precisão) | Evidência [fonte, data] | Porte | Milho GMO | Pendências |
+|---|---|---|---|---|---|---|
+| **Cargill — complexo de Uberlândia/MG** | 60.498.706/0134-88 (**confirmado**: CNPJ, endereço e coordenada na fonte) | 256,5 (coordenada oficial) | Planta de milho com capacidade de 60 mil t/mês (glúten, amido, óleo); milho "fornecido por fazendeiros, cooperativas e corretores" [Parecer SUPRAM TM 0138312/2021, 25/01/2021] | Demais | a confirmar | Operação 2025–26 (licença de 8 anos, sem fonte recente); capacidade não é consumo; registro MAPA MG0001937 (CNPJ mascarado) a conciliar |
+
+### 2. Uso ou processamento de milho comprovado, compra de terceiros a confirmar
+
+| Unidade | CNPJ (vínculo) | km (precisão) | Evidência [fonte, data] | Porte | Milho GMO | Pendências |
+|---|---|---|---|---|---|---|
+| **Cimilho — Uberlândia/MG** (ME/EPP) | 19.980.044/0001-53 (**confirmado**: endereço do site = Receita) | 268,1 (centroide; **conferir**) | Fabrica derivados de milho para ração e indústria, vende milho em grão e armazena grãos [cimilho.com.br, 06/10/2026] | EPP | a confirmar | Compra de terceiros (o site cita "fornecedores" sem detalhar); papel duplo de processadora e comerciante; distância |
+| São Martinho — Usina Boa Vista, Quirinópolis/GO | 51.466.860/0062-78 (**confirmado**: Receita "Fazenda Boa Vista", CNAE álcool, e MAPA) | 151,4 (centroide) | 495 mil t de milho previstas na safra 2026/27 [RPAnews, 27/05/2026] | Demais | a confirmar | Origem do milho |
+| Cargill Bioenergia — Usina São Francisco, Quirinópolis/GO | 10.249.419/0002-16 (**confirmado**: Receita "USF Usina São Francisco" e MAPA) | 151,4 (centroide) | Cana e milho em 2025/26; maceração de 600 mil t/ano [STG News, 01/09/2026; Globo Rural, 11/06/2025] | Demais | a confirmar | Origem do milho |
+| Rei do Milho — Inhumas/GO | 05.574.242/0001-02 (**confirmado**: endereço do site = Receita) | 106,5 (coordenada de mapa) | Moagem de milho [reidomilho.com.br, 06/10/2026] | Demais | a confirmar | Origem do milho; **recuperação judicial** na razão social (risco de crédito) |
+| Caramuru — complexo de Itumbiara/GO | sugerido: 00.080.671/0001-00 (matriz publicada pela empresa); filiais 0032-06 e 0033-97 no mesmo complexo | 142,4 (centroide) | Processamento de milho de 24 mil t/mês [caramuru.com, página sem data] | Demais | a confirmar; **linha não transgênica declarada** (restrição só dessa linha) | CNPJ da fábrica de milho; se há linha que aceita GMO |
+| JBJ — confinamento Fazenda Colorado, Aruanã/GO | sugerido: 15.689.716/0022-40 "JBJ Nutrição Animal" (MAPA); outros CNPJs da raiz na Fazenda Colorado | 284,1 (centroide; **conferir**) | Mais de 1.000 t de ração/dia; "parte significativa do milho" é produção própria [Curta Mais, 05/01/2026] | Demais | a confirmar | A produção própria não prova compra: quanto é comprado; CNPJ da fábrica; distância |
+| Gem Alimentos — usina de etanol de milho, Acreúna/GO | sugerido: 25.006.271/0001-85 | 48,2 (centroide) | Autorização da ANP para etanol de milho; a empresa mói milho e modifica amido [DOU de 23/02/2023, via Empreender em Goiás] | Demais | a confirmar | **Operação atual** (fonte de 2023); CNPJ da usina |
+| BRF/MBRF — fábrica de rações de Rio Verde/GO | sugerido: 01.838.723/0172-83 | 129,2 (centroide) | Ração com milho e sorgo locais [Folha, 23/06/2014; dado de 2007]. A unidade opera em 2026 [AgFeed, 21/02/2026] | Demais | a confirmar | **Uso atual de milho** (fonte antiga); CNPJ da fábrica |
+| JBS — confinamento Fazenda Planura, Aruanã/GO | não confirmado. O CNPJ JBS Confinamento "Fazenda Planura" (09.084.219/0010-81) segue ativo na GO-530 km 30 | 284,1 (centroide; **conferir**) | **Histórica:** fábrica de ração de 100 t/h no confinamento [ACSURS, 07/05/2014] | Demais (cadastro de terceiros) | a confirmar | **Operação atual**. A JBJ registra no MAPA uma fábrica de ração no mesmo endereço; identidade ou sucessão **não comprovada**, a conciliar |
+| Milhão Ingredientes — Goianira, Goiânia e Rio Verde | sugerido (3 registros MAPA da raiz 08.647.384) | 95,3 a 129,2 (centroide) | Processa milho [milhao.net, 06/10/2026] | ver registros | **restrição registrada** só na linha de ingredientes Non-GMO; outras linhas a verificar | Se alguma linha ou unidade aceita GMO |
+| BRMill — Fazenda São Miguel, Silvânia/GO | sugerido: 08.469.992/0001-02 | 163,3 (centroide) | Moinho de milho não-GMO com produção própria [brmill.com.br, 06/10/2026] | ver registro | **restrição registrada** nesta unidade (não-GMO) | Se há outra unidade ou linha; produção própria x compra |
+
+### 3. Atividade compatível, uso de milho a confirmar
+
+A idade da empresa é só informação. Nenhuma tem fonte que cite milho. Indícios de terceiros estão anotados.
+
+| Unidade | CNPJ | km (precisão) | Atividade e indícios [fonte] | Porte (abertura) | Milho GMO | Pendências |
+|---|---|---|---|---|---|---|
+| Usina Rio Verde — Rio Verde/GO | não encontrado | 129,2 (centroide) | Etanol de cana e "de grãos", DDG e WDG; milho não nomeado [usinarioverde.com.br] | não consultado | a confirmar | Se os grãos incluem milho; CNPJ |
+| Rural Forte Nutrição Animal — Pontalina/GO | 06.026.372/0001-73 | 68,5 (coordenada de mapa) | Fábrica de ração no Distrito Agroindustrial | EPP (2003) | a confirmar | Uso e compra de milho; canal oficial |
+| Sociagro Nutrição Animal — Paraúna/GO | 08.769.542/0001-35 | 54,4 (mapa) ou 72,8 (centroide), a conciliar | Fábrica de ração | EPP (2007) | a confirmar | Endereço a conciliar (Receita: Rua Tegucigalpa; mapa: GO-320); uso de milho |
+| Nutrir Ind. e Com. de Rações — Itaberaí/GO | 26.899.864/0001-80 | 123,8 (centroide) | Fábrica de ração; CNAEs secundários de amidos e moagem | EPP (1991) | a confirmar | Endereço a conciliar (Rua VA-14 x Av. Goiás 3827C); uso de milho |
+| Super-Bovi Nutrição Animal — Goianápolis/GO | 19.091.828/0001-20 | 121,5 (centroide) | Fábrica de ração no Parque Industrial | EPP (2013) | a confirmar | Uso de milho |
+| Rações VR — Orizona/GO | 07.611.367/0001-90 | 177,0 (coordenada de mapa) | Fábrica de ração no Setor Agroindustrial. Indício de terceiro: avaliação de 2021, "rações para gado, porcos e galinhas" | EPP (2005) | a confirmar | Uso de milho |
+| Ração Ituiutaba — Ituiutaba/MG | 71.054.894/0001-40 | 205,9 (centroide) | Fábrica de ração. Indício de terceiro: avaliação de 2018 cita "milho e sorgo em grão e moídos" | EPP (1993) | a confirmar | Fonte própria; se fabrica ou só revende |
+| Ração da Fazenda — Cristianópolis/GO | 04.018.126/0001-44 | 134,0 (centroide) | Fábrica de ração | EPP (2000) | a confirmar | Uso de milho |
+| Camaru Ind. e Com. de Rações — Itumbiara/GO | 03.888.858/0001-22 | 142,4 (centroide) | Fábrica de ração; diretório cita também ração para animais de estimação | EPP (2000) | a confirmar | Local da fábrica (Receita: Rua Rui de Almeida, 80, centro), a conciliar; linhas para bovinos e aves; uso de milho |
+| Rações Garantido (Yabagata) — Trindade/GO | 21.196.572/0001-68 | 75,5 (centroide) | Fábrica de ração (CNAE 1066) | ME (2014) | a confirmar | Endereço da Receita em bairro residencial (Setor Laguna Parque): local da fábrica a conciliar; uso de milho |
+| Casa do Milho Distribuição — Araguari/MG | 28.035.928/0001-20 | 241,0 (centroide) | Atacadista de cereais (CNAE 4632), com fabricação de ração e moagem como atividades secundárias; registro de ração no MAPA. O nome com "milho" é só indício | ME (2017) | a confirmar | Endereço a conciliar (Rua José David Skaf, 740 x Av. Calimério P. de Ávila, 1751); outro CNPJ com o mesmo nome (41.159.707/0001-22, carnes), a conciliar; uso de milho |
+| Rações 2 Irmãos (Agrofos) — Uberlândia/MG | 09.405.401/0001-04 | 268,1 (centroide; **conferir**) | Fábrica de ração; 3 estabelecimentos da raiz em Uberlândia | EPP (2008) | a confirmar | Distância e endereço (Receita: Rua dos Trombones, 310; diretório: Tibery), a conciliar; uso de milho |
+
+Os demais estabelecimentos do MAPA (405 consumidoras potenciais, com 152 ME/EPP) seguem em `CANDIDATAS.md` e `candidatas.csv`, com suas pendências.
 
 ## Reconciliação dos totais (sem misturar critérios)
 
@@ -99,10 +78,10 @@ Novas consultas: só fontes públicas (sites das empresas, licenças, Receita vi
 | Linhas do CSV do MAPA no raio | 1.743 | Uma linha por combinação de registro, atividade e classificação |
 | Registros MAPA distintos → ativos → ativos fabricantes | 507 → 472 → 445 | Número do registro |
 | Estabelecimentos MAPA únicos | 445 | 389 por CNPJ completo e 56 por registro (CNPJ a conciliar) |
-| Linhas de `candidatas.csv` | 474 | 445 do MAPA (7 delas fundidas com uma manual pelo mesmo CNPJ completo) + 29 manuais em linha própria |
+| Linhas de `candidatas.csv` | 474 | 445 do MAPA (7 fundidas com uma manual pelo mesmo CNPJ completo) + 29 manuais em linha própria |
 | Estabelecimentos distintos | 456 a 474 | 18 manuais têm possível correspondência a conciliar com 23 registros MAPA |
 | Consumidoras potenciais do MAPA | 405 | Papel, independente do porte |
 | Porte dessas 405 | 100 ME + 52 EPP + 202 Demais + 51 não consultado = 405 | Porte cadastral da Receita; "Demais" não indica média nem grande |
 | **152** ME/EPP | 100 + 52 | Todas as consumidoras com porte ME ou EPP |
 | **150** na seção 10 do `CANDIDATAS.md` | 152 − 2 | Cimilho (EPP) e Casa do Milho (ME) estão na seção 9, para não se repetirem. **Não** são "150 pequenas" por outro critério |
-| Lote ME/EPP | 8 | Seleção dentro das 152 pelos critérios acima |
+| ME/EPP nesta lista curta | 12 | Cimilho no grupo 2 e 11 no grupo 3 |

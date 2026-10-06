@@ -151,7 +151,7 @@ Comparação curta com o lote ME/EPP: `QUALIFICACAO-LOTES-2026-10-06.md`.
 
 | Candidata (id) | Município | km | Situação [fonte] |
 |---|---|---|---|
-| **JBS — confinamento com fábrica de ração (Fazenda Planura)** (M10) | Aruanã/GO | 284,1 | Fonte de 2014: não comprova operação atual. O CNPJ JBS Confinamento 'Fazenda Planura' segue ativo (GO-530 km 30), mas a JBJ registra no MAPA uma fábrica de ração no mesmo endereço — provável sobreposição com M09, a conciliar [ACSURS 07/05/2014; cadastro de terceiros (indicecnpj, Receita 07/2026)] |
+| **JBS — confinamento com fábrica de ração (Fazenda Planura)** (M10) | Aruanã/GO | 284,1 | Fonte de 2014: não comprova operação atual. O CNPJ JBS Confinamento 'Fazenda Planura' segue ativo (GO-530 km 30), e a JBJ registra no MAPA uma fábrica de ração no mesmo endereço; identidade ou sucessão da unidade não comprovada — linhas mantidas separadas, a conciliar [ACSURS 07/05/2014; cadastro de terceiros (indicecnpj, Receita 07/2026)] |
 
 ## 7. Processam milho com restrição não-GMO registrada (por linha ou unidade)
 

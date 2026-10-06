@@ -1032,7 +1032,8 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
     - Rei do Milho (endereço do site = Receita; em recuperação judicial);
     - São Martinho Boa Vista e Cargill Bioenergia São Francisco (Receita com o nome da unidade e o mesmo CNPJ no MAPA).
   - 4 sugeridos: Gem, BRF, Caramuru, JBJ.
-  - Rebaixadas: Usina Rio Verde ("grãos" não prova milho) e JBS Aruanã (fonte de 2014; provável sobreposição com a JBJ na GO-530 km 30).
+  - Rebaixadas: Usina Rio Verde ("grãos" não prova milho) e JBS Aruanã (evidência histórica de 2014; mantida separada da JBJ, pois o endereço comum não comprova identidade nem sucessão).
+- **Revisão 2 da qualificação:** idade da empresa deixa de ser critério; Camaru, Rações Garantido, Casa do Milho e Rações 2 Irmãos voltam como candidatas com pendências a conciliar; lista curta em 3 grupos (compra de terceiros comprovada: Cargill Uberlândia; uso comprovado, compra a confirmar: Cimilho e outras 10; atividade compatível: 12). Consultas à BrasilAPI suspensas enquanto houver 429. Suíte não repetida (revisão só documental).
   - Compra de terceiros comprovada só na Cargill Uberlândia; a JBJ produz parte do próprio milho.
 - **Lote ME/EPP (8):** só a Cimilho tem evidência própria de milho; as outras 7 têm atividade pertinente e endereço conferido, sem fonte própria.
 - **Reconciliação:**
