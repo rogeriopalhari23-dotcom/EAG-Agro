@@ -1,31 +1,29 @@
-# Lote aceito para qualificação: milho GMO, Indiara/GO (06/10/2026)
+# Lote aceito para qualificação: milho GMO, Indiara/GO, 300 km (06/10/2026, revisão 2)
 
 **Aceite de Rogério (06/10/2026):**
 - Empresas: Cimilho, Cargill Uberlândia, São Martinho (Usina Boa Vista) e Cargill Bioenergia (Unidade São Francisco).
-- O aceite autoriza **cadastro e pesquisa**. Não confirma compra atual, aceitação de milho GMO nem abordagem.
-- As demais candidatas, incluindo as 152 ME/EPP, continuam visíveis em `CANDIDATAS.md` e `QUALIFICACAO-LOTES-2026-10-06.md`.
+- O aceite autoriza cadastro e pesquisa. Não confirma compra atual, aceitação de milho GMO nem abordagem.
+- As demais candidatas, incluindo as 152 ME/EPP, continuam visíveis.
 
 **O que não foi feito:**
-- nenhum envio preparado;
-- nenhum crédito Snov consumido;
-- nenhuma campanha ativada;
 - nenhum e-mail deduzido;
-- nenhum representante legal (sócio, administrador) tratado como comprador.
+- nenhum crédito Snov consumido;
+- nenhum telefonema nem mensagem;
+- nenhum representante legal tratado como comprador.
 
-## Bloqueio do cadastro no Compass (credencial)
+## 1. Situação no Compass (leitura de 06/10/2026)
 
-| Acesso | Situação em 06/10/2026 |
+| Item | Resultado |
 |---|---|
-| API de produção | Atrás do Cloudflare Access, sessão expirada. `cloudflared access token` respondeu: "Unable to find token… run login command" |
-| D1 remoto pelo wrangler | Erro 7403 ("account is not authorized") |
+| Leitura do D1 de produção (`wrangler d1 execute --remote`, só SELECT) | **Funcionou**: 11 empresas no total, 6 brasileiras |
+| Empresas com as raízes 19980044, 60498706, 51466860 ou 10249419 | **Nenhuma** |
+| Empresas com "Cargill", "Martinho" ou "Cimilho" no nome | **Nenhuma**: não há duplicação a evitar |
+| Unidades em `company_units` com os 4 CNPJs | **Nenhuma** |
+| **Conclusão** | As 4 unidades **não estão cadastradas**. Existem só o arquivo `cadastro-lote-aceito.json` e o script `scripts/cadastrar-lote-aceito.mjs`, testado apenas em simulação |
+| O que bloqueia a gravação | A API exige sessão do Cloudflare Access, e `cloudflared access token` responde "Unable to find token". A gravação direta no banco não foi feita, porque pularia as regras da API |
+| Revisão 2 do pacote | Retirado o canal `coprodutos@saomartinho.com.br`, que atende vendas. Cargos e responsabilidades corrigidos. Incluído Valter Junior (ver 3.3). Método de distância explicitado na fonte |
 
-Cadastrar direto no banco contornaria as regras da API (raiz de CNPJ única, e-mail só publicado, limite de 3 pessoas), por isso **não foi feito**.
-
-**Pronto para aplicar:**
-- `cadastro-lote-aceito.json`: empresa pela unidade e CNPJ, evidência pendente de validação, canal geral publicado e pessoas com fonte;
-- `scripts/cadastrar-lote-aceito.mjs`: simula por padrão e só grava com `--apply`. Se a raiz de CNPJ já existir (outra unidade), não anexa nada e pede conferência.
-
-**Para aplicar** (Rogério, no PowerShell):
+**Comando para gravar** (Rogério, PowerShell; a simulação vem antes, sem `--apply`):
 
 ```powershell
 & "C:\Program Files (x86)\cloudflared\cloudflared.exe" access login https://eag-compass-production.rogeriopalhari23.workers.dev
@@ -33,105 +31,154 @@ $env:CF_ACCESS_TOKEN = & "C:\Program Files (x86)\cloudflared\cloudflared.exe" ac
 node --use-system-ca scripts/cadastrar-lote-aceito.mjs docs/implementation/descoberta-milho-indiara/cadastro-lote-aceito.json --base https://eag-compass-production.rogeriopalhari23.workers.dev --apply
 ```
 
-**Limitação conhecida:**
-- O cadastro manual grava o CNPJ da unidade na empresa (`registration_id`), mas não cria a linha em `company_units`. Só a busca da Casa dos Dados cria essa linha.
-- Por isso a distância e o QSA automático não aparecem na tela. A distância conferida está nesta página e na fonte da empresa (opção C de `DESCOBERTA-BRASIL-PROXIMO-PASSO.md`, ainda não aprovada).
+## 2. Distâncias (mesma metodologia para todas)
 
-## Resumo por empresa
+**Método:**
+- distância **geodésica em linha reta** (fórmula de haversine, Terra com raio de 6.371 km);
+- **não** é percurso rodoviário: a estrada é mais longa, e não foi calculada;
+- Indiara entra sempre pelo centroide do município (IBGE, -17,1852; -49,9682), referência do Compass (R11.3/R11.6);
+- no outro extremo, o melhor ponto disponível da unidade.
 
-### 1. Cargill — complexo de Uberlândia/MG
+| Unidade | Ponto usado | Precisão | Linha reta até o centroide de Indiara | Comparação: sede urbana de Indiara (OSM, -17,1387; -49,9862) | Comparação: centroide × centroide |
+|---|---|---|---|---|---|
+| Cargill Uberlândia | 18°50'57"S, 48°17'17"O (coordenada de referência do complexo no parecer SUPRAM 2021) | Oficial | **256,5 km** | 261,6 km | 268,1 km |
+| Cimilho | Rua Grécia, Tibery, Uberlândia (OSM, rua inteira; o número 1000 não está no mapa) | Rua, ±1 km | **263,0 km** | 268,1 km | 268,1 km |
+| São Martinho Boa Vista | Centroide de Quirinópolis; não há coordenada pública da usina, e as outorgas da SEMAD trazem só pontos de captação de irrigação | Município | **151,4 km** | 155,4 km | 151,4 km |
+| Cargill Bioenergia São Francisco | Centroide de Quirinópolis, pelo mesmo motivo | Município | **151,4 km** | 155,4 km | 151,4 km |
 
-**Grupo:** compra de milho de terceiros comprovada.
+**Os 263 km da Cimilho** são distância geográfica em linha reta, não percurso rodoviário. As 4 unidades ficam dentro dos 300 km em qualquer das três referências.
 
-| Campo | Situação |
+## 3. Tabela por unidade
+
+### 3.1 Cargill — complexo de Uberlândia/MG (CNPJ 60.498.706/0134-88)
+
+**Evidências, separadas por tipo:**
+
+| Tipo | Conteúdo [fonte, data] |
 |---|---|
-| Unidade e CNPJ | 60.498.706/0134-88. Rua Will Cargill, 880, Distrito Industrial. **Confirmado**: CNPJ, endereço e coordenada publicados no parecer SUPRAM; endereço igual ao da Receita |
-| Distância | **256,5 km** pela coordenada oficial do parecer (18°50'57"S, 48°17'17"O) |
-| Evidência de milho | Planta de milho de 60 mil t/mês de capacidade. Milho "fornecido por fazendeiros, cooperativas e corretores" [Parecer SUPRAM TM 0138312/2021, 25/01/2021] |
-| Operação atual | Vaga "Operador III — Envase de Amido, Uberlândia" publicada em 09/2026 (careers.cargill.com, vaga 333840) |
-| Milho GMO | **A confirmar.** O perfil público de um originador cita milho waxy e **Non-GMO**, além de "milho regular" para moagem: há linha Non-GMO, sem prova de que todo o milho seja Non-GMO |
-| Canal profissional público | Nenhum canal comercial de compra de milho publicado. O telefone e o e-mail da Receita são cadastrais e não foram usados |
+| Compra histórica | Milho "fornecido por fazendeiros, cooperativas e corretores" [Parecer SUPRAM, 25/01/2021] |
+| Capacidade | 60 mil t/mês de milho (nominal, não é consumo) [mesmo parecer] |
+| Operação atual | Vaga de envase de amido em Uberlândia [careers.cargill.com, 09/2026]. Matéria sobre o complexo [Hosa, 11/08/2026] |
+| Previsão de volume | Não encontrada |
 
 **Pessoas:**
 
-| Pessoa | Cargo (fonte) | Responsabilidade de compra | Unidade | Canal disponível |
-|---|---|---|---|---|
-| Vinicius de Carvalho Figueiredo | Origination Manager — Corn CSSTSA, desde 05/2022 (LinkedIn público, 09/2026) | Indicada: gerente de originação de milho do negócio de amidos. **Decisor não confirmado** | Uberlândia | Só o perfil do LinkedIn |
-| Paulo Henrique Borges Silva | Originação de milho para as fábricas, desde 12/2023 (LinkedIn público, 08/2026) | Indicada: origina milho waxy e Non-GMO e garante milho regular para moagem. Influenciador | Uberlândia | Só o perfil do LinkedIn |
+| Campo | Vinicius de Carvalho Figueiredo | Paulo Henrique Borges Silva |
+|---|---|---|
+| Vínculo atual | Cargill, cargo atual desde 05/2022 [LinkedIn, 04/09/2026] | Cargill, cargo atual desde 12/2023 [LinkedIn, 19/08/2026] |
+| Cargo | Origination Manager — Corn CSSTSA (amidos e adoçantes América do Sul). Local do cargo: Uberlândia. Residência no perfil: Maringá/PR | Merchant, Starches & Sweeteners. Local: Uberlândia |
+| Responsabilidade de compra | Gerencia a originação de milho do negócio de amidos. **Se decide a compra desta unidade: a confirmar.** O escopo "South America" pode incluir outras fábricas | Origina milho **waxy e Non-GMO**. Para o milho **regular**, "garante a disponibilidade… em alinhamento com a CASC" (originação de grãos da Cargill). A compra do milho regular parece passar pela CASC: **a confirmar** |
+| Unidade atendida | Uberlândia (local do cargo); outras fábricas a confirmar | "As fábricas" de amidos; Uberlândia é o local do cargo |
+| Canal profissional | Só o perfil do LinkedIn | Só o perfil do LinkedIn |
 
-**Não incluídos:**
-- comprador de MRO (peças e serviços);
-- originadores da área de grãos e insumos (CASC), que compram soja e milho de produtores para outra operação, não para a fábrica.
+**Canal da empresa e da unidade:**
+- telefone oficial publicado da unidade Amidos e Adoçantes Uberlândia: (34) 3218-4900 [cargill.com.br/localidades]. É canal geral e não foi usado;
+- fornecedores de materiais e serviços: Central de Fornecedores, portal Aravo, só por convite;
+- produtores: GPS Cargill, cadastro por link enviado por um representante comercial;
+- **não há canal público específico de venda de milho para a fábrica**.
 
-**Próximo passo:**
-- confirmar com fonte se o gerente de originação de milho decide a compra para a fábrica de Uberlândia;
-- confirmar se a fábrica aceita milho GMO (linha regular);
-- conciliar o registro MAPA MG0001937.
+**Milho GMO:** **a confirmar.** Existe uma linha Non-GMO e waxy; "regular" não prova GMO. Nenhum rótulo ou ficha técnica com o símbolo de transgênico foi encontrado.
 
-### 2. São Martinho — Usina Boa Vista, Quirinópolis/GO
+**Pendência:** quem compra o milho regular para Uberlândia (gerente de originação CSSTSA ou mesa regional da CASC). Um perfil público antigo de "Merchant Regional MG GO Leste" descreve a mesa regional "visando atender a originação de grãos para a Fábrica de Uberlândia", mas a pessoa está hoje em outra função e não foi registrada.
 
-**Grupo:** passa para **compra de milho de terceiros comprovada** (antes estava no grupo 2).
+**Próximo passo:** depois do cadastro, registrar a dúvida CSSTSA × CASC como ponto a verificar e buscar fonte sobre GMO no milho regular. Nenhum contato antes da T11.
 
-| Campo | Situação |
+### 3.2 São Martinho — Usina Boa Vista, Quirinópolis/GO (CNPJ 51.466.860/0062-78)
+
+**Evidências, separadas por tipo:**
+
+| Tipo | Conteúdo [fonte, data] |
 |---|---|
-| Unidade e CNPJ | 51.466.860/0062-78. Rod. GO-164 km 10, Fazenda Boa Vista. **Confirmado** por cadastro oficial (Receita, CNAE álcool, e MAPA) |
-| Distância | 151,4 km pelo centroide; a usina é rural, longe do limite |
-| Evidência de compra | Em 31/03/2024 a companhia havia comprado cerca de 439 mil t de milho para a safra 24/25 [carta financeira, 17/06/2024]. Milho "adquirido de cooperativas e tradings" e "diretamente dos produtores"; 120 fornecedores de milho homologados [relatório de sustentabilidade da São Martinho] |
-| Operação atual | 495 mil t de milho previstas na safra 2026/27 [RPAnews, 27/05/2026]. Unidade coletora de 240 mil t em Montividiu em construção (Kepler Weber, 12/2025) |
-| Milho GMO | **A confirmar** |
-| Canal profissional público | `coprodutos@saomartinho.com.br` e (64) 3615-9704, publicados no site. É canal de **venda de coprodutos**, não de compra de milho |
+| Compra histórica | Cerca de 439 mil t de milho compradas até 31/03/2024 para a safra 24/25 [carta financeira, 17/06/2024]. Milho "adquirido de cooperativas e tradings" e "diretamente dos produtores" [relatório de sustentabilidade, sem data no trecho] |
+| Previsão de volume | 495 mil t na safra 2026/27 [RPAnews, 27/05/2026]. Segunda fase com +635 mil t/ano a partir de 2027 |
+| Operação atual | "Processa 500 mil t de milho anualmente" [RPAnews, 01/04/2026]. Unidade coletora de 240 mil t em Montividiu contratada [Portal GHF, 01/12/2025] |
+| Homologação de fornecedores | **De milho:** "homologação de 120 fornecedores aptos ao fornecimento de milho" com critérios socioambientais (Agrotools e Neoway); contratos com cláusulas de legislação, trabalho, anticorrupção e LGPD [relatório]. **De materiais e serviços:** Portal de Compras Paradigma mais cadastro no SAP, este só por solicitação do comprador responsável [manual "Cadastro de Novo Fornecedor", site]. O manual cobre Suprimentos; **se a homologação de milho usa o mesmo portal: a confirmar** |
 
 **Pessoas:**
 
-| Pessoa | Cargo (fonte) | Responsabilidade de compra | Unidade | Canal disponível |
-|---|---|---|---|---|
-| Luciano Jorge Silva | Gerente de Originação de Milho e Comercialização de Coprodutos (LinkedIn público, 08/2026) | Indicada: lidera a originação de milho e a segurança de abastecimento. **Decisor não confirmado** | Boa Vista, única planta de milho do grupo (BNDES). O perfil não mostra a localização | Só o perfil do LinkedIn |
-| Helder Gosling | Diretor Comercial e de Logística (Portal GHF, 01/12/2025) | Nível de diretoria; citado sobre o abastecimento de milho da Boa Vista. Compra direta não confirmada | Corporativo / Boa Vista | Nenhum canal público pessoal |
+| Campo | Luciano Jorge Silva | Helder Gosling |
+|---|---|---|
+| Vínculo atual | São Martinho, desde 01/2026 [LinkedIn, 27/08/2026] | Diretor citado em 01/12/2025 [Portal GHF] |
+| Cargo | Gerente de Originação de Milho e Comercialização de Coprodutos; base em Rio Verde/GO | Diretor Comercial e de Logística |
+| Responsabilidade de compra | Lidera a originação de milho e a segurança de abastecimento. **Decisor não confirmado** | Falou sobre o abastecimento de milho da Boa Vista e os fornecedores. Compra direta não confirmada |
+| Unidade atendida | Operação de etanol de milho; a Boa Vista é a **única** planta de milho do grupo [BNDES; RPAnews 01/04/2026] | Boa Vista, citada na matéria; função corporativa |
+| Canal profissional | Só o perfil do LinkedIn | Nenhum canal público pessoal |
 
-**Não incluídos:** compradores de MRO e materiais da unidade.
+**Canal da empresa:**
+- não há canal público de compra de milho;
+- `coprodutos@` atende **vendas** de coprodutos e foi retirado do pacote de cadastro;
+- o Portal de Compras é para Suprimentos.
 
-**Próximo passo:**
-- confirmar o canal de cadastro de fornecedor de milho (homologação);
-- confirmar se aceita milho GMO.
+**Milho GMO:** **a confirmar.** As certificações citadas são ISCC, Halal e Kosher; nenhuma é Non-GMO. Nenhum rótulo com o símbolo de transgênico foi encontrado.
 
-### 3. Cargill Bioenergia — Usina São Francisco, Quirinópolis/GO
+**Pendência:** o canal de homologação de **fornecedor de milho** e se Luciano atende a Boa Vista diretamente (o perfil indica base em Rio Verde).
 
-**Grupo:** uso de milho comprovado; compra de terceiros com indício forte, a confirmar.
+**Próximo passo:** depois do cadastro, registrar o gerente de originação como decisor provável, ainda não confirmado. Nenhum contato antes da T11.
 
-| Campo | Situação |
+### 3.3 Cargill Bioenergia — Usina São Francisco, Quirinópolis/GO (CNPJ 10.249.419/0002-16)
+
+**Evidências, separadas por tipo:**
+
+| Tipo | Conteúdo [fonte, data] |
 |---|---|
-| Unidade e CNPJ | 10.249.419/0002-16. Rod. GO-206 km 18, Fazenda São Francisco. **Confirmado** pelo nome fantasia "USF Usina São Francisco" na Receita e pelo registro MAPA |
-| Distância | 151,4 km pelo centroide |
-| Evidência de milho | Processa cana e milho em 2025/26 (etanol, óleo, DDG) [STG News, 01/09/2026]; maceração de 600 mil t de milho/ano [Globo Rural, 11/06/2025] |
-| Indício de compra | Perfil público de analista de "originação de grãos (milho/sorgo)" na SJC Bioenergia (2022–09/2025). A pessoa saiu em 02/2026 e por isso **não** foi registrada |
-| Milho GMO | **A confirmar** |
-| Canal profissional público | Nenhum canal comercial publicado. O e-mail fiscal da Receita não foi usado |
+| Operação atual | Cana e milho na safra 2025/26 [STG News, 01/09/2026] |
+| Capacidade | Maceração de 600 mil t de milho/ano [Globo Rural, 11/06/2025] |
+| Compra histórica | Originação de milho e sorgo "para abastecimento das operações de bioenergia da Cargill", com "negociação e fechamento de contratos de compra de milho e sorgo" com produtores e cooperativas, de 01/2025 a 09/2025 [perfil público de ex-originador, 17/08/2026]. **A pessoa não está mais no cargo** |
+| Previsão de volume | Não encontrada |
 
 **Pessoas:**
 
-| Pessoa | Cargo (fonte) | Responsabilidade de compra | Unidade | Canal disponível |
-|---|---|---|---|---|
-| Evandro Rogério Zanini | Gerente de Suprimentos Corporativo (LinkedIn público, 09/2026, ainda com o nome SJC) | Compras, contratos e almoxarifado das usinas e da unidade de grãos. **Compra de milho não declarada** | Quirinópolis e Cachoeira Dourada | Só o perfil do LinkedIn |
+| Campo | Valter Junior | Evandro Rogério Zanini |
+|---|---|---|
+| Vínculo atual | Cargill, Coordenador de Negócios II em Quirinópolis desde 09/2025 [LinkedIn, 12/09/2026] | Perfil ainda com o nome SJC Bioenergia [LinkedIn, 21/09/2026] |
+| Cargo | Coordenador de Negócios II. Antes, de 07/2022 a 09/2025: originação de milho e sorgo e venda de coprodutos na SJC | Gerente de Suprimentos Corporativo |
+| Responsabilidade de compra | **A confirmar:** o perfil não descreve o cargo atual. Na Cargill, "coordenador de negócios" costuma originar grãos, mas isso é hipótese, não confirmação | Compras, contratos e almoxarifado. **Responsabilidade por milho não declarada**; suprimentos, sozinho, não comprova a compra da commodity |
+| Unidade atendida | Quirinópolis; se atende a Usina São Francisco: a confirmar | As usinas e a unidade de grãos (genérico) |
+| Canal profissional | Só o perfil do LinkedIn | Só o perfil do LinkedIn |
 
-**Ponto a verificar:** quem origina milho hoje para a unidade de grãos depois da integração à Cargill. Pode ser a originação regional da Cargill. Um perfil de "Diretor Comercial … originação de milho" em Quirinópolis aparece como cargo anterior e **não** foi registrado.
+**Correção da revisão anterior:** o texto anterior dizia que o ex-analista de originação "saiu em 02/2026". Errado: a postagem "encerro meu ciclo na Cargill Bioenergia" é de **outra pessoa**, que Valter apenas curtiu. Valter segue na Cargill, em outro cargo.
 
-**Próximo passo:** identificar o originador de milho atual da Cargill Bioenergia por fonte pública.
+**Canal da empresa:**
+- telefone oficial publicado da unidade Quirinópolis: (64) 3615-9500 [cargill.com.br/localidades]. É canal geral e não foi usado;
+- não há canal público de compra de milho.
 
-### 4. Cimilho — Uberlândia/MG (EPP)
+**Milho GMO:** **a confirmar.** Nenhuma fonte encontrada.
 
-**Grupo:** uso e processamento de milho comprovados; compra de terceiros a confirmar.
+**Pendência:** **responsável atual pela originação de milho da unidade não identificado.** A busca pública ficou nos dois perfis acima. Outros perfis de originação em Quirinópolis são de 2025 e já encerrados.
+
+**Próximo passo:** a pesquisa pública chegou ao limite. Depois do cadastro, registrar o ponto a verificar "originador de milho atual da Usina São Francisco" para confirmar no primeiro contato autorizado.
+
+### 3.4 Cimilho — Uberlândia/MG (CNPJ 19.980.044/0001-53, EPP)
+
+**Evidências, separadas por tipo:**
+
+| Tipo | Conteúdo [fonte, data] |
+|---|---|
+| Uso e processamento | Fabrica derivados de milho; vende milho em grão; armazena grãos [cimilho.com.br, consultado em 06/10/2026, página sem data] |
+| Compra de terceiros | **Não comprovada.** O site cita "fornecedores" e milho "provindo da zona rural", sem dizer de quem compra. Os serviços de **armazenagem e moagem para terceiros** usam milho do cliente: isso **não** é compra |
+| Operação atual | Receita ativa. Licença ambiental simplificada (LAS Cadastro) deferida em 21/04/2018 [SEMAD MG]. LinkedIn da empresa com 3 funcionários. Anúncio ativo no MF Rural. Não há fonte datada de produção recente |
+| Previsão de volume | Não encontrada |
+
+**Pessoas e canal:**
 
 | Campo | Situação |
 |---|---|
-| Unidade e CNPJ | 19.980.044/0001-53. Rua Grécia, 1000, Tibery. **Confirmado**: endereço do site igual ao da Receita |
-| Distância | **263,0 km** pela rua (OpenStreetMap, sem o número: precisão de ±1 km). Antes era 268,1 km pelo centroide; está dentro do raio |
-| Evidência de milho | Fabrica derivados de milho para ração e indústria, vende milho em grão e armazena grãos [cimilho.com.br, consultado em 06/10/2026] |
-| Operação atual | Receita ativa; página da empresa no LinkedIn com 3 funcionários (+1 no ano); anúncio ativo no MF Rural. Sem fonte datada da produção |
+| Pessoa identificada | **Nenhuma.** A conta "Gerente na Cimilho" no LinkedIn usa o nome da empresa e não identifica uma pessoa |
+| Cargo, responsabilidade, unidade | — (a confirmar) |
+| Canal profissional | Canal **geral** da empresa, publicado no site: `cimilho@cimilho.com.br`, (34) 3213-4242 e (34) 3213-4251. Preservado como canal geral, não como comprador |
 | Milho GMO | **A confirmar** |
-| Canal profissional público | `cimilho@cimilho.com.br` e (34) 3213-4242 / 3213-4251, publicados no site. Canal geral, não comprador |
 
-**Pessoas:** nenhuma identificada. O perfil "Gerente na Cimilho" no LinkedIn é uma conta com o nome da empresa, não de uma pessoa. Os sócios da Receita são representantes legais e **não** foram tratados como compradores.
+**Pendência:**
+- responsável pela compra de milho e evidência de compra de terceiros: **busca pública esgotada**;
+- sócios da Receita são representantes legais e não foram usados como compradores.
 
-**Ponto a verificar:** quem compra o milho e de quem (o site cita "fornecedores").
+**Próximo passo:** depois do cadastro, registrar o ponto a verificar "quem compra milho e de quem", para o primeiro contato autorizado pelo canal geral.
 
-**Próximo passo:** confirmar o responsável pela compra e o volume pelo canal geral, só quando o contato for autorizado.
+## 4. Resumo para decisão
+
+| Unidade | Responsável encontrado | Canal apropriado hoje | Evidência mais forte | Pendência principal |
+|---|---|---|---|---|
+| Cargill Uberlândia | Gerente de originação de milho CSSTSA (decisor não confirmado); merchant de milho Non-GMO e waxy | Nenhum canal de compra público; telefone geral da unidade publicado | Compra de produtores, cooperativas e corretores (2021) e operação em 2026 | Milho regular comprado via CASC? GMO? |
+| São Martinho Boa Vista | Gerente de originação de milho (desde 01/2026; decisor não confirmado) | Nenhum canal de compra de milho público (coprodutos@ é vendas) | Compra de cerca de 439 mil t (2024); 120 fornecedores de milho homologados; 495 mil t previstas (2026/27) | Canal de homologação de fornecedor de milho; GMO |
+| Cargill Bioenergia São Francisco | **Nenhum confirmado.** Coordenador de Negócios em Quirinópolis (função atual não descrita) e gerente de suprimentos (milho não declarado) | Telefone geral da unidade publicado | Compra de milho e sorgo por originação própria até 09/2025; operação em 2026 | Originador atual; GMO |
+| Cimilho | **Nenhum** | E-mail e telefone gerais do site | Processa e vende milho (site sem data); LAS 2018 | Quem compra e de quem; GMO |

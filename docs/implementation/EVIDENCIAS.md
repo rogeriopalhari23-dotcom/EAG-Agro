@@ -1060,3 +1060,20 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
   - Cimilho: nenhuma pessoa.
   - Nenhum decisor confirmado.
 - **Detalhe:** `descoberta-milho-indiara/LOTE-ACEITO-2026-10-06.md`.
+### Lote aceito — revisão 2 (2026-10-06)
+
+- **Leitura do Compass (D1, só SELECT):** nenhuma das 4 raízes de CNPJ cadastrada, nenhuma duplicata por nome e nenhuma unidade. O cadastro segue **só preparado**; a API continua sem sessão do Access.
+- **Distâncias, mesma metodologia** (linha reta, haversine, centroide de Indiara até o melhor ponto da unidade):
+  - Cargill Uberlândia: 256,5 km (coordenada oficial);
+  - Cimilho: 263,0 km (rua, OSM);
+  - São Martinho e Cargill Bioenergia: 151,4 km (centroide; sem coordenada pública da usina).
+  - Não é percurso rodoviário.
+- **Pesquisa:**
+  - Cargill Uberlândia: o merchant cuida do milho Non-GMO e waxy; o milho regular está alinhado com a CASC (a confirmar);
+  - São Martinho: 120 fornecedores de milho homologados; Portal de Compras Paradigma só para suprimentos; gerente de originação desde 01/2026;
+  - Cargill Bioenergia: originador atual não identificado;
+  - Cimilho: compra de terceiros não comprovada (armazenagem e moagem para terceiros não são compra);
+  - GMO a confirmar nas 4.
+- **Correção:** o texto anterior dizia que o ex-originador da Cargill Bioenergia (Valter Junior) "saiu em 02/2026". A postagem era de outra pessoa; ele segue na Cargill em Quirinópolis, com função atual não descrita.
+- **Pacote:** retirado `coprodutos@` (vendas).
+- **Suíte:** não repetida, porque só houve mudança de documentos e dados.
