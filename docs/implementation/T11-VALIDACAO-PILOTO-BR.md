@@ -2,7 +2,12 @@
 
 **Data:** 06/10/2026. **Estado:** preparação. **Nada aqui está aprovado.**
 
-**Escopo:** 4 ligações de nível 0 (Cimilho, Cargill Uberlândia, São Martinho Boa Vista, Cargill Bioenergia São Francisco). Não inclui e-mail, Alemanha, rastreamento de abertura nem campanha.
+**Escopo (atualizado em 06/10/2026):** 13 ligações de nível 0, das unidades aceitas por Rogério:
+- lote 1: Cimilho, Cargill Uberlândia, São Martinho Boa Vista e Cargill Bioenergia São Francisco;
+- lote de 6 ME/EPP: Rural Forte, Sociagro, Nutrir, Super-Bovi, Rações VR e Ração Ituiutaba;
+- grupo 2: Rei do Milho, Caramuru Itumbiara e BRF Rio Verde.
+
+Não inclui e-mail, Alemanha, rastreamento de abertura nem campanha. A versão anterior (só as 4 do lote 1) foi substituída antes do envio, para a validação cobrir todas as ligações.
 
 **Base:**
 - Spec vigente: tabela de dependências, R9, R19, R21, R23, R26, R28.7, §6.0.1 e premissas;
@@ -12,7 +17,7 @@
 
 ## 1. O que é exigência, o que é proposta e o que é questão jurídica
 
-| # | Item | Tipo | Fonte (requisito ou trecho) | Efeito nas 4 ligações |
+| # | Item | Tipo | Fonte (requisito ou trecho) | Efeito nas 13 ligações |
 |---|---|---|---|---|
 | 1 | T11 validada antes de contato real | **Exigência expressa** | Spec, tabela de dependências: "T11 · Compliance pré-envio e política de ciclo de vida · Não validado com responsável competente · **Antes de contatos reais da Etapa 1**" | Bloqueia. A ligação ao comprador é contato real |
 | 2 | Tratamento conforme LGPD e "política EAG" | **Exigência expressa** | Constituição P7: "tratados conforme LGPD/GDPR e política EAG" | Exige saber qual é a política da EAG ou se ela existe (questão 13) |
@@ -22,7 +27,7 @@
 | 6 | Descadastro por qualquer meio, inclusive "contato manual", vale antes do próximo contato | **Exigência expressa** | R21.2, R21.3, R21.6 | Já implementado: oposição dita na ligação vira supressão manual |
 | 7 | Descarte comercial não implica conservação indefinida | **Exigência expressa** | R23.4 | Precisa de prazo de retenção dos dados pessoais de quem foi descartado (§3) |
 | 8 | Pedido de exclusão avaliado e executado, incluindo índices e referências | **Exigência expressa** | R23.5, R23.6 | Mecanismo existe; falta validar prazo de resposta e alcance (questão 9) |
-| 9 | Triagem de sanções antes do contato | **Exigência expressa**, política já decidida | R19.2 item 6 e R19.3; decisão de Rogério de 24/09/2026 (OFAC, CEIS, CNEP; 30 dias) | Feita em 06/10: 0 resultados; vale até 24/10/2026 |
+| 9 | Triagem de sanções antes do contato | **Exigência expressa**, política já decidida | R19.2 item 6 e R19.3; decisão de Rogério de 24/09/2026 (OFAC, CEIS, CNEP; 30 dias) | Feita em 06/10 nas 13: 0 resultados; listas válidas até 24/10/2026. Se a T11 for validada depois disso, reimportar as listas e refazer a triagem antes das ligações |
 | 10 | Testes controlados antes de qualquer contato real | Exigência expressa, **aplicação ao telefone a interpretar** | R26.6: "Antes de qualquer contato real, testes controlados DEVEM comprovar envio, recebimento, supressão, pausas…" | O texto fala de canais automáticos. Para ligação manual, pedir confirmação de Rogério; não tratar como bloqueio sem decisão |
 | 11 | Retenção do hash de supressão: sem prazo fixo enquanto houver prospecção, revisão anual | **Proposta não aprovada** | T11-POLITICA §2.1 ("Escolha (proposta)") | Nenhum, até decisão |
 | 12 | Remoção de supressão só em 3 casos (erro, pedido do titular, ordem de autoridade) | **Proposta não aprovada** | T11-POLITICA §2.3 | Nenhum, até decisão |
@@ -47,19 +52,17 @@
 >
 > **1. Finalidade e alcance**
 >
-> - Identificar quem compra milho em 4 unidades industriais num raio de 300 km de Indiara/GO:
->   - Cimilho (Uberlândia/MG);
->   - Cargill (fábrica de amidos, Uberlândia/MG);
->   - São Martinho (Usina Boa Vista, Quirinópolis/GO);
->   - Cargill Bioenergia (Usina São Francisco, Quirinópolis/GO).
-> - Canal: **somente telefone**, pelos números gerais publicados pelas empresas. Sem e-mail, sem WhatsApp e sem campanha automática.
+> - Identificar quem compra milho em 13 unidades industriais num raio de 300 km de Indiara/GO:
+>   - processadoras e usinas: Cimilho (Uberlândia/MG), Cargill (amidos, Uberlândia/MG), São Martinho (Usina Boa Vista, Quirinópolis/GO), Cargill Bioenergia (Usina São Francisco, Quirinópolis/GO), Rei do Milho (Inhumas/GO), Caramuru (Itumbiara/GO);
+>   - fábricas de ração: BRF (Rio Verde/GO) e seis fábricas pequenas em Goiás e Minas Gerais (Pontalina, Paraúna, Itaberaí, Goianápolis, Orizona e Ituiutaba).
+> - Canal: **somente telefone**, pelos números gerais das empresas: os publicados por elas e, quando não há, o telefone do cadastro público da Receita Federal. Sem e-mail, sem WhatsApp e sem campanha automática.
 > - Objetivo da ligação: saber quem cuida da compra de milho e pedir uma conversa de 20–30 min. Sem preço ou oferta na ligação.
 >
 > **2. Dados utilizados (só profissionais e públicos)**
 >
-> - Das empresas: CNPJ, endereço, atividade e evidências públicas (licenças ambientais, relatórios, sites, notícias), com fonte e data.
+> - Das empresas: CNPJ, endereço, atividade e evidências públicas (cadastro do MAPA, Receita Federal, licenças ambientais, relatórios, sites, notícias), com fonte e data. Também a triagem em listas de sanções (OFAC, CEIS, CNEP), só de empresas.
 > - De 6 profissionais: nome, cargo e URL do perfil público no LinkedIn, marcados "a validar". Nenhum e-mail ou telefone pessoal foi coletado ou deduzido.
-> - Canais: telefones e e-mails gerais publicados pelas empresas.
+> - Canais: telefones e e-mails gerais das empresas (publicados por elas ou no cadastro público da Receita). Alguns telefones do cadastro da Receita podem ser de sócios; não são tratados como canal comercial confirmado.
 >
 > **3. Apresentação em nome da EAG**
 >
@@ -108,6 +111,23 @@
 
 **Registro da resposta:** quando a EAG responder, registrar só as decisões expressamente validadas, com responsável, data e alcance de cada uma. Uma resposta parcial não conclui a T11; o que não for respondido continua pendente.
 
+**Respostas da EAG** (preencher só com o que for expressamente validado; "pendente" até lá):
+
+| # | Pergunta | Situação | Resposta validada | Responsável | Data | Alcance |
+|---|---|---|---|---|---|---|
+| 1 | Controlador | pendente | — | — | — | — |
+| 2 | Apresentação "da EAG Agro" com ferramenta pessoal | pendente | — | — | — | — |
+| 3 | Política de privacidade e encarregado (DPO) | pendente | — | — | — | — |
+| 4 | Base legal, balanceamento e registro (Art. 37) | pendente | — | — | — | — |
+| 5 | O que informar ao profissional (origem e oposição) | pendente | — | — | — | — |
+| 6 | Cloudflare e ferramentas fora do Brasil (Art. 33) | pendente | — | — | — | — |
+| 7 | Prazos de guarda (supressão, remoções, caixa, backups) | pendente | — | — | — | — |
+| 8 | Quem atende exclusão que envolve a caixa da EAG | pendente | — | — | — | — |
+| 9 | Prazo de resposta a pedido de exclusão | pendente | — | — | — | — |
+
+- **Encaminhamento:** feito por Rogério (data e destinatário a registrar).
+- **Como o Compass muda depois:** só quando as respostas cobrirem o item 1 (§1). As ligações seguem com a linha "ANTES DE LIGAR" até lá.
+
 ## 3. Retenção: opções para as decisões de Rogério (nenhuma escolhida)
 
 O parecer da EAG (perguntas 7–9) pode restringir ou impor prazos; as opções abaixo valem dentro do que ele permitir.
@@ -140,8 +160,8 @@ O parecer da EAG (perguntas 7–9) pode restringir ou impor prazos; as opções 
 
 **Compass:** tarefa corrigida em produção em 06/10/2026 pela nova edição de tarefas (Worker 9866c2c3): telefone como canal geral da unidade, com fonte e data, e distância de 159,3 km. Mesmo id, revisão 2, histórico registrado e pendência T11 mantida.
 
-## 5. Estado das 4 ligações
+## 5. Estado das 13 ligações
 
-- Aguardando T11 (item 1).
-- Triagem de sanções válida até 24/10/2026.
+- Aguardando T11 (item 1). Próximo passo: Rogério encaminha a mensagem do §2 ao responsável competente da EAG; as respostas são registradas por pergunta, conforme a regra do §2.
+- Triagem de sanções das 13: 0 correspondências; listas válidas até 24/10/2026.
 - Nenhum contato comercial, Snov, campanha ou mudança de regra.
