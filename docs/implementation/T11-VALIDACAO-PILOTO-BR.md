@@ -85,14 +85,14 @@
 >   - a exclusão só foi testada com dados fictícios;
 >   - não há prazo de retenção definido;
 >   - backups do banco, a "volta no tempo" da Cloudflare, a caixa de e-mail e o diário local da ponte guardam cópias até haver regra;
->   - não encontrei política de privacidade publicada no site da EAG (`/politica-de-privacidade` e `/privacidade` deram 404 em 01/10/2026).
+>   - a política de privacidade da EAG **não foi localizada nas fontes que consultei**: `eagagro.com/politica-de-privacidade` e `/privacidade` retornaram 404 em 01/10/2026. Isso não significa que a EAG não tenha uma.
 >
 > **6. Perguntas (respostas objetivas, por favor)**
 >
 > 1. Quem é o controlador destes dados: a EAG, eu, ou ambos?
 > 2. A EAG autoriza que eu me apresente "da EAG Agro" nesta prospecção, feita com ferramenta pessoal?
 > 3. A EAG tem política de privacidade e encarregado (DPO)? Se sim, onde estão?
-> 4. A base legal pode ser o legítimo interesse (LGPD Art. 7 IX)? É preciso registrar o teste de balanceamento e a operação (Art. 37)? Quem faz?
+> 4. Qual é a base legal adequada? Levanto o legítimo interesse (LGPD Art. 7 IX e Art. 10) como **hipótese a avaliar**, ainda sem validação jurídica. Se for essa, é preciso registrar o teste de balanceamento e a operação (Art. 37)? Quem faz?
 > 5. O que devo dizer ao profissional, na ligação ou depois, sobre a origem dos dados e o direito de oposição (Art. 10 §2 e Art. 18)?
 > 6. O uso da Cloudflare e de ferramentas de busca e IA fora do Brasil é aceitável (Art. 33)? Há condição?
 > 7. Por quanto tempo a EAG exige ou permite guardar:
@@ -136,7 +136,7 @@ O parecer da EAG (perguntas 7–9) pode restringir ou impor prazos; as opções 
 - É o **telefone geral da unidade**, não um canal de compras.
 - A mesma página traz a coordenada oficial (-18,5477; -50,4326): **159,3 km** em linha reta do centroide de Indiara (antes: 151,4 km pelo centroide de Quirinópolis).
 
-**Ajuste necessário no Compass:** o roteiro da tarefa em produção ainda diz "telefone não confirmado". Hoje não há rota para editar roteiro de tarefa; corrigir exige decisão (cancelar e recriar a tarefa, ou criar a edição). Até lá, vale o telefone deste documento.
+**Compass:** tarefa corrigida em produção em 06/10/2026 pela nova edição de tarefas (Worker 9866c2c3): telefone como canal geral da unidade, com fonte e data, e distância de 159,3 km. Mesmo id, revisão 2, histórico registrado e pendência T11 mantida.
 
 ## 5. Estado das 4 ligações
 

@@ -1183,3 +1183,27 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 - **Distância:** coordenada oficial da usina (-18,5477; -50,4326) a 159,3 km em linha reta do centroide de Indiara.
 - **Pendência:** o roteiro da tarefa em produção ainda diz "telefone não confirmado"; editar exige decisão.
 - Nada aprovado, enviado ou contatado.
+
+### Edição de tarefas publicada e tarefa da São Martinho corrigida (2026-10-06)
+
+- **Antes:** não havia rota de atualização de tarefa (só criar e concluir).
+- **Implementação** (commit 9576cb9):
+  - `PATCH /api/tasks/:id`, para perfis de escrita: só tarefa aberta, manual e sem ficha; motivo obrigatório; revisão contra edição concorrente (R23.3);
+  - id preservado;
+  - não altera estado, resultado, ficha nem aprovações;
+  - a linha "ANTES DE LIGAR:" (T11) não pode ser retirada.
+  - Histórico em `task_revisions` (migração 0033): valor anterior e novo cifrados, motivo, autor e data; sem UPDATE. O `audit_log` registra só os campos (R8.1.1).
+  - `GET /api/tasks/:id/history`. A exclusão de dados pessoais apaga o histórico junto com o roteiro.
+- **Testes:** 2 casos novos em `tasks.test.mjs`: edição e histórico, recusas (sem motivo, revisão antiga, retirada da T11, leitor, tarefa concluída) e tarefa de ficha congelada sem alterar mensagens nem aprovações. Suíte completa: 406 aprovados, 0 falhas.
+- **Publicação:**
+  - backup privado do D1 antes da migração em `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0033-20261006\eag_compass.sql` (29.581.350 bytes, SHA-256 446E90E9A8A5B833…, acesso só do usuário);
+  - migração 0033 aplicada;
+  - Worker **9866c2c3-0f48-427c-bcbf-7366daa30597**.
+- **Tarefa da São Martinho Boa Vista** (f3e7e383, produção):
+  - telefone (64) 3615-9700 como canal geral da unidade, com fonte (saomartinho.com.br, "Negócios & Unidades") e data (06/10/2026);
+  - distância de 159,3 km em linha reta (haversine) do centroide de Indiara até a coordenada oficial da usina, não rodoviária;
+  - próxima ação: aguardar a T11;
+  - revisão 1 → 2; histórico com 3 campos (`script`, `channel_note`, `next_action`); a tarefa segue aberta, não concluída, com a linha da T11.
+  - Fundamento do perfil comprador atualizado com a nova distância (revisão 2).
+  - Outras 3 tarefas sem alteração.
+- **Estado:** canal `planned`; campanhas inativas; nenhum envio pendente; ponte lendo a caixa.
