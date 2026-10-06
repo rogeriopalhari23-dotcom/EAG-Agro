@@ -43,7 +43,8 @@ import { mapInfo, mapTiles } from "./map-tiles.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
-export const VERSION = "0.3.1-review.2";
+// Não exportar: o workerd trata toda exportação nomeada do módulo principal como entrypoint (falha no wrangler dev).
+const VERSION = "0.3.1-review.2";
 async function route(request, env, rid) {
   const u = new URL(request.url),
     path = u.pathname,

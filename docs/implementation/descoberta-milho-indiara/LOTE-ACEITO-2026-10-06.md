@@ -1,4 +1,4 @@
-# Lote aceito para qualificação: milho GMO, Indiara/GO, 300 km (06/10/2026, revisão 2)
+# Lote aceito para qualificação: milho GMO, Indiara/GO, 300 km (06/10/2026, revisão 3)
 
 **Aceite de Rogério (06/10/2026):**
 - Empresas: Cimilho, Cargill Uberlândia, São Martinho (Usina Boa Vista) e Cargill Bioenergia (Unidade São Francisco).
@@ -11,25 +11,44 @@
 - nenhum telefonema nem mensagem;
 - nenhum representante legal tratado como comprador.
 
-## 1. Situação no Compass (leitura de 06/10/2026)
+## 1. Situação no Compass (atualizada em 06/10/2026, rodada 3)
 
-| Item | Resultado |
+| Ambiente | Situação |
 |---|---|
-| Leitura do D1 de produção (`wrangler d1 execute --remote`, só SELECT) | **Funcionou**: 11 empresas no total, 6 brasileiras |
-| Empresas com as raízes 19980044, 60498706, 51466860 ou 10249419 | **Nenhuma** |
-| Empresas com "Cargill", "Martinho" ou "Cimilho" no nome | **Nenhuma**: não há duplicação a evitar |
-| Unidades em `company_units` com os 4 CNPJs | **Nenhuma** |
-| **Conclusão** | As 4 unidades **não estão cadastradas**. Existem só o arquivo `cadastro-lote-aceito.json` e o script `scripts/cadastrar-lote-aceito.mjs`, testado apenas em simulação |
-| O que bloqueia a gravação | A API exige sessão do Cloudflare Access, e `cloudflared access token` responde "Unable to find token". A gravação direta no banco não foi feita, porque pularia as regras da API |
-| Revisão 2 do pacote | Retirado o canal `coprodutos@saomartinho.com.br`, que atende vendas. Cargos e responsabilidades corrigidos. Incluído Valter Junior (ver 3.3). Método de distância explicitado na fonte |
+| **Local** (`npm run dev`, http://127.0.0.1:8787, D1 local `eag-compass-db`) | **Cadastrado e conferido** pela API |
+| **Produção** (eag-compass-production) | **Não cadastrado.** A leitura do D1 de produção confirmou zero empresas com as 4 raízes. A gravação exige sessão do Cloudflare Access, que segue ausente ("Unable to find token") |
 
-**Comando para gravar** (Rogério, PowerShell; a simulação vem antes, sem `--apply`):
+**O que foi gravado no ambiente local, por empresa:**
+- 1 empresa, cadastrada pelo CNPJ da unidade;
+- 1 evidência empresarial pendente de validação;
+- perfil comprador "possível consumidor final" (porte pendente);
+- pessoas com fonte: Cargill Uberlândia 2, São Martinho 2, Cargill Bioenergia 2, Cimilho 0;
+- canal geral: só Cimilho (e-mail e telefone do site);
+- 1 tarefa "Ligação (nível 0)" aberta, com o roteiro da skill mais o complemento da unidade.
+
+A primeira tentativa falhou sem gravar nada (403, falta de Origin), e a segunda gravou tudo. Duas pessoas voltaram 422 (relevância acima de 300 caracteres) e foram reenviadas com o texto encurtado. Conferência por API: 1 empresa por CNPJ, sem duplicatas.
+
+**Onde ver no painel local:**
+1. Menu **Empresas**, botão **Abrir** na linha da empresa (a lista mostra a razão social: CIMILHO…, CARGILL AGRICOLA S A, SAO MARTINHO S/A, CARGILL BIOENERGIA LTDA.).
+2. Na tela da empresa:
+   - o título mostra a unidade;
+   - o **resumo** mostra "Por que pode comprar" (resumo da oportunidade), "Contato e responsável" (pessoas a validar), **Próxima ação** e o **Roteiro**;
+   - a aba **Contatos** mostra as pessoas (com fonte e responsabilidade a confirmar) e o canal geral;
+   - a aba **Evidências** mostra evidência e perfil.
+3. Menu **Abordagem → Tarefas** (ou "Ver tarefas" em Início): as 4 ligações de nível 0 com roteiro e o formulário "Registrar resultado".
+
+**Para aplicar em produção** (depois do `cloudflared access login`; a simulação vem primeiro, sem `--apply`):
 
 ```powershell
-& "C:\Program Files (x86)\cloudflared\cloudflared.exe" access login https://eag-compass-production.rogeriopalhari23.workers.dev
 $env:CF_ACCESS_TOKEN = & "C:\Program Files (x86)\cloudflared\cloudflared.exe" access token -app=https://eag-compass-production.rogeriopalhari23.workers.dev
 node --use-system-ca scripts/cadastrar-lote-aceito.mjs docs/implementation/descoberta-milho-indiara/cadastro-lote-aceito.json --base https://eag-compass-production.rogeriopalhari23.workers.dev --apply
 ```
+
+As melhorias de tela (próxima ação e roteiro no resumo, unidade no título, contagem de pessoas) só aparecem em produção depois de uma **publicação autorizada** (`npm run deploy`). Sem ela, a produção mostra os dados com a tela atual.
+
+**Limitações:**
+- a lista de Empresas mostra o selo "Sem contato" quando só há pessoas a validar (sem contato aceito);
+- o porte segue "Desconhecido" porque o cadastro manual não cria a ficha da unidade.
 
 ## 2. Distâncias (mesma metodologia para todas)
 
@@ -182,3 +201,17 @@ node --use-system-ca scripts/cadastrar-lote-aceito.mjs docs/implementation/desco
 | São Martinho Boa Vista | Gerente de originação de milho (desde 01/2026; decisor não confirmado) | Nenhum canal de compra de milho público (coprodutos@ é vendas) | Compra de cerca de 439 mil t (2024); 120 fornecedores de milho homologados; 495 mil t previstas (2026/27) | Canal de homologação de fornecedor de milho; GMO |
 | Cargill Bioenergia São Francisco | **Nenhum confirmado.** Coordenador de Negócios em Quirinópolis (função atual não descrita) e gerente de suprimentos (milho não declarado) | Telefone geral da unidade publicado | Compra de milho e sorgo por originação própria até 09/2025; operação em 2026 | Originador atual; GMO |
 | Cimilho | **Nenhum** | E-mail e telefone gerais do site | Processa e vende milho (site sem data); LAS 2018 | Quem compra e de quem; GMO |
+
+## 5. Rodada 3: buscas específicas de canal (06/10/2026)
+
+| Unidade | Resultado |
+|---|---|
+| Cargill Uberlândia | Nenhum canal oficial de originação ou homologação de milho para a fábrica. Canais existentes: telefone geral da unidade (34) 3218-4900 [cargill.com.br/localidades]; GPS Cargill (produtor, por convite); Central de Fornecedores Aravo (materiais e serviços, por convite) |
+| São Martinho Boa Vista | Nenhum canal oficial de fornecedor de milho nem telefone público da unidade. Portal de Compras Paradigma: só Suprimentos. Indício de relação direta com fornecedores: Luciano Jorge Silva relata contato com "parceiros e fornecedores de milho em Goiás" na Tecnoshow (LinkedIn, 11/04/2026). **Telefone: pendência explícita** |
+| Cargill Bioenergia São Francisco | Pesquisa pública esgotada. Ligação pelo telefone geral da unidade (64) 3615-9500 |
+| Cimilho | Pesquisa pública esgotada. Ligação pelo canal geral (34) 3213-4242 / 3213-4251 |
+
+**Roteiro de abertura:**
+- o roteiro da skill (nível 0) foi mantido sem alteração;
+- o complemento da unidade identifica "Rogerio Palhari, da EAG Agro" e pergunta quem cuida da compra de milho da unidade, como pedido. Não usa a fórmula que a skill proíbe ("poderia falar com o setor de compras?");
+- a primeira linha lembra que o contato real depende da T11.

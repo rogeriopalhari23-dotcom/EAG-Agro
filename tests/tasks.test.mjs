@@ -88,4 +88,14 @@ check("P2-T14: reunião cria confirmação na manhã; linha do tempo e funil sem
   const l0 = await ctx.api(`/api/companies/${r.companyId}/level0`, "POST", { commodity: "sugar" });
   assert.equal(l0.status, 201);
   assert.match(ctx.DB.raw.prepare("SELECT script FROM tasks WHERE kind='call_l0'").get().script, /para quem eu endereço/);
+  // Repetir não duplica; o complemento da unidade vem depois do roteiro da skill e aparece na tela da empresa.
+  const dup = await ctx.api(`/api/companies/${r.companyId}/level0`, "POST", { commodity: "sugar", unitScript: "Pergunta extra" });
+  assert.equal(dup.status, 409);
+  const corn = await ctx.api(`/api/companies/${r.companyId}/level0`, "POST", { commodity: "corn", unitScript: "Aceita milho GMO?" });
+  assert.equal(corn.status, 201);
+  const script = ctx.DB.raw.prepare("SELECT script FROM tasks WHERE id=?").get(corn.data.id).script;
+  assert.ok(script.indexOf("para quem eu endereço") < script.indexOf("Aceita milho GMO?"));
+  const view = await ctx.api(`/api/companies/${r.companyId}`);
+  assert.ok(view.data.openTasks.some((t) => t.id === corn.data.id && /Aceita milho GMO\?/.test(t.script)));
+  assert.equal(typeof view.data.peopleCount, "number");
 });

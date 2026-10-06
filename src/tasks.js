@@ -84,9 +84,15 @@ export async function createLevel0(request, env, actor, rid, companyId) {
   await company(env, actor, companyId);
   const i = await bodyJson(request);
   const commodity = str(i.commodity, "commodity", 40);
+  // Uma ligação de nível 0 aberta por empresa e commodity: repetir o cadastro não duplica a tarefa.
+  const open = await s(env, "SELECT id FROM tasks WHERE tenant_id=? AND company_id=? AND commodity=? AND kind='call_l0' AND status='open'", actor.tenant_id, companyId, commodity).first();
+  if (open) fail(409, "task_duplicate", "Já existe ligação de nível 0 aberta para esta empresa e commodity.", { id: open.id });
+  // Complemento da unidade (perguntas e pendências próprias) vem depois do roteiro da skill, que não é alterado.
+  const unitScript = str(i.unitScript, "roteiro da unidade", 4000, true);
+  const script = unitScript ? `${LEVEL0_SCRIPT}\n\n— Desta unidade —\n${unitScript}` : LEVEL0_SCRIPT;
   const id = crypto.randomUUID();
   await commit(env, [
-    s(env, "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script) VALUES (?,?,?,?,'call_l0',?,?,0,?)", id, actor.tenant_id, companyId, commodity, actor.id, str(i.dueDate || now().slice(0, 10), "data", 10), LEVEL0_SCRIPT),
+    s(env, "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script) VALUES (?,?,?,?,'call_l0',?,?,0,?)", id, actor.tenant_id, companyId, commodity, actor.id, str(i.dueDate || now().slice(0, 10), "data", 10), script),
     auditStatement(env, actor, rid, "task.created", "task", id, { kind: "call_l0", companyId }),
   ]);
   return { id };

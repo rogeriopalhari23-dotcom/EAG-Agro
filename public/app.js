@@ -1221,7 +1221,9 @@ function companySummary(data, goTab) {
       ? "Canal geral da empresa; responsável por compras ainda não identificado"
       : contacts.length
         ? `${contacts.length} contato(s); nenhum decisor identificado`
-        : "Nenhum contato registrado";
+        : data.peopleCount
+          ? `${data.peopleCount} pessoa(s) de compras a validar; responsabilidade de compra não confirmada`
+          : "Nenhum contato registrado";
   let pending, action;
   if (!profile) (pending = "Perfil comprador não registrado para a commodity."), (action = ["Registrar perfil", "evidencias"]);
   else if (!profile.ficha?.ok) (pending = profile.ficha?.reason || "Perfil ainda não permite ficha."), (action = ["Ver perfil e evidências", "evidencias"]);
@@ -1234,6 +1236,25 @@ function companySummary(data, goTab) {
   } else if (data.openFichas?.length) (pending = `Ficha ${lbl(data.openFichas[0].status).toLowerCase()}; acompanhe os envios em Abordagem.`), (action = ["Abrir ficha", () => showFicha(data.openFichas[0].id)]);
   else (pending = "Pronta para preparar a ficha; o envio só acontece após aprovação individual."), (action = ["Preparar ficha", "ficha"]);
   const item = (k, v, extra) => el("div", {}, text("span", k, "k"), text("strong", v), extra ? text("small", extra) : null);
+  // Próxima ação já registrada (tarefa aberta) prevalece sobre a sugestão calculada; o roteiro fica à mão.
+  const task = (data.openTasks || [])[0];
+  if (task)
+    return el(
+      "div",
+      { class: "company-summary" },
+      item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
+      item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
+      item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
+      item("Contato e responsável", contact),
+      item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`),
+      el(
+        "div",
+        { class: "next" },
+        el("p", {}, text("strong", "Próxima ação: "), `${TASK_KIND[task.kind] || task.kind} — vence ${task.due_date}. Registre o resultado em Tarefas.`),
+        task.script ? details("Roteiro", el("pre", { class: "message" }, task.script)) : null,
+        button("Abrir Tarefas", () => (document.querySelector("dialog.drawer")?.close(), navigate("Tarefas")), true),
+      ),
+    );
   return el(
     "div",
     { class: "company-summary" },
@@ -1268,7 +1289,7 @@ async function companyNode(id, offset = 0, inDrawer = false) {
   const data = await api(`/api/companies/${id}?limit=50&offset=${offset}`);
   const c = data.company,
     node = section(
-      c.legal_name,
+      c.trade_name ? `${c.trade_name} (${c.legal_name})` : c.legal_name,
       `${c.country_code} · ${statusLabels[c.pipeline_status]} · Fonte: ${c.source_label}`,
     );
   if (!inDrawer) node.append(button("Voltar às empresas", () => navigate("Empresas")));

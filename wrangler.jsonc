@@ -78,6 +78,8 @@
   "env": {
     "local": {
       "name": "eag-compass-local",
+      // Sem herdar o domínio de produção: no wrangler dev a URL da requisição continua 127.0.0.1 (login local).
+      "routes": [],
       "vars": {
         "ENVIRONMENT": "local",
         "ALLOW_LOCAL_AUTH": "true",

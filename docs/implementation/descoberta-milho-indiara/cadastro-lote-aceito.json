@@ -37,7 +37,15 @@
           "timezone": "America/Sao_Paulo"
         }
       ],
-      "people": []
+      "people": [],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Processadora de milho (EPP) em Uberlândia/MG, 263 km em linha reta de Indiara: fabrica derivados de milho para ração e indústria, vende milho em grão e armazena grãos (site, consulta 06/10/2026). Compra de terceiros não comprovada; GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (34) 3213-4242 ou (34) 3213-4251 — publicados em cimilho.com.br (consulta 06/10/2026)\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho da Cimilho aí em Uberlândia? Encontro essa pessoa neste número?\nQualificação (com quem cuida da compra de milho):\n1. Vocês compram milho de terceiros ou só processam milho de clientes? (o site oferece armazenagem e moagem para terceiros — isso não é compra)\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho desta fábrica?\n4. Como funciona a homologação de fornecedores de milho?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: nenhuma pessoa identificada; compra de terceiros não comprovada; GMO a confirmar. Pesquisa pública esgotada."
+      }
     },
     {
       "chave": "cargill-uberlandia",
@@ -84,7 +92,15 @@
           "roleSuggestion": "influencer",
           "relevance": "Merchant de amidos e adoçantes desde 12/2023 (perfil público, 08/2026): origina milho waxy e Non-GMO; para milho regular, garante disponibilidade para as fábricas em alinhamento com a CASC (originação de grãos da Cargill). Compra do milho regular parece passar pela CASC; a confirmar."
         }
-      ]
+      ],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Fábrica de amidos e adoçantes em Uberlândia/MG, 256,5 km em linha reta de Indiara (coordenada oficial): planta de milho de 60 mil t/mês de capacidade; milho 'fornecido por fazendeiros, cooperativas e corretores' (Parecer SUPRAM 25/01/2021). Operação atual indicada por vaga de 09/2026. GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (34) 3218-4900 — unidade Amidos e Adoçantes Uberlândia, cargill.com.br/localidades (consulta 06/10/2026)\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho para a fábrica de amidos de Uberlândia? É com a originação de milho (Vinicius Figueiredo) ou com a originação de grãos da região?\nQualificação (com quem cuida da compra de milho):\n1. Vocês compram milho de terceiros ou só processam milho de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO? (o merchant cita milho waxy e Non-GMO; o 'regular' não prova GMO)\n3. Qual unidade e qual pessoa decidem a compra de milho desta fábrica? (CSSTSA x mesa regional CASC)\n4. Como funciona a homologação de fornecedores de milho?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: decisor não confirmado; GMO a confirmar; operação 2025–26 só por vaga de 09/2026."
+      }
     },
     {
       "chave": "sao-martinho-boa-vista",
@@ -121,7 +137,7 @@
           "sourceKind": "linkedin_manual",
           "sourceUrl": "https://linkedin.com/in/luciano-jorge-silva-a9242a57",
           "roleSuggestion": "decision_maker",
-          "relevance": "Gerente de Originação de Milho e Comercialização de Coprodutos desde 01/2026, base em Rio Verde/GO (perfil público, 27/08/2026); lidera originação e segurança de abastecimento da operação de etanol de milho. Unidade atendida: Boa Vista é a única planta de milho do grupo (BNDES; RPAnews 01/04/2026). Decisor não confirmado."
+          "relevance": "Gerente de Originação de Milho e Coprodutos desde 01/2026, base Rio Verde/GO (LinkedIn, 27/08/2026). Boa Vista é a única planta de milho do grupo. Responsabilidade pela compra desta unidade a confirmar; decisor não confirmado."
         },
         {
           "name": "Helder Gosling",
@@ -131,7 +147,15 @@
           "roleSuggestion": "influencer",
           "relevance": "Citado (12/2025) sobre o abastecimento de milho da Unidade Boa Vista e a relação com fornecedores de milho. Nível de diretoria corporativa; responsabilidade direta de compra não confirmada."
         }
-      ]
+      ],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Usina Boa Vista (etanol de milho) em Quirinópolis/GO, 151 km em linha reta de Indiara (centroide): compra de milho de cooperativas, tradings e produtores; ~439 mil t compradas até 31/03/2024 (carta financeira 17/06/2024); 495 mil t previstas em 2026/27 (RPAnews 27/05/2026). GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: NÃO CONFIRMADO — nenhum telefone público da Unidade Boa Vista para compra de milho foi encontrado (coprodutos@ e seus telefones atendem vendas e não são usados). Pendência: localizar o telefone da unidade antes de ligar.\nAbertura (quando houver telefone): Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da originação de milho da Unidade Boa Vista? É com o Luciano Jorge Silva?\nQualificação (com quem cuida da compra de milho):\n1. Vocês compram milho de terceiros ou só processam milho de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho desta fábrica?\n4. Como funciona a homologação de fornecedores de milho? (relatório cita 120 fornecedores de milho homologados com critérios socioambientais; o Portal de Compras Paradigma é de Suprimentos)\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: telefone não confirmado; decisor não confirmado; GMO a confirmar."
+      }
     },
     {
       "chave": "cargill-bioenergia-sao-francisco",
@@ -175,9 +199,17 @@
           "sourceKind": "linkedin_manual",
           "sourceUrl": "https://linkedin.com/in/valter-junior-654433111",
           "roleSuggestion": "influencer",
-          "relevance": "Desde 09/2025 Coordenador de Negócios II na Cargill em Quirinópolis; antes (07/2022–09/2025) originação de grãos (milho/sorgo) e venda de coprodutos na SJC Bioenergia (perfil público, 12/09/2026). O perfil não descreve o cargo atual: responsabilidade pela originação de milho da Usina São Francisco a confirmar."
+          "relevance": "Vínculo atual: Coordenador de Negócios II na Cargill, Quirinópolis, desde 09/2025 (LinkedIn, 12/09/2026). Antes originou milho/sorgo na SJC (até 09/2025). Responsabilidade atual por milho DESCONHECIDA; não é comprador confirmado."
         }
-      ]
+      ],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Usina São Francisco (cana e milho) em Quirinópolis/GO, 151 km em linha reta de Indiara (centroide): processa milho em 2025/26 (STG News 01/09/2026); maceração de 600 mil t/ano (Globo Rural 11/06/2025); originação própria de milho e sorgo até 09/2025. Originador atual e GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (64) 3615-9500 — Cargill Bioenergia Quirinópolis, cargill.com.br/localidades (consulta 06/10/2026)\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida hoje da originação de milho da Usina São Francisco?\nQualificação (com quem cuida da compra de milho):\n1. Vocês compram milho de terceiros ou só processam milho de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho desta fábrica? (Valter Junior é Coordenador de Negócios em Quirinópolis; responsabilidade atual por milho desconhecida — perguntar, não afirmar)\n4. Como funciona a homologação de fornecedores de milho?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: originador atual não identificado (pesquisa pública esgotada); GMO a confirmar."
+      }
     }
   ]
 }

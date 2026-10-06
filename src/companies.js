@@ -138,6 +138,16 @@ export async function getCompany(request, env, actor, id) {
     await s(env, "SELECT * FROM company_units WHERE tenant_id=? AND company_id=? ORDER BY cnpj", actor.tenant_id, id).all()
   ).results;
   out.profiles = await listProfiles(env, actor, id);
+  // Pessoas de compras encontradas (a validar): o resumo não deve dizer "nenhum contato" quando há pessoas com fonte.
+  out.peopleCount = (
+    await s(env, "SELECT COUNT(*) n FROM person_candidates WHERE tenant_id=? AND company_id=? AND status<>'dismissed'", actor.tenant_id, id).first()
+  ).n;
+  // Próxima ação registrada (tarefas abertas) com o roteiro, para a tela da empresa.
+  out.openTasks = await Promise.all(
+    (
+      await s(env, "SELECT id,kind,commodity,due_date,script FROM tasks WHERE tenant_id=? AND company_id=? AND status='open' ORDER BY due_date,created_at LIMIT 5", actor.tenant_id, id).all()
+    ).results.map(async (t) => ({ ...t, script: t.script?.startsWith("enc:") ? await decryptPii(t.script.slice(4), env) : t.script })),
+  );
   // Condições R12.10 (empresas no exterior): estado e evidência por commodity.
   out.conditions = (
     await s(env, "SELECT product_id,condition,status,evidence_id,note,updated_by,updated_at FROM company_conditions WHERE tenant_id=? AND company_id=? ORDER BY product_id,condition", actor.tenant_id, id).all()

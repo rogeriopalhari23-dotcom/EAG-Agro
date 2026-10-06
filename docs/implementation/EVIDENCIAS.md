@@ -1077,3 +1077,22 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
 - **Correção:** o texto anterior dizia que o ex-originador da Cargill Bioenergia (Valter Junior) "saiu em 02/2026". A postagem era de outra pessoa; ele segue na Cargill em Quirinópolis, com função atual não descrita.
 - **Pacote:** retirado `coprodutos@` (vendas).
 - **Suíte:** não repetida, porque só houve mudança de documentos e dados.
+### Lote aceito — rodada 3: registros utilizáveis (2026-10-06)
+
+- **Local (D1 `eag-compass-db`, `npm run dev`):** as 4 unidades estão cadastradas pela API, cada uma com:
+  - evidência pendente;
+  - perfil "possível consumidor final";
+  - pessoas com fonte (2, 2, 2 e 0);
+  - canal geral (só Cimilho);
+  - ligação de nível 0 com roteiro da unidade.
+  - Conferido por API e pela tela, por screenshot do Chrome headless.
+- **Produção:** não cadastrado; a sessão do Access segue ausente. A leitura do D1 de produção mostra 0 empresas nas 4 raízes.
+- **Código:**
+  - `POST /companies/:id/level0` aceita `unitScript`, colocado depois do roteiro da skill, e recusa uma segunda ligação aberta para a mesma empresa e commodity (409);
+  - `GET /companies/:id` devolve `openTasks` (com roteiro) e `peopleCount`;
+  - a tela da empresa mostra a próxima ação registrada e o roteiro, a unidade no título e as pessoas a validar;
+  - `VERSION` deixou de ser exportação do worker, porque o workerd local recusava exportação que não é entrypoint;
+  - `env.local` ganhou `routes: []`, porque o wrangler dev herdava o domínio de produção e quebrava o login local.
+  - Testes: `tasks.test.mjs` com casos novos; suíte completa com 403 aprovados e 0 falhas.
+  - **Não publicado.**
+- **Buscas específicas:** nenhum canal oficial de compra de milho para a Cargill Uberlândia nem para a São Martinho Boa Vista. O telefone da Boa Vista fica como pendência explícita.
