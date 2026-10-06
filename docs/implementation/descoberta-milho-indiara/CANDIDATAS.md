@@ -65,11 +65,11 @@
 | Registros ativos com atividade de **fabricante** | 445 |
 | **Estabelecimentos MAPA únicos** | **445**: 389 por CNPJ completo conferido (nenhum CNPJ repetido) e 56 só pelo registro, com CNPJ a conciliar |
 | Candidatas da pesquisa manual (rodada 1) | 36 |
-| Manuais com o **mesmo CNPJ completo** de um registro MAPA (fundidas) | 4 (SuperFrango ×3, Comigo Rio Verde) |
-| Manuais mantidas como linha própria | 32 |
-| Linhas em `candidatas.csv` | 477 |
-| Manuais com **possível correspondência** a registro MAPA (a conciliar) | 21, ligadas a 26 registros MAPA |
-| **Estabelecimentos distintos** | **entre 456 e 477**: o valor exato depende da conciliação desses 21 casos |
+| Manuais com o **mesmo CNPJ completo** de um registro MAPA (fundidas) | 7 (SuperFrango ×3, Comigo Rio Verde, Rei do Milho, São Martinho Boa Vista, Cargill Bioenergia São Francisco) |
+| Manuais mantidas como linha própria | 29 |
+| Linhas em `candidatas.csv` | 474 |
+| Manuais com **possível correspondência** a registro MAPA (a conciliar) | 18, ligadas a 23 registros MAPA |
+| **Estabelecimentos distintos** | **entre 456 e 474**: o valor exato depende da conciliação desses 18 casos |
 
 **Papéis entre os 445 estabelecimentos MAPA** (o papel é independente do porte):
 
@@ -88,7 +88,7 @@
   - Demais (não indica média nem grande) 202; não consultado 51; EPP (pequena) 52; ME (micro) 100;
   - "Demais" só diz que **não** é ME nem EPP, sem distinguir média de grande;
   - porte só desempata.
-- **Matriz/filial:** filial 101; matriz 253; não consultado 51.
+- **Matriz/filial:** matriz 253; filial 101; não consultado 51.
 - **Raiz de CNPJ:** 42 estabelecimentos dividem a raiz com outra unidade no raio, ou seja, são a mesma pessoa jurídica. Isso **não** é "grupo econômico", campo que fica "não pesquisado" salvo fonte.
 - **Evidência de milho:** nenhuma das linhas só-MAPA tem evidência específica. O registro **indica a atividade** e não prova compra de milho.
 - **Milho GMO:** "a confirmar" em todas, salvo restrição registrada numa linha ou unidade (seção 7).
@@ -104,18 +104,22 @@ A evidência sobre a empresa fica no nível da empresa.
 
 | Situação | Qtde | Casos |
 |---|---|---|
-| **Vínculo confirmado** por CNPJ publicado na fonte da evidência | **1** | Cargill Uberlândia (M08): parecer IGAM/COPAM com CNPJ 60.498.706/0134-88 |
-| **Vínculo confirmado** pelo cadastro oficial da própria unidade, com o mesmo CNPJ no MAPA | **4** | SuperFrango NV (M12), Itaberaí (M14, M15) e Comigo Rio Verde (M17). Todos são **indícios**, sem evidência específica de milho |
+| **Vínculo confirmado** por CNPJ e endereço publicados na fonte da evidência | **1** | Cargill Uberlândia (M08): parecer IGAM/COPAM 2021 com CNPJ, endereço e coordenada |
+| **Vínculo confirmado** por endereço da fonte igual ao da Receita | **1** | Rei do Milho (M02): endereço do site = endereço do CNPJ 05.574.242/0001-02 |
+| **Vínculo confirmado** por cadastro oficial com nome ou endereço da unidade, mesmo CNPJ no MAPA | **2** | São Martinho (M06: Receita "Fazenda Boa Vista", CNAE álcool) e Cargill Bioenergia (M07: Receita "USF Usina São Francisco") |
+| **Vínculo confirmado** pelo cadastro oficial da própria unidade, mesmo CNPJ no MAPA, só indício | **4** | SuperFrango NV (M12), Itaberaí (M14, M15) e Comigo Rio Verde (M17) |
 | CNPJ da unidade pelo cadastro oficial, sem registro MAPA com o mesmo CNPJ | 2 | Premix Anápolis (M19), Cargill Agro Rio Verde (T01, trader) |
-| **Vínculo sugerido** (nome e município), a conciliar | **21 candidatas manuais ↔ 26 registros MAPA** | ver colunas "Registro MAPA" e "Possível correspondência" |
+| **Vínculo sugerido** (nome e município), a conciliar | **18 candidatas manuais ↔ 23 registros MAPA** | ver colunas "Registro MAPA" e "Possível correspondência" |
 | Sem registro MAPA sugerido | 11 | Usina Rio Verde, JBS Aruanã, Fazenda Tropical, Agrocria, Confinamento Pontal, Rialma Agropecuária, Cargill Agro (T01), Gravos e os 3 projetos |
 
-Evidência específica de milho (12):
-- 1 tem vínculo confirmado com a unidade (M08);
-- 8 descrevem a unidade, mas sem CNPJ na fonte (M01, M03, M05, M06, M07, M09, M10, R02);
-- 3 são do nível da empresa (M02 Rei do Milho, M04 Usina Rio Verde, R01 Milhão).
+Evidência específica de milho (10, depois da revisão de 06/10/2026):
+- 4 com vínculo confirmado com a unidade: M02, M06, M07, M08;
+- 5 descrevem a unidade, mas o CNPJ só é sugerido: M01 Gem, M03 BRF, M05 Caramuru, M09 JBJ, R02 BRMill;
+- 1 do nível da empresa: R01 Milhão.
 
-Os 26 registros MAPA sugeridos continuam como linhas próprias, com "possível correspondência".
+Rebaixadas na revisão:
+- **Usina Rio Verde (M04)** passa a indício, porque "etanol de grãos" não comprova milho.
+- **JBS Aruanã (M10)** passa a histórica, porque a fonte de 2014 não comprova a operação atual (seção 6).
 
 ## 6. Primeiro lote para o aceite de Rogério: evidência específica de milho
 
@@ -126,23 +130,28 @@ Critérios:
 
 A coluna "Registro MAPA" mostra só a **sugestão**: aceitar a candidata não concilia o CNPJ.
 
-| # | Candidata (id) | Município | km | Evidência de milho [fonte] | Nível da evidência | CNPJ da unidade | Registro MAPA | Milho GMO |
+| # | Candidata (id) | Município | km | Evidência de milho [fonte] | Nível da evidência | CNPJ da unidade | Registro MAPA / CNPJ sugerido | Milho GMO |
 |---|---|---|---|---|---|---|---|---|
-| 1 | **Gem Alimentos — usina de etanol de milho** (M01) | Acreúna/GO | 48,2 | Etanol de milho habilitado pela ANP (até 120 mil L/dia); moagem, laminação e amido [Empreender em Goiás 27/02/2023] | nível unidade | não encontrado | possível correspondência com registro MAPA GO0009253 25.006.271/0001-85 (Acreúna/GO) — a conciliar | a confirmar |
-| 2 | **Rei do Milho Alimentos** (M02) | Inhumas/GO | 108,8 | Moagem de milho: canjica, grits, fubá, gérmen [reidomilho.com.br, consultado em 06/10/2026] | nível empresa | não encontrado | possível correspondência com registro MAPA GO0012572 05.574.242/0001-02 (Inhumas/GO) — a conciliar | a confirmar |
-| 3 | **BRF/MBRF — complexo de Rio Verde (fábrica de rações)** (M03) | Rio Verde/GO | 129,2 | Ração com milho e sorgo locais; ~750 mil t de milho e farelo de soja em 2007 [Folha de S.Paulo 23/06/2014; artigo UNIFACS; Política em Goiás 18/09/2024] | nível unidade | não encontrado | possível correspondência com registro MAPA GO0009520 01.838.723/0172-83 (Rio Verde/GO) — a conciliar | a confirmar |
-| 4 | **Usina Rio Verde** (M04) | Rio Verde/GO | 129,2 | Etanol de grãos, DDG e WDG (milho não nomeado na fonte) [usinarioverde.com.br, consultado em 06/10/2026] | nível empresa | não encontrado | nenhum registro MAPA sugerido | a confirmar |
-| 5 | **Caramuru Alimentos — fábrica de processamento de milho** (M05) | Itumbiara/GO | 142,4 | Fábrica de milho desde 1975: fubá, canjica, flocos, óleo; também origina grãos [Relatório Caramuru 2020] | nível unidade | não encontrado | possível correspondência com registro MAPA GO0009970 00.080.671/0001-00 (Itumbiara/GO) — a conciliar | a confirmar; a empresa declara linha de produtos não transgênicos (restrição dessa linha, não de toda a operação) |
-| 6 | **São Martinho — Usina Boa Vista, planta de milho** (M06) | Quirinópolis/GO | 151,4 | Etanol de milho: 500 mil t/ano em operação (ampliação de 2027 é projeto à parte) [Globo Rural 11/08/2025] | nível unidade | não encontrado | possível correspondência com registro MAPA GO0008761 51.466.860/0062-78 (Quirinópolis/GO) — a conciliar | a confirmar |
-| 7 | **Cargill Bioenergia — Unidade São Francisco** (M07) | Quirinópolis/GO | 151,4 | Etanol de cana e de milho; óleo de milho e DDG [Notícia da Hora 31/08/2026] | nível unidade | não encontrado | possível correspondência com registro MAPA GO0011258 10.249.419/0002-16 (Quirinópolis/GO) — a conciliar | a confirmar |
-| 8 | **Cargill — complexo de Uberlândia** (M08) | Uberlândia/MG | 268,1 | Planta de milho de 60 mil t/mês (amido, glúten, óleo) [Parecer IGAM/COPAM de 25/01/2021 (publica o CNPJ do empreendimento)] | nível unidade | 60.498.706/0134-88 (CNPJ publicado na fonte da evidência (parecer IGAM/COPAM)) | possível correspondência com registro MAPA MG0001937 CNPJ a conciliar (Uberlândia/MG) — a conciliar | a confirmar |
-| 9 | **Grupo JBJ — confinamento Fazenda Colorado** (M09) | Aruanã/GO | 284,1 | Confinamento com mais de 1.000 t de ração/dia; produz parte do próprio milho [Curta Mais 05/01/2026] | nível unidade | não encontrado | possível correspondência com registro MAPA GO0011355 15.689.716/0022-40 (Aruanã/GO) — a conciliar | a confirmar |
-| 10 | **JBS — confinamento com fábrica de ração** (M10) | Aruanã/GO | 284,1 | Fábrica de ração de 100 t/h no confinamento; fonte de 2014, conferir se segue ativa e se é a mesma área da JBJ [ACSURS 07/05/2014] | nível unidade | não encontrado | nenhum registro MAPA sugerido | a confirmar |
+| 1 | **Gem Alimentos — usina de etanol de milho** (M01) | Acreúna/GO | 48,2 (centroide) | Autorização ANP (DOU 23/02/2023) para etanol de milho, até 120 mil L/dia; a empresa mói milho e modifica amido. Operação atual não confirmada por fonte de 2024–2026; compra de milho de terceiros não declarada [Empreender em Goiás 27/02/2023; JornalCana 24/02/2023] | nível unidade | não confirmado | CNPJ sugerido: 25.006.271/0001-85 (Receita: GEM e/ou GEM ALIMENTOS, BR-060 km 308, Acreúna; CNAE secundário álcool e óleo de milho) — nome e município batem, mas a fonte não traz CNPJ nem endereço da usina · possível correspondência com registro MAPA GO0009253 25.006.271/0001-85 (Acreúna/GO) — a conciliar | a confirmar |
+| 2 | **Rei do Milho Alimentos** (M02) | Inhumas/GO | 106,5 (coordenada) | Moagem de milho (creme, sêmola, grits, fubá, gérmen); parque de 140 mil m² em Inhumas desde 1999. Compra de milho de terceiros não declarada. Razão social atual: 'em recuperação judicial' [reidomilho.com.br, consultado em 06/10/2026] | nível unidade | 05.574.242/0001-02 — confirmado: registro MAPA (CNPJ da lista oficial conferido pela máscara do CSV); endereço do site (Rod. GO-426 km 01, 2024, Bloco B, Inhumas) = endereço da Receita do CNPJ | mesmo CNPJ: GO0012572 | a confirmar |
+| 3 | **BRF/MBRF — complexo de Rio Verde (fábrica de rações)** (M03) | Rio Verde/GO | 129,2 (centroide) | Ração com milho e sorgo locais; ~750 mil t de milho e farelo de soja em 2007 (dados de 2007–2014). A unidade segue operando (8 mil funcionários, 2026), mas o uso atual de milho não foi confirmado por fonte recente [Folha de S.Paulo 23/06/2014; artigo UNIFACS; AgFeed 21/02/2026 (operação)] | nível unidade | não confirmado | CNPJ sugerido: 01.838.723/0172-83 (único registro de ração BRF em Rio Verde no MAPA; Receita: BR-060 km 394, CNAE abate de suínos) — a fonte da evidência não traz CNPJ nem endereço da fábrica · possível correspondência com registro MAPA GO0009520 01.838.723/0172-83 (Rio Verde/GO) — a conciliar | a confirmar |
+| 4 | **Caramuru Alimentos — fábrica de processamento de milho** (M05) | Itumbiara/GO | 142,4 (centroide) | Site da empresa: unidade de Itumbiara com processamento de milho de 24 mil t/mês, degerminação 960 t/dia, pré-cozido 5 mil t/mês (página sem data). Também origina grãos; compra de terceiros não declarada nessa página [caramuru.com, página 'Unidades industriais – Itumbiara', consultada em 06/10/2026] | nível unidade | não confirmado | CNPJ sugerido: 00.080.671/0001-00 é o CNPJ da matriz publicado pela própria empresa (Via Expressa Júlio Borges de Souza, 4240, Itumbiara); há outras filiais no mesmo complexo (0032-06 no nº 4240; 0033-97 no nº 4200) — qual delas opera a fábrica de milho fica a confirmar · possível correspondência com registro MAPA GO0009970 00.080.671/0001-00 (Itumbiara/GO) — a conciliar | a confirmar; a empresa declara linha de produtos não transgênicos (restrição dessa linha, não de toda a operação) |
+| 5 | **São Martinho — Usina Boa Vista, planta de milho** (M06) | Quirinópolis/GO | 151,4 (centroide) | Em operação: previsão de 495 mil t de milho na safra 2026/27 (manutenção ampliada pela 2ª fase). Compra de milho de terceiros não declarada nas fontes; a ampliação de 2027 é projeto à parte [RPAnews 27/05/2026; BNDES (operação desde 2023/24)] | nível unidade | 51.466.860/0062-78 — confirmado: registro MAPA (CNPJ da lista oficial conferido pela máscara do CSV); cadastros oficiais: Receita (Rod. GO-164 km 10, Fazenda Boa Vista, CNAE fabricação de álcool) e registro MAPA GO0008761 de ingrediente no mesmo CNPJ | mesmo CNPJ: GO0008761 | a confirmar |
+| 6 | **Cargill Bioenergia — Unidade São Francisco** (M07) | Quirinópolis/GO | 151,4 (centroide) | Em operação em 2025/26: cana e milho; maceração de 600 mil t de milho/ano; óleo de milho e DDG. Compra de milho de terceiros não declarada [STG News 01/09/2026; Globo Rural 11/06/2025] | nível unidade | 10.249.419/0002-16 — confirmado: registro MAPA (CNPJ da lista oficial conferido pela máscara do CSV); cadastro oficial: Receita com nome fantasia 'USF USINA SAO FRANCISCO' (Rod. GO-206 km 18, Fazenda São Francisco) e registro MAPA GO0011258 no mesmo CNPJ | mesmo CNPJ: GO0011258 | a confirmar |
+| 7 | **Cargill — complexo de Uberlândia** (M08) | Uberlândia/MG | 256,5 (coordenada) | Planta de milho com capacidade nominal de 60 mil t/mês (glúten, amido, óleo); 'milho também fornecido por fazendeiros, cooperativas e corretores' — compra de terceiros declarada. Licença renovada em 2021 por 8 anos; operação 2025–2026 não confirmada por fonte própria recente [Parecer Único SUPRAM TM 0138312/2021, de 25/01/2021] | nível unidade | 60.498.706/0134-88 — confirmado: CNPJ e endereço (Rua Will Cargill, 880) publicados na fonte da evidência; mesmo endereço na Receita | possível correspondência com registro MAPA MG0001937 CNPJ a conciliar (Uberlândia/MG) — a conciliar | a confirmar |
+| 8 | **Grupo JBJ — confinamento Fazenda Colorado** (M09) | Aruanã/GO | 284,1 (centroide) | Mais de 1.000 t de ração/dia; 'parte significativa do milho' é produzida no próprio sistema — produção própria não comprova compra de terceiros [Curta Mais 05/01/2026] | nível unidade | não confirmado | CNPJ sugerido: 15.689.716/0022-40 'JBJ NUTRICAO ANIMAL' (registro MAPA; endereço na GO-530 km 30, Fazenda Planura). A Fazenda Colorado tem outros CNPJs da mesma raiz (0033-00, 0032-11) — a fábrica que atende o confinamento fica a confirmar · possível correspondência com registro MAPA GO0011355 15.689.716/0022-40 (Aruanã/GO) — a conciliar | a confirmar |
 
-**Antes do cadastro de cada aceita:**
-- confirmar o CNPJ da unidade (fonte com CNPJ, ou cadastro oficial com endereço);
-- conferir a distância das linhas 8 a 10 (≥ 268 km);
-- para JBS, conferir se a fonte de 2014 ainda vale e se é a mesma área da JBJ.
+**Leitura das evidências (revisão de 06/10/2026):**
+- capacidade nominal não é consumo;
+- produção própria de milho (JBJ) não comprova compra de terceiros;
+- só a Cargill Uberlândia declara compra de "fazendeiros, cooperativas e corretores";
+- notícia antiga não comprova operação atual. A operação recente está confirmada só para São Martinho e Cargill Bioenergia (2026); para BRF, a operação da unidade é de 2026, mas o dado de milho é de 2007–2014.
+
+Comparação curta com o lote ME/EPP: `QUALIFICACAO-LOTES-2026-10-06.md`.
+
+| Candidata (id) | Município | km | Situação [fonte] |
+|---|---|---|---|
+| **JBS — confinamento com fábrica de ração (Fazenda Planura)** (M10) | Aruanã/GO | 284,1 | Fonte de 2014: não comprova operação atual. O CNPJ JBS Confinamento 'Fazenda Planura' segue ativo (GO-530 km 30), mas a JBJ registra no MAPA uma fábrica de ração no mesmo endereço — provável sobreposição com M09, a conciliar [ACSURS 07/05/2014; cadastro de terceiros (indicecnpj, Receita 07/2026)] |
 
 ## 7. Processam milho com restrição não-GMO registrada (por linha ou unidade)
 
@@ -153,7 +162,7 @@ Uma linha não-GMO **não** prova que todas as operações da empresa recusem mi
 | **BRMill Alimentos — Fazenda São Miguel** (R02) | Silvânia/GO | 163,3 | Moinho de milho não-GMO, com produção própria [brmill.com.br, consultado em 06/10/2026] | restrição registrada nesta unidade (moinho não-GMO) | possível correspondência com registro MAPA GO0011479 08.469.992/0001-02 (Silvânia/GO) — a conciliar |
 | **Milhão Ingredientes** (R01) | localização pendente | — | Processa milho; linha de ingredientes de milho Non-GMO (unidades em Goianira e Rio Verde, ex-LDC) [milhao.net, consultado em 06/10/2026] | restrição registrada só na linha de ingredientes Non-GMO; outras linhas e unidades a verificar | possível correspondência com registro MAPA GO0012424 08.647.384/0002-21 (Goianira/GO); GO0012637 08.647.384/0001-40 (Goiânia/GO); GO0023566 08.647.384/0006-55 (Rio Verde/GO) — a conciliar |
 
-A Caramuru (lote 1, linha 5) declara linha de produtos não transgênicos. A restrição fica nessa linha, não na fábrica inteira.
+A Caramuru (lote 1) declara linha de produtos não transgênicos. A restrição fica nessa linha, não na fábrica inteira.
 
 ## 8. Demais candidatas da pesquisa manual (indício por atividade)
 
@@ -166,6 +175,7 @@ A Caramuru (lote 1, linha 5) declara linha de produtos não transgênicos. A res
 | **Agroquima — fábrica de rações e suplementos** (M11) | Aparecida de Goiânia/GO | 85,9 | Rações e suplementos para bovinos [LinkedIn, consultado em 06/10/2026] | não encontrado | possível correspondência com registro MAPA GO0011193 CNPJ a conciliar (Aparecida de Goiânia/GO) — a conciliar |
 | **Adimax — unidade industrial** (M13) | Goianápolis/GO | 121,5 | Alimentos para cães e gatos [adimax.com.br, consultado em 06/10/2026] | não encontrado | possível correspondência com registro MAPA GO0010693 03.887.324/0012-34 (Goianápolis/GO) — a conciliar |
 | **De Heus — unidade industrial** (M16) | Itaberaí/GO | 123,8 | Suplementos, premixes, núcleos, proteinados e rações; a matéria cita milho nas dietas da região, não na fábrica [Portal do Agronegócio 26/05/2026] | não encontrado | possível correspondência com registro MAPA GO0011630 02.513.991/0010-22 (Itaberaí/GO) — a conciliar |
+| **Usina Rio Verde** (M04) | Rio Verde/GO | 129,2 | Rebaixada: o site fala em 'etanol de grãos', DDG e WDG, sem nomear milho — grãos não comprovam milho [usinarioverde.com.br, consultado em 06/10/2026] | não encontrado | nenhum registro MAPA sugerido |
 | **Fazenda Tropical — boitel** (M18) | Montividiu/GO | 130,6 | Boitel; mais de 35 mil cabeças já confinadas [fazendatropicalgoias.com.br, consultado em 06/10/2026] | não encontrado | nenhum registro MAPA sugerido |
 | **Premix — filial Anápolis** (M19) | Anápolis/GO | 145,4 | Premix e suplementos; nada sobre milho [BrasilAPI 06/10/2026] | 50.411.321/0028-77 | possível correspondência com registro MAPA GO0014818 CNPJ a conciliar (Anápolis/GO) — a conciliar |
 | **Agrocria Nutrição Animal** (M20) | Anápolis/GO | 145,4 | Nutrição para confinamento com milho grão inteiro (relatório de 2014) [relatório de estágio, 2014] | não encontrado | nenhum registro MAPA sugerido |
@@ -192,7 +202,7 @@ Usinas registradas no MAPA como produtoras de ingrediente (possível DDG de milh
 
 ## 10. Pequenas empresas (ME/EPP pelo porte cadastral)
 
-São 150 consumidoras potenciais com porte ME ou EPP na Receita:
+Entre as 405 consumidoras potenciais do MAPA, **152** têm porte ME ou EPP na Receita (100 ME + 52 EPP). Esta seção lista **150**: as outras 2 (Cimilho, EPP, e Casa do Milho, ME) estão na seção 9, para não aparecerem duas vezes. Das 150:
 - 140 estão ativas na Receita;
 - 115 têm CNAE principal 1066-0 (alimentos para animais).
 
@@ -387,7 +397,7 @@ Comigo e Caramuru também originam grãos, mas ficam entre as consumidoras pela 
 
 ## 13. Distância a conferir (≥ 270 km, centroide)
 
-Grupo JBJ — confinamento Fazenda Colorado (Aruanã/GO, 284,1 km); JBS — confinamento com fábrica de ração (Aruanã/GO, 284,1 km); BRF/MBRF — Mineiros (fábrica de rações) (Mineiros/GO, 299,8 km); PECUAGRO - NUTRICAO ANIMAL (Doverlândia/GO, 271,8 km); CSG S/A (Brasília/DF, 279,2 km); FVO - BRASILIA INDUSTRIAL (Brasília/DF, 279,2 km); NUTROPLUS (Brasília/DF, 279,2 km); PET S KITCHEN (Brasília/DF, 279,2 km); NUTRINA-VET (Brasília/DF, 279,2 km); CEREALISTA GUARA (Brasília/DF, 279,2 km); UNIÃO QUÍMICA FARMACÊUTICA NACIONAL S.A (Brasília/DF, 279,2 km); SCP CHEF DE PATAS (Brasília/DF, 279,2 km); NUTRINI RAOES E MINERAIS (Brasília/DF, 279,2 km); SEARA (Brasília/DF, 279,2 km); BONASA (Brasília/DF, 279,2 km); BOLT LUCKY LTDA (Brasília/DF, 279,2 km); COOPA DF (Brasília/DF, 279,2 km); RANGAUT (Brasília/DF, 279,2 km); RAINHA ALIMENTOS (Brasília/DF, 279,2 km); ALIPAN NUTRICAO ANIMAL (Brasília/DF, 279,2 km); IDEAL ALIMENTOS (Brasília/DF, 279,2 km); SEARA ALIMENTOS LTDA (Brasília/DF, 279,2 km); HIDROVET NUTRICAO (Hidrolina/GO, 279,5 km); BOIMAX NUTRICAO ANIMAL (Hidrolina/GO, 279,5 km); BOIPORE (Aporé/GO, 281,5 km); AGROPECUARIA SUPER NUTRI NUTRICAO ANIMAL (Crixás/GO, 283,2 km); JBJ NUTRICAO ANIMAL (Aruanã/GO, 284,1 km); RACOES NUTRIMILK (Iturama/MG, 284,2 km); DRY MATTER NUTRICAO ANIMAL (Iturama/MG, 284,2 km); CASA AGROPECUÁRIA SANTA CRUZ LTDA (Douradoquara/MG, 286,4 km); S.A. USINA CORURIPE AÇÚCAR E ÁLCOOOL (Carneirinho/MG, 299,3 km); NUTRIBRAZ NUTRICAO ANIMAL (Carneirinho/MG, 299,3 km); COOPERATIVA MISTA AGROPECUARIA DO VALE DO ARAGUAIA (Mineiros/GO, 299,8 km); MINERMIX (Mineiros/GO, 299,8 km); PREZOTTO CEREAIS (Mineiros/GO, 299,8 km); RIT CEREAIS (Mineiros/GO, 299,8 km); FORTUNCERES S.A. (Mineiros/GO, 299,8 km); FORTALEZA RACOES (Mineiros/GO, 299,8 km); BRF S.A. (Mineiros/GO, 299,8 km); BRF S.A. (Mineiros/GO, 299,8 km)
+Grupo JBJ — confinamento Fazenda Colorado (Aruanã/GO, 284,1 km); BRF/MBRF — Mineiros (fábrica de rações) (Mineiros/GO, 299,8 km); PECUAGRO - NUTRICAO ANIMAL (Doverlândia/GO, 271,8 km); CSG S/A (Brasília/DF, 279,2 km); FVO - BRASILIA INDUSTRIAL (Brasília/DF, 279,2 km); NUTROPLUS (Brasília/DF, 279,2 km); PET S KITCHEN (Brasília/DF, 279,2 km); NUTRINA-VET (Brasília/DF, 279,2 km); CEREALISTA GUARA (Brasília/DF, 279,2 km); UNIÃO QUÍMICA FARMACÊUTICA NACIONAL S.A (Brasília/DF, 279,2 km); SCP CHEF DE PATAS (Brasília/DF, 279,2 km); NUTRINI RAOES E MINERAIS (Brasília/DF, 279,2 km); SEARA (Brasília/DF, 279,2 km); BONASA (Brasília/DF, 279,2 km); BOLT LUCKY LTDA (Brasília/DF, 279,2 km); COOPA DF (Brasília/DF, 279,2 km); RANGAUT (Brasília/DF, 279,2 km); RAINHA ALIMENTOS (Brasília/DF, 279,2 km); ALIPAN NUTRICAO ANIMAL (Brasília/DF, 279,2 km); IDEAL ALIMENTOS (Brasília/DF, 279,2 km); SEARA ALIMENTOS LTDA (Brasília/DF, 279,2 km); HIDROVET NUTRICAO (Hidrolina/GO, 279,5 km); BOIMAX NUTRICAO ANIMAL (Hidrolina/GO, 279,5 km); BOIPORE (Aporé/GO, 281,5 km); AGROPECUARIA SUPER NUTRI NUTRICAO ANIMAL (Crixás/GO, 283,2 km); JBJ NUTRICAO ANIMAL (Aruanã/GO, 284,1 km); JBS — confinamento com fábrica de ração (Fazenda Planura) (Aruanã/GO, 284,1 km); RACOES NUTRIMILK (Iturama/MG, 284,2 km); DRY MATTER NUTRICAO ANIMAL (Iturama/MG, 284,2 km); CASA AGROPECUÁRIA SANTA CRUZ LTDA (Douradoquara/MG, 286,4 km); S.A. USINA CORURIPE AÇÚCAR E ÁLCOOOL (Carneirinho/MG, 299,3 km); NUTRIBRAZ NUTRICAO ANIMAL (Carneirinho/MG, 299,3 km); COOPERATIVA MISTA AGROPECUARIA DO VALE DO ARAGUAIA (Mineiros/GO, 299,8 km); MINERMIX (Mineiros/GO, 299,8 km); PREZOTTO CEREAIS (Mineiros/GO, 299,8 km); RIT CEREAIS (Mineiros/GO, 299,8 km); FORTUNCERES S.A. (Mineiros/GO, 299,8 km); FORTALEZA RACOES (Mineiros/GO, 299,8 km); BRF S.A. (Mineiros/GO, 299,8 km); BRF S.A. (Mineiros/GO, 299,8 km)
 
 ## 14. Áreas sem cobertura (declaradas, R11.8)
 
@@ -401,7 +411,7 @@ Grupo JBJ — confinamento Fazenda Colorado (Aruanã/GO, 284,1 km); JBS — conf
 
 ## 15. Pendências, em ordem
 
-1. **Aceite de Rogério** sobre o lote 1 (seção 6) e, se quiser, sobre o segundo lote (seção 9).
+1. **Aceite de Rogério** sobre o lote 1 (seção 6) e o lote ME/EPP (`QUALIFICACAO-LOTES-2026-10-06.md`). Nada é aceito automaticamente.
 2. **Conciliação de CNPJ** só das aceitas, com fonte que publique o CNPJ ou cadastro oficial com endereço. Sem fusão por nome.
 3. **Validação comercial por lotes:**
    - reaproveitar o cache da BrasilAPI e as evidências já registradas;

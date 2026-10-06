@@ -7,11 +7,13 @@ const t = (head, list, f) => [`| ${head.join(" | ")} |`, `|${head.map(() => "---
 const out = [];
 const cons = rows.filter((x) => x.papel.startsWith("consumidora"));
 const lote1 = cons.filter((x) => x.ev === "específica" && x.sec === "A");
-out.push("### LOTE1\n" + t(["#", "Candidata (id)", "Município", "km", "Evidência de milho [fonte]", "Nível da evidência", "CNPJ da unidade", "Registro MAPA", "Milho GMO"], lote1, (x, i) => [i + 1, `**${x.nome}** (${x.mid})`, x.municipio, km(x), x.evidenciaTexto, x.evidencia.replace("específica, ", ""), x.cnpj === "não encontrado" ? "não encontrado" : `${x.cnpj} (${x.cnpjVinculo})`, x.possivel, x.gmo]));
+out.push("### LOTE1\n" + t(["#", "Candidata (id)", "Município", "km", "Evidência de milho [fonte]", "Nível da evidência", "CNPJ da unidade", "Registro MAPA / CNPJ sugerido", "Milho GMO"], lote1, (x, i) => [i + 1, `**${x.nome}** (${x.mid})`, x.municipio, `${km(x)} (${x.precisao.startsWith("estimada") ? "centroide" : "coordenada"})`, x.evidenciaTexto, x.evidencia.replace("específica, ", ""), x.cnpj === "não encontrado" ? "não confirmado" : `${x.cnpj} — confirmado: ${x.cnpjVinculo}`, x.origem.startsWith("MAPA + ") ? `mesmo CNPJ: ${x.registros}` : x.possivel, x.gmo]));
 const a3 = rows.filter((x) => x.sec === "A3");
 out.push("### A3\n" + t(["Candidata (id)", "Município", "km", "Evidência [fonte]", "Restrição GMO registrada", "Registro MAPA"], a3, (x) => [`**${x.nome}** (${x.mid})`, x.municipio, km(x), x.evidenciaTexto, x.gmo, x.possivel]));
 const ind = rows.filter((x) => x.origem.startsWith("pesquisa manual") && x.ev === "indício");
-const fund = rows.filter((x) => x.origem.startsWith("MAPA + "));
+const hist = rows.filter((x) => x.ev === "histórica");
+out.push("### HISTORICAS\n" + t(["Candidata (id)", "Município", "km", "Situação [fonte]"], hist, (x) => [`**${x.nome}** (${x.mid})`, x.municipio, km(x), x.evidenciaTexto]));
+const fund = rows.filter((x) => x.origem.startsWith("MAPA + ") && x.ev === "indício");
 out.push("### INDICIOS_MANUAIS\n" + t(["Candidata (id)", "Município", "km", "Indício [fonte]", "CNPJ", "Registro MAPA"], [...fund, ...ind], (x) => [`**${x.nome}** (${x.mid})`, x.municipio, km(x), x.evidenciaTexto, x.cnpj, x.origem.startsWith("MAPA + ") ? `mesmo CNPJ: ${x.registros}` : x.possivel]));
 const forte = cons.filter((x) => x.origem === "MAPA" && /milho no nome|usina\/bioenergia/.test(x.atividade) && !x.possivel);
 out.push("### INDICIO_FORTE\n" + t(["Razão social (MAPA)", "CNPJ", "Município", "km", "Atividade (MAPA)", "CNAE (Receita)", "Porte", "Situação"], forte, (x) => [x.razao.trim(), x.cnpj, x.municipio, km(x), x.atividade, x.cnae, x.porte, x.situacao]));

@@ -1024,3 +1024,19 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
   - 150 ME/EPP visíveis.
   - Também `candidatas.csv` (477 linhas) e scripts em `descoberta-milho-indiara/scripts/`.
 - **Nada aceito, cadastrado, validado ou enviado.**
+### Qualificação dos lotes (2026-10-06, sem contato nem aceite)
+
+- **Lote 1:** CNPJ, endereço e distância revisados.
+  - 4 vínculos confirmados:
+    - Cargill Uberlândia (CNPJ, endereço e coordenada no parecer SUPRAM 2021; 256,5 km pela coordenada);
+    - Rei do Milho (endereço do site = Receita; em recuperação judicial);
+    - São Martinho Boa Vista e Cargill Bioenergia São Francisco (Receita com o nome da unidade e o mesmo CNPJ no MAPA).
+  - 4 sugeridos: Gem, BRF, Caramuru, JBJ.
+  - Rebaixadas: Usina Rio Verde ("grãos" não prova milho) e JBS Aruanã (fonte de 2014; provável sobreposição com a JBJ na GO-530 km 30).
+  - Compra de terceiros comprovada só na Cargill Uberlândia; a JBJ produz parte do próprio milho.
+- **Lote ME/EPP (8):** só a Cimilho tem evidência própria de milho; as outras 7 têm atividade pertinente e endereço conferido, sem fonte própria.
+- **Reconciliação:**
+  - 474 linhas no CSV; 456–474 estabelecimentos distintos;
+  - 152 ME/EPP (100 + 52), das quais 150 listadas na seção 10 e 2 na seção 9.
+- **Limite de taxa:** a BrasilAPI respondeu 429 nas novas consultas de endereço. O endereço veio de páginas públicas da base da Receita (08–09/2026).
+- **Arquivo:** `descoberta-milho-indiara/QUALIFICACAO-LOTES-2026-10-06.md`.

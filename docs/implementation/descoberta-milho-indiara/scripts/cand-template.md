@@ -65,11 +65,11 @@
 | Registros ativos com atividade de **fabricante** | 445 |
 | **Estabelecimentos MAPA únicos** | **445**: 389 por CNPJ completo conferido (nenhum CNPJ repetido) e 56 só pelo registro, com CNPJ a conciliar |
 | Candidatas da pesquisa manual (rodada 1) | 36 |
-| Manuais com o **mesmo CNPJ completo** de um registro MAPA (fundidas) | 4 (SuperFrango ×3, Comigo Rio Verde) |
-| Manuais mantidas como linha própria | 32 |
+| Manuais com o **mesmo CNPJ completo** de um registro MAPA (fundidas) | 7 (SuperFrango ×3, Comigo Rio Verde, Rei do Milho, São Martinho Boa Vista, Cargill Bioenergia São Francisco) |
+| Manuais mantidas como linha própria | 29 |
 | Linhas em `candidatas.csv` | {{LINHAS}} |
-| Manuais com **possível correspondência** a registro MAPA (a conciliar) | 21, ligadas a 26 registros MAPA |
-| **Estabelecimentos distintos** | **entre 456 e 477**: o valor exato depende da conciliação desses 21 casos |
+| Manuais com **possível correspondência** a registro MAPA (a conciliar) | 18, ligadas a 23 registros MAPA |
+| **Estabelecimentos distintos** | **entre 456 e 474**: o valor exato depende da conciliação desses 18 casos |
 
 **Papéis entre os 445 estabelecimentos MAPA** (o papel é independente do porte):
 
@@ -104,18 +104,22 @@ A evidência sobre a empresa fica no nível da empresa.
 
 | Situação | Qtde | Casos |
 |---|---|---|
-| **Vínculo confirmado** por CNPJ publicado na fonte da evidência | **1** | Cargill Uberlândia (M08): parecer IGAM/COPAM com CNPJ 60.498.706/0134-88 |
-| **Vínculo confirmado** pelo cadastro oficial da própria unidade, com o mesmo CNPJ no MAPA | **4** | SuperFrango NV (M12), Itaberaí (M14, M15) e Comigo Rio Verde (M17). Todos são **indícios**, sem evidência específica de milho |
+| **Vínculo confirmado** por CNPJ e endereço publicados na fonte da evidência | **1** | Cargill Uberlândia (M08): parecer IGAM/COPAM 2021 com CNPJ, endereço e coordenada |
+| **Vínculo confirmado** por endereço da fonte igual ao da Receita | **1** | Rei do Milho (M02): endereço do site = endereço do CNPJ 05.574.242/0001-02 |
+| **Vínculo confirmado** por cadastro oficial com nome ou endereço da unidade, mesmo CNPJ no MAPA | **2** | São Martinho (M06: Receita "Fazenda Boa Vista", CNAE álcool) e Cargill Bioenergia (M07: Receita "USF Usina São Francisco") |
+| **Vínculo confirmado** pelo cadastro oficial da própria unidade, mesmo CNPJ no MAPA, só indício | **4** | SuperFrango NV (M12), Itaberaí (M14, M15) e Comigo Rio Verde (M17) |
 | CNPJ da unidade pelo cadastro oficial, sem registro MAPA com o mesmo CNPJ | 2 | Premix Anápolis (M19), Cargill Agro Rio Verde (T01, trader) |
-| **Vínculo sugerido** (nome e município), a conciliar | **21 candidatas manuais ↔ 26 registros MAPA** | ver colunas "Registro MAPA" e "Possível correspondência" |
+| **Vínculo sugerido** (nome e município), a conciliar | **18 candidatas manuais ↔ 23 registros MAPA** | ver colunas "Registro MAPA" e "Possível correspondência" |
 | Sem registro MAPA sugerido | 11 | Usina Rio Verde, JBS Aruanã, Fazenda Tropical, Agrocria, Confinamento Pontal, Rialma Agropecuária, Cargill Agro (T01), Gravos e os 3 projetos |
 
-Evidência específica de milho (12):
-- 1 tem vínculo confirmado com a unidade (M08);
-- 8 descrevem a unidade, mas sem CNPJ na fonte (M01, M03, M05, M06, M07, M09, M10, R02);
-- 3 são do nível da empresa (M02 Rei do Milho, M04 Usina Rio Verde, R01 Milhão).
+Evidência específica de milho (10, depois da revisão de 06/10/2026):
+- 4 com vínculo confirmado com a unidade: M02, M06, M07, M08;
+- 5 descrevem a unidade, mas o CNPJ só é sugerido: M01 Gem, M03 BRF, M05 Caramuru, M09 JBJ, R02 BRMill;
+- 1 do nível da empresa: R01 Milhão.
 
-Os 26 registros MAPA sugeridos continuam como linhas próprias, com "possível correspondência".
+Rebaixadas na revisão:
+- **Usina Rio Verde (M04)** passa a indício, porque "etanol de grãos" não comprova milho.
+- **JBS Aruanã (M10)** passa a histórica, porque a fonte de 2014 não comprova a operação atual (seção 6).
 
 ## 6. Primeiro lote para o aceite de Rogério: evidência específica de milho
 
@@ -128,10 +132,15 @@ A coluna "Registro MAPA" mostra só a **sugestão**: aceitar a candidata não co
 
 {{LOTE1}}
 
-**Antes do cadastro de cada aceita:**
-- confirmar o CNPJ da unidade (fonte com CNPJ, ou cadastro oficial com endereço);
-- conferir a distância das linhas 8 a 10 (≥ 268 km);
-- para JBS, conferir se a fonte de 2014 ainda vale e se é a mesma área da JBJ.
+**Leitura das evidências (revisão de 06/10/2026):**
+- capacidade nominal não é consumo;
+- produção própria de milho (JBJ) não comprova compra de terceiros;
+- só a Cargill Uberlândia declara compra de "fazendeiros, cooperativas e corretores";
+- notícia antiga não comprova operação atual. A operação recente está confirmada só para São Martinho e Cargill Bioenergia (2026); para BRF, a operação da unidade é de 2026, mas o dado de milho é de 2007–2014.
+
+Comparação curta com o lote ME/EPP: `QUALIFICACAO-LOTES-2026-10-06.md`.
+
+{{HISTORICAS}}
 
 ## 7. Processam milho com restrição não-GMO registrada (por linha ou unidade)
 
@@ -139,7 +148,7 @@ Uma linha não-GMO **não** prova que todas as operações da empresa recusem mi
 
 {{A3}}
 
-A Caramuru (lote 1, linha 5) declara linha de produtos não transgênicos. A restrição fica nessa linha, não na fábrica inteira.
+A Caramuru (lote 1) declara linha de produtos não transgênicos. A restrição fica nessa linha, não na fábrica inteira.
 
 ## 8. Demais candidatas da pesquisa manual (indício por atividade)
 
@@ -153,7 +162,7 @@ Usinas registradas no MAPA como produtoras de ingrediente (possível DDG de milh
 
 ## 10. Pequenas empresas (ME/EPP pelo porte cadastral)
 
-São {{PME_N}} consumidoras potenciais com porte ME ou EPP na Receita:
+Entre as 405 consumidoras potenciais do MAPA, **152** têm porte ME ou EPP na Receita (100 ME + 52 EPP). Esta seção lista **{{PME_N}}**: as outras 2 (Cimilho, EPP, e Casa do Milho, ME) estão na seção 9, para não aparecerem duas vezes. Das {{PME_N}}:
 - 140 estão ativas na Receita;
 - 115 têm CNAE principal 1066-0 (alimentos para animais).
 
@@ -196,7 +205,7 @@ Comigo e Caramuru também originam grãos, mas ficam entre as consumidoras pela 
 
 ## 15. Pendências, em ordem
 
-1. **Aceite de Rogério** sobre o lote 1 (seção 6) e, se quiser, sobre o segundo lote (seção 9).
+1. **Aceite de Rogério** sobre o lote 1 (seção 6) e o lote ME/EPP (`QUALIFICACAO-LOTES-2026-10-06.md`). Nada é aceito automaticamente.
 2. **Conciliação de CNPJ** só das aceitas, com fonte que publique o CNPJ ou cadastro oficial com endereço. Sem fusão por nome.
 3. **Validação comercial por lotes:**
    - reaproveitar o cache da BrasilAPI e as evidências já registradas;
