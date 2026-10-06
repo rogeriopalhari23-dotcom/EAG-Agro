@@ -917,3 +917,21 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
   - No Compass: `reply_reader_state.last_read_ok_at = 2026-10-06T04:20:13Z`. O último erro registrado é o antigo de 2026-10-01, sem erro novo.
 - **Estado final:** canal `planned`, nenhuma campanha ativa, fila inalterada (último `accepted` em 2026-10-01 17:46 UTC), **nenhuma mensagem enviada**.
 - **Fora desta etapa:** canal e campanhas não ativados; nenhuma purga; `redigir-diario.mjs` não executado; prazos da T11 continuam pendentes.
+
+## Revisão do fluxo principal e comparação produção x branches (2026-10-06, sem publicar)
+
+- **Fila:** os itens não implementados (P1-T12, P2-T15, P2-T17, P3-T12, RADAR-PESSOAS, T11-VALIDACAO) dependem só de portões externos ou decisões. Nenhum é trabalho técnico puro.
+- **Leitura em produção não feita:** a sessão do Access expirou (302 para o login, que exige navegador). A revisão foi feita no código e com dados fictícios.
+- **Erros concretos corrigidos** (commit local `91fbd46`):
+  1. **"Antes de aprovar" incompleto.** A tela montava a lista no navegador e omitia gates que `approve()` confere: liberação internacional (P3-T12), seleção e validação comercial, endereço confirmado, fuso por destinatário, dados excluídos e exclusões reaplicadas. Para as fichas alemãs, a tela mostraria 2 pendências e a aprovação recusaria por uma terceira, invisível.
+     - Agora `getFicha` devolve `approvalGates`, calculados pelo servidor na mesma ordem.
+     - Também mostra, à parte, o que o pré-envio ainda exige: e-mail validado em dia, pela mesma regra do `preSendCheck`, e triagem de sanções.
+     - Teste: cada bloqueio mostrado corresponde à recusa real, um a um, até aprovar.
+  2. **"Próximo passo" do cartão da busca internacional.** Ignorava a ficha aberta da empresa (ex.: Amori em aprovação aparecia com "Porte não informado") e tratava o canal geral publicado como "nenhum contato".
+     - Agora a ficha aberta da campanha vem primeiro, e o canal geral aponta a ficha de identificação, indicando se o e-mail está validado.
+- **Verificação:** `npm run check` com 386 + 2 + 15, 0 falhas; UI smoke OK, sem erros JS.
+- **Comparação produção x branches:** `BRANCHES-E-PRODUCAO.md`.
+  - Produção = código de `origin/v2-revisao-2`.
+  - `main` desatualizada, ancestral, 50 commits atrás.
+  - Proposta de avanço simples registrada, não executada.
+- **Estado preservado:** ponte lendo a caixa; canal `planned`; nenhuma mensagem, crédito, purga ou publicação.
