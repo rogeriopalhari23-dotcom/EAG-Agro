@@ -997,3 +997,30 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
 - **Cobertura parcial declarada:** só em Anápolis há 32 empresas ativas com CNAE 1066-0, e no estado há 146 com CNAE 1064-3. A lacuna exige fonte estruturada.
 - **Ajustes de veracidade antes de salvar:** três sites que eu tinha preenchido sem fonte consultada (Cargill, SuperFrango, De Heus) foram trocados por "não encontrado nesta rodada"; o grupo da Fazenda Colorado foi corrigido para "Grupo JBJ".
 - **Nada aceito, cadastrado, validado ou enviado.** Canal `planned`.
+
+### Rodada 2 — cadastro oficial MAPA (SIPEAGRO) + Receita (2026-10-06, sem contato)
+
+- **Fonte oficial adotada após validação por amostra:**
+  - CSV aberto "SIPEAGRO — Alimentação Animal": CC-BY, arquivo de 04/10/2026, 17.977 linhas, CNPJ mascarado;
+  - lista oficial em PDF de 21/07/2026, com CNPJ completo;
+  - o CNPJ do PDF só é aceito quando bate com os dígitos visíveis do CSV.
+  - Nada contratado.
+- **Enriquecimento:** BrasilAPI para 361 CNPJs (situação, CNAE, porte, matriz/filial, município), um pedido a cada 2 s, 0 erros. Sem e-mails, telefones ou pessoas.
+- **Deduplicação:** só por CNPJ completo.
+  - 1.743 linhas no raio → 507 registros → 472 ativos → **445 fabricantes ativos únicos** (389 por CNPJ conferido; 56 com CNPJ a conciliar).
+  - Das 36 candidatas manuais, 4 têm o mesmo CNPJ completo de um registro e foram fundidas.
+  - 32 continuam em linhas próprias; 21 delas têm **possível correspondência** (nome e município) com 26 registros, sem fusão.
+  - Estabelecimentos distintos: **entre 456 e 477**.
+- **Vínculos entre evidência manual e unidade:**
+  - **5 confirmados**: Cargill Uberlândia, pelo CNPJ publicado no parecer IGAM/COPAM; e 4 unidades com o mesmo CNPJ no cadastro oficial e no MAPA, todas indícios: SuperFrango ×3 e Comigo Rio Verde;
+  - **21 sugeridos**, a conciliar.
+  - Das 12 evidências específicas de milho, só 1 tem vínculo confirmado com a unidade.
+- **Dimensões separadas:** papel, atividade, porte (ME/EPP/Demais, sem deduzir PME de "Demais"), raiz de CNPJ (≠ grupo econômico), situação MAPA e Receita, evidência, GMO, precisão da distância (sempre por centroide; ≥ 270 km = conferir).
+- **Restrição não-GMO só na linha ou unidade citada:** Milhão (linha de ingredientes Non-GMO), BRMill (unidade) e Caramuru (linha).
+- **"32 em Anápolis" e "146 em GO":** vêm dos agregadores privados cirtrox.com.br e cnpjgo.com.br. Não são cobertura comprovada; o SIPEAGRO tem 26 fabricantes ativos em Anápolis.
+- **Entrega:** `CANDIDATAS.md` (rodada 2), com:
+  - primeiro lote de 10 com evidência específica para aceite;
+  - segundo lote sugerido de 7;
+  - 150 ME/EPP visíveis.
+  - Também `candidatas.csv` (477 linhas) e scripts em `descoberta-milho-indiara/scripts/`.
+- **Nada aceito, cadastrado, validado ou enviado.**
