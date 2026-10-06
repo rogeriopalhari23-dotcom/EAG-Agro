@@ -149,3 +149,33 @@ test("Radar: resultado por empresa — consumidoras/fábricas antes, traders à 
   assert.equal((await api(`/api/foreign-searches/${s.id}/close`, "POST", { note: "Primeira rodada concluída" })).data.status, "closed");
   assert.equal((await api(`/api/foreign-searches/${s.id}/candidates`, "POST", { legalName: "Outra GmbH", sourceLabel: "x" })).data.error.code, "search_closed");
 });
+
+test("Radar: próximo passo do cartão considera a ficha da empresa nesta campanha e o canal geral publicado", async (t) => {
+  const { api, DB, campaignId } = await world(t);
+  const s = (await api(`/api/campaigns/${campaignId}/foreign-search`, "POST", { confirm: true })).data;
+  const X = await company(api, s.id, "Rösterei Beispiel GmbH", { website: "https://roesterei.example", activityText: "Torrefação de café", activitySource: "Site da empresa" });
+  await size(api, X, "small");
+  await profile(api, X, "possible_final_consumer");
+  const card = async () => {
+    const r = (await api(`/api/foreign-searches/${s.id}`)).data;
+    return Object.values(r.groups).flat().find((c) => c.id === X);
+  };
+  assert.ok((await card()).pending.includes("Nenhum decisor ou comprador com fonte registrada."));
+  // Canal geral publicado (com fonte): o cartão aponta a ficha de identificação, e não "nenhum contato".
+  const ch = await api(`/api/companies/${X}/channels`, "POST", { email: "info@roesterei.example", sourceUrl: "https://roesterei.example/kontakt", timezone: "Europe/Berlin" });
+  assert.equal(ch.status, 201, JSON.stringify(ch.data));
+  let c = await card();
+  assert.ok(c.pending.includes("Responsável por compras não identificado: canal geral com e-mail ainda não validado."), JSON.stringify(c.pending));
+  DB.raw.prepare("UPDATE contacts SET email_validation='valid' WHERE id=?").run(ch.data.contactId);
+  c = await card();
+  assert.ok(c.pending.includes("Responsável por compras não identificado: canal geral com e-mail validado (ficha de identificação)."));
+  assert.equal(c.openFicha, null);
+  // Ficha aberta nesta campanha: o próximo passo é ela, antes das pendências de cadastro.
+  DB.raw.prepare("INSERT INTO fichas(id,tenant_id,company_id,campaign_id,status,created_by) VALUES ('fx','eag-internal',?,?,'in_approval','system-admin')").run(X, campaignId);
+  c = await card();
+  assert.equal(c.pending[0], "Ficha aguardando sua aprovação: os bloqueios estão listados na própria ficha.");
+  assert.deepEqual(c.openFicha, { id: "fx", status: "in_approval" });
+  DB.raw.exec("UPDATE fichas SET status='discarded' WHERE id='fx'");
+  c = await card();
+  assert.equal(c.openFicha, null, "ficha descartada não é próximo passo");
+});

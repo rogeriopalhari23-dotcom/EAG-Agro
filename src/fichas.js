@@ -13,6 +13,7 @@ import { reviewSequence, reviewIdentification } from "./review.js";
 import { generateIdentification, commodityDisplayDe, IDENT_VERSION } from "./templates/identificacao.js";
 import { unsubUrl } from "./unsub-token.js";
 import { erasuresConsistent } from "./erasure.js";
+import { complianceStatus } from "./scores.js";
 import { manualTaskStatements } from "./tasks.js";
 
 const ROLES = ["decision_maker", "influencer", "provisional_decision_maker"];
@@ -221,6 +222,7 @@ export async function getFicha(env, actor, id) {
     ficha: f,
     version: { no: v.version_no, id: v.id, purpose: v.purpose, language: v.language, reviewOk: !!v.review_ok, findings: JSON.parse(v.pv_report_json), skill: v.skill_sha256, templates: v.templates_version, generator: v.generator_version, snapshot: JSON.parse(await decryptPii(v.snapshot_enc, env)) },
     messages, approvals: approvals.results, toApprove, outbox: outbox.results,
+    approvalGates: await approvalGates(env, actor, f, v, toApprove, msgs.results),
   };
 }
 
@@ -361,4 +363,64 @@ export function invalidationStatements(env, { campaignId, contactId }, reason) {
       at, at,
     ),
   ];
+}
+
+// Tudo o que approve() confere, na mesma ordem, para a ficha mostrar os bloqueios antes do clique; o servidor confere de
+// novo ao aprovar. "send" lista o que o pré-envio ainda exige depois da aprovação (não impede aprovar).
+export async function approvalGates(env, actor, f, v, toApprove, messageRows) {
+  const gates = [];
+  const add = (id, label, ok, why) => gates.push({ id, label, ok: !!ok, why: ok ? null : why });
+  add("review", "Revisor PV sem violações", v.review_ok, "Corrija os textos e gere nova versão (R17.3).");
+  add("postal", "Endereço físico confirmado (R19.13)", postalAddressConfirmed(env), ADDRESS_PENDING);
+  add("open", "Ficha aberta", !["discarded", "deferred"].includes(f.status), "Ficha adiada ou descartada.");
+  const campaign = await s(env, "SELECT * FROM campaigns WHERE id=?", f.campaign_id).first();
+  add("campaign_active", "Campanha ativa", campaign?.status === "active", `Campanha "${campaign?.name ?? "—"}" em ${campaign?.status ?? "—"}: ativar é decisão de Rogério.`);
+  if (campaign?.market === "international") {
+    const release = (await parameters(env, actor.tenant_id))["international_enabled:international"];
+    add("international", "Fluxo internacional liberado (P3-T12)", release?.enabled === true, "Liberação internacional ainda não registrada (validação P3-T12).");
+    let why = null;
+    try {
+      await internationalGate(env, actor.tenant_id, campaign);
+    } catch (e) {
+      why = e.message || "Seleção ou validação comercial pendente.";
+    }
+    add("selection", "Seleção do país e validação comercial da commodity", !why, why);
+  }
+  const snap = JSON.parse(await decryptPii(v.snapshot_enc, env));
+  add("campaign_version", "Campanha sem mudança desde esta versão", campaign && snap.campaignVersion === campaign.version, "A campanha mudou: gere nova versão da ficha (R22.5).");
+  if (toApprove.some((g) => g.channel === "email")) {
+    const ch = await s(env, "SELECT state FROM channels WHERE tenant_id=? AND channel='email'", actor.tenant_id).first();
+    add("channel", "Canal de e-mail liberado (R26.2)", ch && ch.state !== "planned", "Canal de e-mail ainda planejado: a liberação é decisão de Rogério.");
+  }
+  add("erasure", "Exclusões de dados reaplicadas após restauração", await erasuresConsistent(env, actor.tenant_id), "O banco voltou para antes de uma exclusão: reaplique as exclusões.");
+  const compliance = await complianceStatus(env, actor.tenant_id, f.company_id);
+  const validationDays = (await parameters(env, actor.tenant_id))["email_validation_max_age_days:email"];
+  const at = now();
+  const recipients = [];
+  for (const contactId of [...new Set(toApprove.map((g) => g.contactId))]) {
+    const c = await s(env, "SELECT timezone,email_validation,email_validated_at,email_validation_expires_at FROM contacts WHERE tenant_id=? AND id=?", actor.tenant_id, contactId).first();
+    const purged = messageRows.some((m) => m.contact_id === contactId && m.purged_at);
+    const approve = [];
+    const addR = (id, label, ok, why) => approve.push({ id, label, ok: !!ok, why: ok ? null : why });
+    addR("purged", "Dados do destinatário não excluídos", !purged, "Dados pessoais excluídos: este texto não pode ser aprovado.");
+    addR("timezone", "Fuso do destinatário confirmado (R18.6)", c?.timezone, "Confirme o fuso no cadastro do contato.");
+    const send = [];
+    const addS = (id, label, ok, why) => send.push({ id, label, ok: !!ok, why: ok ? null : why });
+    if (toApprove.some((g) => g.contactId === contactId && g.channel === "email")) {
+      // Mesma regra do pré-envio (sending.js): vencimento gravado ou data da validação + parâmetro aprovado.
+      const expires =
+        c?.email_validation_expires_at ||
+        (c?.email_validated_at && Number.isInteger(validationDays) ? new Date(Date.parse(c.email_validated_at) + validationDays * 86400000).toISOString() : null);
+      addS(
+        "email_valid",
+        "E-mail validado e dentro da validade",
+        c?.email_validation === "valid" && expires && expires > at,
+        c?.email_validation !== "valid" ? `Validação: ${c?.email_validation ?? "não feita"}.` : expires ? `Validade venceu em ${expires.slice(0, 10)}.` : "Validação sem data de vencimento.",
+      );
+    }
+    addS("compliance", "Triagem de sanções em dia", compliance.status === "clear", compliance.status === "unavailable" ? "Triagem ausente ou vencida (listas ou empresa)." : `Triagem: ${compliance.status}.`);
+    recipients.push({ contactId, timezone: c?.timezone ?? null, approve, send });
+  }
+  const pending = gates.filter((g) => !g.ok).length + recipients.reduce((n, r) => n + r.approve.filter((g) => !g.ok).length, 0);
+  return { gates, recipients, canApprove: pending === 0 };
 }

@@ -238,7 +238,7 @@ async function companyCard(env, actor, x, row, productId) {
     const [name, title] = await Promise.all([decryptPii(c.full_name_encrypted, env), decryptPii(c.job_title_encrypted, env)]);
     contacts.push({
       id: c.id, name, jobTitle: title, role: c.prospect_role, source: c.source_label, sourceUrl: c.source_url,
-      verified: !!(c.source_label || c.source_url), emailValidation: c.email_validation, timezone: c.timezone, targetFlag: contactTargetFlag(title, c.relationship_note),
+      verified: !!(c.source_label || c.source_url), emailValidation: c.email_validation, timezone: c.timezone, targetFlag: contactTargetFlag(title, c.relationship_note), kind: c.contact_kind,
     });
   }
   const deciders = contacts.filter((c) => ["decision_maker", "provisional_decision_maker", "influencer"].includes(c.role) && c.verified);
@@ -252,11 +252,22 @@ async function companyCard(env, actor, x, row, productId) {
   if (buyer === "found") pending.push("Nenhuma evidência própria de compra ou importação registrada (use a validação assistida).");
   if (buyer !== "confirmed_importer") pending.push("Origem Brasil não comprovada para esta empresa (o dado do país não serve de prova).");
   if (!profile) pending.push("Perfil comprador desta commodity não registrado.");
-  if (!deciders.length) pending.push("Nenhum decisor ou comprador com fonte registrada.");
+  // Canal geral publicado (com fonte) leva à ficha de identificação do responsável; não substitui o decisor.
+  const channels = contacts.filter((c) => c.kind === "company_channel" && c.verified);
+  if (!deciders.length && channels.length)
+    pending.push(channels.some((c) => c.emailValidation === "valid") ? "Responsável por compras não identificado: canal geral com e-mail validado (ficha de identificação)." : "Responsável por compras não identificado: canal geral com e-mail ainda não validado.");
+  else if (!deciders.length) pending.push("Nenhum decisor ou comprador com fonte registrada.");
   else if (!deciders.some((c) => c.emailValidation === "valid")) pending.push("E-mail do decisor não validado.");
   if (deciders.length && !deciders.some((c) => c.timezone)) pending.push("Fuso do destinatário não confirmado.");
+  const fichaRow = x.campaign_id
+    ? await s(env, "SELECT id,status FROM fichas WHERE tenant_id=? AND company_id=? AND campaign_id=? AND status IN ('draft','in_approval','approved') ORDER BY updated_at DESC LIMIT 1", actor.tenant_id, row.id, x.campaign_id).first()
+    : null;
+  if (fichaRow?.status === "in_approval") pending.unshift("Ficha aguardando sua aprovação: os bloqueios estão listados na própria ficha.");
+  else if (fichaRow?.status === "approved") pending.unshift("Ficha aprovada: acompanhe os envios e respostas em Abordagem.");
+  else if (fichaRow?.status === "draft") pending.unshift("Ficha em rascunho: conclua e envie para aprovação.");
   return {
     id: row.id, name: row.legal_name, tradeName: row.trade_name,
+    openFicha: fichaRow ? { id: fichaRow.id, status: fichaRow.status } : null,
     size: row.size_class ? { class: row.size_class, label: SIZE_LABEL[row.size_class], basis: row.size_basis === "proven" ? "comprovado" : "estimado", reference: sizeReference(row.country_code), source: row.size_source, checkedAt: row.size_checked_at } : null,
     activity: row.activity_text ? { text: row.activity_text, source: row.activity_source } : null,
     website: row.website,

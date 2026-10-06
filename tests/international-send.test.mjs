@@ -140,3 +140,47 @@ test("P3-T10: o teto do dia é do remetente e soma Nacional + Internacional (R19
   assert.equal(second.reason, "daily_cap");
   assert.equal(tr.sent.length, 1);
 });
+
+// Bloqueios da aprovação calculados pelo servidor (d.approvalGates) batem com a recusa real de approve().
+const gateIds = (g) => [...g.gates.filter((x) => !x.ok).map((x) => x.id), ...g.recipients.flatMap((r) => r.approve.filter((x) => !x.ok).map((x) => x.id))];
+
+test("Ficha mostra antes do clique cada bloqueio que approve() recusa, inclusive a liberação internacional", async (t) => {
+  const { api, DB, companyId, dm } = await world(t);
+  await api(`/api/contacts/${dm}`, "PATCH", { timezone: "Asia/Tokyo" });
+  await release(api, "templates_en_approved", TEMPLATES_EN_VERSION);
+  const f = (await api("/api/fichas", "POST", { companyId, campaignId: "cp-int", recipients: [dm] })).data;
+  const view = async () => (await api(`/api/fichas/${f.id}`)).data;
+  let v = await view();
+  const x = v.toApprove.find((a) => a.channel === "email");
+  const approve = () => api(`/api/fichas/${f.id}/approve`, "POST", { versionNo: 1, contactId: dm, channel: "email", messagesSha256: x.messagesSha256, startDate: DAY });
+  const codeOf = { international: "international_not_enabled", channel: "channel_not_ready", campaign_active: "campaign_not_active", timezone: "timezone_pending" };
+
+  // 1) Só falta a liberação internacional: a ficha lista exatamente isso e approve recusa por isso.
+  assert.deepEqual(gateIds(v.approvalGates), ["international"]);
+  assert.equal(v.approvalGates.canApprove, false);
+  assert.equal((await approve()).data.error.code, codeOf.international);
+  // 2) Canal planejado, campanha em rascunho e fuso apagado aparecem todos; approve recusa pelo primeiro na ordem dele.
+  DB.raw.exec("UPDATE channels SET state='planned' WHERE channel='email'");
+  DB.raw.exec("UPDATE campaigns SET status='draft' WHERE id='cp-int'");
+  DB.raw.prepare("UPDATE contacts SET timezone=NULL WHERE id=?").run(dm);
+  v = await view();
+  assert.deepEqual(gateIds(v.approvalGates).sort(), ["campaign_active", "channel", "international", "timezone"]);
+  assert.equal((await approve()).data.error.code, codeOf.timezone);
+  // 3) Resolvendo um a um, a recusa acompanha o que a ficha mostra.
+  DB.raw.prepare("UPDATE contacts SET timezone='Asia/Tokyo' WHERE id=?").run(dm);
+  assert.equal((await approve()).data.error.code, codeOf.campaign_active);
+  DB.raw.exec("UPDATE campaigns SET status='active' WHERE id='cp-int'");
+  assert.equal((await approve()).data.error.code, codeOf.international);
+  await release(api, "international_enabled", "international");
+  v = await view();
+  assert.deepEqual(gateIds(v.approvalGates), ["channel"]);
+  assert.equal((await approve()).data.error.code, codeOf.channel);
+  DB.raw.exec("UPDATE channels SET state='internal_test' WHERE channel='email'");
+  v = await view();
+  assert.deepEqual(gateIds(v.approvalGates), []);
+  assert.equal(v.approvalGates.canApprove, true);
+  assert.equal((await approve()).status, 200);
+  // Para o envio (não impede aprovar): e-mail validado em dia e triagem em dia, por destinatário.
+  const send = Object.fromEntries(v.approvalGates.recipients[0].send.map((s) => [s.id, s.ok]));
+  assert.deepEqual(send, { email_valid: true, compliance: true });
+});

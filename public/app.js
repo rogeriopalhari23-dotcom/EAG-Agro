@@ -2540,12 +2540,8 @@ async function fichasView() {
 async function showFicha(id) {
   const d = await api(`/api/fichas/${id}`);
   const v = d.version;
-  // Campanha e canal só antecipam os motivos de recusa; a conferência que vale é a do servidor ao aprovar.
-  const [company, camp, sending] = await Promise.all([
-    api(`/api/companies/${d.ficha.company_id}`),
-    api(`/api/campaigns/${d.ficha.campaign_id}`).catch(() => null),
-    api("/api/sending/today").catch(() => null),
-  ]);
+  // Os bloqueios da aprovação vêm calculados pelo servidor (d.approvalGates).
+  const company = await api(`/api/companies/${d.ficha.company_id}`);
   const contactOf = (cid) => company.contacts.find((x) => x.id === cid);
   const recipientOf = (cid) => v.snapshot.recipients.find((x) => x.contactId === cid);
   const channelName = (ch) => (ch === "email" ? "E-mail" : ch === "call" ? "Ligações" : "LinkedIn");
@@ -2596,21 +2592,22 @@ async function showFicha(id) {
       item("Revisor PV", bad.length ? `${bad.length} violação(ões)` : "Sem violações", `modelos ${v.templates}`),
     ),
   );
-  // Condições que o servidor confere na aprovação, na ordem em que costumam faltar.
-  const c = camp?.campaign;
+  // Condições que o servidor confere na aprovação (lista calculada por ele, na mesma ordem); ele confere de novo ao aprovar.
+  const g = d.approvalGates;
+  const who = (cid) => contactOf(cid)?.fullName || "destinatário";
   const checks = [
-    ["Revisor PV sem violações", v.reviewOk, "Corrija os textos e gere nova versão."],
-    ["Ficha aberta", open, `Ficha ${lbl(d.ficha.status).toLowerCase()}.`],
-    c ? ["Campanha ativa", c.status === "active", `Campanha "${c.name}": ${lbl(c.status).toLowerCase()}. Ative em Configurações › Campanhas.`] : null,
-    c && v.snapshot.campaignVersion !== undefined ? ["Campanha sem mudança desde esta versão", v.snapshot.campaignVersion === c.version, "A campanha mudou: gere nova versão da ficha."] : null,
-    sending && d.toApprove.some((g) => g.channel === "email") ? ["Canal de e-mail liberado", sending.channel !== "planned", "Canal ainda planejado: o teste interno precisa ser liberado antes."] : null,
-  ].filter(Boolean);
+    ...g.gates.map((x) => [x.label, x.ok, x.why]),
+    ...g.recipients.flatMap((r) => r.approve.map((x) => [`${x.label} — ${who(r.contactId)}`, x.ok, x.why])),
+  ];
+  const sendChecks = g.recipients.flatMap((r) => r.send.map((x) => [`${x.label} — ${who(r.contactId)}`, x.ok, x.why]));
   const missing = checks.filter(([, ok]) => !ok);
+  const list = (rows) => el("ul", { class: "checklist" }, ...rows.map(([label, ok, why]) => el("li", {}, text("span", ok ? "ok" : "pendente", ok ? "tag ok" : "tag warn"), el("span", {}, label, !ok ? text("small", why) : null))));
   node.append(
     panel(
       "Antes de aprovar",
-      el("ul", { class: "checklist" }, ...checks.map(([label, ok, why]) => el("li", {}, text("span", ok ? "ok" : "pendente", ok ? "tag ok" : "tag warn"), el("span", {}, label, !ok ? text("small", why) : null)))),
-      text("p", missing.length ? "A aprovação será recusada enquanto houver pendência. O fuso de cada destinatário aparece no bloco dele." : "O servidor confere tudo de novo no momento da aprovação.", "muted"),
+      list(checks),
+      text("p", missing.length ? `A aprovação será recusada enquanto houver pendência (${missing.length}).` : "Nada impede a aprovação; o servidor confere tudo de novo no momento de aprovar.", "muted"),
+      sendChecks.length ? details("Para o envio, depois da aprovação", el("div", {}, list(sendChecks), text("p", "Não impedem aprovar; seguram cada envio até estarem em dia.", "muted"))) : null,
     ),
   );
   const pv = panel("Revisor PV");
