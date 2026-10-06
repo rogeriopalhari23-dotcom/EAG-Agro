@@ -42,7 +42,7 @@
 | São Martinho — Usina Boa Vista, Quirinópolis/GO | 51.466.860/0062-78 (**confirmado**: Receita "Fazenda Boa Vista", CNAE álcool, e MAPA) | 151,4 (centroide) | 495 mil t de milho previstas na safra 2026/27 [RPAnews, 27/05/2026] | Demais | a confirmar | Origem do milho |
 | Cargill Bioenergia — Usina São Francisco, Quirinópolis/GO | 10.249.419/0002-16 (**confirmado**: Receita "USF Usina São Francisco" e MAPA) | 151,4 (centroide) | Cana e milho em 2025/26; maceração de 600 mil t/ano [STG News, 01/09/2026; Globo Rural, 11/06/2025] | Demais | a confirmar | Origem do milho |
 | Rei do Milho — Inhumas/GO | 05.574.242/0001-02 (**confirmado**: endereço do site = Receita) | 106,5 (coordenada de mapa) | Moagem de milho [reidomilho.com.br, 06/10/2026] | Demais | a confirmar | Origem do milho; **recuperação judicial** na razão social (risco de crédito) |
-| Caramuru — complexo de Itumbiara/GO | sugerido: 00.080.671/0001-00 (matriz publicada pela empresa); filiais 0032-06 e 0033-97 no mesmo complexo | 142,4 (centroide) | Processamento de milho de 24 mil t/mês [caramuru.com, página sem data] | Demais | a confirmar; **linha não transgênica declarada** (restrição só dessa linha) | CNPJ da fábrica de milho; se há linha que aceita GMO |
+| Caramuru — complexo de Itumbiara/GO | sugerido: 00.080.671/0001-00 (matriz publicada pela empresa); filiais 0032-06 e 0033-97 no mesmo complexo | 142,4 (centroide) | Processamento de milho de 24 mil t/mês [caramuru.com, página sem data] | Demais | a confirmar; **linha não transgênica declarada** (restrição só dessa linha) — *corrigido em 06/10/2026: a página NON-GMO cita Sorriso e São Simão, não Itumbiara; ver "Grupo 2, descoberta complementar"* | CNPJ da fábrica de milho; se há linha que aceita GMO |
 | JBJ — confinamento Fazenda Colorado, Aruanã/GO | sugerido: 15.689.716/0022-40 "JBJ Nutrição Animal" (MAPA); outros CNPJs da raiz na Fazenda Colorado | 284,1 (centroide; **conferir**) | Mais de 1.000 t de ração/dia; "parte significativa do milho" é produção própria [Curta Mais, 05/01/2026] | Demais | a confirmar | A produção própria não prova compra: quanto é comprado; CNPJ da fábrica; distância |
 | Gem Alimentos — usina de etanol de milho, Acreúna/GO | sugerido: 25.006.271/0001-85 | 48,2 (centroide) | Autorização da ANP para etanol de milho; a empresa mói milho e modifica amido [DOU de 23/02/2023, via Empreender em Goiás] | Demais | a confirmar | **Operação atual** (fonte de 2023); CNPJ da usina |
 | BRF/MBRF — fábrica de rações de Rio Verde/GO | sugerido: 01.838.723/0172-83 | 129,2 (centroide) | Ração com milho e sorgo locais [Folha, 23/06/2014; dado de 2007]. A unidade opera em 2026 [AgFeed, 21/02/2026] | Demais | a confirmar | **Uso atual de milho** (fonte antiga); CNPJ da fábrica |
@@ -130,3 +130,17 @@ Escopo: só as lacunas da lista curta (CNPJ da unidade, operação atual, local 
 **Fora do pedido (só registro):** Milhão compra milho de 180 produtores de Goiás [Globo Rural, 29/02/2024]. Não foi pesquisada.
 
 **Situação:** nenhuma das 5 foi aceita ou cadastrada. Aguarda aceite individual de Rogério; se houver aceite, o cadastro inclui a triagem de sanções (regra de 06/10/2026).
+
+**Aceite (06/10/2026):** Rogério aceitou **Rei do Milho, Caramuru Itumbiara e BRF/MBRF Rio Verde** para qualificação. **JBJ e Gem continuam em descoberta.** O aceite não confirma compra de terceiros, GMO nem responsável de compra.
+
+**CNPJ que opera cada unidade (conferido antes do cadastro; os 3 foram confirmados, nenhum ficou só sugerido):**
+
+| Unidade | CNPJ | Fundamento |
+|---|---|---|
+| Rei do Milho, Inhumas | 05.574.242/0001-02 | Endereço do site = Receita (matriz ativa) + registro MAPA |
+| Caramuru, complexo de Itumbiara | 00.080.671/0001-00 | Único CNPJ ativo da raiz em Itumbiara com atividade industrial de milho na Receita (secundários 1064-3, 1065-1, óleo de milho, 1066-0); endereço nº 4240 publicado pela empresa; registro MAPA. As filiais 0032-06 (transporte) e 0033-97 (armazém geral) não são industriais |
+| BRF, fábrica de rações de Rio Verde | 01.838.723/0172-83 | Único registro de ração da BRF no MAPA em Rio Verde; Receita: filial ativa na BR-060 km 394, Setor Industrial (CNAE principal abate de suínos; o CNPJ cobre o complexo) |
+
+**Novo achado no Rei do Milho:** a página de contatos publica `compras@reidomilho.com.br` (departamento, não pessoa) e destaca "Não-transgênicos". Isso é indício de restrição a GMO em parte das linhas; a aceitação de GMO é desconhecida.
+
+Registro em produção: `cadastro-lote-g2-aceito.json`. Triagem e conferência em `EVIDENCIAS.md`.

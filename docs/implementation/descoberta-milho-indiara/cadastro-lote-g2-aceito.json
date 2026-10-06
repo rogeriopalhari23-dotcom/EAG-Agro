@@ -1,0 +1,154 @@
+{
+  "aceite": "Rogério, 06/10/2026: Rei do Milho, Caramuru Itumbiara e BRF/MBRF Rio Verde aceitos para qualificação; não confirma compra de terceiros, aceitação de milho GMO nem responsabilidade de compra. JBJ e Gem seguem em descoberta.",
+  "produto": "Milho GMO",
+  "empresas": [
+    {
+      "chave": "rei-do-milho",
+      "company": {
+        "legalName": "REI DO MILHO ALIMENTOS LTDA",
+        "tradeName": "Rei do Milho — fábrica, Inhumas",
+        "countryCode": "BR",
+        "registrationId": "05574242000102",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — CNPJ confirmado: endereço do site (Rod. GO-426 km 01, 2024, Bloco B, Inhumas/GO) = endereço da Receita (matriz, ativa) e registro MAPA SIPEAGRO (04/10/2026) no mesmo CNPJ. Em recuperação judicial com plano homologado. 106,5 km pela coordenada de diretório de mapas (não oficial). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "http://www.reidomilho.com.br/site/contatos.php"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "company_document",
+          "market": "national",
+          "supports": ["consumes_as_input"],
+          "reference": "Site do Rei do Milho: indústria de derivados de milho (creme, sêmola, grits, fubá, gérmen) para nutrição humana e animal; página 'Agricultura e Cultivo' sobre a origem da matéria-prima. Origem do milho (própria ou de terceiros) não esclarecida. ATENÇÃO GMO: o site destaca 'Não-transgênicos' e prioridade à agricultura orgânica — indício de restrição a milho GMO em ao menos parte das linhas; aceitação de GMO desconhecida. Página sem data.",
+          "sourceUrl": "http://www.reidomilho.com.br/site/contatos.php",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        },
+        {
+          "category": "commercial_signal",
+          "evidenceType": "judicial_record",
+          "reference": "Recuperação judicial nº XXXXX-05.2020.8.09.0072 (TJGO): pedido em 10/03/2020, processamento deferido em 31/03/2020, plano homologado; 150 credores, R$ 58,52 mi no edital (PreservaCred, consulta 18/09/2026). Risco de crédito: não é motivo de descarte; exige condição de pagamento conservadora. Cumprimento atual do plano não verificado.",
+          "sourceUrl": "https://preservacred.com.br/dados/empresas/05574242000102-rei-do-milho-alimentos",
+          "factDate": "2020-03-31",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [
+        {
+          "email": "compras@reidomilho.com.br",
+          "phone": "(62) 3514-1751",
+          "label": "E-mail de Compras e telefone da indústria publicados no site (não é comprador identificado)",
+          "sourceUrl": "http://www.reidomilho.com.br/site/contatos.php",
+          "sourceKind": "company_site",
+          "timezone": "America/Sao_Paulo"
+        }
+      ],
+      "people": [],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Moinho de milho em Inhumas/GO, 106,5 km em linha reta de Indiara (coordenada de mapa): derivados de milho para nutrição humana e animal (site, consulta 06/10/2026). Compra de terceiros não comprovada. Site destaca linha não transgênica: aceitação de GMO desconhecida. Em recuperação judicial com plano homologado (risco de crédito)."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (62) 3514-1751 — indústria, publicado em reidomilho.com.br (consulta 06/10/2026). E-mail de Compras publicado: compras@reidomilho.com.br (canal de departamento, não pessoa).\nDistância: 106,5 km pela coordenada de diretório de mapas (não oficial). Linha reta (haversine) a partir do centroide de Indiara; não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho do Rei do Milho?\nQualificação (com quem cuida da compra de milho):\n1. Vocês compram milho de terceiros (produtor, cerealista, trading) ou usam milho próprio?\n2. O site destaca produtos não transgênicos: alguma linha aceita milho GMO, ou toda a compra exige Non-GMO?\n3. Qual pessoa decide a compra de milho desta fábrica?\n4. Como funciona o cadastro ou a homologação de fornecedores de milho?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nAlerta interno (não mencionar na ligação): recuperação judicial com plano homologado — risco de crédito; condição de pagamento conservadora.\nPendências: origem do milho; aceitação de GMO (indício de restrição); responsável de compras; cumprimento atual do plano de recuperação.",
+        "channelNote": "(62) 3514-1751 e compras@reidomilho.com.br — publicados no site (reidomilho.com.br/site/contatos.php, consulta 06/10/2026); canal de departamento, nenhum comprador identificado",
+        "nextAction": "Aguardar a T11; depois, ligar e esclarecer origem do milho, aceitação de GMO (site destaca não transgênicos) e responsável de compras. Avaliar risco de crédito (recuperação judicial) antes de qualquer proposta."
+      }
+    },
+    {
+      "chave": "caramuru-itumbiara",
+      "company": {
+        "legalName": "CARAMURU ALIMENTOS S/A",
+        "tradeName": "Caramuru — complexo industrial de Itumbiara",
+        "countryCode": "BR",
+        "registrationId": "00080671000100",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — CNPJ confirmado para o complexo de Itumbiara: matriz ativa na Via Expressa Júlio Borges de Souza, 4240 (endereço publicado pela empresa nos termos de uso do site); é o único CNPJ ativo da raiz em Itumbiara com atividades industriais de milho na Receita (CNAEs secundários 1064-3 farinha de milho e derivados, 1065-1 amidos, óleo de milho, 1066-0 alimentos para animais) e tem registro MAPA SIPEAGRO (04/10/2026). As filiais 0032-06 (transporte, nº 4240 Sala A) e 0033-97 (armazém geral, nº 4200) não são industriais. 142,4 km pelo centroide de Itumbiara (sem coordenada pública da fábrica). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/00080671000100"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "company_document",
+          "market": "national",
+          "supports": ["consumes_as_input"],
+          "reference": "Site da Caramuru, página 'Unidades industriais – Itumbiara': processamento de milho de 24.000 t/mês, degerminação de 960 t/dia, pré-cozido de 5.000 t/mês, além de soja, óleos especiais (milho, girassol, canola) e pipoca. Página sem data, consulta 06/10/2026. Histórico: fábrica de milho de Itumbiara aberta em 1975, matéria-prima de fornecedores com critérios socioambientais (Relatório 2020). Compra de milho de terceiros nesta unidade: não detalhada (sem volume).",
+          "sourceUrl": "https://www.caramuru.com/?page_id=3081",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        },
+        {
+          "category": "business",
+          "evidenceType": "company_document",
+          "market": "national",
+          "supports": [],
+          "reference": "CORREÇÃO (06/10/2026) da lista curta, que registrava 'linha não transgênica declarada' para Itumbiara: a página NON-GMO da Caramuru atribui os produtos não transgênicos às unidades de Sorriso-MT e São Simão-GO (soja não transgênica, SPC e lecitina). A página não cita Itumbiara nem a linha de milho. A restrição fica presa a essas linhas; a aceitação de milho GMO em Itumbiara permanece DESCONHECIDA (nem restrição nem aceitação comprovadas). O registro anterior foi mantido no histórico (QUALIFICACAO-LOTES-2026-10-06.md).",
+          "sourceUrl": "https://www.caramuru.com/?page_id=925",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Complexo industrial de Itumbiara/GO, 142,4 km em linha reta de Indiara (centroide): processamento de milho de 24 mil t/mês (site, página sem data, consulta 06/10/2026). Compra de terceiros desta unidade sem volume publicado. Aceitação de GMO em Itumbiara desconhecida (restrição NON-GMO publicada é de Sorriso e São Simão). Empresa grande: canal pode ser o cadastro de fornecedores."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (64) 3404-0200 — telefone cadastral da matriz/complexo na Receita (GuiaPJ, base 09/2026); canal cadastral, não verificado como compras. O e-mail cadastral é do fiscal e não é usado. O site tem 'Fale conosco', SAC e 'Cadastro de fornecedores' (caramuru.com).\nDistância: 142,4 km pelo centroide de Itumbiara (sem coordenada pública da fábrica). Linha reta (haversine) a partir do centroide de Indiara; não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da originação de milho da fábrica de Itumbiara?\nQualificação (com quem cuida da compra de milho):\n1. A fábrica de milho de Itumbiara compra milho de terceiros (produtor, cerealista, trading)? A compra é da unidade ou centralizada?\n2. A linha de milho de Itumbiara aceita milho GMO, ou exige Non-GMO? (a restrição publicada é de Sorriso e São Simão, não de Itumbiara)\n3. Qual pessoa decide a compra de milho desta fábrica?\n4. Como funciona o cadastro de fornecedores (critérios socioambientais citados pela empresa)?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: compra de terceiros e volume; aceitação de GMO desconhecida; responsável de compras; fonte atual (2025–2026) específica da linha de milho de Itumbiara.",
+        "channelNote": "(64) 3404-0200 — telefone cadastral da matriz/complexo (Receita via GuiaPJ, base 09/2026), não verificado como compras; site: Fale conosco, SAC e Cadastro de fornecedores (caramuru.com). E-mail cadastral é do fiscal: não usar",
+        "nextAction": "Aguardar a T11; depois, ligar ou usar o cadastro de fornecedores para esclarecer compra de terceiros, aceitação de GMO em Itumbiara (desconhecida) e responsável pela originação de milho."
+      }
+    },
+    {
+      "chave": "brf-rio-verde",
+      "company": {
+        "legalName": "BRF S.A",
+        "tradeName": "BRF/MBRF — complexo de Rio Verde (fábrica de rações)",
+        "countryCode": "BR",
+        "registrationId": "01838723017283",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — CNPJ confirmado para a fábrica de rações de Rio Verde: é o único registro de ração (ração, concentrado, núcleo, premix, suplemento) da BRF no cadastro MAPA SIPEAGRO (04/10/2026) em Rio Verde, e a Receita localiza esta filial ativa na Rodovia BR-060 km 394, Setor Industrial, Rio Verde/GO (CNAE principal abate de suínos; o mesmo CNPJ cobre o complexo). Grupo controlado pela MBRF. 129,2 km pelo centroide de Rio Verde (sem coordenada pública da fábrica). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Porte grande: não exclui a candidata. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/01838723017283"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "company_document",
+          "market": "national",
+          "supports": [],
+          "reference": "EVIDÊNCIA DO GRUPO (não da unidade): a MBRF é 'uma das maiores compradoras de soja e milho do Brasil para a produção de ração' e ampliou estoques de grãos (Reuters/Notícias Agrícolas, 19/03/2026). Relatório Integrado BRF 2024: compra direta do produtor, equipes de compra e armazéns perto das fábricas; mais de 3 mil fornecedores de grãos (milho, soja, sorgo). Não comprova que a unidade de Rio Verde compra milho localmente; compras podem ser centralizadas (a confirmar).",
+          "sourceUrl": "https://www.noticiasagricolas.com.br/noticias/agronegocio/417503-mbrf-ve-cenario-favoravel-para-graos-do-brasil-mas-amplia-estoques-diante-de-incertezas.html",
+          "factDate": "2026-03-19",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        },
+        {
+          "category": "business",
+          "evidenceType": "public_nominal_record",
+          "market": "national",
+          "supports": [],
+          "reference": "EVIDÊNCIA DA UNIDADE DE RIO VERDE: registro de estabelecimento de ração no MAPA (SIPEAGRO, 04/10/2026) para o CNPJ 01.838.723/0172-83; a unidade opera em 2026 (AgFeed, 21/02/2026). Uso de milho específico de Rio Verde só em fonte HISTÓRICA: ração com milho e sorgo locais, ~750 mil t de milho e farelo de soja (Folha, 23/06/2014, dado de 2007). Nenhuma fonte atual de compra de milho pela unidade.",
+          "sourceUrl": "https://agfeed.com.br/economia/com-novos-investimentos-rio-verde-triplica-pib-em-10-anos-e-aposta-em-nova-era-do-milho/",
+          "factDate": "2026-02-21",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Fábrica de rações do complexo BRF de Rio Verde/GO, 129,2 km em linha reta de Indiara (centroide): registro de ração no MAPA e operação em 2026. Compra de milho comprovada só no nível do grupo MBRF (2026); uso de milho na unidade só em fonte de 2014. Compras centralizadas a confirmar; GMO a confirmar. Porte grande não exclui."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: NÃO LOCALIZADO para a unidade. O telefone e o e-mail do cadastro da Receita são do centro de serviços tributário em SC (não usar). Canal corporativo público: Portal do Fornecedor BRF (brf-global.com; cadastro por convite ou autocadastro e compras via Ariba). Pendência: localizar a área de originação de grãos que atende Rio Verde.\nDistância: 129,2 km pelo centroide de Rio Verde (sem coordenada pública da fábrica). Linha reta (haversine) a partir do centroide de Indiara; não é percurso rodoviário.\nAbertura (quando houver telefone): Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho para a fábrica de rações de Rio Verde?\nQualificação (com quem cuida da compra de milho):\n1. A compra de milho da fábrica de Rio Verde é feita pela unidade ou pela mesa central de grãos do grupo?\n2. Compram milho de produtor, cerealista ou trading na região? Aceitam milho GMO?\n3. Qual pessoa decide a compra de milho para Rio Verde?\n4. Como funciona a homologação de fornecedores de grãos (Política de Compra Sustentável de Grãos, rastreabilidade)?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: canal da unidade; compras centralizadas a confirmar; uso atual de milho na unidade (fonte específica só de 2014); GMO; responsável.",
+        "channelNote": "Telefone da unidade não localizado. Receita traz (47) 3249-4420 e e-mail do centro tributário em SC: não usar. Canal corporativo: Portal do Fornecedor BRF (brf-global.com/portais-brf/portal-do-fornecedor)",
+        "nextAction": "Aguardar a T11; antes de ligar, localizar o canal da originação de grãos que atende Rio Verde; depois, esclarecer se a compra é local ou centralizada, GMO e responsável."
+      }
+    }
+  ]
+}

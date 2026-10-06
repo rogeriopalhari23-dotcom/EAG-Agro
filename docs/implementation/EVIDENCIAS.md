@@ -1284,3 +1284,42 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - aceitar como conta corporativa: BRF/MBRF;
   - manter em descoberta: JBJ (compra de terceiros não comprovada) e Gem (sem fonte de operação em 2025–2026).
 - **Sem aceite, cadastro, Snov, contato, ficha ou alteração da T11.** Nenhum teste rodado: alteração só de documentação.
+
+## Grupo 2: cadastro e triagem de Rei do Milho, Caramuru Itumbiara e BRF Rio Verde (06/10/2026)
+
+- **Aceite:** Rogério, 06/10/2026, para qualificação. JBJ e Gem seguem em descoberta.
+- **Duplicações:** nenhuma em produção antes do cadastro (busca por raiz 05574242, 00080671, 01838723 e por nome). Só a Cimilho casou pelo termo "milho", com raiz diferente.
+- **CNPJs:** os três foram confirmados, com o fundamento em `QUALIFICACAO-LOTES-2026-10-06.md`. Nenhum foi cadastrado como confirmado só por sugestão.
+- **Cadastro em produção** (`scripts/cadastrar-lote-aceito.mjs`, arquivo `cadastro-lote-g2-aceito.json`), em cada unidade:
+  - empresa com fonte, distância e método no rótulo;
+  - 2 evidências pendentes de validação;
+  - perfil `possible_final_consumer` (não confirmado);
+  - ligação de nível 0 (revisão 2) com a linha da T11, canal e próxima ação;
+  - nenhuma pessoa.
+  - Canal: só o Rei do Milho tem canal (`compras@` e telefone publicados no site). Caramuru e BRF não têm e-mail publicado utilizável; o telefone e o portal ficam na tarefa.
+- **BRF:** duas evidências separadas.
+  - Grupo MBRF: compra de milho em 2026 (Reuters/Notícias Agrícolas, 19/03/2026) e Relatório Integrado 2024. Não sustenta condição da unidade.
+  - Unidade de Rio Verde: registro MAPA de ração e operação em 2026 (AgFeed). O uso de milho específico da unidade só aparece em fonte de 2014.
+  - Compras centralizadas: a confirmar. O porte não exclui a candidata.
+- **Caramuru:** a evidência de correção cita a página NON-GMO (`caramuru.com/?page_id=925`): a restrição é de Sorriso e São Simão. A linha anterior da lista curta foi preservada com a nota de correção. A aceitação de GMO em Itumbiara é **desconhecida**.
+- **Triagem de sanções** (`POST /api/companies/:id/screening`, critério de 24/09/2026):
+  - listas válidas até 24/10/2026: OFAC SDN 00e702fc (24/09 19:17 UTC), CEIS 279f05dc (19:19 UTC), CNEP 9b743870 (19:21 UTC).
+
+| Unidade | Identidade pesquisada | Run | Resultado |
+|---|---|---|---|
+| Rei do Milho | CNPJ 05574242000102 (exato e raiz); nomes "REI DO MILHO ALIMENTOS LTDA" e "Rei do Milho — fábrica, Inhumas" | e9e4903f | 0 |
+| Caramuru | CNPJ 00080671000100 (exato e raiz); nomes "CARAMURU ALIMENTOS S/A" e "Caramuru — complexo industrial de Itumbiara" | 6fd1bf6f | 0 |
+| BRF | CNPJ 01838723017283 (exato e raiz); nomes "BRF S.A" e "BRF/MBRF — complexo de Rio Verde (fábrica de rações)" | 00e757c0 | 0 |
+
+- **Conferência complementar** (somente leitura, fora do critério):
+  - nenhuma entrada com as 3 raízes;
+  - nome parcial: "G G Brasil Foods" (CEIS, 27.606.589/0001-22), raiz e empresa diferentes; "Brasil Foods" foi nome antigo da BRF. **Para análise de Rogério, sem bloquear e sem confirmar sanção.**
+  - A marca do grupo **MBRF/Marfrig não foi triada como identidade própria**: a unidade cadastrada é BRF S.A.
+- **Estado conferido em produção:**
+  - 24 empresas;
+  - 13 ligações de nível 0 abertas, as 3 novas sem bloqueio no sistema e com a T11 no roteiro;
+  - canais e-mail, WhatsApp e LinkedIn `planned`;
+  - campanhas: 1 rascunho e 1 encerrada;
+  - outbox sem mudança (5 aceitos, 19 cancelados);
+  - 9 fichas; nenhuma criada ou aprovada.
+- Sem Snov, sem contato. Nenhum teste rodado: só dados e documentação mudaram.
