@@ -957,3 +957,20 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
    - Rodou só "Validate EAG Compass" nas duas branches.
 7. **Lista de decisões restantes** corrigida, com os bloqueios pelo nome: `DECISOES-PILOTO-2026-10-01.md`, atualização de 2026-10-06.
 8. **Fora desta autorização:** nenhuma campanha ativada, internacional não liberado, nenhum serviço contratado, nenhuma purga.
+
+## Bloqueios corrigidos conforme a Spec e próximo passo da descoberta no Brasil (2026-10-06)
+
+- **Correção:** a lista de 2026-10-06 punha os prazos de retenção da T11 entre os itens que não bloqueiam. Pela Spec, a T11 (inclusive a política de ciclo de vida e retenção) é exigida "Antes de contatos reais da Etapa 1" (tabela de dependências; §6.0.1 "validação jurídica da retenção (T11)"; premissa de retenção; R9.1; R23.4; P7). Lista corrigida em `DECISOES-PILOTO-2026-10-01.md`, separando descoberta de abordagem. A versão errada ficou marcada como substituída.
+- **Fontes nacionais:**
+  - radar R11 depende de T4, e a única fonte aprovada é a Casa dos Dados (G8), sem chave;
+  - só a busca dela cria `company_units`;
+  - Dados Abertos da Receita: gratuitos, não implementados; o endereço registrado devolveu 404 em 2026-10-06.
+- **Caminho manual conferido localmente** (dados fictícios, rede bloqueada):
+  - empresa por CNPJ com fonte 201;
+  - perfil 200 `pending_size`;
+  - evidência 201;
+  - pessoa manual com fonte 201;
+  - pesquisa de pessoas: QSA `skipped` ("Sem CNPJ de unidade cadastrado"), 0 unidades.
+- **Produção (só leitura):** 0 linhas setor → CNAE, 5.570 municípios, 0 buscas nacionais, 6 empresas brasileiras (as do teste interno), nenhuma campanha nacional ativa.
+- **Próximo passo e dados a fornecer:** `DESCOBERTA-BRASIL-PROXIMO-PASSO.md` (opções A manual, B Casa dos Dados em avaliação, C unidade pela BrasilAPI como funcionalidade nova).
+- **Nada contratado, ativado ou enviado.**

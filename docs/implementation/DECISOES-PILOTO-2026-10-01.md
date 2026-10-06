@@ -102,7 +102,7 @@ Nenhuma destas propostas é decisão tomada. A carta postal (3) e o piloto no Br
    - **Efeito:** primeira campanha real num mercado sem a exigência alemã de consentimento para e-mail entre empresas. Continuam a LGPD e o risco da Hostinger §12 já assumido.
    - **Razão:** é o caminho com menos bloqueios jurídicos abertos.
 
-## Atualização de 2026-10-06 — decisões restantes, na ordem para iniciar um piloto
+## Atualização de 2026-10-06 (SUBSTITUÍDA pela correção logo abaixo: punha os prazos de retenção da T11 entre os itens que não bloqueiam, contra a Spec)
 
 Cada item diz o bloqueio pelo nome. Nenhum foi decidido aqui.
 
@@ -125,3 +125,40 @@ Cada item diz o bloqueio pelo nome. Nenhum foi decidido aqui.
 - conferir o plano Workers (janela de 7 ou 30 dias do Time Travel);
 - prazos de retenção da T11 (backups, caixa, diário da ponte);
 - e-mails dos perfis e DNS do `eagcompass.com`.
+
+## Correção de 2026-10-06 — bloqueios conforme a Spec vigente
+
+**T11 inteira, inclusive a política e os prazos de retenção, precisa estar validada antes do primeiro contato real.**
+- **Spec, tabela de dependências:** "T11 | Compliance pré-envio e política de ciclo de vida | Não validado com responsável competente | **Antes de contatos reais da Etapa 1**". A política de ciclo de vida inclui a retenção.
+- **Spec §6.0.1:** lista "validação jurídica da retenção (T11)" entre as pendências.
+- **Premissa da Spec:** "Retenção de dados pessoais: conforme política a validar em T11" (R9.1, R21, R23).
+- **R9.1:** "validação jurídica antes da implementação final".
+- **R23.4:** aplicar a política de retenção aos dados pessoais.
+- **Constituição P7:** "conforme LGPD/GDPR e política EAG".
+
+Não há decisão registrada que separe a retenção do resto da T11. A lista de 2026-10-06 que a punha como "não bloqueia" estava errada.
+
+**Descobrir x abordar:** a Spec limita a T11 a "antes de contatos reais".
+- Descobrir empresas, registrar evidências e localizar pessoas não é contato e pode avançar antes da T11.
+- Os dados pessoais coletados nessa fase (sócios do QSA, pessoas do Impressum) ficam sob P7/R9 e sem prazo de retenção até a T11.
+
+### Ordem para iniciar o piloto
+
+**Descoberta (sem contato com ninguém):**
+1. **Escopo comercial do piloto nacional:** commodity, cidade/UF de referência e raio (Spec §6.0.1: "bloqueia Etapa 1"), mais o ICP da campanha (R28.1).
+2. **Setores usuários → CNAE** (R28.2): cada linha aprovada pelo Administrador, com fonte CONCLA/IBGE. Hoje: 0 linhas.
+3. **Fonte de descoberta** (R11 depende de T4, T5 e T8). Ver `DESCOBERTA-BRASIL-PROXIMO-PASSO.md`:
+   - a fonte aprovada (G8) é a Casa dos Dados, que exige chave e cadastro no serviço;
+   - sem contratação, só a descoberta manual por CNPJ com fonte.
+
+**Abordagem (primeiro contato real), em ordem:**
+4. **T11 validada:** jurídico ou encarregado da EAG (controlador, marca e caixa, política, **retenção**); para a Alemanha, também advogado de UWG/DSGVO.
+5. **Supressões do OpenClaw** (R21.8, R25.2): importar, ou registrar exceção datada na Spec.
+6. **Só para internacional — liberação P3-T12.**
+7. **Liberação do canal de e-mail** (R26.1, R26.3). O teste técnico (R26.6) já está comprovado.
+8. **Declarações aprovadas da campanha** (R16.7, para as fichas de reunião), **ativação da campanha** e **aprovação individual de cada ficha**.
+
+**Fora da ordem, sem bloquear:**
+- login do Access (conferências da API);
+- plano Workers (janela do Time Travel);
+- perfis e DNS do `eagcompass.com`.
