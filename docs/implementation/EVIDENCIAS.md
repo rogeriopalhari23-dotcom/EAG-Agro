@@ -1244,3 +1244,32 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - Nutrir: fábrica no endereço atual, em bairro residencial.
 - **Ligações:** aparecem em Abordagem → Tarefas **bloqueadas por `compliance_unavailable`**: a triagem de sanções dessas 6 ainda não foi feita. Aguardam também a T11.
 - **Estado:** canal `planned`; campanhas inativas; nenhum envio pendente. Total de empresas: 21.
+
+### Triagem de sanções do lote de 6 ME/EPP e regra para os próximos lotes (2026-10-06)
+
+- **Critério e listas:** os mesmos das 4 anteriores, sem alteração: política de 24/09 (OFAC SDN, CGU CEIS, CGU CNEP; 720 h).
+  - OFAC `SDN.CSV+ALT.CSV sha256:cf3ffced4675` (24/09 19:17 UTC);
+  - CEIS `20260924_CEIS` (19:19);
+  - CNEP `20260924_CNEP` (19:21).
+  - Válidas até **24/10/2026, por volta das 19:17 UTC**.
+- **Triagem pelo fluxo existente** (`POST /api/companies/:id/screening`, 06/10/2026). Cada run registra consulta (CNPJ, país, razão social) e versões das listas.
+
+| Unidade | CNPJ | Run | Resultados |
+|---|---|---|---|
+| Rural Forte — fábrica, Pontalina | 06.026.372/0001-73 | d08d1af1 | 0 |
+| Sociagro — Paraúna | 08.769.542/0001-35 | ec408e20 | 0 |
+| Nutrir — matriz, Itaberaí | 26.899.864/0001-80 | bbf98d7e | 0 |
+| Super-Bovi — Goianápolis | 19.091.828/0001-20 | e93f2e8f | 0 |
+| Rações VR — fábrica, Orizona | 07.611.367/0001-90 | bb126102 | 0 |
+| Ração Ituiutaba | 71.054.894/0001-40 | 6c1a600a | 0 |
+
+- **Conferência complementar** (somente leitura, fora do critério):
+  - nenhuma entrada com as 6 raízes de CNPJ;
+  - 1 nome parecido, "dinutrir" (CEIS, 31.865.774/0001-09): raiz e nome diferentes, só o trecho "nutrir" coincide. **Para análise de Rogério, sem bloquear e sem confirmar sanção.**
+- **Ligações:** as 10 ligações de nível 0 estão sem bloqueio no sistema; todas mantêm a linha da T11 no roteiro e aguardam a T11.
+- **Regra para os próximos lotes (Rogério, 06/10/2026):**
+  - a triagem de sanções entra na rotina de qualificação de todo lote aceito, com as listas válidas e o fluxo existente, **sem confirmação separada por empresa**;
+  - listas vencidas: reimportar antes (ou registrar o impedimento);
+  - correspondência por nome fica para análise.
+  - **Não autoriza contato comercial.**
+- **Estado:** canal `planned`; campanhas inativas; nenhum envio pendente.
