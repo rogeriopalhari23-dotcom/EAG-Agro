@@ -1,6 +1,6 @@
 # Publicação: bloqueio das ligações até a T11 (migração 0035)
 
-**Data:** 06/10/2026. **Estado:** **publicado em 06/10/2026** (Worker `65fe3503-b40e-4e3c-bdae-bc6cc0972799`). A tela de Tarefas e a tela Início excedem o tempo por lentidão da lista; a correção está preparada e ainda não foi publicada (ver `EVIDENCIAS.md`).
+**Data:** 06/10/2026. **Estado:** **publicado em 06/10/2026** (Worker `65fe3503-b40e-4e3c-bdae-bc6cc0972799`). A lentidão da lista, que derrubava Tarefas e Início, foi corrigida e publicada no Worker `1213cf87-67fa-4352-8fc2-e558b07e084c` (mediana de 3,5 s; ver `EVIDENCIAS.md`).
 
 **Base:**
 - Worker atual em produção: `62182b6e-b9f6-4086-bb85-5db0deb58f1f`, publicado de `1ca78a2` com a migração 0034.

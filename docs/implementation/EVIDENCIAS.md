@@ -1576,3 +1576,45 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 **Reversão do bloqueio:** `npx wrangler rollback 62182b6e-b9f6-4086-bb85-5db0deb58f1f`. Com ela, as 7 ligações com telefone voltam a "Para fazer"; a 0035 só criou uma tabela vazia e pode ficar.
 
 **Sem validação T11, sem alteração de supressões, sem contatos.**
+
+## Publicação da correção de desempenho da lista de tarefas (06/10/2026, autorizada por Rogério)
+
+**Antes:**
+- `v2-revisao-2` em `1d4d5b8`, sem migração pendente e sem servidor local aberto;
+- Worker anterior **65fe3503-b40e-4e3c-bdae-bc6cc0972799**;
+- retrato das 13 ligações e contagens guardados.
+
+**Primeira tentativa:**
+- `npm run deploy` parou na verificação prévia: 1 teste falhou (409 aprovados). Nada foi publicado.
+- Causa: o teste procurava o trecho "3615" em toda a auditoria, e UUIDs aleatórios podem conter esse trecho; falhou 1 vez em 5. É falha do teste, não do produto.
+- Correção em `7ea6095`, só em testes (`phone-suppression`, `phone-call-tasks`, `tasks`): as asserções procuram o número completo (`3615-?9[0-9]{3}`, `3333-?4444`). Rodaram 8 vezes seguidas sem falha.
+- `src/`, `public/`, `migrations/` e `wrangler.jsonc` idênticos a `1d4d5b8`.
+
+**Publicação:**
+- `npm run deploy` passou a verificação interna: 410 testes da suíte principal, 2 do Worker e 16 da ponte.
+- Worker **1213cf87-67fa-4352-8fc2-e558b07e084c**, 100% do tráfego, 2026-10-06T23:14:45Z.
+
+**Latência medida em produção** (`GET /api/tasks?until=<hoje>&limit=100`, 15 tarefas, 5 chamadas):
+- 4.509, 3.857, 3.540, 3.016 e 2.295 ms; mediana **3,5 s**.
+- Antes: 21,7 s e 20,9 s.
+- Outras rotas: suspensas 0,8 s; `/api/dashboard` 0,7 s; `/api/fichas` 0,5 s; `/api/sending/today` 1,2 s.
+- O limite de espera da interface (20 s) não foi alterado.
+- O desempenho foi considerado suficiente, por ficar bem abaixo do limite; reaproveitar parâmetros e listas de sanções entre tarefas fica como melhoria futura, não necessária.
+
+**Navegador em produção** (Chrome headless, sessão do Access, sem gravação):
+- Início carregou em ~4,4 s, sem erro.
+- Abordagem → Tarefas carregou em ~5,8 s, sem erro.
+- **13 ligações em "Bloqueadas"**, as 13 com "T11 pendente" e 6 com "sem telefone definido".
+- Formulários de oposição e de edição presentes nas 13.
+- "Para fazer (2)" tem só duas tarefas "Responder" (`reply_followup`, 01/10/2026) dos testes internos da ponte ("TESTE INTERNO EAG A" e "G", não são prospects). **Nenhuma ligação ou LinkedIn sem bloqueio.**
+- Nenhum erro de página.
+
+**Sem mudança:**
+- retrato das 13 ligações idêntico ao de antes (ids, telefones, fontes, roteiros, estado, revisão, histórico e bloqueios);
+- tarefas 15; `task_revisions` 35; validações T11 0; supressões 2;
+- campanhas: 1 rascunho e 1 encerrada; outbox: 5 aceitos e 19 cancelados; canais `planned`.
+- **Ponte:** leitura bem-sucedida às 23:18:35 UTC, depois do deploy.
+
+**Reversão:** `npx wrangler rollback 65fe3503-b40e-4e3c-bdae-bc6cc0972799` volta à versão lenta, que também tem o bloqueio T11. Não reverter para versão anterior a essa, porque ela não tem o bloqueio.
+
+**Sem validação T11, sem liberação de contatos, sem reversão.**
