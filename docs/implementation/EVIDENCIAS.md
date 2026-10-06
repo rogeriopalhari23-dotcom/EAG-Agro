@@ -1273,3 +1273,14 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - correspondência por nome fica para análise.
   - **Não autoriza contato comercial.**
 - **Estado:** canal `planned`; campanhas inativas; nenhum envio pendente.
+
+## Descoberta complementar de 5 candidatas do grupo 2 (06/10/2026, sem contato)
+
+- **Candidatas:** Rei do Milho, Caramuru Itumbiara, JBJ Aruanã, Gem Acreúna, BRF Rio Verde. Tabela, fontes e datas em `descoberta-milho-indiara/QUALIFICACAO-LOTES-2026-10-06.md`, seção "Grupo 2, descoberta complementar".
+- **Correção:** a restrição não transgênica da Caramuru vale para Sorriso/MT e São Simão/GO (soja). Ela não cobre a linha de milho de Itumbiara.
+- **Recomendações:**
+  - aceitar com alerta: Rei do Milho (recuperação judicial com plano homologado);
+  - aceitar com CNPJ a conciliar: Caramuru;
+  - aceitar como conta corporativa: BRF/MBRF;
+  - manter em descoberta: JBJ (compra de terceiros não comprovada) e Gem (sem fonte de operação em 2025–2026).
+- **Sem aceite, cadastro, Snov, contato, ficha ou alteração da T11.** Nenhum teste rodado: alteração só de documentação.
