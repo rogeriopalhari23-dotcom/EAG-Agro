@@ -1,0 +1,160 @@
+{
+  "aceite": "Rogério, 06/10/2026: autoriza cadastro e pesquisa; não confirma compra atual, aceitação de milho GMO nem abordagem.",
+  "consultadoEm": "2026-10-06",
+  "empresas": [
+    {
+      "chave": "cimilho",
+      "company": {
+        "legalName": "CIMILHO COMERCIO INDUSTRIA DE MILHO GUIMARAES LTDA",
+        "tradeName": "Cimilho",
+        "countryCode": "BR",
+        "registrationId": "19980044000153",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — MAPA SIPEAGRO (registro de ingrediente) + site da empresa; unidade Rua Grécia, 1000, Tibery, Uberlândia/MG (site = Receita); 263,0 km de Indiara pela rua (OSM, ±1 km); aceite de Rogério 06/10/2026 para qualificação",
+        "sourceUrl": "https://cimilho.com.br/"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "company_document",
+          "market": "national",
+          "supports": ["consumes_as_input"],
+          "reference": "Site da Cimilho: fabrica derivados de milho (pré-gelatinizado, farelo de gérmen, fubá) para ração e indústria, vende milho em grão e armazena grãos. Compra de terceiros não detalhada (o site cita 'fornecedores'). Página sem data.",
+          "sourceUrl": "https://cimilho.com.br/",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [
+        { "email": "cimilho@cimilho.com.br", "phone": "(34) 3213-4242", "label": "Canal geral publicado no site (não é comprador identificado)", "sourceUrl": "https://cimilho.com.br/", "sourceKind": "company_site", "timezone": "America/Sao_Paulo" }
+      ],
+      "people": []
+    },
+    {
+      "chave": "cargill-uberlandia",
+      "company": {
+        "legalName": "CARGILL AGRICOLA S A",
+        "tradeName": "Cargill — complexo de Uberlândia",
+        "countryCode": "BR",
+        "registrationId": "60498706013488",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — Parecer Único SUPRAM TM 0138312/2021 (CNPJ, endereço Rua Will Cargill, 880, e coordenada 18°50'57\"S 48°17'17\"O publicados); 256,5 km de Indiara pela coordenada; registro MAPA MG0001937 com CNPJ mascarado a conciliar; aceite de Rogério 06/10/2026 para qualificação",
+        "sourceUrl": "https://igam.mg.gov.br/documents/38374/7245202/APROVADO_-_Item_10/a53781ee-9aa9-b32f-9395-7477338fbb37?t=1723583533134&version=1.0"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "public_nominal_record",
+          "market": "national",
+          "supports": ["buys_commodity", "consumes_as_input"],
+          "reference": "Parecer SUPRAM TM 0138312/2021: planta de milho com capacidade nominal de 60 mil t/mês (glúten, amido, óleo); 'a principal matéria-prima é a commoditie milho, também fornecida por fazendeiros, cooperativas e corretores'. Capacidade não é consumo. Operação atual: vaga 'Operador III Envase de Amido' em Uberlândia publicada em 09/2026 (careers.cargill.com, vaga 333840).",
+          "sourceUrl": "https://igam.mg.gov.br/documents/38374/7245202/APROVADO_-_Item_10/a53781ee-9aa9-b32f-9395-7477338fbb37?t=1723583533134&version=1.0",
+          "factDate": "2021-01-25",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [],
+      "people": [
+        {
+          "name": "Vinicius de Carvalho Figueiredo",
+          "title": "Origination Manager - Corn CSSTSA (Cargill, Uberlândia/MG)",
+          "sourceKind": "linkedin_manual",
+          "sourceUrl": "https://linkedin.com/in/viniciuscfigueiredo",
+          "roleSuggestion": "decision_maker",
+          "relevance": "Gerente de originação de milho do negócio de amidos e adoçantes em Uberlândia desde 05/2022 (perfil público, 09/2026). Responsabilidade de compra a validar; decisor não confirmado."
+        },
+        {
+          "name": "Paulo Henrique Borges Silva",
+          "title": "Originação de milho para as fábricas de amidos (Cargill, Uberlândia/MG)",
+          "sourceKind": "linkedin_manual",
+          "sourceUrl": "https://linkedin.com/in/paulo-henrique-borges-silva-97643263",
+          "roleSuggestion": "influencer",
+          "relevance": "Desde 12/2023 origina milho waxy e Non-GMO e garante milho regular para moagem nas fábricas de Uberlândia (perfil público, 08/2026). Indica linhas Non-GMO e regular; aceitação de GMO a confirmar."
+        }
+      ]
+    },
+    {
+      "chave": "sao-martinho-boa-vista",
+      "company": {
+        "legalName": "SAO MARTINHO S/A",
+        "tradeName": "São Martinho — Usina Boa Vista",
+        "countryCode": "BR",
+        "registrationId": "51466860006278",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — Receita (Rod. GO-164 km 10, Fazenda Boa Vista, Quirinópolis/GO, CNAE fabricação de álcool) e registro MAPA GO0008761 no mesmo CNPJ; 151,4 km de Indiara pelo centroide; aceite de Rogério 06/10/2026 para qualificação",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/51466860006278"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "company_document",
+          "market": "national",
+          "supports": ["buys_commodity", "consumes_as_input"],
+          "reference": "Carta financeira São Martinho (17/06/2024): em 31/03/2024 a companhia havia comprado ~439 mil t de milho para a safra 24/25 (R$ 55,6/saca). Relatório de sustentabilidade: milho adquirido de cooperativas, tradings e diretamente de produtores; 120 fornecedores de milho homologados. Operação atual: 495 mil t de milho previstas na safra 2026/27 (RPAnews, 27/05/2026).",
+          "sourceUrl": "https://ri.saomartinho.com.br/Download.aspx?Arquivo=WSCysbqcXLIPYbRvudWBPw%3D%3D",
+          "factDate": "2024-06-17",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [
+        { "email": "coprodutos@saomartinho.com.br", "phone": "(64) 3615-9704", "label": "Canal publicado de COPRODUTOS (venda de DDG/óleo) — não é canal de compra de milho", "sourceUrl": "https://www.saomartinho.com.br/show.aspx?idCanal=%2F0wKj8RfTpFks0aoJiBnbg%3D%3D", "sourceKind": "company_site", "timezone": "America/Sao_Paulo" }
+      ],
+      "people": [
+        {
+          "name": "Luciano Jorge Silva",
+          "title": "Gerente de Originação de Milho e Comercialização de Coprodutos (São Martinho)",
+          "sourceKind": "linkedin_manual",
+          "sourceUrl": "https://linkedin.com/in/luciano-jorge-silva-a9242a57",
+          "roleSuggestion": "decision_maker",
+          "relevance": "Lidera a originação de milho e a segurança de abastecimento da operação de etanol de milho (perfil público, 08/2026). Unidade atendida: Boa Vista é a única planta de milho do grupo (BNDES); localização do perfil não exibida. Decisor não confirmado."
+        },
+        {
+          "name": "Helder Gosling",
+          "title": "Diretor Comercial e de Logística (São Martinho)",
+          "sourceKind": "manual",
+          "sourceUrl": "https://www.portalghf.com.br/projeto-amplia-a-infraestrutura-de-recebimento-secagem-e-armazenagem-de-milho-destinada-a-unidade-boa-vista",
+          "roleSuggestion": "influencer",
+          "relevance": "Citado (12/2025) sobre o abastecimento de milho da Unidade Boa Vista e a relação com fornecedores de milho. Nível de diretoria corporativa; responsabilidade direta de compra não confirmada."
+        }
+      ]
+    },
+    {
+      "chave": "cargill-bioenergia-sao-francisco",
+      "company": {
+        "legalName": "CARGILL BIOENERGIA LTDA.",
+        "tradeName": "Cargill Bioenergia — Usina São Francisco",
+        "countryCode": "BR",
+        "registrationId": "10249419000216",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — Receita (nome fantasia 'USF USINA SAO FRANCISCO', Rod. GO-206 km 18, Fazenda São Francisco, Quirinópolis/GO) e registro MAPA GO0011258 no mesmo CNPJ; 151,4 km de Indiara pelo centroide; aceite de Rogério 06/10/2026 para qualificação",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/10249419000216"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "public_nominal_record",
+          "market": "national",
+          "supports": ["consumes_as_input"],
+          "reference": "Unidade São Francisco processa cana e milho em 2025/26 (etanol, óleo de milho, DDG) — STG News 01/09/2026; maceração de 600 mil t de milho/ano — Globo Rural 11/06/2025. Indício de compra: perfil público de analista de 'originação de grãos (milho/sorgo)' na SJC Bioenergia (2022–09/2025). Compra atual de terceiros a confirmar.",
+          "sourceUrl": "https://stgnews.com.br/cargill-bioenergia-estima-encerrar-ciclo-2025-26-entre-os-melhores-dos-ultimos-anos/",
+          "factDate": "2026-09-01",
+          "consultedAt": "2026-10-06",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [],
+      "people": [
+        {
+          "name": "Evandro Rogério Zanini",
+          "title": "Gerente de Suprimentos Corporativo (SJC Bioenergia, hoje Cargill Bioenergia)",
+          "sourceKind": "linkedin_manual",
+          "sourceUrl": "https://linkedin.com/in/evandro-rogerio-zanini-975977101",
+          "roleSuggestion": "influencer",
+          "relevance": "Suprimentos corporativos (compras, contratos, almoxarifado) das duas usinas de cana e da unidade de grãos (perfil público, 09/2026, ainda com o nome SJC). Responsabilidade por compra de milho NÃO declarada; originador de milho atual a verificar."
+        }
+      ]
+    }
+  ]
+}

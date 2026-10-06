@@ -1041,3 +1041,22 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
   - 152 ME/EPP (100 + 52), das quais 150 listadas na seção 10 e 2 na seção 9.
 - **Limite de taxa:** a BrasilAPI respondeu 429 nas novas consultas de endereço. O endereço veio de páginas públicas da base da Receita (08–09/2026).
 - **Arquivo:** `descoberta-milho-indiara/QUALIFICACAO-LOTES-2026-10-06.md`.
+### Lote aceito para qualificação (2026-10-06)
+
+- **Aceite de Rogério:** Cimilho, Cargill Uberlândia, São Martinho Boa Vista e Cargill Bioenergia São Francisco. Autoriza cadastro e pesquisa; não confirma compra atual, GMO nem abordagem.
+- **Cadastro no Compass bloqueado por credencial:**
+  - sessão do Access expirada ("Unable to find token");
+  - D1 remoto com erro 7403;
+  - nada gravado direto no banco;
+  - pronto para aplicar: `cadastro-lote-aceito.json` + `scripts/cadastrar-lote-aceito.mjs`, que simula por padrão e não anexa nada a uma raiz de CNPJ já existente.
+- **Conferências:**
+  - São Martinho passa a ter compra de terceiros comprovada (carta financeira de 17/06/2024: cerca de 439 mil t de milho compradas para 24/25; relatório: milho de cooperativas, tradings e produtores);
+  - Cargill Uberlândia em operação (vaga de envase de amido, 09/2026);
+  - Cimilho a 263,0 km pela rua (OSM, ±1 km).
+- **Pessoas com fonte pública (LinkedIn ou notícia), sem e-mail deduzido:**
+  - Cargill Uberlândia: gerente de originação de milho (CSSTSA) e um originador;
+  - São Martinho: gerente de originação de milho e diretor comercial e de logística;
+  - Cargill Bioenergia: gerente de suprimentos corporativo, com responsabilidade por milho **não** declarada; originador atual a verificar;
+  - Cimilho: nenhuma pessoa.
+  - Nenhum decisor confirmado.
+- **Detalhe:** `descoberta-milho-indiara/LOTE-ACEITO-2026-10-06.md`.
