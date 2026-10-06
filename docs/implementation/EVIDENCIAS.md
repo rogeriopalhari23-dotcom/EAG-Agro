@@ -974,3 +974,26 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
 - **Produção (só leitura):** 0 linhas setor → CNAE, 5.570 municípios, 0 buscas nacionais, 6 empresas brasileiras (as do teste interno), nenhuma campanha nacional ativa.
 - **Próximo passo e dados a fornecer:** `DESCOBERTA-BRASIL-PROXIMO-PASSO.md` (opções A manual, B Casa dos Dados em avaliação, C unidade pela BrasilAPI como funcionalidade nova).
 - **Nada contratado, ativado ou enviado.**
+
+## Descoberta milho GMO — Indiara/GO, 300 km (2026-10-06, sem contato)
+
+- **Busca definida por Rogério:** milho GMO; centro Indiara/GO; raio 300 km; mercado Brasil; demanda, não fornecedores.
+- **Correção documental da T11 antes de propor contato:** em `DECISOES-PILOTO-2026-10-01.md`, o item 4 (retenção) passa a bloquear qualquer contato real; em `EXCLUSAO-PURGA-PLANO.md` §2, nota de que as decisões de retenção são da T11 e precedem o contato (Spec, tabela T11; §6.0.1; R9.1; R23.4).
+- **Centro e raio:**
+  - Indiara: IBGE 5209952, centroide -17,1852; -49,9682 (tabela `municipalities`, IBGE malhas v3 de 2026-09-23);
+  - 300 km é valor permitido (R11.14), sem limite técnico;
+  - 224 municípios no raio por centroide (195 GO, 28 MG, 1 DF), em `descoberta-milho-indiara/municipios-300km.csv`.
+- **Fontes:**
+  - Casa dos Dados indisponível (sem chave; nada contratado);
+  - alternativa documentada (opção A): 9 pesquisas web por segmento de uso final;
+  - BrasilAPI para 8 CNPJs de unidades: situação, CNAE, porte "Demais", município. Gratuita, sem crédito.
+- **Resultado em `descoberta-milho-indiara/CANDIDATAS.md` e `candidatas.csv`:**
+  - 25 consumidoras, fábricas e processadoras (10 com evidência explícita de milho, 15 com indício);
+  - 3 projetos;
+  - 2 processadoras que declaram **não-GMO** (evidência contrária), mais Caramuru com linha não transgênica declarada;
+  - 5 traders e originadores em grupo separado;
+  - 2 encontradas fora do raio (Neomille 316 km; Mantiqueira 358 km).
+  - Unidade separada da sede; distância estimada pelo centroide do município da unidade; GMO "a confirmar" em todas.
+- **Cobertura parcial declarada:** só em Anápolis há 32 empresas ativas com CNAE 1066-0, e no estado há 146 com CNAE 1064-3. A lacuna exige fonte estruturada.
+- **Ajustes de veracidade antes de salvar:** três sites que eu tinha preenchido sem fonte consultada (Cargill, SuperFrango, De Heus) foram trocados por "não encontrado nesta rodada"; o grupo da Fazenda Colorado foi corrigido para "Grupo JBJ".
+- **Nada aceito, cadastrado, validado ou enviado.** Canal `planned`.

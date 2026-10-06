@@ -54,6 +54,8 @@
 
 ## 2. Dados que permanecem depois de uma exclusão — nada aqui foi "aceito"; cada item espera decisão
 
+Estas decisões de retenção fazem parte da política de ciclo de vida da T11, que a Spec exige **antes de contatos reais da Etapa 1** (tabela de dependências; §6.0.1 "validação jurídica da retenção (T11)"; R9.1; R23.4). Nenhum contato real antes delas.
+
 | Dado que permanece | Por quê | Quem pode acessar | Decisão T11 que falta |
 | --- | --- | --- | --- |
 | `email_hash` no contato, na supressão e no registro de exclusão | Não voltar a contatar (R9.1.2) e refazer a exclusão após restauração | Administrador (Compass) e o titular da conta Cloudflare | Prazo de retenção do identificador de supressão e do registro de exclusão (T11 §2.1–2.2) |

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-06T14:22:01.392Z",
+  "updatedAt": "2026-10-06T14:32:30.524Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -793,7 +793,7 @@
       "acceptance": "Até 3 pessoas por empresa aderente, com fonte, data e motivo; estados a validar / cargo verificado / decisor confirmado; e-mail e telefone separados; sem LinkedIn automatizado; reaproveitamento por prazo.",
       "validation": "npm run check (tests/people.test.mjs); teste real 48 empresas DE + 3 CNPJs de Franca/SP",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Snov configurada e validada em 2026-10-01. Pessoas da Alemanha aceitas e fichas de identificação criadas. Brasil (2026-10-06): radar nacional R11 depende da Casa dos Dados (fonte aprovada G8; chave ausente) — sem ela, só o caminho manual (empresa por CNPJ com fonte, perfil, evidência, pessoa manual), sem unidade, QSA automático nem distância. Próxima ação: Rogério informa commodity, cidade/UF, raio e ICP e escolhe A/B/C em DESCOBERTA-BRASIL-PROXIMO-PASSO.md."
+      "blockedBy": "Snov configurada e validada em 2026-10-01. Pessoas da Alemanha aceitas e fichas de identificação criadas. Brasil (2026-10-06): busca definida por Rogério (milho GMO, Indiara/GO, 300 km); radar R11 sem Casa dos Dados (chave ausente) — descoberta pela alternativa documentada (pesquisa com evidências + BrasilAPI): 25 candidatas consumidoras/processadoras, 3 projetos, 2 não-GMO e 5 traders em descoberta-milho-indiara/CANDIDATAS.md, cobertura parcial. Próxima ação: aceite das candidatas por Rogério; ampliar cobertura por fonte estruturada (decisão)."
     },
     {
       "id": "SUPRESSAO-RETENCAO",
