@@ -11,7 +11,7 @@ export function transport(result = { kind: "accepted" }) {
   return { sent, send: async (m) => (sent.push(m), typeof result === "function" ? result(m) : result) };
 }
 
-export async function pilot(ctx, { email = "compras@valeverde.com.br", internal = true, validated = true, cnpj = "11222333000181", legalName = "Doces Vale Verde Ltda.", productId = "product-06", reuseCampaign } = {}) {
+export async function pilot(ctx, { email = "compras@valeverde.com.br", internal = true, validated = true, cnpj = "11222333000181", legalName = "Doces Vale Verde Ltda.", productId = "product-06", reuseCampaign, phone = "+55 16 3333-4444" } = {}) {
   const { api, env, DB } = ctx;
   Object.assign(env, {
     EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP",
@@ -45,7 +45,7 @@ export async function pilot(ctx, { email = "compras@valeverde.com.br", internal 
   DB.raw.prepare("INSERT INTO company_units(id,tenant_id,company_id,cnpj,size_code,source_label,consulted_at) VALUES (?,'eag-internal',?,?,'05','t','2026-09-23')").run(`u-${cnpj}`, co.data.id, cnpj);
   await api(`/api/companies/${co.data.id}/profiles`, "POST", { productId, profileClass: "possible_final_consumer", basis: "CNAE" });
   await api(`/api/companies/${co.data.id}/screening`, "POST", {});
-  const dm = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Maria Souza", email, prospectRole: "decision_maker", sourceLabel: "site", timezone: "America/Sao_Paulo" })).data.id;
+  const dm = (await api(`/api/companies/${co.data.id}/contacts`, "POST", { fullName: "Maria Souza", email, phone: phone ?? undefined, prospectRole: "decision_maker", sourceLabel: "site", timezone: "America/Sao_Paulo" })).data.id;
   // Validação feita 4 dias antes de DAY (dentro dos 30 dias aprovados em 2026-10-01).
   if (validated) DB.raw.prepare("UPDATE contacts SET email_validation='valid',email_validated_at='2099-01-01T12:00:00.000Z' WHERE id=?").run(dm);
   const { id } = (await api("/api/fichas", "POST", { companyId: co.data.id, campaignId, recipients: [dm] })).data;

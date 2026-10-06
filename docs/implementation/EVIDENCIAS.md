@@ -1396,3 +1396,30 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - ligações de ficha (`call_l1`) só são cruzadas com telefone se ele for informado na tarefa; o telefone do contato não é lido;
   - as 13 ligações em produção ainda não têm telefone estruturado.
 - **Não publicado.** T11 não alterada; nenhuma ligação liberada, campanha ativada ou contato feito. Canais `planned`.
+
+### Complemento (06/10/2026): número de toda ligação, ligações de ficha, oposição e preparação das 13 tarefas (não publicado)
+
+- **Toda ligação identifica o número:**
+  - Ligações de ficha pegam o telefone do destinatário (contato e pessoa de compras vinculada), com a fonte.
+  - Sem número, número sem código do país ou números divergentes viram pendência (`phone_missing`, `phone_unrecognized`, `phone_ambiguous`). A ligação não aparece como pronta e não conclui.
+  - Nada é escolhido automaticamente: o número de uma ligação de ficha é definido na tarefa, com fonte, e o roteiro continua congelado.
+  - Ligações antigas sem telefone ficam pendentes até a definição.
+- **Backend:** listagem e conclusão conferem a supressão do número da tarefa.
+- **Oposição:** o resultado "opposed" grava a nota da conversa e a supressão do número na mesma operação, inclusive com a ligação já suspensa, e suspende as outras ligações ao número. Uma nova ligação ao número já nasce suspensa.
+- **Migração 0034:** ainda não publicada; ganhou `phone_source` e `phone_issue`, e o histórico aceita `phone_source`.
+- **Testes:**
+  - `tests/phone-call-tasks.test.mjs`, com 9 casos: ficha com número e fonte, sem número, divergência, mesmo número em formatos diferentes, formato sem código do país, número já suprimido, tarefa antiga sem telefone e três cenários de oposição.
+  - O cenário de teste (`pilot`) agora dá telefone ao contato.
+  - `npm run check`: 403 testes da suíte principal, 2 do Worker e 16 da ponte.
+  - `validate-deploy` passou.
+  - `npm run test:ui` passou, com Playwright 1.63.0 instalado fora do projeto e o Chrome do sistema.
+- **Compatibilidade:** a suíte do commit publicado (`9576cb9`, Worker 9866c2c3) passou com a 0034 aplicada: 388 testes da suíte principal e 2 do Worker.
+- **13 tarefas:**
+  - plano em `descoberta-milho-indiara/telefones-ligacoes-l0.json`, script `scripts/atualizar-telefones-ligacoes.mjs`;
+  - simulação contra a produção (só leitura): 7 a definir, 6 pendentes (Cimilho, Rural Forte, Super-Bovi, Sociagro, Ração Ituiutaba e BRF), 0 problemas;
+  - caminho de aplicação testado no ambiente local.
+- **Incidente local, corrigido:** ao remover a cópia temporária usada no teste de compatibilidade, `git worktree remove --force` seguiu o atalho para `node_modules` e apagou parte das dependências locais.
+  - Restaurado com `npm ci`, nas versões exatas do `package-lock.json`, sem atualização.
+  - `npm ls` passou e a verificação completa passou depois disso.
+  - Repositório e produção não foram afetados.
+- **Plano de publicação e reversão:** `PUBLICACAO-SUPRESSAO-TELEFONE.md`. Nada publicado; T11, canais (`planned`) e campanhas sem alteração; nenhum contato.

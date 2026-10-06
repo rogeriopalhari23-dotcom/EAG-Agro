@@ -14,7 +14,7 @@ import { generateIdentification, commodityDisplayDe, IDENT_VERSION } from "./tem
 import { unsubUrl } from "./unsub-token.js";
 import { erasuresConsistent } from "./erasure.js";
 import { complianceStatus } from "./scores.js";
-import { manualTaskStatements } from "./tasks.js";
+import { manualTaskStatements, recipientPhone, phoneSuppressed } from "./tasks.js";
 
 const ROLES = ["decision_maker", "influencer", "provisional_decision_maker"];
 async function sha256(text) {
@@ -315,8 +315,11 @@ export async function approve(request, env, actor, rid, id) {
     const plain = [];
     // Roteiro tem o nome do contato: vai cifrado para a tarefa (marcado "enc:"), decifrado só na listagem autenticada.
     for (const m of list) plain.push({ ...m, body: `enc:${m.body_enc}` });
+    // Ligação: número do destinatário com a fonte; sem número ou com divergência, a tarefa nasce pendente (R28.18).
+    const phone = channel === "call" ? await recipientPhone(env, actor.tenant_id, contactId) : null;
+    const phoneSuspended = await phoneSuppressed(env, actor.tenant_id, phone?.hash);
     statements.push(
-      ...manualTaskStatements(env, { tenant: actor.tenant_id, ficha: f, contactId, commodity: snap.commodity, owner: f.created_by, start, messages: plain, addDays }),
+      ...manualTaskStatements(env, { tenant: actor.tenant_id, ficha: f, contactId, commodity: snap.commodity, owner: f.created_by, start, messages: plain, addDays, phone, phoneSuspended }),
     );
   }
   statements.push(

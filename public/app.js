@@ -2306,7 +2306,7 @@ async function suppressionView() {
           ],
           async (v) => {
             const r = await api("/api/suppression", "POST", v);
-            notice(r.created ? "Supressão registrada." : "Identificador já estava suprimido.");
+            notice(`${r.created ? "Supressão registrada." : "Identificador já estava suprimido."}${r.tasksSuspended ? ` ${r.tasksSuspended} ligação(ões) com esse número foram suspensas.` : ""}`);
             await navigate("Supressão");
           },
           "Registrar supressão",
@@ -2759,7 +2759,14 @@ async function enviosView() {
 
 // Tarefas: o que vence hoje primeiro; bloqueadas à parte, com o motivo. Roteiro e registro ficam no próprio item.
 // Motivos de bloqueio mais comuns em texto; os demais aparecem pelo código.
-const BLOCK_LABEL = { suppressed_phone: "telefone suprimido (oposição)", suppressed: "e-mail suprimido" };
+const BLOCK_LABEL = {
+  suppressed_phone: "telefone suprimido (oposição)",
+  suppressed: "e-mail suprimido",
+  phone_missing: "sem telefone definido",
+  phone_ambiguous: "telefones divergentes entre as fontes: escolha o número",
+  phone_unrecognized: "telefone sem código do país: confira o número",
+};
+const CALL_KINDS = ["call_l0", "call_l1", "call_l2"];
 const TASK_KIND = { call_l0: "Ligação (nível 0)", call_l1: "Ligação (nível 1)", call_l2: "Ligação (nível 2)", linkedin: "LinkedIn", reply_followup: "Responder", meeting_confirm: "Confirmar reunião", return_suggested: "Retorno sugerido", provider_alert: "Alerta do provedor", review_ambiguous: "Revisar resposta" };
 async function tarefasView() {
   const today = new Date().toISOString().slice(0, 10);
@@ -2782,7 +2789,8 @@ async function tarefasView() {
         t.status === "suspended" ? text("small", `Suspensa: ${t.suspended_reason || "sem motivo registrado"}`) : null,
       ),
     );
-    if (t.phone) box.append(text("p", `Telefone da ligação: ${t.phone}`));
+    if (t.phone) box.append(text("p", `Telefone da ligação: ${t.phone}${t.phone_source ? ` — fonte: ${t.phone_source}` : ""}`));
+    else if (CALL_KINDS.includes(t.kind) && t.phone_source) box.append(text("p", `Telefone pendente: ${t.phone_source}`));
     if (t.channel_note) box.append(text("p", `Canal: ${t.channel_note}`));
     if (t.next_action) box.append(text("p", `Próxima ação: ${t.next_action}`));
     if (t.script) box.append(details("Roteiro", el("pre", { class: "message" }, t.script)));
@@ -2794,6 +2802,7 @@ async function tarefasView() {
           makeForm(
             [
               input("Telefone da ligação (+55 DDD número; a supressão é conferida por ele)", "phone", "tel", t.phone || "", false),
+              input("Fonte do telefone (onde está publicado e data; obrigatória ao trocar o número)", "phoneSource", "text", "", false),
               input("Canal (com fonte e data)", "channelNote", "text", t.channel_note || "", false),
               input("Próxima ação", "nextAction", "text", t.next_action || "", false),
               input("Data", "dueDate", "date", t.due_date, true),
@@ -2801,11 +2810,46 @@ async function tarefasView() {
               input("Motivo da alteração", "reason", "text", "", true),
             ],
             async (v) => {
-              const r = await api(`/api/tasks/${t.id}`, "PATCH", { expectedRevision: t.revision, reason: v.reason, phone: v.phone || null, channelNote: v.channelNote || null, nextAction: v.nextAction || null, dueDate: v.dueDate, script: v.script || null });
+              const r = await api(`/api/tasks/${t.id}`, "PATCH", { expectedRevision: t.revision, reason: v.reason, phone: v.phone || null, phoneSource: v.phoneSource || undefined, channelNote: v.channelNote || null, nextAction: v.nextAction || null, dueDate: v.dueDate, script: v.script || null });
               notice(r.suspended ? "Tarefa atualizada e suspensa: o telefone informado está na lista de supressão." : "Tarefa atualizada; o histórico guarda o valor anterior.");
               await navigate("Tarefas");
             },
             "Salvar alteração",
+          ),
+        ),
+      );
+    if (writable() && t.status === "open" && t.ficha_id && CALL_KINDS.includes(t.kind))
+      box.append(
+        details(
+          t.phone ? "Trocar o telefone da ligação" : "Definir o telefone da ligação",
+          makeForm(
+            [
+              input("Telefone (+55 DDD número)", "phone", "tel", t.phone || "", true),
+              input("Fonte do telefone (onde está publicado e data)", "phoneSource", "text", "", true),
+              input("Motivo", "reason", "text", "", true),
+            ],
+            async (v) => {
+              const r = await api(`/api/tasks/${t.id}`, "PATCH", { expectedRevision: t.revision, reason: v.reason, phone: v.phone, phoneSource: v.phoneSource });
+              notice(r.suspended ? "Telefone definido; a ligação foi suspensa porque o número está na lista de supressão." : "Telefone definido; o roteiro da ficha não mudou.");
+              await navigate("Tarefas");
+            },
+            "Salvar telefone",
+          ),
+        ),
+      );
+    // Oposição: grava o resultado da conversa e a supressão do número juntos, mesmo com a ligação suspensa ou bloqueada.
+    if (writable() && CALL_KINDS.includes(t.kind) && ["open", "suspended"].includes(t.status))
+      box.append(
+        details(
+          "Registrar oposição (não quer ser contatado)",
+          makeForm(
+            [input("O que foi dito (nota da conversa)", "note", "textarea", "", false)],
+            async (v) => {
+              const r = await api(`/api/tasks/${t.id}/complete`, "POST", { outcome: "opposed", note: v.note || undefined });
+              notice(r.suppressed ? `Oposição registrada: número suprimido${r.tasksSuspended ? `; ${r.tasksSuspended} outra(s) ligação(ões) suspensa(s)` : ""}.` : "Oposição registrada. A tarefa não tinha telefone: registre a supressão pelo número em Configurações.");
+              await navigate("Tarefas");
+            },
+            "Registrar oposição",
           ),
         ),
       );

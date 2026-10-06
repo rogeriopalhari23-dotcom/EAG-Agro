@@ -20,7 +20,7 @@ async function world(t) {
   return { ctx, r };
 }
 const level0 = (ctx, r, commodity, phone) =>
-  ctx.api(`/api/companies/${r.companyId}/level0`, "POST", { commodity, phone, unitScript: "ANTES DE LIGAR: contato real depende da T11 validada." });
+  ctx.api(`/api/companies/${r.companyId}/level0`, "POST", { commodity, phone, phoneSource: phone ? "site oficial da unidade, consulta 06/10/2026" : undefined, unitScript: "ANTES DE LIGAR: contato real depende da T11 validada." });
 const suppressPhone = (ctx, value) => ctx.api("/api/suppression", "POST", { channel: "phone", value, reason: "manual_request" });
 const listed = async (ctx, status) => (await ctx.api(`/api/tasks?until=${UNTIL}${status ? `&status=${status}` : ""}`)).data.items;
 const row = (ctx, id) => ctx.DB.raw.prepare("SELECT * FROM tasks WHERE id=?").get(id);
@@ -77,10 +77,10 @@ test("3 e 4: oposição suspende a tarefa já aberta com o número; número dife
   assert.equal(row(ctx, hit).status, "suspended");
   assert.equal(row(ctx, hit).suspended_reason, "telefone suprimido");
   assert.equal(row(ctx, hit).revision, 1, "suspensão não é edição do roteiro");
-  for (const id of [other, noPhone]) {
-    assert.equal(row(ctx, id).status, "open");
-    assert.deepEqual((await listed(ctx)).find((x) => x.id === id).blocked, []);
-  }
+  for (const id of [other, noPhone]) assert.equal(row(ctx, id).status, "open");
+  assert.deepEqual((await listed(ctx)).find((x) => x.id === other).blocked, []);
+  // Sem telefone não é suspensa pela supressão, mas também não aparece como pronta para ligar.
+  assert.deepEqual((await listed(ctx)).find((x) => x.id === noPhone).blocked, ["phone_missing"]);
   assert.equal((await ctx.api(`/api/tasks/${other}/complete`, "POST", { outcome: "no_answer" })).status, 200);
   // Auditoria da suspensão sem o número.
   const audit = ctx.DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='task.suspended' AND entity_id=?").get(hit);
@@ -91,7 +91,7 @@ test("4: trocar o telefone de uma tarefa aberta por um número suprimido a suspe
   const { ctx, r } = await world(t);
   const id = (await level0(ctx, r, "corn", OTHER)).data.id;
   await suppressPhone(ctx, PHONE);
-  const res = await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 1, reason: "telefone oficial da unidade", phone: SAME });
+  const res = await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 1, reason: "telefone oficial da unidade", phone: SAME, phoneSource: "site oficial, consulta 06/10/2026" });
   assert.equal(res.status, 200, JSON.stringify(res.data));
   assert.equal(row(ctx, id).status, "suspended");
   const rev = ctx.DB.raw.prepare("SELECT * FROM task_revisions WHERE task_id=? AND field='phone'").get(id);

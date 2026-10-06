@@ -1,18 +1,22 @@
 -- SUPRESSAO-TELEFONE (2026-10-06): a ligação manual guarda o telefone que será usado, para respeitar a supressão
 -- do número (R21.2, R28.18). phone_hash usa a mesma normalização e HMAC da supressão (formatos equivalentes batem);
--- phone_enc guarda o número normalizado cifrado, para exibição. Nenhum dos dois vai para o audit_log.
+-- phone_enc guarda o número normalizado cifrado, para exibição; phone_source diz de onde ele veio (sem o número).
+-- phone_issue marca a pendência quando não há número utilizável: sem número, divergência entre fontes ou formato
+-- sem código do país. Nada disso vai para o audit_log. Tarefas antigas ficam sem número = pendência "missing".
 ALTER TABLE tasks ADD COLUMN phone_hash TEXT;
 ALTER TABLE tasks ADD COLUMN phone_enc TEXT;
+ALTER TABLE tasks ADD COLUMN phone_source TEXT;
+ALTER TABLE tasks ADD COLUMN phone_issue TEXT CHECK (phone_issue IN ('missing','ambiguous','unrecognized'));
 CREATE INDEX idx_tasks_phone ON tasks(tenant_id, phone_hash) WHERE phone_hash IS NOT NULL;
 
--- O histórico de edição passa a aceitar o campo 'phone'. SQLite não altera CHECK: a tabela é recriada com as mesmas
+-- O histórico de edição passa a aceitar os campos 'phone' e 'phone_source'. SQLite não altera CHECK: a tabela é recriada com as mesmas
 -- linhas, o índice e o gatilho que impede alteração (0033).
 CREATE TABLE task_revisions_0034 (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
   task_id TEXT NOT NULL REFERENCES tasks(id),
   revision INTEGER NOT NULL,
-  field TEXT NOT NULL CHECK (field IN ('script','channel_note','next_action','due_date','phone')),
+  field TEXT NOT NULL CHECK (field IN ('script','channel_note','next_action','due_date','phone','phone_source')),
   old_value_enc TEXT,
   new_value_enc TEXT,
   reason TEXT NOT NULL CHECK (length(reason) >= 10),
