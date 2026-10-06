@@ -80,7 +80,7 @@
 > **5. Oposição, supressão e exclusão (já existentes)**
 >
 > - Quem pedir para não ser contatado, por qualquer meio inclusive na ligação, entra numa lista de supressão que guarda só um identificador pseudonimizado (hash), canal, motivo e data. O acesso é restrito ao administrador, e reimportação não remove a supressão.
-> - Pedido de exclusão: apaga contato, textos e mensagens, e mantém só o hash para não voltar a contatar.
+> - Pedido de exclusão: o Compass elimina os dados abrangidos pela rotina implementada, incluindo dados de contato e determinados textos, mensagens e tarefas. Mantém um identificador pseudonimizado para evitar novo contato e registros residuais de auditoria. Notas livres podem exigir revisão manual. Cópias em backups, na caixa corporativa e nos registros locais têm tratamento separado, ainda pendente de definição.
 > - Limitações conhecidas:
 >   - a exclusão só foi testada com dados fictícios;
 >   - não há prazo de retenção definido;
@@ -105,6 +105,8 @@
 >
 > Posso enviar o detalhamento técnico se for útil. Obrigado,
 > Rogerio Palhari
+
+**Registro da resposta:** quando a EAG responder, registrar só as decisões expressamente validadas, com responsável, data e alcance de cada uma. Uma resposta parcial não conclui a T11; o que não for respondido continua pendente.
 
 ## 3. Retenção: opções para as decisões de Rogério (nenhuma escolhida)
 
