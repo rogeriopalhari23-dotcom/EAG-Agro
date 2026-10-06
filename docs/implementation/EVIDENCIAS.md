@@ -899,3 +899,21 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
     - fila: 5 `accepted` (internas, a última às 17:46 UTC de 01/10, antes da publicação) e 19 `cancelled`;
     - **nenhuma mensagem enviada** depois da publicação.
 12. **Fora desta autorização:** nenhuma purga real, remoção de supressão, redação de registros nem exclusão de backup.
+
+## Ponte de e-mail retomada em operação contínua (2026-10-06, decisão de Rogério)
+
+- **Antes de mexer:** canais `planned`; campanhas 1 `draft` e 1 `ended` (nenhuma ativa); fila 5 `accepted` + 19 `cancelled`, **0 pendentes**.
+- **Tarefas do Windows:** só existe "EAG Compass - ponte de e-mail" (gatilho ao entrar no Windows). A tarefa do prazo do teste interno já tinha sido removida em 01/10. Nada do teste na pasta Inicializar nem em `HKCU\…\Run`. Nenhuma tarefa foi desativada.
+- **Cópia protegida** da configuração: `eag-compass-backups\ponte-config-antes-prazo-20261006\config.json`.
+  - SHA-256 `96786122909BD5B348AE4D923349FD18303E41FDCD37B9D15646C53BB670DB61`, igual ao original.
+  - Acesso só de `ROGERIONOTE\Roger`. A permissão explícita foi aplicada antes de cortar a herança e o arquivo continuou legível.
+- **Correção:** removida só a chave `BRIDGE_TEST_DEADLINE`. As chaves `SMTP_PORT`, `MAILBOX_USER` e `COMPASS_URL` ficaram na mesma ordem, e o recuo foi mantido. `segredos.json` inalterado (`2A5BB59649A52218…`). Diário: 6 linhas, todas `reported`, antes e depois.
+- **`ponte conferir`:** `compass_ok`, `imap_ok` (131 mensagens), `smtp_ok` (`smtp.hostinger.com:465`), "nenhuma mensagem enviada".
+- **`ponte iniciar`:**
+  - PID 1868 às 00:17:16 (Cuiabá);
+  - início automático ligado; gatilho de logon ativo; reinício a cada 1 min, até 999 vezes; sem limite de tempo; resultado 267009, que significa "em execução".
+- **Ciclos observados:** 04:17:47, 04:18:58 e 04:20:15 UTC.
+  - Todos com `nothing_due`, leitura OK, `lastReadError` nulo e 0 envios.
+  - No Compass: `reply_reader_state.last_read_ok_at = 2026-10-06T04:20:13Z`. O último erro registrado é o antigo de 2026-10-01, sem erro novo.
+- **Estado final:** canal `planned`, nenhuma campanha ativa, fila inalterada (último `accepted` em 2026-10-01 17:46 UTC), **nenhuma mensagem enviada**.
+- **Fora desta etapa:** canal e campanhas não ativados; nenhuma purga; `redigir-diario.mjs` não executado; prazos da T11 continuam pendentes.

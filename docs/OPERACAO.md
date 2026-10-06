@@ -128,6 +128,20 @@ O Worker **não consegue** abrir conexão com `smtp.hostinger.com`/`imap.hosting
 
 Até a decisão: canal de e-mail segue `planned`; não grave `MAILBOX_PASSWORD` no Worker (não teria efeito).
 
+## Ponte de e-mail no Windows — operação contínua (desde 2026-10-06)
+
+- **Estado:**
+  - a ponte roda continuamente no PC de Rogério;
+  - a tarefa "EAG Compass - ponte de e-mail" inicia ao entrar no Windows (usuário `ROGERIONOTE\Roger`) e reinicia a cada 1 min se cair (até 999 vezes), sem limite de tempo, também na bateria;
+  - cada ciclo (60–70 s) lê a caixa e só pede envio de passo aprovado com canal liberado. Com o canal `planned`, nada sai.
+- **Configuração:** `%LOCALAPPDATA%\eag-mail-bridge\config.json`, com `SMTP_PORT`, `MAILBOX_USER` e `COMPASS_URL`.
+  - O prazo do teste interno (`BRIDGE_TEST_DEADLINE = 2026-10-01T21:00:00Z`) foi **removido** em 2026-10-06 por decisão de Rogério: ele parava a ponte e a caixa ficou sem leitura de 01/10 21:00 UTC a 06/10.
+  - Cópia anterior protegida, só para o usuário: `C:\Users\Roger\eag-compass-backups\ponte-config-antes-prazo-20261006\config.json`.
+  - Segredos (`segredos.json`, cifrados) e diário de recuperação (`journal.sqlite`) não foram alterados.
+- **Comandos:** `bridge\ponte estado` (situação), `bridge\ponte registro`, `bridge\ponte conferir` (Compass, IMAP e login SMTP, sem enviar), `bridge\ponte parar` e `bridge\ponte iniciar`.
+- **Para o PC sem a ponte:** `ponte parar`. O Compass segura qualquer envio sem leitura da caixa nos últimos 10 minutos (R19.14).
+- **Pendente (T11):** `bridge\scripts\redigir-diario.mjs`, a redação do texto SMTP antigo no diário, só depois da decisão de retenção. Não rodar antes.
+
 ## Domínio eagcompass.com — transição
 
 Pré-configurado: domínio personalizado no Worker, `www` → apex (301). Falta só a troca dos nameservers no hPanel. Depois da ativação: incluir `eagcompass.com` e `eagcompass.com/u` nas aplicações do Access (mesmo AUD), testar login e descadastro, então `PUBLIC_BASE_URL=https://eagcompass.com` e `workers_dev: false`.
