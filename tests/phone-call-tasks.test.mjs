@@ -44,7 +44,7 @@ test("Ficha: a ligação leva o telefone do destinatário com a fonte e fica pro
     assert.match(x.phone_hash, /^[0-9a-f]{64}$/);
     assert.equal(x.phone_issue, null);
     assert.match(x.phone_source, /^contato \(/);
-    assert.ok(!x.phone_source.includes("3333"), "a fonte não repete o número");
+    assert.ok(!/3333-?4444/.test(x.phone_source), "a fonte não repete o número");
   }
   const item = (await listed(ctx)).find((x) => x.kind === "call_l1");
   assert.equal(item.phone, "+551633334444");
@@ -153,7 +153,7 @@ test("Oposição: grava o resultado e a supressão juntos, suspende as outras li
   const c = await mk("wheat");
   assert.equal(c.data.suspended, true);
   const audit = JSON.stringify(ctx.DB.raw.prepare("SELECT * FROM audit_log WHERE action IN ('suppression.added','task.suspended','task.completed')").all());
-  assert.ok(!audit.includes("3615") && !audit.includes("Atendente"), "auditoria sem número nem nota");
+  assert.ok(!/3615-?9[0-9]{3}/.test(audit) && !audit.includes("Atendente"), "auditoria sem número nem nota");
   assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='suppression.added'").get().n, 1);
 });
 

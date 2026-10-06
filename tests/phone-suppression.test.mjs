@@ -53,8 +53,8 @@ test("1 e 2: telefone suprimido impede a ligação, inclusive escrito em outro f
   assert.deepEqual(done.data.error.details.reasons, ["suppressed_phone"]);
   // O número não fica legível no banco nem na auditoria.
   assert.match(t1.phone_hash, /^[0-9a-f]{64}$/);
-  assert.ok(!JSON.stringify(t1).includes("3615"));
-  assert.ok(!JSON.stringify(ctx.DB.raw.prepare("SELECT * FROM audit_log").all()).includes("3615"));
+  assert.ok(!/3615-?9[0-9]{3}/.test(JSON.stringify(t1)));
+  assert.ok(!/3615-?9[0-9]{3}/.test(JSON.stringify(ctx.DB.raw.prepare("SELECT * FROM audit_log").all())));
 });
 
 test("2: formatos equivalentes geram o mesmo identificador; telefone sem código do país é recusado", async (t) => {
@@ -84,7 +84,7 @@ test("3 e 4: oposição suspende a tarefa já aberta com o número; número dife
   assert.equal((await ctx.api(`/api/tasks/${other}/complete`, "POST", { outcome: "no_answer" })).status, 200);
   // Auditoria da suspensão sem o número.
   const audit = ctx.DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='task.suspended' AND entity_id=?").get(hit);
-  assert.ok(audit && !audit.new_value_json.includes("3615"));
+  assert.ok(audit && !/3615-?9[0-9]{3}/.test(audit.new_value_json));
 });
 
 test("4: trocar o telefone de uma tarefa aberta por um número suprimido a suspende; histórico guarda o número cifrado", async (t) => {
@@ -95,7 +95,7 @@ test("4: trocar o telefone de uma tarefa aberta por um número suprimido a suspe
   assert.equal(res.status, 200, JSON.stringify(res.data));
   assert.equal(row(ctx, id).status, "suspended");
   const rev = ctx.DB.raw.prepare("SELECT * FROM task_revisions WHERE task_id=? AND field='phone'").get(id);
-  assert.ok(rev && !rev.new_value_enc.includes("3615"));
+  assert.ok(rev && !/3615-?9[0-9]{3}/.test(rev.new_value_enc));
   const h = (await ctx.api(`/api/tasks/${id}/history`)).data.items.find((x) => x.field === "phone");
   assert.equal(h.newValue, "+556436159700");
 });

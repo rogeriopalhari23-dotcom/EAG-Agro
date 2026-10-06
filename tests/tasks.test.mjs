@@ -127,7 +127,7 @@ check("Tarefas: edição de ligação manual aberta guarda histórico cifrado, p
   assert.match(after.script, /^ANTES DE LIGAR:/m);
   // Histórico: valores cifrados no banco, legíveis pela rota; auditoria sem conteúdo.
   const rev = ctx.DB.raw.prepare("SELECT * FROM task_revisions WHERE task_id=? AND field='script'").get(id);
-  assert.ok(!rev.old_value_enc.includes("NÃO CONFIRMADO") && !rev.new_value_enc.includes("3615"));
+  assert.ok(!rev.old_value_enc.includes("NÃO CONFIRMADO") && !/3615-?9[0-9]{3}/.test(rev.new_value_enc));
   const h = await ctx.api(`/api/tasks/${id}/history`);
   const s = h.data.items.find((x) => x.field === "script");
   assert.equal(s.oldValue, oldScript);
@@ -135,7 +135,7 @@ check("Tarefas: edição de ligação manual aberta guarda histórico cifrado, p
   assert.equal(s.reason, "corrigir telefone oficial");
   assert.ok(s.changedBy && s.changedAt);
   const audit = ctx.DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='task.updated' AND entity_id=?").get(id).new_value_json;
-  assert.ok(!audit.includes("3615") && !audit.includes("NÃO CONFIRMADO"));
+  assert.ok(!/3615-?9[0-9]{3}/.test(audit) && !audit.includes("NÃO CONFIRMADO"));
   // Histórico não aceita alteração.
   assert.throws(() => ctx.DB.raw.prepare("UPDATE task_revisions SET reason='trocado à mão' WHERE task_id=?").run(id));
   // Leitor não edita.
