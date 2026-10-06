@@ -118,7 +118,7 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
       env,
       `UPDATE tasks SET status=CASE WHEN status IN ('open','suspended') THEN 'cancelled' ELSE status END,
          suspended_reason=CASE WHEN status IN ('open','suspended') THEN 'dados pessoais excluídos' ELSE suspended_reason END,
-         script=NULL,result_json=NULL,channel_note=NULL,next_action=NULL
+         script=NULL,result_json=NULL,channel_note=NULL,next_action=NULL,phone_hash=NULL,phone_enc=NULL
        WHERE tenant_id=? AND (contact_id=? ${allOwnIds.length ? `OR inbound_id IN (${ph(allOwnIds)})` : ""})`,
       tenant, contactId, ...allOwnIds,
     ),
@@ -187,7 +187,7 @@ export async function purgeInboundContent(request, env, actor, rid, inboundId) {
   await commit(env, [
     s(env, "UPDATE inbound_messages SET r2_key='purged',message_id=NULL,in_reply_to=NULL,references_json='[]',content_purged_at=? WHERE id=?", at, m.id),
     s(env, "DELETE FROM task_revisions WHERE tenant_id=? AND task_id IN (SELECT id FROM tasks WHERE tenant_id=? AND inbound_id=?)", actor.tenant_id, actor.tenant_id, m.id),
-    s(env, "UPDATE tasks SET script=NULL,result_json=NULL,channel_note=NULL,next_action=NULL WHERE tenant_id=? AND inbound_id=?", actor.tenant_id, m.id),
+    s(env, "UPDATE tasks SET script=NULL,result_json=NULL,channel_note=NULL,next_action=NULL,phone_hash=NULL,phone_enc=NULL WHERE tenant_id=? AND inbound_id=?", actor.tenant_id, m.id),
     auditStatement(env, actor, rid, "inbound.content_purged", "inbound_message", m.id, { reason }),
   ]);
   return { id: m.id, purged: true };

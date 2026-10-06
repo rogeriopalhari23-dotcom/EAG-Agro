@@ -1363,3 +1363,36 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - O item 6 de `T11-VALIDACAO-PILOTO-BR.md` foi corrigido por nota, preservando o texto original.
   - A correção do código está proposta e ainda não foi implementada.
 - **Estado:** as 13 ligações seguem abertas, com a linha da T11 no roteiro. Nenhum contato. Canais `planned`. Nenhum teste rodado: só documentação mudou.
+
+## Supressão por telefone nas ligações manuais (06/10/2026, implementada; não publicada)
+
+- **Falha reproduzida antes da correção** (`tests/phone-suppression.test.mjs`): 5 de 6 casos falhavam. A tarefa seguia `open` depois da oposição por telefone, o telefone não era validado, a edição ignorava o número e não havia auditoria de suspensão. O caso 6 (e-mail) já passava e ficou como proteção contra regressão.
+- **Correção:**
+  - **Migração 0034:**
+    - `tasks.phone_hash`, com o mesmo HMAC e a mesma normalização da supressão;
+    - `tasks.phone_enc`, o número normalizado cifrado;
+    - índice parcial;
+    - `task_revisions` recriada para aceitar o campo `phone`, com as mesmas linhas, o mesmo índice e o mesmo gatilho que impede alteração.
+  - **`restrictionsFor`:** passa a consultar também a supressão do canal `phone` (motivo `suppressed_phone`), na listagem e na conclusão.
+  - **`POST /api/suppression` com canal `phone`:** suspende as ligações abertas com o número (`suspended_reason` = "telefone suprimido"), com auditoria `task.suspended` sem o número. Repetir a supressão não muda nada; concluídas ficam intactas.
+  - **Criação e edição de ligação:**
+    - aceitam `phone` (E.164; sem `+55` é recusado);
+    - número já suprimido cria ou deixa a tarefa suspensa;
+    - o histórico guarda o número cifrado.
+  - **Remoção administrativa da supressão:** não reativa tarefa.
+  - **Exclusão de dados pessoais:** apaga `phone_hash` e `phone_enc` das tarefas afetadas.
+  - **Tela Abordagem → Tarefas:**
+    - mostra o telefone da ligação e um campo para editá-lo;
+    - mostra o motivo legível do bloqueio;
+    - mostra a seção "Suspensas — não voltam sozinhas", com o motivo, sem edição nem conclusão. Isso usa `GET /api/tasks?status=suspended`.
+- **Verificações:**
+  - `npm run check` passou: 394 testes da suíte principal, 2 do Worker e 16 da ponte, além de sintaxe, skill e site.
+  - `validate-deploy` passou.
+  - Migração 0034 aplicada no D1 local (Wrangler): tabela, índice e gatilho conferidos.
+  - Conferência no servidor local com dados fictícios: a supressão suspendeu 1 tarefa e o outro número ficou aberto; captura da tela conferida.
+  - `npm run test:ui` não rodou: o Playwright é dependência opcional e não está instalado.
+- **Alcance:** número exato normalizado, em todas as ligações (R21.2). Nenhuma inferência por nome (R21.3).
+- **Limites conhecidos:**
+  - ligações de ficha (`call_l1`) só são cruzadas com telefone se ele for informado na tarefa; o telefone do contato não é lido;
+  - as 13 ligações em produção ainda não têm telefone estruturado.
+- **Não publicado.** T11 não alterada; nenhuma ligação liberada, campanha ativada ou contato feito. Canais `planned`.

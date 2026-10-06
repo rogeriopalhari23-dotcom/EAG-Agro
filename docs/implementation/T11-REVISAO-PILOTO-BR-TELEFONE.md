@@ -99,7 +99,7 @@ O bloqueio de hoje vem da Spec, não diretamente da lei. A lei impõe obrigaçõ
 
 Em ordem. Nenhuma exige parecer externo.
 
-1. **Corrigir a supressão por telefone (código).**
+1. **Corrigir a supressão por telefone (código).** *Implementada em 06/10/2026 na `v2-revisao-2` (migração 0034, testes em `tests/phone-suppression.test.mjs`); **não publicada**. Falta, depois da publicação, preencher o telefone de cada uma das 13 ligações pela edição auditada.*
    - Hoje uma oposição dita na ligação não suspende a tarefa de nível 0.
    - Proposta: a tarefa guarda o hash do telefone a ligar, e `restrictionsFor` passa a consultar também a supressão do canal `phone`.
    - Teste: suprimir o número deve suspender a tarefa, e a conclusão deve ser recusada.

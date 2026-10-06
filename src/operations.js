@@ -25,6 +25,7 @@ import {
 import { identifierHash } from "./crypto.js";
 import { validateParameter, crossCheck } from "./parameter-registry.js";
 import { invalidationStatements } from "./fichas.js";
+import { PHONE_SUPPRESSED } from "./tasks.js";
 export async function setParameter(request, env, actor, rid, key) {
   requireRole(actor, new Set(["admin"]));
   const i = await bodyJson(request),
@@ -511,6 +512,12 @@ export async function suppress(request, env, actor, rid) {
     ["opt_out", "hard_bounce", "manual_request", "legacy_import"],
     "motivo",
   );
+  // Oposição por telefone: as ligações abertas com esse número ficam suspensas, com o motivo (R21.2, R28.18).
+  // Repetir a supressão não muda nada (só pega abertas); concluídas ficam como estão; remover a supressão não reativa.
+  const calls =
+    channel === "phone"
+      ? (await s(env, "SELECT id,company_id FROM tasks WHERE tenant_id=? AND status='open' AND phone_hash=? AND kind IN ('call_l0','call_l1','call_l2')", actor.tenant_id, hash).all()).results
+      : [];
   const result = await commit(env, [
     s(
       env,
@@ -534,6 +541,10 @@ export async function suppress(request, env, actor, rid) {
       JSON.stringify({ channel, reason }),
       rid,
     ),
+    ...calls.flatMap((t) => [
+      s(env, "UPDATE tasks SET status='suspended',suspended_reason=? WHERE tenant_id=? AND id=? AND status='open'", PHONE_SUPPRESSED, actor.tenant_id, t.id),
+      auditStatement(env, actor, rid, "task.suspended", "task", t.id, { companyId: t.company_id, reason: "suppressed_phone" }),
+    ]),
   ]);
   const saved = await s(
     env,
@@ -542,7 +553,7 @@ export async function suppress(request, env, actor, rid) {
     hash,
     channel,
   ).first();
-  return { id: saved.id, created: !!result[0].meta.changes };
+  return { id: saved.id, created: !!result[0].meta.changes, tasksSuspended: calls.length };
 }
 export async function isSuppressed(env, tenant, channel, value) {
   const hash = await identifierHash(env, tenant, channel, value);

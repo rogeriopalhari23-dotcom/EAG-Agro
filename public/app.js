@@ -2758,10 +2758,14 @@ async function enviosView() {
 }
 
 // Tarefas: o que vence hoje primeiro; bloqueadas à parte, com o motivo. Roteiro e registro ficam no próprio item.
+// Motivos de bloqueio mais comuns em texto; os demais aparecem pelo código.
+const BLOCK_LABEL = { suppressed_phone: "telefone suprimido (oposição)", suppressed: "e-mail suprimido" };
 const TASK_KIND = { call_l0: "Ligação (nível 0)", call_l1: "Ligação (nível 1)", call_l2: "Ligação (nível 2)", linkedin: "LinkedIn", reply_followup: "Responder", meeting_confirm: "Confirmar reunião", return_suggested: "Retorno sugerido", provider_alert: "Alerta do provedor", review_ambiguous: "Revisar resposta" };
 async function tarefasView() {
   const today = new Date().toISOString().slice(0, 10);
   const d = await api(`/api/tasks?until=${today}&limit=100`);
+  // Suspensas (oposição por telefone, resposta recebida etc.) ficam à vista com o motivo; não voltam sozinhas.
+  const suspended = (await api(`/api/tasks?until=9999-12-31&status=suspended&limit=100`)).items;
   const node = section("Tarefas", "Respostas e confirmações primeiro; ligações começam pelos leads mais fracos. Tarefa bloqueada não é concluída.");
   const blocked = d.items.filter((t) => t.blocked?.length);
   const open = d.items.filter((t) => !t.blocked?.length);
@@ -2774,19 +2778,22 @@ async function tarefasView() {
         {},
         text("strong", t.legal_name),
         el("div", { class: "tags" }, text("span", TASK_KIND[t.kind] || t.kind, "tag"), text("span", t.due_date < today ? `Atrasada (${t.due_date})` : `Vence ${t.due_date === today ? "hoje" : t.due_date}`, t.due_date < today ? "tag warn" : "tag")),
-        t.blocked?.length ? text("small", `Bloqueada: ${t.blocked.join(", ")}`) : null,
+        t.blocked?.length ? text("small", `Bloqueada: ${t.blocked.map((b) => BLOCK_LABEL[b] || b).join(", ")}`) : null,
+        t.status === "suspended" ? text("small", `Suspensa: ${t.suspended_reason || "sem motivo registrado"}`) : null,
       ),
     );
+    if (t.phone) box.append(text("p", `Telefone da ligação: ${t.phone}`));
     if (t.channel_note) box.append(text("p", `Canal: ${t.channel_note}`));
     if (t.next_action) box.append(text("p", `Próxima ação: ${t.next_action}`));
     if (t.script) box.append(details("Roteiro", el("pre", { class: "message" }, t.script)));
     // Edição só de tarefa manual sem ficha (texto de ficha aprovada é congelado); não conclui nem libera a ligação.
-    if (writable() && !t.ficha_id && ["call_l0", "call_l1", "call_l2", "linkedin"].includes(t.kind))
+    if (writable() && t.status === "open" && !t.ficha_id && ["call_l0", "call_l1", "call_l2", "linkedin"].includes(t.kind))
       box.append(
         details(
           "Editar roteiro, canal ou próxima ação",
           makeForm(
             [
+              input("Telefone da ligação (+55 DDD número; a supressão é conferida por ele)", "phone", "tel", t.phone || "", false),
               input("Canal (com fonte e data)", "channelNote", "text", t.channel_note || "", false),
               input("Próxima ação", "nextAction", "text", t.next_action || "", false),
               input("Data", "dueDate", "date", t.due_date, true),
@@ -2794,15 +2801,15 @@ async function tarefasView() {
               input("Motivo da alteração", "reason", "text", "", true),
             ],
             async (v) => {
-              await api(`/api/tasks/${t.id}`, "PATCH", { expectedRevision: t.revision, reason: v.reason, channelNote: v.channelNote || null, nextAction: v.nextAction || null, dueDate: v.dueDate, script: v.script || null });
-              notice("Tarefa atualizada; o histórico guarda o valor anterior.");
+              const r = await api(`/api/tasks/${t.id}`, "PATCH", { expectedRevision: t.revision, reason: v.reason, phone: v.phone || null, channelNote: v.channelNote || null, nextAction: v.nextAction || null, dueDate: v.dueDate, script: v.script || null });
+              notice(r.suspended ? "Tarefa atualizada e suspensa: o telefone informado está na lista de supressão." : "Tarefa atualizada; o histórico guarda o valor anterior.");
               await navigate("Tarefas");
             },
             "Salvar alteração",
           ),
         ),
       );
-    if (writable() && !t.blocked?.length)
+    if (writable() && t.status === "open" && !t.blocked?.length)
       box.append(
         details(
           "Registrar resultado",
@@ -2837,6 +2844,7 @@ async function tarefasView() {
   };
   node.append(panel(`Para fazer (${open.length})`, open.length ? rows(open, card) : text("p", "Nenhuma tarefa para hoje.", "empty")));
   if (blocked.length) node.append(details(`Bloqueadas (${blocked.length}) — aguardam a condição indicada`, rows(blocked, card)));
+  if (suspended.length) node.append(details(`Suspensas (${suspended.length}) — não voltam sozinhas`, rows(suspended, card)));
   return node;
 }
 

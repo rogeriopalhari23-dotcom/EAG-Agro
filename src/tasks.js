@@ -3,9 +3,21 @@ import { bodyJson, fail, str, oneOf, number, requireRole, page, WRITE_ROLES } fr
 import { statement as s, commit, auditStatement, now, company } from "./store.js";
 import { restrictionsFor } from "./restrictions.js";
 import { LEVEL0_SCRIPT } from "./templates/prospeccao-vendas.js";
-import { decryptPii, encryptPii } from "./crypto.js";
+import { decryptPii, encryptPii, identifierHash, normalizeIdentifier } from "./crypto.js";
 
 const MANUAL = new Set(["call_l0", "call_l1", "call_l2", "linkedin"]);
+export const PHONE_SUPPRESSED = "telefone suprimido";
+
+// Telefone da ligação: mesma normalização e HMAC da supressão (R21.2), para que formatos equivalentes do mesmo número
+// batam e números distintos não. O número fica só cifrado; o hash serve para cruzar com a supressão.
+async function phoneFields(env, tenant, value) {
+  const phone = normalizeIdentifier("phone", value);
+  return { phone, hash: await identifierHash(env, tenant, "phone", phone), enc: await encryptPii(phone, env) };
+}
+async function phoneSuppressed(env, tenant, hash) {
+  if (!hash) return false;
+  return !!(await s(env, "SELECT 1 x FROM suppression_entries WHERE tenant_id=? AND identifier_hash=? AND channel='phone'", tenant, hash).first());
+}
 const ICP_BADNESS = "CASE (SELECT bp.icp_status FROM buyer_profiles bp WHERE bp.tenant_id=t.tenant_id AND bp.company_id=t.company_id ORDER BY bp.unit_key='' DESC LIMIT 1) WHEN 'out_trader' THEN 10 WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 ELSE 4 END";
 
 // Tarefas geradas na aprovação de um canal manual (a ficha já tem os roteiros congelados).
@@ -26,25 +38,28 @@ export async function listTasks(request, env, actor) {
   const u = new URL(request.url);
   const { limit, offset } = page(request);
   const until = str(u.searchParams.get("until") || now().slice(0, 10), "data", 10);
+  // Suspensas (R28.18) aparecem à parte, com o motivo, para não sumirem da vista de Rogério.
+  const status = oneOf(u.searchParams.get("status") || "open", ["open", "suspended"], "estado");
   const rows = (
     await s(
       env,
       `SELECT t.*,c.legal_name,${ICP_BADNESS} badness FROM tasks t JOIN companies c ON c.id=t.company_id
-       WHERE t.tenant_id=? AND t.status='open' AND t.due_date<=? ORDER BY t.priority DESC, badness DESC, t.due_date, t.created_at LIMIT ? OFFSET ?`,
-      actor.tenant_id, until, limit + 1, offset,
+       WHERE t.tenant_id=? AND t.status=? AND t.due_date<=? ORDER BY t.priority DESC, badness DESC, t.due_date, t.created_at LIMIT ? OFFSET ?`,
+      actor.tenant_id, status, until, limit + 1, offset,
     ).all()
   ).results;
   // Canal manual obedece às mesmas restrições do e-mail (errata item 6): a tarefa aparece com o bloqueio.
   const items = [];
   for (const t of rows.slice(0, limit)) {
     let blocked = [];
-    if (MANUAL.has(t.kind)) {
+    if (MANUAL.has(t.kind) && t.status === "open") {
       const campaign = t.ficha_id ? (await s(env, "SELECT campaign_id FROM fichas WHERE id=?", t.ficha_id).first())?.campaign_id : null;
       const emailHash = t.contact_id ? (await s(env, "SELECT email_hash FROM contacts WHERE id=?", t.contact_id).first())?.email_hash : null;
-      blocked = await restrictionsFor(env, actor.tenant_id, { companyId: t.company_id, campaignId: campaign, commodity: t.commodity, emailHash });
+      blocked = await restrictionsFor(env, actor.tenant_id, { companyId: t.company_id, campaignId: campaign, commodity: t.commodity, emailHash, phoneHash: t.phone_hash });
     }
     const script = t.script?.startsWith("enc:") ? await decryptPii(t.script.slice(4), env) : t.script;
-    items.push({ ...t, script, blocked });
+    const { phone_hash, phone_enc, ...rest } = t;
+    items.push({ ...rest, phone: phone_enc ? await decryptPii(phone_enc, env) : null, script, blocked });
   }
   return { items, nextOffset: rows.length > limit ? offset + limit : null };
 }
@@ -59,7 +74,7 @@ export async function completeTask(request, env, actor, rid, id) {
   if (MANUAL.has(t.kind)) {
     const campaign = t.ficha_id ? (await s(env, "SELECT campaign_id FROM fichas WHERE id=?", t.ficha_id).first())?.campaign_id : null;
     const emailHash = t.contact_id ? (await s(env, "SELECT email_hash FROM contacts WHERE id=?", t.contact_id).first())?.email_hash : null;
-    const reasons = await restrictionsFor(env, actor.tenant_id, { companyId: t.company_id, campaignId: campaign, commodity: t.commodity, emailHash });
+    const reasons = await restrictionsFor(env, actor.tenant_id, { companyId: t.company_id, campaignId: campaign, commodity: t.commodity, emailHash, phoneHash: t.phone_hash });
     if (reasons.length) fail(409, "task_blocked", "Contato bloqueado por pausa, supressão ou triagem.", { reasons });
   }
   const outcome = oneOf(i.outcome, ["done", "no_answer", "not_reached", "wrong_contact"], "resultado");
@@ -90,17 +105,25 @@ export async function createLevel0(request, env, actor, rid, companyId) {
   // Complemento da unidade (perguntas e pendências próprias) vem depois do roteiro da skill, que não é alterado.
   const unitScript = str(i.unitScript, "roteiro da unidade", 4000, true);
   const script = unitScript ? `${LEVEL0_SCRIPT}\n\n— Desta unidade —\n${unitScript}` : LEVEL0_SCRIPT;
+  // Telefone opcional; número já suprimido cria a tarefa suspensa, com o motivo (R28.18).
+  const phone = i.phone == null || i.phone === "" ? null : await phoneFields(env, actor.tenant_id, str(i.phone, "telefone", 40));
+  const suspended = await phoneSuppressed(env, actor.tenant_id, phone?.hash);
   const id = crypto.randomUUID();
   await commit(env, [
-    s(env, "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script) VALUES (?,?,?,?,'call_l0',?,?,0,?)", id, actor.tenant_id, companyId, commodity, actor.id, str(i.dueDate || now().slice(0, 10), "data", 10), script),
-    auditStatement(env, actor, rid, "task.created", "task", id, { kind: "call_l0", companyId }),
+    s(
+      env,
+      "INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script,phone_hash,phone_enc,status,suspended_reason) VALUES (?,?,?,?,'call_l0',?,?,0,?,?,?,?,?)",
+      id, actor.tenant_id, companyId, commodity, actor.id, str(i.dueDate || now().slice(0, 10), "data", 10), script, phone?.hash ?? null, phone?.enc ?? null,
+      suspended ? "suspended" : "open", suspended ? PHONE_SUPPRESSED : null,
+    ),
+    auditStatement(env, actor, rid, "task.created", "task", id, { kind: "call_l0", companyId, suspended }),
   ]);
-  return { id };
+  return { id, ...(suspended ? { suspended: true } : {}) };
 }
 
 // Edição de tarefa manual aberta (roteiro, canal, próxima ação, data). Preserva o id e não toca estado, resultado,
 // ficha nem aprovações. Tarefa vinda de ficha aprovada tem texto congelado: muda só por nova versão da ficha.
-const EDITABLE = { script: ["script", "roteiro", 8000], channelNote: ["channel_note", "canal", 500], nextAction: ["next_action", "próxima ação", 500], dueDate: ["due_date", "data", 10] };
+const EDITABLE = { script: ["script", "roteiro", 8000], channelNote: ["channel_note", "canal", 500], nextAction: ["next_action", "próxima ação", 500], dueDate: ["due_date", "data", 10], phone: ["phone", "telefone", 40] };
 const T11_NOTICE = /^ANTES DE LIGAR:.*$/gm;
 export async function updateTask(request, env, actor, rid, id) {
   requireRole(actor, WRITE_ROLES);
@@ -114,11 +137,13 @@ export async function updateTask(request, env, actor, rid, id) {
   const reason = str(i.reason, "motivo", 500);
   if (reason.length < 10) fail(422, "reason_required", "Informe o motivo da alteração (10 caracteres ou mais).");
   const encrypted = t.script?.startsWith("enc:");
-  const current = { script: encrypted ? await decryptPii(t.script.slice(4), env) : t.script, channel_note: t.channel_note, next_action: t.next_action, due_date: t.due_date };
+  const current = { script: encrypted ? await decryptPii(t.script.slice(4), env) : t.script, channel_note: t.channel_note, next_action: t.next_action, due_date: t.due_date, phone: t.phone_enc ? await decryptPii(t.phone_enc, env) : null };
   const next = {};
+  let phone = null;
   for (const [key, [col, label, max]] of Object.entries(EDITABLE)) {
     if (i[key] === undefined) continue;
-    const value = i[key] === null ? null : str(i[key], label, max, true) ?? null;
+    let value = i[key] === null ? null : str(i[key], label, max, true) ?? null;
+    if (col === "phone" && value) value = (phone = await phoneFields(env, actor.tenant_id, value)).phone;
     if (col === "due_date" && !/^\d{4}-\d{2}-\d{2}$/.test(value || "")) fail(422, "invalid_date", "Data no formato AAAA-MM-DD.");
     if ((value ?? null) !== (current[col] ?? null)) next[col] = value;
   }
@@ -131,11 +156,16 @@ export async function updateTask(request, env, actor, rid, id) {
   const cols = Object.keys(next);
   const stored = { ...next };
   if ("script" in stored && encrypted && stored.script) stored.script = `enc:${await encryptPii(stored.script, env)}`;
+  // O telefone vira hash (para a supressão) e número cifrado; número suprimido suspende a tarefa na mesma gravação.
+  const sets = cols.filter((c) => c !== "phone").map((c) => [`${c}=?`, stored[c]]);
+  const suspend = "phone" in next && (await phoneSuppressed(env, actor.tenant_id, phone?.hash));
+  if ("phone" in next) sets.push(["phone_hash=?", phone?.hash ?? null], ["phone_enc=?", phone?.enc ?? null]);
+  if (suspend) sets.push(["status=?", "suspended"], ["suspended_reason=?", PHONE_SUPPRESSED]);
   await commit(env, [
     s(
       env,
-      `UPDATE tasks SET ${cols.map((c) => `${c}=?`).join(",")},revision=CASE WHEN revision=? THEN revision+1 ELSE -1 END WHERE tenant_id=? AND id=? AND status='open'`,
-      ...cols.map((c) => stored[c]), t.revision, actor.tenant_id, id,
+      `UPDATE tasks SET ${sets.map(([c]) => c).join(",")},revision=CASE WHEN revision=? THEN revision+1 ELSE -1 END WHERE tenant_id=? AND id=? AND status='open'`,
+      ...sets.map(([, v]) => v), t.revision, actor.tenant_id, id,
     ),
     ...(await Promise.all(
       cols.map(async (c) =>
@@ -147,8 +177,9 @@ export async function updateTask(request, env, actor, rid, id) {
       ),
     )),
     auditStatement(env, actor, rid, "task.updated", "task", id, { companyId: t.company_id, fields: cols, revision: t.revision + 1 }),
+    ...(suspend ? [auditStatement(env, actor, rid, "task.suspended", "task", id, { companyId: t.company_id, reason: "suppressed_phone" })] : []),
   ]);
-  return { id, revision: t.revision + 1, fields: cols };
+  return { id, revision: t.revision + 1, fields: cols, ...(suspend ? { suspended: true } : {}) };
 }
 
 // Histórico da tarefa (valores decifrados só para quem pode escrever).
