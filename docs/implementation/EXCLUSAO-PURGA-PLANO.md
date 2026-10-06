@@ -1,8 +1,9 @@
 # EXCLUSAO-PURGA — alcance, dados que permanecem, migração 0032, publicação e reversão
 
-**Estado (2026-10-01):**
+**Estado (2026-10-01, atualizado na publicação):**
 - Implementado e testado só com dados fictícios.
-- **Não publicado.**
+- **Publicado** em 2026-10-01 (Worker `9913e71c`, migração 0032, 2 vínculos). Registro em EVIDENCIAS.
+- `redigir-diario.mjs` **adiado**: depende da decisão T11.
 - Nenhuma exclusão real foi executada; nenhum backup ou registro local foi apagado.
 
 **Requisitos:** R9.1, R9.1.1, R9.1.2, R21.5, R23.5.

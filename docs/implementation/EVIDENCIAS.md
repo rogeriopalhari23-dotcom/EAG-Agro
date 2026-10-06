@@ -864,3 +864,38 @@ Detalhes e tabela em `docs/implementation/FONTES-EMPRESAS-EXTERIOR.md` §6.
   - suíte completa 384 + 2 + 15 (ponte), 0 falhas;
   - suíte da versão em produção (`b3935f9`) com a 0032 final aplicada: 373/373, numa cópia temporária já removida.
 - **Fora desta etapa:** nada publicado, nenhuma purga real, nenhum backup ou registro local apagado; canal `planned`, campanhas inativas.
+
+## Publicação de EXCLUSAO-PURGA e da correção de respostas (2026-10-01, autorizada por Rogério)
+
+Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
+
+1. **Commits conferidos:** `v2-revisao-2` limpa e igual a `origin` em `ab040e3`; código a publicar: `ab723e9`, `c3c2bd1`, `1b9fd59`, `ab040e3` (os demais desde `b3935f9` são só documentos).
+2. **Verificação:** `npm run check` com 384 + 2 + 15, 0 falhas.
+3. **Bookmark** antes da migração: `00000707-0000008e-000050f7-312320b704e8e0ba63c6ac20ac4f909d` (20:47 UTC).
+4. **Backup protegido:**
+   - arquivo: `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0032-20261001\eag_compass.sql`, 29.416.992 bytes, do mesmo bookmark;
+   - SHA-256 `3ab1ff618686297f8e0cfdfc007b563e158a0c3fa6002bd91bad4a47afd7077a`;
+   - acesso só de `ROGERIONOTE\Roger`, sem herança.
+   - Correção registrada: a primeira aplicação de permissões (`icacls /inheritance:r … /T`) deixou o arquivo sem nenhuma entrada; foi corrigida com permissão explícita e o hash conferido de novo, igual. Contém PII; guarda conforme decisão T11.
+5. **Migração:** só a `0032_exclusao_purga.sql` pendente; aplicada (9 comandos).
+   - Esquema conferido: trigger novo; `erasure_ledger` vazio; `idx_inbound_message_key`; colunas `tasks.inbound_id`, `ficha_messages.purged_at`, `inbound_messages.content_purged_at` e `message_key`.
+6. **Vínculo das tarefas:** a prévia mostrou 2 tarefas sem vínculo, 1 candidata cada (igual ao esperado).
+   - `correcoes/0032-vinculo-tarefas-resposta.sql`: `5aa82911…` → `ea7d4ca4…` e `9e00ea80…` → `f896fb57…`.
+   - Auditoria `vinculo-tarefas-0032` = 2; tarefas sem vínculo = 0.
+7. **Worker:** `validate-deploy` OK; `wrangler deploy` → versão **`9913e71c-66f5-4be4-8fb4-58c7209d7a36`** (20:50 UTC), 100% ativa (conferido em `deployments status`).
+8. **Conferências só de leitura:**
+   - `GET /api/tasks/reply-review` = 0 itens;
+   - ficha da Amori igual (`in_approval` v2, passo 1 `d60987c8…`);
+   - canais `planned`.
+9. **Ponte Windows:**
+   - antes: `config.json` `96786122909BD5B3…` e `segredos.json` `2A5BB59649A52218…` (prefixos do SHA-256, conteúdo não lido); diário com 6 linhas, todas `reported`;
+   - `ponte parar` (parada limpa) → código já em `ab040e3` na mesma pasta → `ponte iniciar`: PID 15068, leitura OK às 16:52:37 e 16:57:35 (Cuiabá);
+   - depois: mesmos hashes e mesmas 6 linhas;
+   - `redigir-diario.mjs` **não executado** (adiado por decisão T11).
+10. **Parada da ponte pelo prazo do teste:** às 21:00 UTC a ponte parou sozinha pelo `BRIDGE_TEST_DEADLINE = 2026-10-01T21:00:00Z` do `config.json`, prazo do teste interno. O processo anterior tinha o mesmo prazo. A trava não alterou nada, porque o canal já estava `planned`. Desde então a ponte está parada e a caixa não é lida. A configuração não foi alterada: remover ou trocar o prazo depende de decisão de Rogério.
+11. **Estado conferido em 2026-10-06:**
+    - canal `email` `planned` (desde 2026-10-01 17:51 UTC);
+    - campanhas: 1 `draft`, 1 `ended`;
+    - fila: 5 `accepted` (internas, a última às 17:46 UTC de 01/10, antes da publicação) e 19 `cancelled`;
+    - **nenhuma mensagem enviada** depois da publicação.
+12. **Fora desta autorização:** nenhuma purga real, remoção de supressão, redação de registros nem exclusão de backup.
