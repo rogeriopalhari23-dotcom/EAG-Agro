@@ -26,6 +26,9 @@ export class D1Test {
         return { results: db.raw.prepare(sql).all(...args), success: true };
       },
       async run() {
+        return this.runSync();
+      },
+      runSync() {
         const stmt = db.raw.prepare(sql);
         if (stmt.columns().length) {
           return {
@@ -38,11 +41,13 @@ export class D1Test {
       },
     };
   }
+  // Lote atômico e isolado como no D1: roda sem ceder a vez entre BEGIN e COMMIT, para que lotes concorrentes
+  // (Promise.all no Worker) não se intercalem na mesma transação.
   async batch(statements) {
     this.raw.exec("BEGIN");
     try {
       const result = [];
-      for (const s of statements) result.push(await s.run());
+      for (const s of statements) result.push(s.runSync ? s.runSync() : await s.run());
       this.raw.exec("COMMIT");
       return result;
     } catch (e) {

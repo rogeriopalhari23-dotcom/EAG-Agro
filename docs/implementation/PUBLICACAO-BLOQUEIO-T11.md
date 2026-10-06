@@ -1,6 +1,6 @@
 # Publicação: bloqueio das ligações até a T11 (migração 0035)
 
-**Data:** 06/10/2026. **Estado:** pronto para publicar, **não publicado**. Executar só com autorização de Rogério.
+**Data:** 06/10/2026. **Estado:** **publicado em 06/10/2026** (Worker `65fe3503-b40e-4e3c-bdae-bc6cc0972799`). A tela de Tarefas e a tela Início excedem o tempo por lentidão da lista; a correção está preparada e ainda não foi publicada (ver `EVIDENCIAS.md`).
 
 **Base:**
 - Worker atual em produção: `62182b6e-b9f6-4086-bb85-5db0deb58f1f`, publicado de `1ca78a2` com a migração 0034.

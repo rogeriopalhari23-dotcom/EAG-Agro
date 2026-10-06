@@ -5,6 +5,9 @@ import { complianceStatus } from "./scores.js";
 
 export async function restrictionsFor(env, tenant, { companyId, campaignId, commodity, emailHash, phoneHash }) {
   const reasons = [];
+  // Lote de restrições e triagem de sanções são independentes: correm em paralelo (latência do D1 em produção).
+  const compliance = companyId ? complianceStatus(env, tenant, companyId) : Promise.resolve(null);
+  compliance.catch(() => {}); // o erro chega a quem aguarda abaixo; evita rejeição sem tratamento enquanto o lote roda
   const [pauses, campaign, openclaw, sup, phoneSup] = await env.DB.batch([
     s(
       env,
@@ -26,7 +29,7 @@ export async function restrictionsFor(env, tenant, { companyId, campaignId, comm
   if (emailHash && sup.results.length) reasons.push("suppressed");
   if (phoneHash && phoneSup.results.length) reasons.push("suppressed_phone");
   if (companyId) {
-    const comp = await complianceStatus(env, tenant, companyId);
+    const comp = await compliance;
     if (comp.status !== "clear") reasons.push(comp.status === "unavailable" ? "compliance_unavailable" : `compliance_${comp.status}`);
   }
   return [...new Set(reasons)];

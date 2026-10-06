@@ -84,11 +84,15 @@ async function t11Cleared(env, tenant, companyId, kind) {
 // Uma validação T11 só retira o próprio motivo; os demais continuam.
 async function taskBlocks(env, tenant, t) {
   if (!MANUAL.has(t.kind)) return [];
-  const campaign = t.ficha_id ? (await s(env, "SELECT campaign_id FROM fichas WHERE id=?", t.ficha_id).first())?.campaign_id : null;
-  const emailHash = t.contact_id ? (await s(env, "SELECT email_hash FROM contacts WHERE id=?", t.contact_id).first())?.email_hash : null;
+  // Consultas independentes em paralelo: cada ida ao D1 custa latência de rede em produção.
+  const [campaign, emailHash, t11] = await Promise.all([
+    t.ficha_id ? s(env, "SELECT campaign_id FROM fichas WHERE id=?", t.ficha_id).first().then((x) => x?.campaign_id ?? null) : null,
+    t.contact_id ? s(env, "SELECT email_hash FROM contacts WHERE id=?", t.contact_id).first().then((x) => x?.email_hash ?? null) : null,
+    t11Cleared(env, tenant, t.company_id, t.kind),
+  ]);
   const reasons = await restrictionsFor(env, tenant, { companyId: t.company_id, campaignId: campaign, commodity: t.commodity, emailHash, phoneHash: t.phone_hash });
   if (CALLS.has(t.kind) && !t.phone_hash) reasons.push(`phone_${t.phone_issue || "missing"}`);
-  if (!(await t11Cleared(env, tenant, t.company_id, t.kind))) reasons.push("t11_pending");
+  if (!t11) reasons.push("t11_pending");
   return reasons;
 }
 
@@ -108,13 +112,18 @@ export async function listTasks(request, env, actor) {
     ).all()
   ).results;
   // Canal manual obedece às mesmas restrições do e-mail (errata item 6): a tarefa aparece com o bloqueio.
-  const items = [];
-  for (const t of rows.slice(0, limit)) {
-    const blocked = t.status === "open" ? await taskBlocks(env, actor.tenant_id, t) : [];
-    const script = t.script?.startsWith("enc:") ? await decryptPii(t.script.slice(4), env) : t.script;
-    const { phone_hash, phone_enc, ...rest } = t;
-    items.push({ ...rest, phone: phone_enc ? await decryptPii(phone_enc, env) : null, script, blocked });
-  }
+  // Tarefas em paralelo (a ordem da lista é preservada): em produção, a soma sequencial passava do tempo da tela.
+  const items = await Promise.all(
+    rows.slice(0, limit).map(async (t) => {
+      const [blocked, script, phone] = await Promise.all([
+        t.status === "open" ? taskBlocks(env, actor.tenant_id, t) : [],
+        t.script?.startsWith("enc:") ? decryptPii(t.script.slice(4), env) : t.script,
+        t.phone_enc ? decryptPii(t.phone_enc, env) : null,
+      ]);
+      const { phone_hash, phone_enc, ...rest } = t;
+      return { ...rest, phone, script, blocked };
+    }),
+  );
   return { items, nextOffset: rows.length > limit ? offset + limit : null };
 }
 

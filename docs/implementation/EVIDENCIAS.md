@@ -1515,3 +1515,64 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 - **Teste de compatibilidade:** desta vez a cópia temporária ficou dentro do repositório (`.claude/worktrees`, ignorada pelo git), sem atalho para `node_modules`; `npm ls` íntegro depois da remoção.
 - **Plano de publicação e reversão:** `PUBLICACAO-BLOQUEIO-T11.md`.
 - **Estado:** T11 não validada; nada publicado; canais `planned`; campanhas inativas; supressões sem alteração; nenhum contato.
+
+## Publicação do bloqueio T11 (06/10/2026, autorizada por Rogério) e lentidão da lista de tarefas
+
+**Antes:**
+- `v2-revisao-2` limpo e sincronizado em `672bf80`;
+- `npm run test:ui` passou;
+- retrato das 13 ligações guardado.
+
+**Ponto de restauração:**
+- Worker anterior **62182b6e-b9f6-4086-bb85-5db0deb58f1f** (100%);
+- bookmark do D1: `00000726-0000003c-000050fc-100170c11fd36c9a5031c4fd166d62d5`;
+- backup privado: `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0035-20261006\eag_compass.sql`, 29.757.486 bytes, SHA-256 `f64c12a27faf77afbb773f69eeb2d1d2848e59d934c3755b3a59ba505a353952`, acesso só de `ROGERIONOTE\Roger`.
+
+**Estado anterior:**
+- 35 linhas em `task_revisions`;
+- 15 tarefas;
+- 2 supressões;
+- canais `planned`;
+- campanhas: 1 rascunho e 1 encerrada;
+- outbox: 5 aceitos e 19 cancelados;
+- ponte com leitura bem-sucedida às 22:41 UTC.
+
+**Migração:**
+- só a 0035 estava pendente e foi aplicada;
+- conferidos: tabela `compliance_validations`, índice e os dois gatilhos;
+- **0 registros de validação**;
+- depois: "No migrations to apply".
+
+**Deploy:**
+- A primeira tentativa de `npm run deploy` parou antes do upload: um servidor local deixado aberto por mim na rodada anterior travava `dist/` (EBUSY). Nada foi publicado nessa tentativa. Encerrei os processos e repeti.
+- Publicado o Worker **65fe3503-b40e-4e3c-bdae-bc6cc0972799** (100%, 22:47 UTC). A verificação interna do deploy passou: 409 testes da suíte principal, 2 do Worker e 16 da ponte.
+
+**Conferido em produção (só leitura e sondagens sem gravação):**
+- 13 ligações abertas, ids únicos, nenhuma suspensa, nenhuma pronta: as 7 com telefone bloqueadas por `t11_pending`; as 6 sem telefone por `phone_missing` e `t11_pending`.
+- Comparação com o retrato: ids, telefones, roteiros (hash), canal, próxima ação, data, estado, revisão e histórico iguais nas 13.
+- **Edição durante o bloqueio:** PATCH com os mesmos valores retornou 422 `nothing_to_change`, ou seja, passou pela checagem e não havia nada a gravar.
+- **Oposição durante o bloqueio:** POST "opposed" com nota acima do limite retornou 422 de validação da nota; o bloqueio não barra a oposição.
+- **Conclusão comum:** retornou 409 `task_blocked` com `t11_pending`.
+- Depois das sondagens: as 13 tarefas sem nenhuma revisão ou histórico novo.
+- `task_revisions` com as mesmas 35 linhas; 2 supressões; 0 validações; canais `planned`; campanhas inativas; outbox sem mudança.
+- Ponte com leitura bem-sucedida às **23:02:04 UTC**, depois do deploy.
+
+**Problema encontrado na conferência do painel:**
+- Em Abordagem → Tarefas, a tela mostrou "A solicitação demorou demais".
+- `GET /api/tasks` levou ~21 s (duas medições: 21,7 s e 20,9 s); a tela desiste aos 20 s. A lista de suspensas levou 0,6 s.
+- A tela Início também carrega essa lista e é afetada.
+- Causa: cerca de 7 idas ao D1 em sequência por ligação (pausas, supressões, triagem, parâmetros, país, T11), em série para as 13. As 2 consultas da T11 levaram ao estouro um tempo que provavelmente já estava perto do limite.
+- O bloqueio no servidor continua efetivo; nada foi liberado.
+- **Não revertido**, porque a reversão retiraria o bloqueio T11.
+
+**Correção preparada, não publicada:**
+- A lista calcula os bloqueios das tarefas em paralelo.
+- Em cada tarefa, as consultas independentes também rodam em paralelo (lote de restrições junto com a triagem; parâmetros junto com a empresa).
+- As regras não mudaram.
+- O simulador de D1 dos testes passou a executar cada lote sem ceder a vez dentro da transação, como no D1 real.
+- **Teste novo** `tests/tasks-latency.test.mjs`, com 40 ms por ida ao banco e 13 ligações: o código publicado levou 4.408 ms (falha); a correção leva cerca de 349 ms, com a mesma ordem e os mesmos bloqueios. Estimativa em produção: perto de 1,7 s.
+- `npm run check`: 410 testes da suíte principal, 2 do Worker e 16 da ponte. `validate-deploy` e `npm run test:ui` passaram.
+
+**Reversão do bloqueio:** `npx wrangler rollback 62182b6e-b9f6-4086-bb85-5db0deb58f1f`. Com ela, as 7 ligações com telefone voltam a "Para fazer"; a 0035 só criou uma tabela vazia e pode ficar.
+
+**Sem validação T11, sem alteração de supressões, sem contatos.**

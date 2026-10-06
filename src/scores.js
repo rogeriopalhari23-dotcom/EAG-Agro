@@ -473,8 +473,7 @@ export async function qualify(env, actor, requestId, companyId, demandId) {
 }
 // Estado da triagem para o pré-envio (R19.2 item 6, R19.3): indisponível nunca vira liberação.
 export async function complianceStatus(env, tenantId, companyId) {
-  const params = await parameters(env, tenantId);
-  const c = await s(env, "SELECT * FROM companies WHERE tenant_id=? AND id=?", tenantId, companyId).first();
+  const [params, c] = await Promise.all([parameters(env, tenantId), s(env, "SELECT * FROM companies WHERE tenant_id=? AND id=?", tenantId, companyId).first()]);
   if (!c) return { status: "unavailable", reason: "company_not_found" };
   const screen = await currentScreening(env, { tenant_id: tenantId }, c, params);
   if (screen.blocked || c.exception_status === "sanction_blocked") return { status: "blocked", reason: "sanction_blocked" };
