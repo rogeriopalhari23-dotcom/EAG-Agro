@@ -27,7 +27,7 @@
 | 11 | Retenção do hash de supressão: sem prazo fixo enquanto houver prospecção, revisão anual | **Proposta não aprovada** | T11-POLITICA §2.1 ("Escolha (proposta)") | Nenhum, até decisão |
 | 12 | Remoção de supressão só em 3 casos (erro, pedido do titular, ordem de autoridade) | **Proposta não aprovada** | T11-POLITICA §2.3 | Nenhum, até decisão |
 | 13 | Quem é o controlador (EAG, Rogério ou ambos) e se a EAG autoriza a prospecção em seu nome por ferramenta pessoal | **Questão jurídica** | T11-POLITICA §3 (perguntas 1–2); fato: a ligação se apresenta "da EAG Agro" | Decide quem responde pelo tratamento |
-| 14 | Base legal (provável legítimo interesse, LGPD Art. 7 IX e Art. 10), teste de balanceamento e registro de operações (Art. 37) | **Questão jurídica** | T11-POLITICA §2.1 (Interpretação); Guia ANPD (fev/2024) | Condiciona o uso de nomes e cargos de profissionais |
+| 14 | Base legal (hipótese a avaliar, sem validação jurídica: legítimo interesse, LGPD Art. 7 IX e Art. 10), teste de balanceamento e registro de operações (Art. 37) | **Questão jurídica** | T11-POLITICA §2.1 (Interpretação); Guia ANPD (fev/2024) | Condiciona o uso de nomes e cargos de profissionais |
 | 15 | Transferência internacional (Cloudflare, Snov) | **Questão jurídica** | T11-POLITICA §3, pergunta 5 (LGPD Art. 33; Res. CD/ANPD 19/2024) | Snov não é usado neste piloto; a Cloudflare é |
 | 16 | Prazos de guarda: histórico de remoções, caixa da EAG, backups, diário da ponte | **Questão jurídica + escolha de Rogério** | T11-POLITICA §2.2 ("prazo de prova a definir pelo validador"); EXCLUSAO-PURGA §2 | §3 |
 | 17 | Rastreamento de abertura de e-mail | Exigência condicionada a T1 e T11 | R28.7, AT64 | **Não se aplica**: ligação, sem e-mail |
