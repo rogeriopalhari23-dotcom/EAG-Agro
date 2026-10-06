@@ -1,25 +1,22 @@
-# Código em produção x branches (conferido em 2026-10-06)
+# Código em produção x branches
 
-Só leitura. Nada foi sincronizado, mesclado nem publicado.
+## Situação em 2026-10-06 14:00 UTC (depois da publicação autorizada)
 
 | Referência | Commit | Situação |
 | --- | --- | --- |
-| **Produção** (Worker `eag-compass-production`) | versão `9913e71c-66f5-4be4-8fb4-58c7209d7a36`, publicada em 2026-10-01 20:50 UTC a partir de `ab040e3` (árvore limpa, conferida no deploy) | 100% ativa (`wrangler deployments status`) |
-| `origin/v2-revisao-2` | `58a2d24` | Código idêntico ao de produção: entre `ab040e3` e `58a2d24` só mudaram documentos (`git diff ab040e3 origin/v2-revisao-2 -- src public migrations bridge wrangler.jsonc package.json` vazio) |
-| `v2-revisao-2` local | `91fbd46` | 1 commit à frente do GitHub, **não enviado e não publicado**: correção do fluxo (bloqueios da ficha e próximo passo do cartão da busca), com 3 arquivos de código e 2 de teste |
-| `origin/main` | `bbe69ec` (2026-09-30) | **Desatualizada:** é ancestral de `v2-revisao-2`, com 0 commits próprios e 50 atrás. Não tem as migrações 0030–0032, a ponte de e-mail, a supressão com retenção, EXCLUSAO-PURGA, a correção de respostas nem o redesign |
-| `main` local | `38eea61` (2026-09-22) | 82 commits atrás de `origin/main`; ancestral de `v2-revisao-2` |
-| `redesign-ui` (local e GitHub) | `61c1321` | Já contida em `v2-revisao-2` (tag `producao-7d178094` aponta para ela) |
-| `v2-planejamento` (local) | `20ef963` | Já contida em `v2-revisao-2` |
-| Worktrees | `eag-compass-antes` (`1c9b234`, destacada) e `eag-compass-redesign` (`61c1321`) | Cópias de comparação; nenhum trabalho fora de `v2-revisao-2` |
+| **Produção** (Worker `eag-compass-production`) | versão `4a515430-0249-43bb-9663-1f3982dd7cb8`, publicada às 13:58:59 UTC por `npm run deploy`, a partir de `2abf8fe` (código = `91fbd46`) | 100% ativa |
+| `v2-revisao-2` (local e GitHub) | `2abf8fe` | Igual à produção |
+| `main` (local e GitHub) | `2abf8fe` | Sincronizada por avanço simples (`bbe69ec..2abf8fe` no GitHub; `38eea61..2abf8fe` local), sem force push. Não havia commit exclusivo da `main` |
+| `redesign-ui`, `v2-planejamento`, worktrees `eag-compass-antes` e `eag-compass-redesign` | — | Já contidas em `v2-revisao-2`; nada a preservar fora dela |
 
-**Diferença `main` → `v2-revisao-2` (853 arquivos):**
-- a maior parte são fontes do mapa (`public/mapa/fonts/…`) e capturas de tela do redesign em `docs/`;
-- o código fica em `src/`, `public/app.js`, `bridge/`, `tests/` e nas migrações 0030–0032.
+**Workflows conferidos antes de atualizar a `main`:**
+- `ci.yml` roda em push para `main`, `v2-planejamento` e `v2-revisao-2`, e faz só `npm ci` e `npm run check`, sem segredos e sem deploy.
+- `mdic-mensal.yml` só roda pelo agendamento (dias 10–12, 12h UTC) ou manualmente. Push não dispara, e ele só publica os dados do MDIC (nenhuma ação comercial).
+- Depois dos pushes rodou só "Validate EAG Compass" nas duas branches.
+- **O deploy continua manual** (`npm run deploy`).
 
-## Proposta (decisão de Rogério; não executada)
+## Registro anterior (2026-10-06, antes da publicação)
 
-- **Sincronizar `main` com `v2-revisao-2` por avanço simples (fast-forward)**, depois de enviar `91fbd46`. Não há conflito possível: `main` não tem commit próprio.
-  - Efeito: `main` passa a refletir a linha de produção, e a branch padrão do GitHub deixa de mostrar código de 30/09.
-  - A produção não muda: o deploy é manual (`wrangler deploy`) e não há workflow de publicação no repositório.
-- **`91fbd46`:** enviar ao GitHub e publicar numa próxima autorização, com `npm run check` e o mesmo roteiro de deploy. Não tem migração.
+- Produção `9913e71c` (de `ab040e3`) tinha o mesmo código de `origin/v2-revisao-2` (`58a2d24`).
+- `origin/main` estava em `bbe69ec` (2026-09-30): ancestral de `v2-revisao-2`, 50 commits atrás.
+- A `main` local estava em `38eea61` (2026-09-22).

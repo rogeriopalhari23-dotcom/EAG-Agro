@@ -935,3 +935,25 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
   - `main` desatualizada, ancestral, 50 commits atrás.
   - Proposta de avanço simples registrada, não executada.
 - **Estado preservado:** ponte lendo a caixa; canal `planned`; nenhuma mensagem, crédito, purga ou publicação.
+
+## Publicação da correção do fluxo e sincronização da main (2026-10-06, autorizada por Rogério)
+
+1. **Conferência antes de publicar:**
+   - `v2-revisao-2` limpa, 2 commits à frente do GitHub: `91fbd46` (código: `public/app.js`, `src/fichas.js`, `src/foreign-search.js` e testes) e `2abf8fe` (só documentos);
+   - código em relação à produção anterior: só `91fbd46`;
+   - sem migração.
+2. **Verificação:** `npm run check` com 386 + 2 + 15, 0 falhas.
+3. **Publicação:** `npm run deploy` (o `predeploy` repetiu `check` e `validate-deploy`).
+   - Versão **`4a515430-0249-43bb-9663-1f3982dd7cb8`** (13:58:59 UTC), do commit **`2abf8fe`**; 1 arquivo estático novo (`app.js`).
+   - `v2-revisao-2` enviada (`58a2d24..2abf8fe`).
+4. **Depois da publicação (D1):**
+   - canal `email` `planned`; 0 campanhas ativas; 0 envios pendentes;
+   - fila com 5 `accepted`, o último em 2026-10-01 17:46 UTC (nenhum envio novo);
+   - leitura da caixa pela ponte às 13:59:36 UTC, depois do deploy.
+5. **Bloqueios das fichas em produção:** **não conferidos pela API**. A sessão do Access expirou (`cloudflared access token`: "Unable to find token") e o login exige navegador. Os bloqueios estão cobertos pelo teste que compara cada um com a recusa real de `approve()`.
+   - A conferir depois de `cloudflared access login`: Amori, BLACK & YUM e 24grad devem listar `campaign_active`, `international` e `channel`.
+6. **`main`:** workflows conferidos (só CI no push; deploy manual).
+   - Avanço simples `bbe69ec..2abf8fe` no GitHub e `38eea61..2abf8fe` local, sem force push e sem commits exclusivos a preservar.
+   - Rodou só "Validate EAG Compass" nas duas branches.
+7. **Lista de decisões restantes** corrigida, com os bloqueios pelo nome: `DECISOES-PILOTO-2026-10-01.md`, atualização de 2026-10-06.
+8. **Fora desta autorização:** nenhuma campanha ativada, internacional não liberado, nenhum serviço contratado, nenhuma purga.

@@ -101,3 +101,27 @@ Nenhuma destas propostas é decisão tomada. A carta postal (3) e o piloto no Br
    - **Proposta:** iniciar pelo nacional, com commodity, cidade/UF e raio escolhidos por Rogério, assim que a chave da Casa dos Dados existir (contratação só com OK) e o item 3 estiver respondido. A Alemanha segue pelo item 3.
    - **Efeito:** primeira campanha real num mercado sem a exigência alemã de consentimento para e-mail entre empresas. Continuam a LGPD e o risco da Hostinger §12 já assumido.
    - **Razão:** é o caminho com menos bloqueios jurídicos abertos.
+
+## Atualização de 2026-10-06 — decisões restantes, na ordem para iniciar um piloto
+
+Cada item diz o bloqueio pelo nome. Nenhum foi decidido aqui.
+
+1. **Escopo do piloto:** nacional ou Alemanha.
+   - Nacional: commodity, cidade/UF e raio.
+   - Alemanha por e-mail: depende do item 2b. Proposta já registrada: começar pelo nacional.
+2. **Validação jurídica T11**, antes de qualquer contato real:
+   - (a) jurídico ou encarregado da EAG: controlador, uso da marca e da caixa `eagagro.com`, política de privacidade e retenção;
+   - (b) só para a Alemanha: advogado de UWG/DSGVO (e-mail entre empresas sem consentimento prévio, aviso do Art. 14, representante na UE).
+3. **Fonte de empresas do piloto:**
+   - nacional: chave da Casa dos Dados (serviço pago, só com OK);
+   - Alemanha: as empresas já encontradas servem.
+4. **Supressões do OpenClaw** (R21.8/R25.2): conferir a impressão da VPS no hPanel e importar, ou registrar na Spec a exceção datada "sem base recuperável". Bloqueia o primeiro envio.
+5. **Só para internacional — liberação P3-T12:** primeira rotina mensal completa da Comtrade com amostra interna e liberação registrada (`international_enabled`).
+6. **Liberação do canal de e-mail** (R26.1/R26.3): passar de `planned` a `habilitado` com a evidência do teste T1, só depois dos itens 2 a 5 aplicáveis.
+7. **Campanha e fichas:** ativar a campanha e aprovar cada ficha individualmente. A ficha agora lista todos os bloqueios antes do clique.
+
+**Não bloqueiam o início:**
+- renovar o login do Access (`cloudflared access login`) para as conferências da API;
+- conferir o plano Workers (janela de 7 ou 30 dias do Time Travel);
+- prazos de retenção da T11 (backups, caixa, diário da ponte);
+- e-mails dos perfis e DNS do `eagcompass.com`.
