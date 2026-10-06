@@ -2765,6 +2765,7 @@ const BLOCK_LABEL = {
   phone_missing: "sem telefone definido",
   phone_ambiguous: "telefones divergentes entre as fontes: escolha o número",
   phone_unrecognized: "telefone sem código do país: confira o número",
+  t11_pending: "T11 pendente (validação do contato real para este país e canal)",
 };
 const CALL_KINDS = ["call_l0", "call_l1", "call_l2"];
 const TASK_KIND = { call_l0: "Ligação (nível 0)", call_l1: "Ligação (nível 1)", call_l2: "Ligação (nível 2)", linkedin: "LinkedIn", reply_followup: "Responder", meeting_confirm: "Confirmar reunião", return_suggested: "Retorno sugerido", provider_alert: "Alerta do provedor", review_ambiguous: "Revisar resposta" };

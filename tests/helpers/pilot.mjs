@@ -11,8 +11,15 @@ export function transport(result = { kind: "accepted" }) {
   return { sent, send: async (m) => (sent.push(m), typeof result === "function" ? result(m) : result) };
 }
 
-export async function pilot(ctx, { email = "compras@valeverde.com.br", internal = true, validated = true, cnpj = "11222333000181", legalName = "Doces Vale Verde Ltda.", productId = "product-06", reuseCampaign, phone = "+55 16 3333-4444" } = {}) {
+export async function pilot(ctx, { email = "compras@valeverde.com.br", internal = true, validated = true, cnpj = "11222333000181", legalName = "Doces Vale Verde Ltda.", productId = "product-06", reuseCampaign, phone = "+55 16 3333-4444", t11 = true } = {}) {
   const { api, env, DB } = ctx;
+  // Validação T11 fictícia do escopo do piloto (Brasil, contato manual), só para os testes que exercitam a ligação.
+  // Os testes da própria T11 usam t11: false. Em produção não há botão para isso (migração 0035).
+  if (t11)
+    for (const scope of ["br_manual_phone", "br_manual_linkedin"])
+      DB.raw
+        .prepare("INSERT OR IGNORE INTO compliance_validations(id,tenant_id,gate,scope,decision,responsible,decided_on,basis,recorded_by,request_id) VALUES (?,'eag-internal','t11',?,'validated','Responsável fictício (teste)','2026-01-01','Validação fictícia para os testes automatizados','system-admin','teste')")
+        .run(`teste-t11-${scope}`, scope);
   Object.assign(env, {
     EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP",
     EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Exemplo, 100 — Sertãozinho/SP",

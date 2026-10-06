@@ -1494,3 +1494,24 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 - Worker: `npx wrangler rollback 9866c2c3-0f48-427c-bcbf-7366daa30597`. É compatível com o banco migrado; o Worker antigo ignora telefone e suspensões nas ligações.
 - Telefones: edição auditada por tarefa (`phone: null` com motivo).
 - Banco, só em último recurso: `npx wrangler d1 time-travel restore eag_compass --bookmark=00000725-00000100-000050fc-0ed904436e09b38b29a4fafb64a1f45a` ou o backup acima. Ambos perdem as gravações posteriores, inclusive os 7 telefones.
+
+## Bloqueio das ligações até a T11 (06/10/2026, implementado; não publicado)
+
+- **Falha reproduzida:** `tests/t11-gate.test.mjs`, com 6 casos. Antes da correção, os 6 falhavam: uma ligação com telefone aparecia pronta (`blocked: []`) sem nenhuma validação T11.
+- **Correção:**
+  - **Migração 0035, `compliance_validations`:**
+    - escopo específico (país + canal; sem "T11 inteira"), responsável, data e fundamento;
+    - só inclusão; revogação é linha nova;
+    - sem rota e sem botão para gravar; registro vazio.
+  - **`taskBlocks`:** acrescenta `t11_pending` quando não há validação vigente do escopo exato da tarefa (ligação → `xx_manual_phone`, LinkedIn → `xx_manual_linkedin`, pelo país da empresa). O cálculo vale na listagem e na conclusão; o estado da tarefa não muda.
+  - Correção de dados, oposição e exclusão seguem possíveis. Uma validação futura só retira o próprio motivo.
+  - A aprovação do uso pessoal do Compass não conta como validação.
+  - Tela: "T11 pendente".
+- **Verificações:**
+  - `npm run check`: 409 testes da suíte principal, 2 do Worker e 16 da ponte;
+  - `validate-deploy` e `npm run test:ui` passaram;
+  - a suíte do commit publicado (`1ca78a2`) passou com a 0035: 403 da suíte principal e 2 do Worker;
+  - ambiente local com a 0035: "Para fazer (0)" e todas as ligações em "Bloqueadas" com "T11 pendente".
+- **Teste de compatibilidade:** desta vez a cópia temporária ficou dentro do repositório (`.claude/worktrees`, ignorada pelo git), sem atalho para `node_modules`; `npm ls` íntegro depois da remoção.
+- **Plano de publicação e reversão:** `PUBLICACAO-BLOQUEIO-T11.md`.
+- **Estado:** T11 não validada; nada publicado; canais `planned`; campanhas inativas; supressões sem alteração; nenhum contato.

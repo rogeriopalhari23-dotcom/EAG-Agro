@@ -63,14 +63,32 @@ export function manualTaskStatements(env, { tenant, ficha, contactId, commodity,
     });
 }
 
-// O que impede a ligação agora: restrições comuns (pausa, supressão, triagem…) e, em ligação, a falta de um número
-// definido (tarefa antiga sem telefone, divergência entre fontes, formato sem código do país).
+// T11 (Spec: "antes de contatos reais"): contato manual só fica pronto com validação vigente para o escopo exato
+// (país da empresa + canal). Vale a decisão mais recente cuja data já chegou; sem registro, fica "T11 pendente".
+// Escopo de outro país ou canal (Alemanha, e-mail automático, campanhas) não libera. O bloqueio é só calculado.
+const T11_CHANNEL = { call_l0: "manual_phone", call_l1: "manual_phone", call_l2: "manual_phone", linkedin: "manual_linkedin" };
+async function t11Cleared(env, tenant, companyId, kind) {
+  const c = await s(env, "SELECT country_code FROM companies WHERE tenant_id=? AND id=?", tenant, companyId).first();
+  if (!c?.country_code || !T11_CHANNEL[kind]) return false;
+  const scope = `${c.country_code.toLowerCase()}_${T11_CHANNEL[kind]}`;
+  const v = await s(
+    env,
+    "SELECT decision FROM compliance_validations WHERE tenant_id=? AND gate='t11' AND scope=? AND decided_on<=? ORDER BY decided_on DESC, recorded_at DESC, rowid DESC LIMIT 1",
+    tenant, scope, now().slice(0, 10),
+  ).first();
+  return v?.decision === "validated";
+}
+
+// O que impede a ligação agora: restrições comuns (pausa, supressão, triagem…), em ligação a falta de um número
+// definido (tarefa antiga sem telefone, divergência entre fontes, formato sem código do país) e a T11 do escopo.
+// Uma validação T11 só retira o próprio motivo; os demais continuam.
 async function taskBlocks(env, tenant, t) {
   if (!MANUAL.has(t.kind)) return [];
   const campaign = t.ficha_id ? (await s(env, "SELECT campaign_id FROM fichas WHERE id=?", t.ficha_id).first())?.campaign_id : null;
   const emailHash = t.contact_id ? (await s(env, "SELECT email_hash FROM contacts WHERE id=?", t.contact_id).first())?.email_hash : null;
   const reasons = await restrictionsFor(env, tenant, { companyId: t.company_id, campaignId: campaign, commodity: t.commodity, emailHash, phoneHash: t.phone_hash });
   if (CALLS.has(t.kind) && !t.phone_hash) reasons.push(`phone_${t.phone_issue || "missing"}`);
+  if (!(await t11Cleared(env, tenant, t.company_id, t.kind))) reasons.push("t11_pending");
   return reasons;
 }
 
