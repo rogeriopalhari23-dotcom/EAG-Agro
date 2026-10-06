@@ -85,3 +85,26 @@ Os demais estabelecimentos do MAPA (405 consumidoras potenciais, com 152 ME/EPP)
 | **152** ME/EPP | 100 + 52 | Todas as consumidoras com porte ME ou EPP |
 | **150** na seção 10 do `CANDIDATAS.md` | 152 − 2 | Cimilho (EPP) e Casa do Milho (ME) estão na seção 9, para não se repetirem. **Não** são "150 pequenas" por outro critério |
 | ME/EPP nesta lista curta | 12 | Cimilho no grupo 2 e 11 no grupo 3 |
+
+## Lote de 6 candidatas ME/EPP: descoberta e qualificação (06/10/2026, sem contato)
+
+**Fontes:**
+- cadastro MAPA (SIPEAGRO, 04/10/2026);
+- cache da BrasilAPI (06/10/2026); nova consulta respondeu 403 e foi **suspensa**;
+- espelhos públicos da Receita (GuiaPJ, base de 08–09/2026);
+- buscas na web por fonte própria (site, Instagram, LinkedIn).
+
+**Distâncias:** sempre em linha reta (haversine) a partir do centroide de Indiara. "Mapa" = coordenada de diretório de mapas (não oficial); "centroide" = centro do município.
+
+**Nos 6:** todas ativas, EPP, CNAE principal 1066-0 (fabricação de alimentos para animais), matriz. GMO **a confirmar**. Nenhum responsável de compras identificado. Os sócios do QSA são representantes legais e não foram tratados como compradores.
+
+| Candidata | Unidade (Receita) | km | Atividade atual e milho | Compra de terceiros | Canal disponível (fonte) | Pendências | Recomendação |
+|---|---|---|---|---|---|---|---|
+| **Rações VR** (R V Rações, 07.611.367/0001-90) | Via Primária 01, Setor Agroindustrial, Orizona/GO; **4 filiais ativas** (loja "Casa do Produtor" no Centro) | 177,0 (mapa) / 189,5 (centroide) | **Fonte própria:** perfil @racoesvr_orizona, "Fábrica de Rações de alta qualidade em Orizona-Goiás". CNAE secundário 1069-4 (moagem de produtos vegetais). Ração para gado, porcos e galinhas segundo cliente (indício, 2021). Milho **não citado** | Não comprovada | (64) 3474-1528 e e-mail do cadastro da Receita; Instagram próprio | Uso e compra de milho; qual estabelecimento fabrica | **Aceitar para qualificação.** É a única com fábrica confirmada por fonte própria; linhas para espécies que usam milho |
+| **Rural Forte** (06.026.372/0001-73) | Via Primária, Qd 02 Lt 14–23, Distrito Agroindustrial, Pontalina/GO; filial 0002-54 é atacado e loja | 68,5 (mapa) / 59,7 (centroide) | Fábrica no distrito industrial (cadastro e mapa); maior capital do lote (R$ 1,29 mi). Loja "Rural Forte Ltda" em Pontalina no LinkedIn (52 pessoas). **Atenção:** o site `ruralforte.com.br` é de outra empresa (SP), não usado. Milho **não citado** | Não comprovada | (64) 99295-1212 e e-mail do cadastro da Receita (pode ser contato cadastral, não comercial) | Uso e compra de milho; site próprio não localizado | **Aceitar para qualificação.** Fábrica em distrito industrial, a mais próxima de Indiara e a de maior porte relativo |
+| **Nutrir** (26.899.864/0001-80) | **Divergência resolvida:** a unidade ativa é a matriz, Rua VA-14, Qd 30 Lt 09, Residencial Vergílio Araújo, Itaberaí. O endereço da Av. Goiás é da filial 0003-42, **baixada em 26/11/2021**; a filial 0002-61 (Goiás/GO) foi baixada em 10/11/2020 | 123,8 (centroide) | Fabricação de ração desde 1991; CNAEs secundários de amidos, moagem e pós-colheita (indícios cadastrais). Milho **não citado** | Não comprovada | (62) 3375-2464 e e-mail do cadastro da Receita | Se a fábrica opera no endereço atual (bairro residencial); uso de milho | **Manter em descoberta**, aceite opcional: ativa e antiga, mas sem fonte própria e com fábrica a confirmar |
+| **Super-Bovi** (19.091.828/0001-20) | Rua dos Empresários, Qd Gleba XI Lt B, Parque Industrial, Goianápolis/GO; estabelecimento único | 121,5 (centroide) | Fabricação de ração (cadastro); nenhuma fonte própria localizada. Milho **não citado** | Não comprovada | (62) 99468-9092 e e-mail do cadastro da Receita | Tudo depende de contato | **Manter em descoberta**: só há o cadastro |
+| **Ração Ituiutaba** (71.054.894/0001-40) | Av. Paranaíba, 2671, Platina, Ituiutaba/MG | 205,9 (centroide) | Fabricação (cadastro); diretório a descreve como "fábrica de ração de cachorro"; **indício de terceiro:** avaliação de 2018 cita "milho e sorgo em grão e moídos" à venda (pode ser revenda). Nenhuma fonte própria | Não comprovada | (34) 3268-2327 (Receita) ou (34) 3268-2108 (diretório): **divergência** | Se fabrica com milho ou só revende; ração pet x produção; telefone | **Manter em descoberta**: único indício de milho é de terceiro e antigo |
+| **Sociagro** (08.769.542/0001-35) | **Divergência não resolvida:** todos os espelhos da Receita trazem Rua Tegucigalpa, Qd 1-B Lt 01 **Sala A**, Setor Ponte de Pedra, Paraúna. Só o diretório de mapas traz "Fábrica de Ração, GO-320 saída para Jandaia". Sem fonte que ligue os dois | 54,4 (mapa) / 72,8 (centroide) | Fabricação de ração (cadastro); CNAE secundário de varejo. Milho **não citado** | Não comprovada | (64) 3556-1969 e (64) 3556-1350 (Receita e diretório) | Local da fábrica: "Sala A" sugere escritório; uso de milho | **Manter em descoberta** até esclarecer onde fica a fábrica |
+
+**Encerramento da pesquisa:** nas 6, as lacunas restantes (uso e compra de milho, GMO, responsável de compras, local da fábrica em Nutrir e Sociagro) dependem de contato direto. Contato real aguarda a T11.

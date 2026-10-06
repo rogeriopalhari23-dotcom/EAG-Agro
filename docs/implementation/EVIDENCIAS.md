@@ -1207,3 +1207,23 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - Fundamento do perfil comprador atualizado com a nova distância (revisão 2).
   - Outras 3 tarefas sem alteração.
 - **Estado:** canal `planned`; campanhas inativas; nenhum envio pendente; ponte lendo a caixa.
+
+### Lote de 6 candidatas ME/EPP qualificado (2026-10-06, sem contato)
+
+- **Candidatas:** Rural Forte, Sociagro, Nutrir, Super-Bovi, Rações VR, Ração Ituiutaba. Detalhes em `descoberta-milho-indiara/QUALIFICACAO-LOTES-2026-10-06.md`, seção final.
+- **Cadastro:** todas ativas, EPP, CNAE 1066-0, matriz.
+- **Divergências de endereço:**
+  - Nutrir resolvida: o endereço da Av. Goiás é da filial 0003-42, baixada em 26/11/2021; a unidade ativa é a matriz na Rua VA-14;
+  - Sociagro não resolvida: Rua Tegucigalpa "Sala A" no cadastro × "GO-320 saída para Jandaia" no diretório de mapas.
+- **Fonte própria:** só a Rações VR (perfil no Instagram: "Fábrica de Rações… Orizona").
+- **Homônimo descartado como fonte:** `ruralforte.com.br` é de outra empresa (SP).
+- **Milho:**
+  - nenhuma tem evidência própria de uso de milho;
+  - Ração Ituiutaba tem só indício de terceiro (avaliação de 2018);
+  - compra de terceiros não comprovada em nenhuma;
+  - GMO a confirmar em todas.
+- **BrasilAPI:** 200 no teste e depois **403** no lote; consultas suspensas e cache reaproveitado.
+- **Recomendações:**
+  - aceitar para qualificação: Rações VR e Rural Forte;
+  - manter em descoberta: Nutrir (aceite opcional), Super-Bovi, Ração Ituiutaba e Sociagro.
+- Nada aceito, cadastrado, enviado ou contatado; Snov e T11 inalterados.
