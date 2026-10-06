@@ -1,0 +1,156 @@
+{
+  "aceite": "Rogério, 06/10/2026: candidatas para qualificação; não confirma uso de milho, compra de terceiros, GMO nem responsabilidade de compra.",
+  "produto": "Milho GMO",
+  "empresas": [
+    {
+      "chave": "rural-forte",
+      "company": {
+        "legalName": "RURAL FORTE NUTRICAO ANIMAL LTDA",
+        "tradeName": "Rural Forte — fábrica, Pontalina",
+        "countryCode": "BR",
+        "registrationId": "06026372000173",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — cadastro MAPA SIPEAGRO (04/10/2026) e Receita (espelho GuiaPJ, consulta 06/10/2026); unidade: Via Primário, Qd 02 Lt 14–23, Distrito Agroindustrial, Pontalina/GO; 68,5 km pela coordenada de diretório de mapas (não oficial) e 59,7 km pelo centroide de Pontalina. Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/06026372000173"
+      },
+      "evidence": [],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "unconfirmed",
+        "basis": "Perfil não confirmado: fabricante de ração (CNAE 1066-0) registrado no MAPA; uso e compra de milho não esclarecidos nas fontes públicas consultadas (06/10/2026). GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (64) 99295-1212 — telefone do cadastro da Receita (GuiaPJ, base 09/2026); canal cadastral, não verificado como comercial. Há e-mail cadastral de aparência pessoal, não copiado. Site ruralforte.com.br é de OUTRA empresa (SP), não usar\nDistância: 68,5 km pela coordenada de diretório de mapas (não oficial) e 59,7 km pelo centroide de Pontalina. Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho da Rural Forte?\nQualificação (com quem cuida da compra de milho):\n1. Usam milho na ração? Compram milho de terceiros (de quem: produtor, cerealista, trading) ou usam milho próprio ou de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho?\n4. Como funciona o cadastro ou a homologação de fornecedores?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: uso e compra de milho; GMO; responsável; site próprio não localizado.",
+        "channelNote": "(64) 99295-1212 — telefone do cadastro da Receita (GuiaPJ, base 09/2026); canal cadastral, não verificado como comercial. Há e-mail cadastral de aparência pessoal, não copiado. Site ruralforte.com.br é de OUTRA empresa (SP), não usar",
+        "nextAction": "Aguardar a T11; depois, ligar e esclarecer uso de milho, compra de terceiros, GMO e responsável (não esclarecidos nas fontes públicas consultadas; próximo passo sugerido: contato direto)."
+      }
+    },
+    {
+      "chave": "sociagro",
+      "company": {
+        "legalName": "SOCIAGRO NUTRICAO ANIMAL LTDA",
+        "tradeName": "Sociagro Indústria — Paraúna",
+        "countryCode": "BR",
+        "registrationId": "08769542000135",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — cadastro MAPA SIPEAGRO (04/10/2026) e Receita (espelho GuiaPJ, consulta 06/10/2026); unidade: Rua Tegucigalpa, Qd 1-B Lt 01 Sala A, Setor Ponte de Pedra, Paraúna/GO (Receita); 54,4 km pela coordenada de diretório de mapas do ponto 'Fábrica de Ração, GO-320 saída para Jandaia' (não oficial; vínculo com o CNPJ a conciliar) e 72,8 km pelo centroide de Paraúna. Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/08769542000135"
+      },
+      "evidence": [],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "unconfirmed",
+        "basis": "Perfil não confirmado: fabricante de ração (CNAE 1066-0) registrado no MAPA; uso e compra de milho não esclarecidos nas fontes públicas consultadas (06/10/2026). GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (64) 3556-1969 — cadastro da Receita (GuiaPJ, base 09/2026); (64) 3556-1350 — cadastro da Receita e Guiatelefone. Canais cadastrais, não verificados como comerciais\nDistância: 54,4 km pela coordenada de diretório de mapas do ponto 'Fábrica de Ração, GO-320 saída para Jandaia' (não oficial; vínculo com o CNPJ a conciliar) e 72,8 km pelo centroide de Paraúna. Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho da Sociagro Indústria?\nQualificação (com quem cuida da compra de milho):\n1. Usam milho na ração? Compram milho de terceiros (de quem: produtor, cerealista, trading) ou usam milho próprio ou de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho?\n4. Como funciona o cadastro ou a homologação de fornecedores?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: LOCAL DA FÁBRICA a conciliar (Receita: Rua Tegucigalpa 'Sala A', que sugere escritório; diretório de mapas: GO-320 saída para Jandaia); uso e compra de milho; GMO; responsável.",
+        "channelNote": "(64) 3556-1969 — cadastro da Receita (GuiaPJ, base 09/2026); (64) 3556-1350 — cadastro da Receita e Guiatelefone. Canais cadastrais, não verificados como comerciais",
+        "nextAction": "Aguardar a T11; depois, ligar e esclarecer uso de milho, compra de terceiros, GMO e responsável (não esclarecidos nas fontes públicas consultadas; próximo passo sugerido: contato direto)."
+      }
+    },
+    {
+      "chave": "nutrir",
+      "company": {
+        "legalName": "NUTRIR INDUSTRIA E COMERCIO DE RACOES LTDA",
+        "tradeName": "Nutrir — matriz, Itaberaí",
+        "countryCode": "BR",
+        "registrationId": "26899864000180",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — cadastro MAPA SIPEAGRO (04/10/2026) e Receita (espelho GuiaPJ, consulta 06/10/2026); unidade: Rua VA-14, Qd 30 Lt 09, Residencial Vergílio Araújo, Itaberaí/GO (Receita). O endereço da Av. Goiás é da filial 0003-42, baixada em 26/11/2021; a filial 0002-61 (Goiás/GO) foi baixada em 10/11/2020; 123,8 km pelo centroide de Itaberaí (sem coordenada da unidade). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/26899864000180"
+      },
+      "evidence": [],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "unconfirmed",
+        "basis": "Perfil não confirmado: fabricante de ração (CNAE 1066-0) registrado no MAPA; uso e compra de milho não esclarecidos nas fontes públicas consultadas (06/10/2026). GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (62) 3375-2464 e contatonutriragropecuaria@gmail.com — cadastro da Receita (GuiaPJ, base 09/2026); canais cadastrais, não verificados como comerciais\nDistância: 123,8 km pelo centroide de Itaberaí (sem coordenada da unidade). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho da Nutrir?\nQualificação (com quem cuida da compra de milho):\n1. Usam milho na ração? Compram milho de terceiros (de quem: produtor, cerealista, trading) ou usam milho próprio ou de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho?\n4. Como funciona o cadastro ou a homologação de fornecedores?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: confirmar se a FÁBRICA opera no endereço atual (bairro residencial); uso e compra de milho; GMO; responsável.",
+        "channelNote": "(62) 3375-2464 e contatonutriragropecuaria@gmail.com — cadastro da Receita (GuiaPJ, base 09/2026); canais cadastrais, não verificados como comerciais",
+        "nextAction": "Aguardar a T11; depois, ligar e esclarecer uso de milho, compra de terceiros, GMO e responsável (não esclarecidos nas fontes públicas consultadas; próximo passo sugerido: contato direto)."
+      }
+    },
+    {
+      "chave": "super-bovi",
+      "company": {
+        "legalName": "SUPER-BOVI NUTRICAO ANIMAL LTDA",
+        "tradeName": "Super-Bovi — Goianápolis",
+        "countryCode": "BR",
+        "registrationId": "19091828000120",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — cadastro MAPA SIPEAGRO (04/10/2026) e Receita (espelho GuiaPJ, consulta 06/10/2026); unidade: Rua dos Empresários, Qd Gleba XI Lt B, Parque Industrial, Goianápolis/GO (Receita); estabelecimento único; 121,5 km pelo centroide de Goianápolis (sem coordenada da unidade). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/19091828000120"
+      },
+      "evidence": [],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "unconfirmed",
+        "basis": "Perfil não confirmado: fabricante de ração (CNAE 1066-0) registrado no MAPA; uso e compra de milho não esclarecidos nas fontes públicas consultadas (06/10/2026). GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (62) 99468-9092 e superbovi25nutricaoanimal@gmail.com — cadastro da Receita (GuiaPJ, base 09/2026); (62) 9299-5372 — Diário Cidade (diretório). Divergentes; canais cadastrais, não verificados como comerciais\nDistância: 121,5 km pelo centroide de Goianápolis (sem coordenada da unidade). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho da Super-Bovi?\nQualificação (com quem cuida da compra de milho):\n1. Usam milho na ração? Compram milho de terceiros (de quem: produtor, cerealista, trading) ou usam milho próprio ou de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho?\n4. Como funciona o cadastro ou a homologação de fornecedores?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: uso e compra de milho; GMO; responsável; nenhuma fonte própria localizada.",
+        "channelNote": "(62) 99468-9092 e superbovi25nutricaoanimal@gmail.com — cadastro da Receita (GuiaPJ, base 09/2026); (62) 9299-5372 — Diário Cidade (diretório). Divergentes; canais cadastrais, não verificados como comerciais",
+        "nextAction": "Aguardar a T11; depois, ligar e esclarecer uso de milho, compra de terceiros, GMO e responsável (não esclarecidos nas fontes públicas consultadas; próximo passo sugerido: contato direto)."
+      }
+    },
+    {
+      "chave": "racoes-vr",
+      "company": {
+        "legalName": "R V RACOES LTDA",
+        "tradeName": "Rações VR — fábrica, Orizona",
+        "countryCode": "BR",
+        "registrationId": "07611367000190",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — cadastro MAPA SIPEAGRO (04/10/2026) e Receita (espelho GuiaPJ, consulta 06/10/2026); unidade: Via Primária 01 esq. Secundária 01, Lt 01 I22, Qd 08, Setor Agroindustrial, Orizona/GO (Receita); 4 filiais ativas (loja 'Casa do Produtor' no Centro); 177,0 km pela coordenada de diretório de mapas (não oficial) e 189,5 km pelo centroide de Orizona. Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/07611367000190"
+      },
+      "evidence": [],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "unconfirmed",
+        "basis": "Perfil não confirmado: fabricante de ração (CNAE 1066-0) registrado no MAPA; uso e compra de milho não esclarecidos nas fontes públicas consultadas (06/10/2026). GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (64) 3474-1528 — cadastro da Receita (GuiaPJ, base 08/2026); canal cadastral, não verificado como comercial. Há e-mail cadastral de aparência pessoal, não copiado. Perfil próprio: Instagram @racoesvr_orizona\nDistância: 177,0 km pela coordenada de diretório de mapas (não oficial) e 189,5 km pelo centroide de Orizona. Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho da Rações VR?\nQualificação (com quem cuida da compra de milho):\n1. Usam milho na ração? Compram milho de terceiros (de quem: produtor, cerealista, trading) ou usam milho próprio ou de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho?\n4. Como funciona o cadastro ou a homologação de fornecedores?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: uso e compra de milho; GMO; responsável; qual estabelecimento fabrica.",
+        "channelNote": "(64) 3474-1528 — cadastro da Receita (GuiaPJ, base 08/2026); canal cadastral, não verificado como comercial. Há e-mail cadastral de aparência pessoal, não copiado. Perfil próprio: Instagram @racoesvr_orizona",
+        "nextAction": "Aguardar a T11; depois, ligar e esclarecer uso de milho, compra de terceiros, GMO e responsável (não esclarecidos nas fontes públicas consultadas; próximo passo sugerido: contato direto)."
+      }
+    },
+    {
+      "chave": "racao-ituiutaba",
+      "company": {
+        "legalName": "RACAO ITUIUTABA INDUSTRIA E COMERCIO LTDA",
+        "tradeName": "Ração Ituiutaba",
+        "countryCode": "BR",
+        "registrationId": "71054894000140",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — cadastro MAPA SIPEAGRO (04/10/2026) e Receita (espelho GuiaPJ, consulta 06/10/2026); unidade: Av. Paranaíba, 2671, Platina, Ituiutaba/MG (Receita); 205,9 km pelo centroide de Ituiutaba (sem coordenada da unidade). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário. Aceite de Rogério em 06/10/2026 para qualificação.",
+        "sourceUrl": "https://guiapj.com.br/consulta-cnpj/71054894000140"
+      },
+      "evidence": [],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "unconfirmed",
+        "basis": "Perfil não confirmado: fabricante de ração (CNAE 1066-0) registrado no MAPA; uso e compra de milho não esclarecidos nas fontes públicas consultadas (06/10/2026). GMO a confirmar."
+      },
+      "level0": {
+        "commodity": "corn",
+        "unitScript": "ANTES DE LIGAR: contato real depende da T11 validada (retenção), conforme a Spec — decisão de Rogério. Não falar preço, disponibilidade ou condições: elas não existem nesta etapa.\nTelefone: (34) 3268-2327 — cadastro da Receita (GuiaPJ, base 09/2026); (34) 3268-2108 — diretório Telelista/mylinq. Divergentes; canais cadastrais, não verificados como comerciais\nDistância: 205,9 km pelo centroide de Ituiutaba (sem coordenada da unidade). Distância em linha reta (haversine) a partir do centroide de Indiara (IBGE, -17,1852; -49,9682); não é percurso rodoviário.\nAbertura: Oi, tudo bem? Aqui é o Rogerio Palhari, da EAG Agro. Veja se você consegue me ajudar: quem cuida da compra de milho da Ração Ituiutaba?\nQualificação (com quem cuida da compra de milho):\n1. Usam milho na ração? Compram milho de terceiros (de quem: produtor, cerealista, trading) ou usam milho próprio ou de clientes?\n2. Aceitam milho GMO? Há linha ou exigência Non-GMO?\n3. Qual unidade e qual pessoa decidem a compra de milho?\n4. Como funciona o cadastro ou a homologação de fornecedores?\n5. Qual canal profissional recebe apresentações e ofertas (e-mail de quem)?\nVolume, frequência e condições: só na conversa com o responsável.\nFechamento: pedir 20–30 min com o responsável (duas opções de dia); confirmar o e-mail ao vivo. Registrar o resultado em Tarefas.\nPendências: se fabrica com milho ou só revende (único indício é avaliação de cliente de 2018: 'milho e sorgo em grão e moídos'); ração pet x produção; GMO; responsável; telefone a conciliar.",
+        "channelNote": "(34) 3268-2327 — cadastro da Receita (GuiaPJ, base 09/2026); (34) 3268-2108 — diretório Telelista/mylinq. Divergentes; canais cadastrais, não verificados como comerciais",
+        "nextAction": "Aguardar a T11; depois, ligar e esclarecer uso de milho, compra de terceiros, GMO e responsável (não esclarecidos nas fontes públicas consultadas; próximo passo sugerido: contato direto)."
+      }
+    }
+  ]
+}

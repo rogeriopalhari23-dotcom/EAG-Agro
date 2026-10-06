@@ -1227,3 +1227,20 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - aceitar para qualificação: Rações VR e Rural Forte;
   - manter em descoberta: Nutrir (aceite opcional), Super-Bovi, Ração Ituiutaba e Sociagro.
 - Nada aceito, cadastrado, enviado ou contatado; Snov e T11 inalterados.
+
+### Lote de 6 ME/EPP aceito e cadastrado em produção (2026-10-06)
+
+- **Aceite de Rogério:** Rural Forte, Sociagro, Nutrir, Super-Bovi, Rações VR e Ração Ituiutaba, para qualificação. Não confirma milho, compra de terceiros, GMO nem responsável.
+- **Antes:** produção sem nenhuma das 6 raízes de CNPJ, nem nomes parecidos.
+- **Aplicado** com `scripts/cadastrar-lote-aceito.mjs` e `cadastro-lote-pme-aceito.json` (simulação antes):
+  - 1 empresa por CNPJ confirmado;
+  - perfil "não confirmado" (`unconfirmed`, porte pendente);
+  - 1 ligação de nível 0 com roteiro: skill mais a unidade, com a linha da T11, telefones e distância com método;
+  - canal cadastral e próxima ação gravados pela edição auditada (revisão 2, histórico com 2 campos).
+  - **Nenhum contato criado:** canais cadastrais identificados como tais; e-mails cadastrais de aparência pessoal não copiados.
+- **Telefones divergentes registrados com fonte:** Super-Bovi (Receita × Diário Cidade), Ração Ituiutaba (Receita × Telelista), Sociagro (2 números da Receita).
+- **Pendência de localização:**
+  - Sociagro: Rua Tegucigalpa "Sala A" × GO-320;
+  - Nutrir: fábrica no endereço atual, em bairro residencial.
+- **Ligações:** aparecem em Abordagem → Tarefas **bloqueadas por `compliance_unavailable`**: a triagem de sanções dessas 6 ainda não foi feita. Aguardam também a T11.
+- **Estado:** canal `planned`; campanhas inativas; nenhum envio pendente. Total de empresas: 21.

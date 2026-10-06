@@ -67,8 +67,14 @@ for (const e of lote.empresas) {
     console.log(`${e.chave}: perfil ${r.status}`);
   }
   if (e.level0) {
-    const r = await call("POST", `/api/companies/${id}/level0`, e.level0);
+    const { channelNote, nextAction, ...create } = e.level0;
+    const r = await call("POST", `/api/companies/${id}/level0`, create);
     console.log(`${e.chave}: ligação nível 0 ${r.status}${r.status === 409 ? " (já aberta)" : ""}`);
+    // Canal e próxima ação ficam na tarefa pela edição auditada (revisão 1 → 2).
+    if (r.status === 201 && (channelNote || nextAction)) {
+      const p = await call("PATCH", `/api/tasks/${r.json.id}`, { expectedRevision: 1, reason: "Registro do canal cadastral e da próxima ação no cadastro do lote aceito", channelNote, nextAction });
+      console.log(`${e.chave}: canal e próxima ação ${p.status}${p.status >= 400 ? ` ${p.json.error?.code}` : ""}`);
+    }
   }
 }
 console.log(apply ? "Lote aplicado." : "Simulação concluída: nada foi gravado.");
