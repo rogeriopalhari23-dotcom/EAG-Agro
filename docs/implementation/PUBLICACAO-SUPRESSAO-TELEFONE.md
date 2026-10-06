@@ -1,6 +1,6 @@
 # Publicação: supressão por telefone nas ligações (migração 0034)
 
-**Data:** 06/10/2026. **Estado:** pronto para publicar, **não publicado**. Só executar com autorização de Rogério.
+**Data:** 06/10/2026. **Estado:** **publicado em 06/10/2026** com autorização de Rogério: Worker `62182b6e-b9f6-4086-bb85-5db0deb58f1f`; 7 telefones aplicados e 6 pendentes. Registro em `EVIDENCIAS.md`.
 
 **Escopo:**
 - Código na `v2-revisao-2`.

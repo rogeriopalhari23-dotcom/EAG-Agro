@@ -1423,3 +1423,74 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - `npm ls` passou e a verificação completa passou depois disso.
   - Repositório e produção não foram afetados.
 - **Plano de publicação e reversão:** `PUBLICACAO-SUPRESSAO-TELEFONE.md`. Nada publicado; T11, canais (`planned`) e campanhas sem alteração; nenhum contato.
+
+## Publicação da supressão por telefone e telefones das ligações (06/10/2026, autorizada por Rogério)
+
+**Antes:**
+- branch `v2-revisao-2` limpo e sincronizado com o remoto em `1ca78a2`;
+- `npm run test:ui` passou no commit final (Playwright 1.63.0 externo, Chrome do sistema);
+- `npm run check` passou dentro do deploy: 403 testes da suíte principal, 2 do Worker e 16 da ponte.
+
+**Ponto de restauração:**
+- Worker anterior **9866c2c3-0f48-427c-bcbf-7366daa30597** (100%);
+- bookmark do Time Travel do D1 antes da migração: `00000725-00000100-000050fc-0ed904436e09b38b29a4fafb64a1f45a`;
+- backup privado: `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0034-20261006\eag_compass.sql`, 29.733.437 bytes, SHA-256 `b87b18b95ccf427095c1b62fc02bb02007de9bc8a0abf62d480bc90aec0b81d5`, acesso só de `ROGERIONOTE\Roger`.
+
+**Estado anterior:**
+- 15 tarefas, 13 ligações de nível 0 abertas;
+- 21 linhas em `task_revisions`;
+- 2 supressões, ambas de e-mail;
+- canais `planned`;
+- campanhas: 1 rascunho e 1 encerrada;
+- outbox: 5 aceitos e 19 cancelados.
+
+**Migração:**
+- antes de aplicar, só a 0034 estava pendente;
+- aplicada com `npm run db:migrate:remote`.
+- Esquema conferido:
+  - `tasks.phone_hash`, `phone_enc`, `phone_source`, `phone_issue`;
+  - `idx_tasks_phone`;
+  - `task_revisions` com as mesmas 21 linhas, aceitando `phone_source`, com índice e gatilho `task_revisions_no_update`.
+- Depois: "No migrations to apply".
+
+**Publicação:**
+- `npm run deploy` (check, validate-deploy e deploy);
+- Worker **62182b6e-b9f6-4086-bb85-5db0deb58f1f**, 100% do tráfego, publicado em 2026-10-06T22:14:48Z.
+- Logo depois: as 13 ligações abertas, com ids únicos e a linha da T11, todas bloqueadas por "sem telefone definido"; nenhuma suspensa.
+
+**Telefones** (`scripts/atualizar-telefones-ligacoes.mjs`, plano `telefones-ligacoes-l0.json`):
+- simulação: 7 a definir, 6 pendentes, 0 problemas, sem aviso de Worker antigo;
+- aplicação: 7 respostas 200, nenhuma suspensa;
+- simulação repetida: 7 "já definido", 6 pendentes.
+
+| Ligação | Revisão | Histórico | Telefone | Situação |
+|---|---|---|---|---|
+| Cargill Uberlândia (e6747f59) | 1→2 | 0→2 | +55 34 3218-4900 | definido |
+| São Martinho Boa Vista (f3e7e383) | 2→3 | 3→5 | +55 64 3615-9700 | definido |
+| Cargill Bioenergia (879acd70) | 1→2 | 0→2 | +55 64 3615-9500 | definido |
+| Nutrir (9f489696) | 2→3 | 2→4 | +55 62 3375-2464 | definido |
+| Rações VR (fff3d487) | 2→3 | 2→4 | +55 64 3474-1528 | definido |
+| Rei do Milho (247bad11) | 2→3 | 2→4 | +55 62 3514-1751 | definido |
+| Caramuru (8b4bd935) | 2→3 | 2→4 | +55 64 3404-0200 | definido |
+| Cimilho (55770872) | 1 | 0 | — | pendente: escolher entre dois números |
+| Rural Forte (73eeb92f) | 2 | 2 | — | pendente: O5 (celular não usado) |
+| Super-Bovi (eb02c35d) | 2 | 2 | — | pendente: O5 (celulares não usados) |
+| Sociagro (d7f9f5b6) | 2 | 2 | — | pendente: escolher entre dois números |
+| Ração Ituiutaba (3fc79395) | 2 | 2 | — | pendente: números divergentes |
+| BRF Rio Verde (2ad6c4a7) | 2 | 2 | — | pendente: sem telefone apropriado |
+
+**Conferido depois:**
+- Nas 13 tarefas, roteiro (hash), canal, próxima ação, data, estado e id são iguais aos de antes. O histórico anterior foi preservado e foram acrescentadas só as linhas `phone` e `phone_source`; `task_revisions` passou de 21 para 35 linhas.
+- As 6 pendentes seguem bloqueadas por "sem telefone definido".
+- Auditoria: 7 `task.updated` só com os nomes dos campos, sem número; nenhuma `task.suspended`.
+- Supressões: as mesmas 2, de e-mail. Nenhuma supressão real foi criada ou alterada.
+- Canais `planned`; campanhas inativas; outbox sem mudança.
+- Ponte: leitura bem-sucedida às 22:17:17 UTC, depois do deploy.
+- Nenhum contato.
+
+**T11:** as 7 ligações com telefone não têm bloqueio no sistema. A espera pela T11 continua indicada pela linha "ANTES DE LIGAR" no roteiro, como em todas as ligações desde o cadastro, e pelos canais `planned`. A T11 não foi alterada.
+
+**Reversão:**
+- Worker: `npx wrangler rollback 9866c2c3-0f48-427c-bcbf-7366daa30597`. É compatível com o banco migrado; o Worker antigo ignora telefone e suspensões nas ligações.
+- Telefones: edição auditada por tarefa (`phone: null` com motivo).
+- Banco, só em último recurso: `npx wrangler d1 time-travel restore eag_compass --bookmark=00000725-00000100-000050fc-0ed904436e09b38b29a4fafb64a1f45a` ou o backup acima. Ambos perdem as gravações posteriores, inclusive os 7 telefones.
