@@ -1347,3 +1347,19 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - outbox sem mudança (5 aceitos, 19 cancelados);
   - 9 fichas, nenhuma criada ou aprovada.
   - **Nada foi liberado por esta classificação.**
+
+## T11: uso individual do Compass e revisão do bloqueio das ligações manuais no Brasil (06/10/2026)
+
+- **Decisão registrada:** Rogério aprova o uso individual do Compass como ferramenta pessoal de apoio ao seu trabalho comercial.
+  - Registrada na tabela de decisões da Spec (linha de 2026-10-06).
+  - Não é autorização da EAG, não é parecer jurídico nem isenção da LGPD, e **não valida a T11**.
+  - Não libera e-mail automático, campanhas nem contatos na Alemanha.
+- **Revisão proposta:** `T11-REVISAO-PILOTO-BR-TELEFONE.md`, não aprovada. Separa:
+  - decisões operacionais (O1–O9);
+  - obrigações legais da LGPD (L1–L9);
+  - exigências da Spec (S1–S7).
+  - Inclui a emenda proposta (T11-BR-TEL) e rascunhos de teste de balanceamento, de texto de transparência e de registro simplificado.
+- **Lacuna encontrada no código:** a ligação de nível 0 não é suspensa por supressão de telefone. `restrictionsFor` só recebe o hash de e-mail, e essas tarefas não têm contato vinculado.
+  - O item 6 de `T11-VALIDACAO-PILOTO-BR.md` foi corrigido por nota, preservando o texto original.
+  - A correção do código está proposta e ainda não foi implementada.
+- **Estado:** as 13 ligações seguem abertas, com a linha da T11 no roteiro. Nenhum contato. Canais `planned`. Nenhum teste rodado: só documentação mudou.

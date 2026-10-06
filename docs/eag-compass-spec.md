@@ -833,6 +833,7 @@ Retirado da lista v1.3: "automação completa de follow-up" (agora permitida par
 | 2026-09-30 | R14.8 — porte desconhecido por e-mail? | Aprovada: qualificar o porte na conversa iniciada pelo primeiro contato, inclusive por e-mail; falta de porte não impede ficha cujo objetivo inclua esclarecê-lo. | R14.8 |
 | 2026-09-30 | Endereço físico nos e-mails? | Mantido por exigência do R19.13 (Hostinger §12), só no rodapé, separado da assinatura; vale só com validação de Rogério do texto exato. Validado: "Al. Rio Negro, 503 — Alphaville Industrial, Barueri/SP, Brasil". | R19.13, AT70 |
 | 2026-09-30 | R14.6 — condição própria de microempresa? | Opção A: retirada; todos os portes seguem os mesmos critérios de aderência comercial; pequenas e médias só como desempate; perfil "não confirmado" continua não confirmado. | R14.6, AT59 |
+| 2026-10-06 | O Compass pode ser usado individualmente como ferramenta pessoal? | Sim: Rogério aprova o uso individual do Compass como ferramenta pessoal de apoio ao seu trabalho comercial. **Não** é autorização da EAG, não define controlador perante a EAG, não afasta a LGPD, **não valida a T11** e não libera e-mail automático, campanhas nem contatos na Alemanha. Revisão do bloqueio das ligações manuais no Brasil em proposta (`implementation/T11-REVISAO-PILOTO-BR-TELEFONE.md`), não aprovada. | Premissas (uso), P7; T11 |
 
 ## 6. Decisões pendentes
 
