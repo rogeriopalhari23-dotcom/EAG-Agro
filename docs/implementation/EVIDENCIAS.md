@@ -1323,3 +1323,27 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - outbox sem mudança (5 aceitos, 19 cancelados);
   - 9 fichas; nenhuma criada ou aprovada.
 - Sem Snov, sem contato. Nenhum teste rodado: só dados e documentação mudaram.
+
+### Decisão: "G G Brasil Foods" x BRF Rio Verde, falso positivo (06/10/2026)
+
+- **Decisão:** falso positivo.
+- **Autor:** Rogério Palhari, em 06/10/2026. Registrado por Claude a pedido dele.
+- **Alcance:** vale só para a correspondência entre a BRF S.A. (01.838.723/0172-83, empresa `a756e2b6`) e a entrada abaixo. **Não exclui "G G Brasil Foods" de triagens futuras** nem vale para outra empresa ou unidade.
+- **Motivo (Rogério):** empresas distintas, com raízes de CNPJ diferentes; a semelhança parcial de nome não identifica a BRF.
+- **Entrada da lista (preservada sem alteração):**
+  - CGU CEIS, versão `279f05dc-9e7a-4199-b8fb-30de42d1140c`, baixada em 24/09/2026 19:19:40 UTC, válida até 24/10/2026;
+  - entrada `d581de6d-7050-4e8f-b109-48c02347085a`, "G & G BRASIL FOODS - FRIG S/A", CNPJ 27.606.589/0001-22.
+- **Origem da correspondência:** a semelhança veio da conferência complementar por nome parcial, que é somente leitura e fica fora do critério. Ela **não** veio da triagem do sistema:
+  - a rodada `00e757c0` da BRF terminou com 0 correspondências;
+  - não existe `screening_match` para essa entrada em nenhuma rodada.
+  - Por isso a decisão **não foi gravada** pelo fluxo `screening_decisions`, que exige uma correspondência existente. Criar uma correspondência só para classificá-la fabricaria um registro de triagem. Este texto é o registro da decisão.
+  - Se uma triagem futura do sistema gerar essa correspondência, a decisão deve ser lançada pelo fluxo próprio (Administrador, motivo obrigatório), citando esta seção.
+- **Conferência depois da decisão (06/10/2026):**
+  - BRF: 1 rodada, 0 correspondências, nenhuma correspondência confirmada;
+  - nenhuma decisão de triagem gravada (`screening_decisions` = 0);
+  - ligação de nível 0 da BRF continua aberta, na revisão 2, com a linha da T11 e sem mudança;
+  - canais e-mail, WhatsApp e LinkedIn `planned`;
+  - campanhas: 1 rascunho e 1 encerrada;
+  - outbox sem mudança (5 aceitos, 19 cancelados);
+  - 9 fichas, nenhuma criada ou aprovada.
+  - **Nada foi liberado por esta classificação.**
