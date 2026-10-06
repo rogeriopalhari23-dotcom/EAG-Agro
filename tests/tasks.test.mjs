@@ -99,3 +99,65 @@ check("P2-T14: reunião cria confirmação na manhã; linha do tempo e funil sem
   assert.ok(view.data.openTasks.some((t) => t.id === corn.data.id && /Aceita milho GMO\?/.test(t.script)));
   assert.equal(typeof view.data.peopleCount, "number");
 });
+
+check("Tarefas: edição de ligação manual aberta guarda histórico cifrado, preserva id e estado e mantém a pendência T11", async (ctx) => {
+  const r = await pilot(ctx);
+  const l0 = await ctx.api(`/api/companies/${r.companyId}/level0`, "POST", { commodity: "corn", unitScript: "ANTES DE LIGAR: contato real depende da T11 validada.\nTelefone: NÃO CONFIRMADO" });
+  assert.equal(l0.status, 201);
+  const id = l0.data.id;
+  const before = ctx.DB.raw.prepare("SELECT * FROM tasks WHERE id=?").get(id);
+  const oldScript = before.script;
+  const newScript = oldScript.replace("Telefone: NÃO CONFIRMADO", "Telefone: (64) 3615-9700 — canal geral da unidade (site oficial, 06/10/2026)");
+  // Sem motivo, sem revisão certa, ou tirando a linha da T11: recusado.
+  assert.equal((await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 1, script: newScript })).status, 422);
+  assert.equal((await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 9, reason: "corrigir telefone", script: newScript })).status, 409);
+  const noT11 = await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 1, reason: "corrigir telefone", script: newScript.replace(/^ANTES DE LIGAR:.*$/m, "") });
+  assert.equal(noT11.status, 422);
+  assert.equal(noT11.data.error.code, "t11_notice_required");
+  // Edição válida.
+  const ok = await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 1, reason: "corrigir telefone oficial", script: newScript, channelNote: "(64) 3615-9700 — canal geral da unidade", nextAction: "Aguardar T11" });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.deepEqual(ok.data, { id, revision: 2, fields: ["script", "channel_note", "next_action"] });
+  const after = ctx.DB.raw.prepare("SELECT * FROM tasks WHERE id=?").get(id);
+  assert.equal(after.status, "open");
+  assert.equal(after.result_json, null);
+  assert.equal(after.done_at, null);
+  assert.equal(after.due_date, before.due_date);
+  assert.equal(after.script, newScript);
+  assert.match(after.script, /^ANTES DE LIGAR:/m);
+  // Histórico: valores cifrados no banco, legíveis pela rota; auditoria sem conteúdo.
+  const rev = ctx.DB.raw.prepare("SELECT * FROM task_revisions WHERE task_id=? AND field='script'").get(id);
+  assert.ok(!rev.old_value_enc.includes("NÃO CONFIRMADO") && !rev.new_value_enc.includes("3615"));
+  const h = await ctx.api(`/api/tasks/${id}/history`);
+  const s = h.data.items.find((x) => x.field === "script");
+  assert.equal(s.oldValue, oldScript);
+  assert.equal(s.newValue, newScript);
+  assert.equal(s.reason, "corrigir telefone oficial");
+  assert.ok(s.changedBy && s.changedAt);
+  const audit = ctx.DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='task.updated' AND entity_id=?").get(id).new_value_json;
+  assert.ok(!audit.includes("3615") && !audit.includes("NÃO CONFIRMADO"));
+  // Histórico não aceita alteração.
+  assert.throws(() => ctx.DB.raw.prepare("UPDATE task_revisions SET reason='trocado à mão' WHERE task_id=?").run(id));
+  // Leitor não edita.
+  ctx.DB.raw.exec("INSERT INTO users(id,tenant_id,email,display_name,role) VALUES ('u-leitor','eag-internal','leitor@teste.invalid','Leitor','auditor_viewer')");
+  ctx.env.LOCAL_USER_EMAIL = "leitor@teste.invalid";
+  assert.equal((await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 2, reason: "tentativa do leitor", nextAction: "x" })).status, 403);
+  ctx.env.LOCAL_USER_EMAIL = "admin@local.eag";
+  // Concluída não edita.
+  ctx.DB.raw.prepare("UPDATE tasks SET status='done' WHERE id=?").run(id);
+  assert.equal((await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 2, reason: "depois de concluída", nextAction: "x" })).status, 409);
+});
+
+check("Tarefas: tarefa gerada de ficha aprovada não é editável (texto congelado; ficha e aprovação intactas)", async (ctx) => {
+  const r = await pilot(ctx);
+  await approveCalls(ctx, r);
+  const t = ctx.DB.raw.prepare("SELECT id,revision,script FROM tasks WHERE ficha_id IS NOT NULL LIMIT 1").get();
+  const msgs = JSON.stringify(ctx.DB.raw.prepare("SELECT body_enc FROM ficha_messages ORDER BY id").all());
+  const approvals = JSON.stringify(ctx.DB.raw.prepare("SELECT * FROM ficha_approvals ORDER BY id").all());
+  const res = await ctx.api(`/api/tasks/${t.id}`, "PATCH", { expectedRevision: t.revision, reason: "tentar mudar roteiro congelado", nextAction: "x" });
+  assert.equal(res.status, 409);
+  assert.equal(res.data.error.code, "task_frozen");
+  assert.equal(ctx.DB.raw.prepare("SELECT script FROM tasks WHERE id=?").get(t.id).script, t.script);
+  assert.equal(JSON.stringify(ctx.DB.raw.prepare("SELECT body_enc FROM ficha_messages ORDER BY id").all()), msgs);
+  assert.equal(JSON.stringify(ctx.DB.raw.prepare("SELECT * FROM ficha_approvals ORDER BY id").all()), approvals);
+});

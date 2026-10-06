@@ -145,7 +145,7 @@ export async function getCompany(request, env, actor, id) {
   // Próxima ação registrada (tarefas abertas) com o roteiro, para a tela da empresa.
   out.openTasks = await Promise.all(
     (
-      await s(env, "SELECT id,kind,commodity,due_date,script FROM tasks WHERE tenant_id=? AND company_id=? AND status='open' ORDER BY due_date,created_at LIMIT 5", actor.tenant_id, id).all()
+      await s(env, "SELECT id,kind,commodity,due_date,script,channel_note,next_action,revision,ficha_id FROM tasks WHERE tenant_id=? AND company_id=? AND status='open' ORDER BY due_date,created_at LIMIT 5", actor.tenant_id, id).all()
     ).results.map(async (t) => ({ ...t, script: t.script?.startsWith("enc:") ? await decryptPii(t.script.slice(4), env) : t.script })),
   );
   // Condições R12.10 (empresas no exterior): estado e evidência por commodity.

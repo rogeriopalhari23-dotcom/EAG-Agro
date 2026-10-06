@@ -3,7 +3,7 @@ import { bodyJson, fail, str, oneOf, number, requireRole, page, WRITE_ROLES } fr
 import { statement as s, commit, auditStatement, now, company } from "./store.js";
 import { restrictionsFor } from "./restrictions.js";
 import { LEVEL0_SCRIPT } from "./templates/prospeccao-vendas.js";
-import { decryptPii } from "./crypto.js";
+import { decryptPii, encryptPii } from "./crypto.js";
 
 const MANUAL = new Set(["call_l0", "call_l1", "call_l2", "linkedin"]);
 const ICP_BADNESS = "CASE (SELECT bp.icp_status FROM buyer_profiles bp WHERE bp.tenant_id=t.tenant_id AND bp.company_id=t.company_id ORDER BY bp.unit_key='' DESC LIMIT 1) WHEN 'out_trader' THEN 10 WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 ELSE 4 END";
@@ -96,6 +96,72 @@ export async function createLevel0(request, env, actor, rid, companyId) {
     auditStatement(env, actor, rid, "task.created", "task", id, { kind: "call_l0", companyId }),
   ]);
   return { id };
+}
+
+// Edição de tarefa manual aberta (roteiro, canal, próxima ação, data). Preserva o id e não toca estado, resultado,
+// ficha nem aprovações. Tarefa vinda de ficha aprovada tem texto congelado: muda só por nova versão da ficha.
+const EDITABLE = { script: ["script", "roteiro", 8000], channelNote: ["channel_note", "canal", 500], nextAction: ["next_action", "próxima ação", 500], dueDate: ["due_date", "data", 10] };
+const T11_NOTICE = /^ANTES DE LIGAR:.*$/gm;
+export async function updateTask(request, env, actor, rid, id) {
+  requireRole(actor, WRITE_ROLES);
+  const t = await s(env, "SELECT * FROM tasks WHERE tenant_id=? AND id=?", actor.tenant_id, id).first();
+  if (!t) fail(404, "task_not_found", "Tarefa não encontrada.");
+  if (t.status !== "open") fail(409, "task_not_open", "Só tarefa aberta pode ser editada.");
+  if (t.ficha_id) fail(409, "task_frozen", "O roteiro desta tarefa vem de ficha aprovada (texto congelado): altere pela ficha, com nova versão e aprovação.");
+  if (!MANUAL.has(t.kind)) fail(409, "task_not_editable", "Só tarefas manuais (ligação, LinkedIn) podem ser editadas.");
+  const i = await bodyJson(request);
+  if (i.expectedRevision !== t.revision) fail(409, "edit_conflict", "Recarregue a tarefa antes de alterar.");
+  const reason = str(i.reason, "motivo", 500);
+  if (reason.length < 10) fail(422, "reason_required", "Informe o motivo da alteração (10 caracteres ou mais).");
+  const encrypted = t.script?.startsWith("enc:");
+  const current = { script: encrypted ? await decryptPii(t.script.slice(4), env) : t.script, channel_note: t.channel_note, next_action: t.next_action, due_date: t.due_date };
+  const next = {};
+  for (const [key, [col, label, max]] of Object.entries(EDITABLE)) {
+    if (i[key] === undefined) continue;
+    const value = i[key] === null ? null : str(i[key], label, max, true) ?? null;
+    if (col === "due_date" && !/^\d{4}-\d{2}-\d{2}$/.test(value || "")) fail(422, "invalid_date", "Data no formato AAAA-MM-DD.");
+    if ((value ?? null) !== (current[col] ?? null)) next[col] = value;
+  }
+  if (!Object.keys(next).length) fail(422, "nothing_to_change", "Nenhum campo foi alterado.");
+  // A pendência T11 escrita no roteiro ("ANTES DE LIGAR: …") não pode ser retirada por edição.
+  if ("script" in next)
+    for (const line of current.script?.match(T11_NOTICE) || [])
+      if (!(next.script || "").includes(line)) fail(422, "t11_notice_required", "A pendência T11 do roteiro não pode ser retirada pela edição.");
+  const at = now();
+  const cols = Object.keys(next);
+  const stored = { ...next };
+  if ("script" in stored && encrypted && stored.script) stored.script = `enc:${await encryptPii(stored.script, env)}`;
+  await commit(env, [
+    s(
+      env,
+      `UPDATE tasks SET ${cols.map((c) => `${c}=?`).join(",")},revision=CASE WHEN revision=? THEN revision+1 ELSE -1 END WHERE tenant_id=? AND id=? AND status='open'`,
+      ...cols.map((c) => stored[c]), t.revision, actor.tenant_id, id,
+    ),
+    ...(await Promise.all(
+      cols.map(async (c) =>
+        s(
+          env,
+          "INSERT INTO task_revisions(id,tenant_id,task_id,revision,field,old_value_enc,new_value_enc,reason,changed_by,changed_at,request_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+          crypto.randomUUID(), actor.tenant_id, id, t.revision + 1, c, await encryptPii(current[c], env), await encryptPii(next[c], env), reason, actor.id, at, rid,
+        ),
+      ),
+    )),
+    auditStatement(env, actor, rid, "task.updated", "task", id, { companyId: t.company_id, fields: cols, revision: t.revision + 1 }),
+  ]);
+  return { id, revision: t.revision + 1, fields: cols };
+}
+
+// Histórico da tarefa (valores decifrados só para quem pode escrever).
+export async function taskHistory(env, actor, id) {
+  requireRole(actor, WRITE_ROLES);
+  const t = await s(env, "SELECT id FROM tasks WHERE tenant_id=? AND id=?", actor.tenant_id, id).first();
+  if (!t) fail(404, "task_not_found", "Tarefa não encontrada.");
+  const rows = (await s(env, "SELECT * FROM task_revisions WHERE tenant_id=? AND task_id=? ORDER BY changed_at,rowid", actor.tenant_id, id).all()).results;
+  return {
+    items: await Promise.all(
+      rows.map(async (r) => ({ revision: r.revision, field: r.field, oldValue: await decryptPii(r.old_value_enc, env), newValue: await decryptPii(r.new_value_enc, env), reason: r.reason, changedBy: r.changed_by, changedAt: r.changed_at })),
+    ),
+  };
 }
 
 // Reunião: 10–120 min (sugestão da skill 20–30); confirmação na manhã do dia (R28.10).

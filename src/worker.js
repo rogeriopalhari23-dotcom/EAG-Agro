@@ -295,6 +295,10 @@ async function route(request, env, rid) {
   if (path === "/api/tasks/reply-review" && method === "GET") return response(await erasure.replyTasksForReview(env, actor));
   const tli = path.match(/^\/api\/tasks\/([^/]+)\/link-inbound$/);
   if (tli && method === "POST") return response(await erasure.linkTaskToInbound(request, env, actor, rid, tli[1]));
+  const te = path.match(/^\/api\/tasks\/([^/]+)$/);
+  if (te && te[1] !== "reply-review" && method === "PATCH") return response(await tasks.updateTask(request, env, actor, rid, te[1]));
+  const th = path.match(/^\/api\/tasks\/([^/]+)\/history$/);
+  if (th && method === "GET") return response(await tasks.taskHistory(env, actor, th[1]));
   const tk = path.match(/^\/api\/tasks\/([^/]+)\/complete$/);
   if (tk && method === "POST") return response(await tasks.completeTask(request, env, actor, rid, tk[1]));
   const l0 = path.match(/^\/api\/companies\/([^/]+)\/level0$/);

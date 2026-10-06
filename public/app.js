@@ -1251,6 +1251,8 @@ function companySummary(data, goTab) {
         "div",
         { class: "next" },
         el("p", {}, text("strong", "Próxima ação: "), `${TASK_KIND[task.kind] || task.kind} — vence ${task.due_date}. Registre o resultado em Tarefas.`),
+        task.next_action ? el("p", {}, text("strong", "O que fazer: "), task.next_action) : null,
+        task.channel_note ? el("p", {}, text("strong", "Canal: "), task.channel_note) : null,
         task.script ? details("Roteiro", el("pre", { class: "message" }, task.script)) : null,
         button("Abrir Tarefas", () => (document.querySelector("dialog.drawer")?.close(), navigate("Tarefas")), true),
       ),
@@ -2775,7 +2777,31 @@ async function tarefasView() {
         t.blocked?.length ? text("small", `Bloqueada: ${t.blocked.join(", ")}`) : null,
       ),
     );
+    if (t.channel_note) box.append(text("p", `Canal: ${t.channel_note}`));
+    if (t.next_action) box.append(text("p", `Próxima ação: ${t.next_action}`));
     if (t.script) box.append(details("Roteiro", el("pre", { class: "message" }, t.script)));
+    // Edição só de tarefa manual sem ficha (texto de ficha aprovada é congelado); não conclui nem libera a ligação.
+    if (writable() && !t.ficha_id && ["call_l0", "call_l1", "call_l2", "linkedin"].includes(t.kind))
+      box.append(
+        details(
+          "Editar roteiro, canal ou próxima ação",
+          makeForm(
+            [
+              input("Canal (com fonte e data)", "channelNote", "text", t.channel_note || "", false),
+              input("Próxima ação", "nextAction", "text", t.next_action || "", false),
+              input("Data", "dueDate", "date", t.due_date, true),
+              (() => { const f = input("Roteiro", "script", "textarea", t.script || "", false); f.control.setAttribute("maxlength", "8000"); return f; })(),
+              input("Motivo da alteração", "reason", "text", "", true),
+            ],
+            async (v) => {
+              await api(`/api/tasks/${t.id}`, "PATCH", { expectedRevision: t.revision, reason: v.reason, channelNote: v.channelNote || null, nextAction: v.nextAction || null, dueDate: v.dueDate, script: v.script || null });
+              notice("Tarefa atualizada; o histórico guarda o valor anterior.");
+              await navigate("Tarefas");
+            },
+            "Salvar alteração",
+          ),
+        ),
+      );
     if (writable() && !t.blocked?.length)
       box.append(
         details(
