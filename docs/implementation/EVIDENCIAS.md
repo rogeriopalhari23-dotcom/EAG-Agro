@@ -1129,3 +1129,45 @@ Ordem seguida (EXCLUSAO-PURGA-PLANO.md §4):
 - Uma leitura feita por monitor contou o próprio processo do monitor como supervisor e foi descartada; valem as leituras diretas acima.
 - **Estado final:** ponte iniciada às 13:42:19 (PID 6724); leitura OK às 13:42:26, `nothing_due`, 0 envios.
 - **Nada foi feito em contato, envio, Snov, ficha ou campanha.** O bloqueio da T11 segue.
+
+### Triagem de sanções do lote milho Indiara e situação das ligações (2026-10-06)
+
+**Critério aplicado (sem alteração):** política decidida por Rogério em 2026-09-24 (T11-POLITICA-PROPOSTA §1):
+- listas OFAC SDN (bloqueio legal), CGU CEIS e CGU CNEP (alerta de integridade);
+- validade de 30 dias (`sanctions_max_age_hours` = 720);
+- sem pessoas físicas (sócios não entram);
+- busca por razão social e nome fantasia (nome normalizado exato), CNPJ exato e **outras unidades da mesma raiz de CNPJ** (vão para revisão). Só o CNPJ exato bloqueia; nome sozinho nunca bloqueia sem decisão do Administrador.
+
+**Listas (validade conferida):**
+
+| Lista | Versão | Baixada (UTC) | Registros | Com CNPJ de 14 dígitos |
+|---|---|---|---|---|
+| OFAC SDN | `SDN.CSV+ALT.CSV sha256:cf3ffced4675` (id 00e702fc) | 2026-09-24 19:17 | 11.857 | 0 (lista estrangeira; triagem por nome) |
+| CGU CEIS | `20260924_CEIS` (id 279f05dc) | 2026-09-24 19:19 | 14.503 | 14.491 |
+| CGU CNEP | `20260924_CNEP` (id 9b743870) | 2026-09-24 19:21 | 1.783 | 1.771 |
+
+Válidas até **2026-10-24 ~19:17 UTC**. Depois disso, a triagem deixa de valer (`compliance_unavailable`) até reimportar as listas e triar de novo.
+
+**Triagem pelo fluxo existente** (`POST /api/companies/:id/screening`, Rogério Palhari, 2026-10-06 18:34 UTC, produção):
+
+| Unidade | CNPJ | Run | Resultados |
+|---|---|---|---|
+| Cimilho | 19.980.044/0001-53 | 87d77256 | 0 (bloqueio 0, revisão 0) |
+| Cargill — complexo de Uberlândia | 60.498.706/0134-88 | 327afb8d | 0 |
+| São Martinho — Usina Boa Vista | 51.466.860/0062-78 | d3d1f68b | 0 |
+| Cargill Bioenergia — Usina São Francisco | 10.249.419/0002-16 | 50693a84 | 0 |
+
+Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 listas.
+
+**Conferência complementar** (consulta somente leitura, fora do critério; não altera o resultado):
+- Nenhuma entrada das listas com as raízes 19980044, 60498706, 51466860 ou 10249419.
+- Nomes parecidos (contendo CARGILL, CIMILHO, SAO MARTINHO ou MILHO GUIMARAES): 1 ocorrência, "Comércio de Peças para Tratores São Martinho", CEIS, CNPJ 80.652.548/0001-55. Raiz e atividade são diferentes da São Martinho S/A (51.466.860). Pelo critério aprovado, isso não é correspondência (nem nome exato, nem CNPJ, nem raiz).
+- Fica **registrada para análise de Rogério, sem confirmar sanção** e sem bloquear.
+
+**Ligações (Abordagem → Tarefas) depois da triagem:**
+- As 4 tarefas `call_l0` deixaram a lista de bloqueadas: `compliance_unavailable` saiu, e não há pausa nem supressão.
+- **Bloqueios que permanecem:**
+  - **T11 não validada.** A Spec exige a T11 "antes de contatos reais". **O sistema não impõe isso nas ligações**: o bloqueio é o aviso na primeira linha de cada roteiro e a decisão de Rogério. Se ele quiser trava no sistema, uma pausa (R22) por empresa ou commodity faria isso; não foi criada sem decisão.
+  - **Validade da triagem:** vence com as listas em 2026-10-24.
+  - **São Martinho:** sem telefone confirmado.
+- Ponte lendo a caixa; canal de e-mail `planned`. Nenhum contato, envio, Snov, ficha ou campanha.
