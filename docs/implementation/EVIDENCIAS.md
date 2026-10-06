@@ -1171,3 +1171,15 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - **Validade da triagem:** vence com as listas em 2026-10-24.
   - **São Martinho:** sem telefone confirmado.
 - Ponte lendo a caixa; canal de e-mail `planned`. Nenhum contato, envio, Snov, ficha ou campanha.
+
+### T11: preparação da validação do piloto brasileiro (2026-10-06)
+
+- **Documento:** `T11-VALIDACAO-PILOTO-BR.md`, com:
+  - tabela exigência × proposta × questão jurídica, com requisitos citados;
+  - mensagem pronta para o responsável da EAG, **não enviada**;
+  - opções de retenção A–H, **nenhuma escolhida**.
+  - Único bloqueio expresso para as ligações: a Spec exige a T11 "antes de contatos reais".
+- **Telefone da São Martinho Boa Vista:** (64) 3615-9700, página oficial "Negócios & Unidades" (saomartinho.com.br), consultada em 06/10/2026. É o telefone geral da unidade; o mesmo número aparece na Prefeitura de Quirinópolis e no CONSECANA.
+- **Distância:** coordenada oficial da usina (-18,5477; -50,4326) a 159,3 km em linha reta do centroide de Indiara.
+- **Pendência:** o roteiro da tarefa em produção ainda diz "telefone não confirmado"; editar exige decisão.
+- Nada aprovado, enviado ou contatado.
