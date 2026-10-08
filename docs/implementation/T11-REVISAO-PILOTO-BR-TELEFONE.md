@@ -640,3 +640,65 @@ Este ajuste corrige a §13 em dois pontos e não reabre nenhuma decisão aprovad
   - deixam de valer a linha "EAG: consultar e seguir sob sua responsabilidade, ou aguardar" e a pendência "Implementação necessária antes da liberação: registro de incidentes";
   - a consulta à EAG passa a ser só uma fonte opcional de fatos para a §14.1;
   - a única implementação ainda necessária antes da liberação é a rota de registro da validação, depois da aprovação da emenda.
+
+## 15. Vínculo com a EAG: franquia (fato informado por Rogério em 08/10/2026)
+
+**Fatos informados por Rogério:**
+- Ele é **franqueado da EAG**.
+- A decisão de prospectar as 13 unidades foi dele.
+
+**Situação dos documentos:**
+- O contrato principal de franquia **ainda não foi conferido**.
+- Um modelo de aditivo sem assinatura **não comprova** as obrigações contratuais de Rogério e não foi usado nesta análise.
+
+**Efeito na §14.1:**
+- A hipótese de empregado está afastada.
+- Continua em aberto se o contrato de franquia atribui à EAG a finalidade ou o uso dos contatos e dados da prospecção. Se não atribuir, Rogério é o controlador do tratamento no Compass. Se atribuir, a EAG pode ser controladora, sozinha ou junto com ele.
+- Nada se presume sobre o conteúdo do contrato.
+
+### 15.1 Pontos a conferir no contrato principal
+
+Para cada item, anotar o número da cláusula e a transcrição literal, ou "não há".
+
+1. **Contatos e oportunidades:**
+   - de quem são os contatos, oportunidades e clientes gerados pelo franqueado;
+   - se há obrigação de registrá-los ou repassá-los à franqueadora e em que prazo;
+   - o que acontece com eles ao fim da franquia.
+2. **Conduta comercial:**
+   - quem conduz negociação, proposta e fechamento com compradores;
+   - território, segmento e regras entre franqueados.
+3. **Uso dos dados:**
+   - cláusula de proteção de dados ou LGPD;
+   - papéis declarados de controlador e operador;
+   - instruções sobre coleta, guarda e prazo;
+   - confidencialidade e devolução ou eliminação ao fim do contrato;
+   - comunicação de incidentes entre as partes.
+4. **Ferramentas:**
+   - se é obrigatório usar sistema, CRM, e-mail ou telefone da rede;
+   - se ferramentas próprias do franqueado são permitidas ou vedadas;
+   - se há exigências de segurança.
+5. **Apresentação em nome da EAG:**
+   - uso da marca "EAG Agro" na prospecção;
+   - forma de identificação do franqueado;
+   - roteiros ou materiais obrigatórios;
+   - aprovação prévia de textos.
+6. **Remuneração:** como a origem da oportunidade é comprovada e se isso exige compartilhar dados de contato.
+7. **Aditivos:** quais aditivos foram efetivamente assinados, com data.
+
+**Uso das respostas:**
+- itens 1 e 3 → controlador (§14.1) e texto de O2;
+- item 3 → também o registro de incidentes (§14.2);
+- item 4 → validade da ferramenta pessoal;
+- item 5 → texto de O4 e a emenda.
+
+Nada disso muda as decisões aprovadas. A transferência internacional (L9) segue pendente de comprovação.
+
+### 15.2 Respostas que faltam (substitui a lista da §14.3)
+
+1. **Contrato principal de franquia:** disponibilizar o arquivo ou transcrever as cláusulas dos itens 1–7 da §15.1.
+2. **O2:** qual e-mail atende pedidos de titulares.
+3. **Textos de O1, O3 (com o teste da §4), O4, O5, O7, O8 e O9:** aprovar como estão ou indicar mudanças. O texto de O4 depende do item 5 da §15.1.
+4. **Pequeno porte:** declarar ou não o enquadramento. Responder depois de identificado o controlador.
+5. **Registro de incidentes (§14.2):** aprovar o procedimento e indicar o local da cópia cifrada.
+6. **Números das ligações:** Cimilho, Sociagro e Ração Ituiutaba; canal da BRF.
+7. **Emenda e registro da validação:** aprovar a emenda (§13.2 com os ajustes da §14.4) e a proposta de registro da validação.
