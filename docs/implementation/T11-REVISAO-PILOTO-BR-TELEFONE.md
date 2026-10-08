@@ -21,7 +21,7 @@
 
 ## 0. Decisão registrada nesta data
 
-**Rogério aprovou (06/10/2026) o uso individual do Compass como ferramenta pessoal de apoio ao seu trabalho comercial.**
+**Rogério aprovou (06/10/2026) o uso individual do Compass como ferramenta pessoal de apoio ao seu trabalho comercial.** Finalidade esclarecida em 08/10/2026 (§16.1): ferramenta pessoal de apoio à pesquisa, à organização de informações e à preparação da prospecção. Não é ferramenta da EAG nem substitui sistemas ou procedimentos da rede.
 
 O que isso significa:
 - Ele é o único usuário.
@@ -136,7 +136,7 @@ Em ordem. Nenhuma exige parecer externo.
 ### Transparência e oposição na ligação
 
 - **Abertura (já no roteiro):** "Aqui é o Rogerio Palhari, da EAG Agro."
-- **Se perguntarem de onde veio o contato:** "Peguei o telefone geral da empresa no site [ou: no cadastro público da empresa]. Seu nome e cargo eu vi no perfil profissional público. Guardo só isso numa ferramenta minha de apoio ao trabalho comercial. Você pode pedir acesso, correção ou exclusão por [canal de O2]."
+- **Se perguntarem de onde veio o contato:** "Peguei o telefone geral da empresa no site [ou: no cadastro público da empresa]. Seu nome e cargo eu vi no perfil profissional público. Guardo só isso numa ferramenta pessoal que uso para pesquisa e organização da prospecção. Você pode pedir acesso, correção ou exclusão pelo e-mail rogeriopalhari@hotmail.com." *(Redação atualizada em 08/10/2026; ver §16.4.)*"
 - **Se a pessoa não quiser contato:** "Sem problema, registro agora e não volto a ligar." Registrar a supressão no mesmo dia. Não insistir nem mandar mensagem de despedida (R21.6).
 
 ### Registro simplificado de operações (Art. 37)
@@ -459,9 +459,9 @@ Nada abaixo está aprovado.
 | # | Texto final proposto | O que falta |
 |---|---|---|
 | O1 | "Aprovo ligações manuais no Brasil, feitas por mim, às unidades aceitas no Compass, só pelo telefone geral de cada empresa ou pelo número definido na tarefa com fonte; sem e-mail automático, WhatsApp, LinkedIn, campanha ou Snov." | Aprovação |
-| O2 | "Sou o responsável pelo tratamento feito no Compass e atendo pedidos de titulares pelo endereço [ENDEREÇO]." | **O endereço** e a aprovação |
+| O2 | Redação final na §16.4: "Atendo pedidos de titulares sobre os dados guardados no Compass pelo e-mail rogeriopalhari@hotmail.com." | Endereço definido em 08/10/2026; frase de qualificação só depois da conferência do contrato (§16.3) |
 | O3 | "Adoto o legítimo interesse (LGPD art. 7º, IX) para o piloto, com o teste de balanceamento da §4, revisável se houver orientação contrária." | Aprovação do texto da §4 |
-| O4 | "Na ligação, se perguntarem: 'O telefone é o geral da empresa, publicado no site ou no cadastro público. Seu nome e cargo vieram do perfil profissional público. Guardo só isso numa ferramenta minha de apoio comercial; você pode pedir acesso, correção ou exclusão por [ENDEREÇO DE O2].' Se a pessoa não quiser contato: 'Sem problema, registro agora e não volto a ligar.' Registro a oposição no mesmo dia, informando o tipo do número; se for o número geral, a empresa não é bloqueada." | O endereço de O2 e a aprovação. Depois, as falas entram nos roteiros pela edição auditada |
+| O4 | "Na ligação, se perguntarem: 'O telefone é o geral da empresa, publicado no site ou no cadastro público. Seu nome e cargo vieram do perfil profissional público. Guardo só isso numa ferramenta pessoal que uso para pesquisa e organização da prospecção; você pode pedir acesso, correção ou exclusão pelo e-mail rogeriopalhari@hotmail.com.' (redação da §16.4) Se a pessoa não quiser contato: 'Sem problema, registro agora e não volto a ligar.' Registro a oposição no mesmo dia, informando o tipo do número; se for o número geral, a empresa não é bloqueada." | O endereço de O2 e a aprovação. Depois, as falas entram nos roteiros pela edição auditada |
 | O5 | "Não ligo para celular do cadastro da Receita sem indicação de que é comercial." Efeito: Rural Forte e Super-Bovi seguem sem número até haver telefone comercial | Aprovação, ou outra regra |
 | O7 | "**Confirmação de existência e acesso:** resposta simplificada imediata, ou declaração completa (origem, critérios, finalidade) em até 15 dias do pedido (LGPD art. 19). **Correção, exclusão, oposição e demais pedidos:** sem prazo legal fixo enquanto a ANPD não regulamentar (art. 18, § 5º); meta interna de resposta em até 15 dias, com execução no mesmo dia da decisão; se não for possível atender de imediato, respondo com as razões (art. 18, § 4º). Prazos em dobro de pequeno porte só se o enquadramento for declarado e comprovável." | Aprovação; declarar ou não o enquadramento de pequeno porte |
 | O8 | "**Meta interna:** avaliar um incidente em até 24 h do conhecimento. **Obrigação legal:** se o incidente puder afetar significativamente os titulares e envolver dados sensíveis, de crianças, adolescentes ou idosos, financeiros, de autenticação, sob sigilo ou em larga escala (Res. CD/ANPD 15/2024, art. 5º), comunico à ANPD e aos titulares em até 3 dias úteis do conhecimento de que afetou dados pessoais (arts. 6º e 9º), complementando em até 20 dias úteis. **Registro:** todo incidente, comunicado ou não, registrado e guardado por no mínimo 5 anos (art. 10)." | Aprovação; **o registro de incidentes ainda não existe** e precisa ser criado |
@@ -525,7 +525,7 @@ Este ajuste corrige a §13 em dois pontos e não reabre nenhuma decisão aprovad
 
 | Decisão de tratamento no Compass | Quem decidiu | Registro |
 |---|---|---|
-| Criar e usar o Compass como ferramenta de apoio ao trabalho comercial | Rogério | Spec, decisões de 06/10/2026 |
+| Criar e usar o Compass como ferramenta pessoal de apoio à pesquisa, à organização e à preparação da prospecção (§16.1) | Rogério | Spec, decisões de 06/10/2026 e 08/10/2026 |
 | Quais empresas buscar e aceitar; raio de 300 km, milho GMO | Rogério | aceites e ICP do piloto |
 | Quais dados pessoais entram: nome, cargo e telefone com fonte; minimização | Rogério | §2.2 L2; Spec |
 | Ferramentas e fornecedores: Cloudflare (Worker, D1, R2, Access), ponte local, caixa Hostinger | Rogério | Spec (R19.13, R19.14); publicações |
@@ -535,7 +535,7 @@ Este ajuste corrige a §13 em dois pontos e não reabre nenhuma decisão aprovad
 
 **Leitura dos fatos:**
 1. **Meios e elementos essenciais do tratamento no Compass.** Pelos registros, quem decide é Rogério: dados, fontes, prazos, ferramentas e fornecedores. Não há instrução da EAG sobre nenhum desses pontos.
-2. **Finalidade.** Rogério fixou a finalidade do Compass: apoio ao trabalho comercial dele. Os registros **não** mostram se a prospecção dessas empresas é decidida por ele, por conta própria, ou determinada pela EAG. Exemplos: contrato de franquia ou representação que reserve contatos e oportunidades à EAG, ou que defina alvos e uso de dados.
+2. **Finalidade.** Rogério fixou a finalidade do Compass: ferramenta pessoal de apoio à pesquisa, à organização e à preparação da prospecção, auxiliar aos canais oficiais da EAG (§16.1). Os registros **não** mostram se a prospecção dessas empresas é decidida por ele, por conta própria, ou determinada pela EAG. Exemplos: contrato de franquia ou representação que reserve contatos e oportunidades à EAG, ou que defina alvos e uso de dados.
 3. **Conclusão atual, condicionada às respostas da §14.3:**
    - Se a prospecção é decisão de Rogério e o contrato com a EAG não determina a finalidade nem o uso desses dados, **Rogério é o controlador** do tratamento feito no Compass.
    - Se o vínculo com a EAG determina a finalidade, a EAG pode ser controladora, ou ambos podem ser. Rogério ainda responde pelas decisões de meios que tomou.
@@ -632,7 +632,7 @@ Este ajuste corrige a §13 em dois pontos e não reabre nenhuma decisão aprovad
 
 ### 14.4 Ajustes na §13 (prevalecem sobre o texto anterior)
 
-- **O2:** "Sou o controlador do tratamento feito no Compass e atendo pedidos de titulares pelo endereço [ENDEREÇO]." Esse texto vale só se as respostas 1–3 confirmarem a primeira hipótese do item 3 da §14.1. Nas outras hipóteses, o texto indica o controlador identificado e o canal dele.
+- **O2:** *(substituído pela §16.4)* "Sou o controlador do tratamento feito no Compass e atendo pedidos de titulares pelo endereço [ENDEREÇO]." Esse texto vale só se as respostas 1–3 confirmarem a primeira hipótese do item 3 da §14.1. Nas outras hipóteses, o texto indica o controlador identificado e o canal dele.
 - **O8, registro:** "Registro todo incidente conforme o procedimento da §14.2, por no mínimo 5 anos."
 - **Emenda §13.2, novo item 0:** "controlador do tratamento no Compass identificado pelos fatos de quem decide finalidades e meios (§14.1), com as respostas registradas".
 - **Emenda §13.2, item 3:** "registro de incidentes existente, documental (§14.2) ou no Compass, com guarda mínima de 5 anos".
@@ -688,7 +688,7 @@ Para cada item, anotar o número da cláusula e a transcrição literal, ou "nã
 **Uso das respostas:**
 - itens 1 e 3 → controlador (§14.1) e texto de O2;
 - item 3 → também o registro de incidentes (§14.2);
-- item 4 → validade da ferramenta pessoal;
+- item 4 → dúvida sobre o uso auxiliar a anotar com a cláusula (§16.2), sem virar regra ou bloqueio automático;
 - item 5 → texto de O4 e a emenda.
 
 Nada disso muda as decisões aprovadas. A transferência internacional (L9) segue pendente de comprovação.
@@ -702,3 +702,63 @@ Nada disso muda as decisões aprovadas. A transferência internacional (L9) segu
 5. **Registro de incidentes (§14.2):** aprovar o procedimento e indicar o local da cópia cifrada.
 6. **Números das ligações:** Cimilho, Sociagro e Ração Ituiutaba; canal da BRF.
 7. **Emenda e registro da validação:** aprovar a emenda (§13.2 com os ajustes da §14.4) e a proposta de registro da validação.
+
+## 16. Finalidade do Compass, responsabilidade pelos dados e pendências da T11 (esclarecimento de 08/10/2026)
+
+Os três assuntos ficam separados. Uma resposta em um deles não decide os outros.
+
+### 16.1 Finalidade da ferramenta (fato declarado por Rogério)
+
+- O Compass é a **ferramenta pessoal** de Rogério para apoiar a pesquisa, organizar informações e preparar a prospecção.
+- **Não é ferramenta da EAG**, não é implantação de sistema oficial da franquia e **não substitui** nenhum sistema, CRM ou procedimento da rede.
+- O cadastro oficial, a comunicação das oportunidades e os demais procedimentos contratuais continuam pelos **canais da EAG**.
+- O cadastro no Compass é apenas a organização auxiliar de Rogério.
+- Não há integração do Compass com sistemas da EAG. A integração com CRM externo já estava fora do escopo da Spec.
+
+Esta seção substitui, para descrever a finalidade, a expressão "apoio ao trabalho comercial" usada nas §§0, 4, 13 e 14.
+
+### 16.2 Responsabilidade pelo tratamento dos dados
+
+- Quem decide os meios do tratamento no Compass é Rogério (§14.1). A decisão de prospectar as 13 unidades também foi dele (§15).
+- A qualificação final como controlador depende só de o contrato de franquia atribuir ou não à EAG a finalidade ou o uso desses dados (§15). O contrato principal ainda não foi conferido.
+- **Dúvidas contratuais sobre o uso auxiliar.** Nenhuma cláusula específica foi identificada, porque o contrato não foi lido. As dúvidas a conferir são:
+  - (a) se o contrato restringe o franqueado de manter registros próprios de pesquisa e contatos fora dos sistemas da rede (§15.1, item 4);
+  - (b) se há dever de confidencialidade, devolução ou eliminação de informações ao fim da franquia que alcance esses registros (§15.1, item 3);
+  - (c) se o contrato declara papéis de controlador e operador (§15.1, item 3).
+- Cada dúvida será anotada com o número da cláusula e a transcrição literal quando o contrato for conferido.
+- Enquanto isso, **nenhuma interpretação não confirmada vira regra nova nem bloqueio automático** no Compass.
+- **Canal do titular (O2), definido:** `rogeriopalhari@hotmail.com`.
+  - Esse endereço só recebe pedidos de titulares, atendidos manualmente por Rogério; o Compass não lê essa caixa.
+  - A supressão desse endereço no Compass, vinda do teste interno de 01/10, só impede envios para ele e não afeta o recebimento de pedidos.
+
+### 16.3 Pendências efetivas da T11-BR-TEL
+
+O bloqueio vigente continua sendo o mesmo: `t11_pending` nas 13 tarefas.
+
+| # | Pendência | Tipo |
+|---|---|---|
+| 1 | Aprovar O1, O3 (com o teste da §4), O4, O5, O7, O8 e O9, com O2 e O4 na redação desta seção | Decisão de Rogério |
+| 2 | Conferir o contrato principal para concluir a qualificação de controlador (emenda, item 0) | Comprovação documental |
+| 3 | Mecanismo do art. 33 para a Cloudflare (L9) | Comprovação externa |
+| 4 | Aprovar e criar o registro documental de incidentes (§14.2) e indicar o local da cópia cifrada | Decisão de Rogério e execução |
+| 5 | Números da Cimilho, Sociagro e Ração Ituiutaba; canal da BRF | Decisão de Rogério |
+| 6 | Aprovar a emenda e a proposta de registro da validação; implementar a rota só depois | Decisão de Rogério |
+
+Pequeno porte é decisão opcional e só depois do item 2.
+
+**Não são pendências:**
+- A finalidade da ferramenta (16.1).
+- O canal O2 (16.2).
+- As decisões já aprovadas: uso individual, retenção A1–D1 e D-EXC.
+
+### 16.4 Redação final de O2 e O4 (prevalece sobre §§13.1 e 14.4)
+
+**O2:**
+> "Atendo pedidos de titulares sobre os dados guardados no Compass pelo e-mail rogeriopalhari@hotmail.com."
+
+A frase sobre a qualificação ("sou o controlador…") só entra depois do item 2 da §16.3.
+
+**O4, se perguntarem:**
+> "O telefone é o geral da empresa, publicado no site ou no cadastro público. Seu nome e cargo vieram do perfil profissional público. Guardo só isso numa ferramenta pessoal que uso para pesquisa e organização da prospecção. Você pode pedir acesso, correção ou exclusão pelo e-mail rogeriopalhari@hotmail.com."
+
+O restante de O4 não muda: oposição registrada no mesmo dia, com o tipo do número.

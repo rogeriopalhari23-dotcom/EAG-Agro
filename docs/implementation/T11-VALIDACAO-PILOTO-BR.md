@@ -3,7 +3,7 @@
 **Data:** 06/10/2026. **Estado:** preparação. **Nada aqui está aprovado.**
 
 **Atualização (06/10/2026):**
-- Rogério aprovou o uso individual do Compass como ferramenta pessoal de apoio ao seu trabalho comercial. A T11 **segue não validada**.
+- Rogério aprovou o uso individual do Compass como ferramenta pessoal de apoio ao seu trabalho comercial. Finalidade esclarecida em 08/10/2026: apoio à pesquisa, à organização de informações e à preparação da prospecção; não é ferramenta da EAG nem substitui sistemas ou procedimentos da rede (`T11-REVISAO-PILOTO-BR-TELEFONE.md` §16). A T11 **segue não validada**.
 - A revisão do bloqueio das ligações manuais no Brasil está em `T11-REVISAO-PILOTO-BR-TELEFONE.md` (proposta). Ela separa decisões operacionais, obrigações legais e exigências da Spec.
 
 **Escopo (atualizado em 06/10/2026):** 13 ligações de nível 0, das unidades aceitas por Rogério:
