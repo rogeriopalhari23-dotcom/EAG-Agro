@@ -1842,3 +1842,19 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 **G4 (não executado):** lista exata em `G4-LISTA-BACKUPS-2026-10-08.md`. Ficaria só `d1-remoto-antes-0038-20261008`; seriam eliminados 135 arquivos em 15 pastas: as exportações remotas antes da 0032 até antes da 0037 e 9 cópias locais `d1-local-*`. Execução só com confirmação.
 
 T11 pendente; 13 ligações bloqueadas.
+
+## Ponto de retomada antes da limpeza G4 (08/10/2026)
+
+- **Autorização:** Rogério Palhari, 08/10/2026, executar a limpeza G4 conforme `G4-LISTA-BACKUPS-2026-10-08.md`:
+  - só os 135 arquivos listados, por caminho completo;
+  - conferir tamanho e hash antes;
+  - sem curingas;
+  - remover as 15 pastas só se ficarem vazias;
+  - preservar `d1-remoto-antes-0038-20261008`, a configuração da ponte, o arquivo de segredos e qualquer item fora da lista.
+- **Estado no início:**
+  - repositório em `d88c8a8` (`v2-revisao-2`, limpo);
+  - Worker **663077c0-0065-4f1c-8f79-660d18cc106e** (100%);
+  - migrações até a 0038, nenhuma pendente;
+  - T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas;
+  - 3 supressões; 0 empresas descartadas.
+- **Se a limpeza for interrompida:** recomeçar pela comparação da lista; os arquivos já apagados aparecem como ausentes e não são recriados.
