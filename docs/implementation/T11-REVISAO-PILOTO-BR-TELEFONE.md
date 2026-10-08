@@ -648,7 +648,7 @@ Este ajuste corrige a §13 em dois pontos e não reabre nenhuma decisão aprovad
 - A decisão de prospectar as 13 unidades foi dele.
 
 **Situação dos documentos:**
-- O contrato principal de franquia **ainda não foi conferido**.
+- O contrato principal de franquia **ainda não foi conferido**. *(Lido em 08/10/2026: §17.)*
 - Um modelo de aditivo sem assinatura **não comprova** as obrigações contratuais de Rogério e não foi usado nesta análise.
 
 **Efeito na §14.1:**
@@ -720,8 +720,8 @@ Esta seção substitui, para descrever a finalidade, a expressão "apoio ao trab
 ### 16.2 Responsabilidade pelo tratamento dos dados
 
 - Quem decide os meios do tratamento no Compass é Rogério (§14.1). A decisão de prospectar as 13 unidades também foi dele (§15).
-- A qualificação final como controlador depende só de o contrato de franquia atribuir ou não à EAG a finalidade ou o uso desses dados (§15). O contrato principal ainda não foi conferido.
-- **Dúvidas contratuais sobre o uso auxiliar.** Nenhuma cláusula específica foi identificada, porque o contrato não foi lido. As dúvidas a conferir são:
+- ~~A qualificação final como controlador depende só de o contrato de franquia atribuir ou não à EAG a finalidade ou o uso desses dados.~~ *Corrigido em 08/10/2026 (§17.2): a qualificação é feita por operação, pelas decisões efetivas de cada parte; o contrato foi lido e é uma das fontes.*
+- **Dúvidas contratuais sobre o uso auxiliar.** *Substituídas pelos achados A1–A12 e dúvidas D1–D4 da §17.* Texto anterior: nenhuma cláusula específica foi identificada, porque o contrato não foi lido. As dúvidas a conferir são:
   - (a) se o contrato restringe o franqueado de manter registros próprios de pesquisa e contatos fora dos sistemas da rede (§15.1, item 4);
   - (b) se há dever de confidencialidade, devolução ou eliminação de informações ao fim da franquia que alcance esses registros (§15.1, item 3);
   - (c) se o contrato declara papéis de controlador e operador (§15.1, item 3).
@@ -733,7 +733,7 @@ Esta seção substitui, para descrever a finalidade, a expressão "apoio ao trab
 
 ### 16.3 Pendências efetivas da T11-BR-TEL
 
-O bloqueio vigente continua sendo o mesmo: `t11_pending` nas 13 tarefas.
+*Substituída pela §17.3, que separa as pendências do piloto das pendências por ligação.* O bloqueio vigente continua sendo o mesmo: `t11_pending` nas 13 tarefas.
 
 | # | Pendência | Tipo |
 |---|---|---|
@@ -762,3 +762,71 @@ A frase sobre a qualificação ("sou o controlador…") só entra depois do item
 > "O telefone é o geral da empresa, publicado no site ou no cadastro público. Seu nome e cargo vieram do perfil profissional público. Guardo só isso numa ferramenta pessoal que uso para pesquisa e organização da prospecção. Você pode pedir acesso, correção ou exclusão pelo e-mail rogeriopalhari@hotmail.com."
 
 O restante de O4 não muda: oposição registrada no mesmo dia, com o tipo do número.
+
+## 17. Contrato de franquia lido: achados, responsabilidade por operação e pendências (08/10/2026)
+
+O contrato principal foi lido diretamente em 08/10/2026. Rogério confirmou que o texto corresponde ao contrato dele.
+- O texto completo, as páginas e os trechos ficam numa **análise privada** fora do Git (`C:\Users\Roger\eag-compass-registros\contrato\`, acesso só do usuário `ROGERIONOTE\Roger`).
+- Aqui ficam só os achados, numerados A1–A12 como na análise privada.
+
+A finalidade definida na §16.1 continua valendo: ferramenta pessoal auxiliar, sem substituir sistemas da rede. As decisões concluídas não mudam.
+
+Esta seção corrige a §16.2: a qualificação **não** depende só da leitura do contrato. Ela depende das decisões efetivamente tomadas em cada operação (14.1). O contrato é uma das fontes desses fatos.
+
+### 17.1 Achados concretos
+
+| # | Achado | Efeito |
+|---|---|---|
+| A1 | A operação da franquia é negócio independente e de responsabilidade exclusiva do franqueado; não há subordinação nem representação comercial | Reforça que as decisões de pesquisa e prospecção são de Rogério |
+| A2 | O contrato é com a pessoa física, com previsão de passar a operação a uma empresa indicada por ele, por aditivo | Se uma empresa de Rogério já opera a franquia, ela pode ser a parte responsável na operação da franquia (pergunta 1 da §17.4) |
+| A3 | Antes do **primeiro contato** com um potencial cliente, o franqueado registra CNPJ e nome na plataforma (CRM) da EAG. CNPJ já registrado por outro franqueado não pode ser registrado de novo. A exclusividade depende de iniciar as tratativas em até 3 dias após o registro | Passo **por ligação**, feito no canal da EAG e não no Compass (§17.3) |
+| A4 | O registro oficial de clientes e as disputas entre franqueados usam o sistema oficial da EAG | O Compass não substitui nem prova esse registro |
+| A5 | Etapas da operação e da negociação são reportadas no CRM da EAG ou pelo e-mail de vendas da EAG; comunicações com clientes vão com cópia para esse e-mail | Passo **por ligação**, depois do contato, pelo canal da EAG |
+| A6 | Orçamento, oferta, aprovação e emissão do contrato e pós-venda são feitos ou aprovados pela EAG | Na negociação e no fechamento, quem decide é a EAG |
+| A7 | O franqueado deve usar exclusivamente os sistemas e plataformas homologados ou fornecidos pela EAG | **Dúvida D1** (17.2) |
+| A8 | A confidencialidade alcança as informações **transmitidas pela EAG**, inclusive listas e dados de clientes; uso só na franquia e sem compartilhar com terceiros sem autorização escrita | Os dados do Compass vêm de fontes públicas pesquisadas por Rogério. **Dúvida D2** se informação fornecida pela EAG entrar no Compass |
+| A9 | Ao fim do contrato: devolver o que a EAG forneceu, sem cópias; não contatar clientes indicados pela EAG por 60 meses; há proteção de clientes prospectados durante a vigência | Afeta só o fim da franquia; não afeta o piloto |
+| A10 | A única menção à LGPD é o compromisso da EAG de proteger o que o franqueado fornece. Não há definição de controlador e operador nem instrução de tratamento ao franqueado | O contrato não decide a qualificação; valem as decisões efetivas (17.2) |
+| A11 | Uso da marca só para as finalidades do contrato e dos manuais; não usar a marca nem elemento semelhante como domínio sem autorização; sem site próprio nem divulgação na internet sem consentimento | **Dúvida D3** (17.2). Não há divulgação: o Compass é privado, atrás do Access |
+| A12 | O franqueado comunica à EAG notificações e comunicações recebidas em razão da atividade, sobretudo as que possam afetar a marca, e fatos que possam abalá-la; reclamações relevantes de clientes também | **Dúvida D4** (17.2) |
+
+Manuais e procedimentos operacionais citados no contrato não foram lidos.
+
+### 17.2 Quem decide em cada operação
+
+| Operação | Quem decide finalidade e meios | Base |
+|---|---|---|
+| Pesquisa e organização no Compass: busca, fontes, campos, retenção, supressão, exclusão | **Rogério**. A EAG não instrui nada sobre esse tratamento (A1, A10) | §14.1; decisões de 06/10 e 08/10 |
+| Cadastro da empresa no CRM da EAG antes do contato, relatórios e cópias por e-mail | **EAG** decide o sistema, os campos e o uso (exclusividade, acompanhamento, disputas). Rogério decide apenas quando e o que comunica, dentro do exigido (A3–A5) | Contrato; canal oficial da EAG |
+| Ligação de prospecção: identificação, perguntas, oposição | **Rogério** conduz e decide, seguindo o método da rede; a oposição e o O2 ficam com ele | A1; O1–O5 |
+| Negociação, contrato e pós-venda | **EAG** decide e aprova (A6) | Contrato |
+
+**Consequências:**
+- O controlador do tratamento no Compass é Rogério, na pessoa física, ou a empresa dele, se ela já opera a franquia (A2).
+- O tratamento no CRM e nos canais da EAG é responsabilidade da EAG.
+- A passagem de dados do Compass para o CRM é feita manualmente por Rogério, no limite do que o contrato exige (CNPJ e nome antes do contato; relatórios depois).
+
+**Dúvidas contratuais.** São registradas sem virar regra nova nem bloqueio automático:
+- **D1 (A7):** o uso exclusivo de sistemas homologados alcança uma ferramenta pessoal só de pesquisa e organização, que não substitui o CRM? A leitura atual é que a cláusula trata da operação e do registro, que seguem no CRM. Não foi confirmada.
+- **D2 (A8):** informação fornecida pela EAG, como listas, leads ou dados de clientes, pode ficar no Compass, hospedado na Cloudflare? Até haver esclarecimento, a prática segura é não colocá-la lá. Hoje o Compass não tem dados vindos da EAG.
+- **D3 (A11):** o nome "EAG Compass" e o endereço `eag-compass-…workers.dev` podem ser lidos como uso da marca ou de elemento semelhante em domínio. É uma questão de marca, não de LGPD nem de T11.
+- **D4 (A12):** pedidos de titulares e eventuais incidentes ligados à atividade precisam ser comunicados à EAG? Não está confirmado se o dever alcança esses casos.
+
+### 17.3 Pendências separadas
+
+**Para liberar o piloto** (requisito da T11-BR-TEL; o bloqueio `t11_pending` continua até tudo isto ser cumprido):
+1. Aprovar O1, O3 (com o teste da §4), O4, O5, O7, O8 e O9. O2 já está definido.
+2. Comprovar o mecanismo do art. 33 para a Cloudflare (L9).
+3. Aprovar e criar o registro documental de incidentes (§14.2).
+4. Aprovar a emenda e a proposta de registro da validação; implementar a rota só depois.
+
+**Por ligação.** Valem para cada uma das 13, sem impedir a avaliação das outras:
+- **telefone definido com fonte:**
+  - as 7 com número já definido podem ser avaliadas e liberadas juntas quando os requisitos do piloto estiverem cumpridos: Cargill Uberlândia, São Martinho Boa Vista, Cargill Bioenergia São Francisco, Nutrir, Rações VR, Rei do Milho e Caramuru Itumbiara;
+  - nas 6 sem número, cada uma segue `phone_missing` até a escolha: Cimilho, Sociagro e Ração Ituiutaba (escolher o número), BRF (canal), Rural Forte e Super-Bovi (dependem de O5);
+- **antes do primeiro contato, no CRM da EAG:** registro do CNPJ e do nome (A3), de preferência até 3 dias antes da ligação. Fica fora do Compass e é conferido por Rogério; o Compass não bloqueia por isso;
+- **depois do contato:** relatório no CRM ou pelo e-mail de vendas da EAG (A5);
+- **sanções:** refazer a triagem se a ligação for depois de 24/10/2026 (O9);
+- supressões e demais bloqueios por tarefa, que continuam como estão.
+
+**A qualificação de controlador** (emenda, item 0) fica resolvida por esta seção. A ressalva é a empresa operadora (A2), que só muda o nome do responsável, não o que é feito.
