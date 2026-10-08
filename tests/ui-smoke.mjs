@@ -141,6 +141,33 @@ try {
     path: "review-output/empresa-desktop.png",
     fullPage: true,
   });
+  // D-EXC: aviso da empresa (sem identidade) aparece na tela da empresa com ou sem tarefa aberta, inclusive depois que a
+  // última tarefa é encerrada. Aviso e tarefa fictícios, gravados direto no banco de teste.
+  {
+    const uiCo = ctx.DB.raw.prepare("SELECT id FROM companies WHERE legal_name='Empresa de teste UI'").get().id;
+    ctx.DB.raw
+      .prepare("INSERT INTO company_notices(id,tenant_id,company_id,kind,classification,source_kind,reason,pending,created_by,request_id) VALUES ('nt-ui','eag-internal',?,'erasure_shared_phone','unconfirmed','not_informed','not_classified',1,'teste','ui')")
+      .run(uiCo);
+    // Reabre a empresa pelo caminho do usuário (Empresas → Abrir), que busca os dados de novo.
+    const refresh = async () => {
+      if (await page.locator("dialog.drawer[open]").count()) await page.keyboard.press("Escape");
+      await nav("Empresas");
+      await page.locator(".row", { hasText: "Empresa de teste UI" }).getByRole("button", { name: "Abrir", exact: true }).first().click();
+      await page.locator("dialog.drawer[open]").waitFor();
+    };
+    const noticeVisible = () => page.locator("dialog.drawer[open]").getByText(/^Aviso \(\d{4}-\d{2}-\d{2}\): Pedido de exclusão de uma pessoa desta empresa/).first().waitFor({ timeout: 8000 });
+    await refresh();
+    await noticeVisible(); // sem tarefa nenhuma
+    ctx.DB.raw.prepare("INSERT INTO tasks(id,tenant_id,company_id,commodity,kind,owner_id,due_date,priority,script) VALUES ('tk-ui','eag-internal',?,'corn','call_l0','system-admin','2099-01-05',0,'ANTES DE LIGAR: teste')").run(uiCo);
+    await refresh();
+    await noticeVisible(); // com tarefa aberta
+    ctx.DB.raw.prepare("UPDATE tasks SET status='done',done_at='2099-01-05T12:00:00Z' WHERE id='tk-ui'").run();
+    await refresh();
+    await noticeVisible(); // depois de encerrar a última tarefa
+    await page.getByText(/classificação não confirmada \(tratado como compartilhado; não prova que o número é comercial\) · pendente/).first().waitFor({ timeout: 5000 });
+    await page.keyboard.press("Escape");
+    await page.locator("dialog.drawer[open]").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+  }
   for (const label of [
     "Campanhas",
     "Catálogo",

@@ -89,6 +89,12 @@ test("Número geral compartilhado: não suprime; vínculo pessoal sai; aviso na 
   assert.ok(!item.blocked.includes("suppressed_phone"));
   const co = (await w.ctx.api(`/api/companies/${w.r.companyId}`)).data;
   assert.equal(co.notices.length, 1);
+  // Sem nenhuma tarefa aberta (última encerrada), a ficha da empresa continua trazendo o aviso.
+  w.DB.prepare("UPDATE tasks SET status='done' WHERE company_id=? AND status IN ('open','suspended')").run(w.r.companyId);
+  const coClosed = (await w.ctx.api(`/api/companies/${w.r.companyId}`)).data;
+  assert.equal(coClosed.openTasks.length, 0);
+  assert.deepEqual(coClosed.notices.map((n) => [n.kind, n.classification, n.pending]), [["erasure_shared_phone", "shared", 0]]);
+  w.DB.prepare("UPDATE tasks SET status='open' WHERE id=?").run(w.l0);
   // Exclusão repetida: nenhum aviso nem supressão novos.
   const sup = w.supRows().length;
   assert.equal((await w.erase({ phones: [{ phone: GERAL, kind: "shared" }] })).status, 200);

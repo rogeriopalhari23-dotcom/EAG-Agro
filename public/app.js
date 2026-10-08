@@ -1238,6 +1238,8 @@ function companySummary(data, goTab) {
   const item = (k, v, extra) => el("div", {}, text("span", k, "k"), text("strong", v), extra ? text("small", extra) : null);
   // Próxima ação já registrada (tarefa aberta) prevalece sobre a sugestão calculada; o roteiro fica à mão.
   const task = (data.openTasks || [])[0];
+  // Avisos D-EXC (sem identidade) valem para a empresa com ou sem tarefa aberta, inclusive depois da última encerrada.
+  const notices = (data.notices || []).map((n) => text("p", noticeLine(n), "notice-line"));
   if (task)
     return el(
       "div",
@@ -1253,7 +1255,7 @@ function companySummary(data, goTab) {
         el("p", {}, text("strong", "Próxima ação: "), `${TASK_KIND[task.kind] || task.kind} — vence ${task.due_date}. Registre o resultado em Tarefas.`),
         task.next_action ? el("p", {}, text("strong", "O que fazer: "), task.next_action) : null,
         task.channel_note ? el("p", {}, text("strong", "Canal: "), task.channel_note) : null,
-        ...(data.notices || []).map((n) => text("p", noticeLine(n), "notice-line")),
+        ...notices,
         task.script ? details("Roteiro", el("pre", { class: "message" }, task.script)) : null,
         button("Abrir Tarefas", () => (document.querySelector("dialog.drawer")?.close(), navigate("Tarefas")), true),
       ),
@@ -1266,7 +1268,7 @@ function companySummary(data, goTab) {
     item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
     item("Contato e responsável", contact),
     item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`),
-    el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), button(action[0], () => (typeof action[1] === "function" ? (document.querySelector("dialog.drawer")?.close(), action[1]()) : goTab(action[1])), true)),
+    el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), ...notices, button(action[0], () => (typeof action[1] === "function" ? (document.querySelector("dialog.drawer")?.close(), action[1]()) : goTab(action[1])), true)),
   );
 }
 function organizeCompany(node, data) {
