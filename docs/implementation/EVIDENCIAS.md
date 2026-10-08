@@ -1875,3 +1875,17 @@ T11 pendente; 13 ligações bloqueadas.
   - Nenhum conteúdo de backup foi lido além do cálculo de hash, nem exposto.
 - **Não feito:** suíte de testes, publicação de código e restauração do banco. T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas.
 - **Próxima aplicação da regra D1:** depois da próxima migração confirmada, apagar `d1-remoto-antes-0038-20261008` e manter só a exportação nova.
+
+## Rascunhos do piloto brasileiro por e-mail (2026-10-08, autorização de Rogério)
+
+- **Canal São Martinho Boa Vista:** e-mail geral da unidade conferido na página oficial "Negócios & Unidades" (08/10); coprodutos@ e privacidade@ não usados. Contato `company_channel` `93ea58d8…`, fonte e data, fuso America/Sao_Paulo, não suprimido.
+- **Campanha** `40e348d2-e148-4d03-9dde-d166955ef22f` em `draft`: Milho GMO, nacional, Indiara/GO, 300 km.
+- **Perfis:** `size_call_goal` = 1 em Cimilho (revisão 2), São Martinho (revisão 3) e Rei do Milho (revisão 2). Classe e ICP inalterados.
+- **Fichas** `identify_buyer` pt-BR (`id-pt-1.1.0`), status `in_approval`, revisor sem violações:
+  - Cimilho `92203532…`;
+  - São Martinho `3bba38e2…`;
+  - Rei do Milho `5217599f…`.
+- **Bloqueios de aprovação calculados:** campanha `draft`, canal `planned`, e-mail `pending`.
+- **Não feito:** envio, aprovação, ativação, liberação do canal, Snov, testes (só documentação e gravações pela API).
+- **Observação:** a página oficial traz o telefone (64) 3514-1000 para a Unidade Boa Vista, diferente do (64) 3615-9700 registrado em 06/10. A tarefa de ligação não foi alterada.
+- Detalhes em `PRONTIDAO-PILOTO-BR-EMAIL.md` §§5–6.

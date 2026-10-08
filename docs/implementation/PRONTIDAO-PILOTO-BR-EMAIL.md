@@ -51,7 +51,7 @@ Regras do Compass que se aplicam a cada empresa:
 |---|---|---|---|---|
 | Cimilho | Sim: e-mail geral do site, cadastrado como `company_channel` (fonte do site, verificado em 06/10) | `identify_buyer` | Nunca pedida (`pending` é o estado de criação) | Validar; registrar no CRM da EAG; ficha |
 | Rei do Milho (Inhumas) | Sim: e-mail de compras do site, cadastrado como `company_channel` (verificado em 06/10). O site traz também um e-mail geral, não cadastrado | `identify_buyer` (é canal de setor, não pessoa) | Nunca pedida | Validar; registrar no CRM da EAG; ficha |
-| São Martinho — Usina Boa Vista | Sim, nas evidências: e-mail geral da unidade na página oficial (06/10). **Não está cadastrado como contato** | `identify_buyer` | — | Cadastrar o canal com a fonte já registrada; validar; CRM da EAG; ficha |
+| São Martinho — Usina Boa Vista | Sim: e-mail geral da unidade na página oficial, conferido e **cadastrado em 08/10** (§5) | `identify_buyer` | Nunca pedida | Validar; registrar no CRM da EAG; revisar a ficha |
 | Cargill — Uberlândia | Nenhum registrado. 2 candidatos a pessoa, sem e-mail | — | — | Achar um canal publicado em fonte oficial, sem dedução |
 | Cargill Bioenergia — São Francisco | Nenhum registrado. 2 candidatos, sem e-mail | — | — | Idem |
 | Rural Forte | Nenhum registrado | — | — | Idem |
@@ -99,3 +99,101 @@ Específico do e-mail:
 
    Depois disso vêm a aprovação de cada ficha, a ativação da campanha e a liberação do canal, nessa ordem e só por Rogério.
 4. **Em paralelo:** procurar canais publicados das outras 10 empresas em fontes oficiais, sem dedução, para aumentar o lote além de 3.
+
+## 5. Rascunhos criados (08/10/2026, autorização de Rogério)
+
+Gravados em produção pelo Access. Nenhum envio, aprovação, ativação ou liberação; nenhum crédito da Snov.
+
+| Item | Resultado |
+|---|---|
+| Canal da São Martinho — Usina Boa Vista | Conferido na página oficial "Negócios & Unidades" (`saomartinho.com.br/show.aspx?idCanal=FFaluiXA+xksIA8UxDdVAw==`, 08/10/2026). O e-mail geral da unidade aparece no bloco de endereço da Unidade Boa Vista. Os endereços de coprodutos (DDG e óleo) e de privacidade são separados e **não** foram usados. Cadastrado como `company_channel`: contato `93ea58d8-2218-40fd-b7b2-eb5324691ec9`, fonte e data registradas, rótulo "só identificação do comprador", fuso `America/Sao_Paulo`, não suprimido |
+| Campanha | `40e348d2-e148-4d03-9dde-d166955ef22f`, "Milho GMO — Indiara/GO, 300 km (piloto por e-mail)", nacional, Milho GMO (`product-03`), origem Indiara/GO, raio 300 km, **`draft`**. ICP: fábricas de ração, processadoras de milho e usinas de etanol de milho; porte médio; comprador de grãos ou milho; influenciador de compras ou suprimentos |
+| Perfis comprador (R14.8) | Cimilho, São Martinho e Rei do Milho: marcado "esclarecer o porte é objetivo do primeiro contato" (`size_call_goal`). Classe e ICP não mudaram: continuam `possible_final_consumer` e `pending_size` |
+| Fichas de identificação (pt-BR, `identify_buyer`, modelo `id-pt-1.1.0`) | Cimilho `92203532-1ef4-4ec9-8d0a-9dd4fc51e09e`; São Martinho `3bba38e2-b2b8-491b-b34a-8e4c647d028b`; Rei do Milho `5217599f-cce1-41d1-94fa-4ec4c6be2834`. Status `in_approval` (aguardando revisão); revisor sem violações |
+
+**Conteúdo das fichas.** São 2 passos, dia 0 e dia 4, com o mesmo texto nas três:
+- o e-mail pergunta quem é o responsável pela compra de milho;
+- o segundo passo aceita "a empresa não compra milho" como resposta.
+
+Não afirmam aceitação de GMO, responsabilidade de compra nem compra de terceiros. Não trazem preço, disponibilidade nem condições.
+
+**Bloqueios da aprovação, calculados pelo sistema:**
+- campanha em `draft`;
+- canal `planned`;
+- e-mail não validado (`pending`).
+
+Fuso, endereço físico, sanções e revisor estão ok.
+
+**Para revisar no painel:** Abordagem → Fichas → as três "em aprovação". Também se chega pela página de cada empresa, em "Abrir ficha".
+
+**Observação, sem ação:** a mesma página oficial traz para a Unidade Boa Vista o telefone (64) 3514-1000, diferente do (64) 3615-9700 registrado em 06/10 na tarefa de ligação. As ligações estão fora do escopo; a tarefa não foi alterada.
+
+## 6. Textos para decisão
+
+### E1. Base legal do e-mail de identificação (Brasil)
+
+> Adoto o legítimo interesse (LGPD art. 7º, IX) para enviar, ao canal geral publicado por uma empresa, um e-mail que só pergunta quem é o responsável pela compra de milho.
+>
+> **Teste de balanceamento:**
+> 1. **Finalidade:** prospecção comercial entre empresas para fornecimento de milho a consumidores industriais, dentro da minha atividade de franqueado.
+> 2. **Necessidade:** uso só o endereço geral publicado pela própria empresa no site oficial, com fonte e data. Não uso endereço pessoal, deduzido ou comprado. Nome de pessoa só entra se a empresa indicar.
+> 3. **Expectativa:** o endereço foi publicado pela empresa para contato institucional. A mensagem é curta, sem anexo, sem preço e sem oferta.
+> 4. **Salvaguardas:**
+>    - no máximo 2 mensagens, com 4 dias de intervalo;
+>    - saída por resposta "sair" ou em um clique, processada antes do próximo envio;
+>    - supressão mantida para não recontatar (A1);
+>    - nada sai sem minha aprovação, empresa a empresa;
+>    - endereço validado antes do envio.
+> 5. **Direitos:** pedidos pelo e-mail rogeriopalhari@hotmail.com, ou respondendo à própria mensagem.
+>
+> **Conclusão:** com o caráter institucional do canal e as salvaguardas, o interesse legítimo não se sobrepõe aos direitos dos titulares. Revisável se houver orientação contrária.
+
+### E2. Transparência no próprio e-mail
+
+- **E2-a (manter):** o texto atual identifica remetente, empresa, finalidade, endereço físico e forma de saída. Informações sobre dados só a pedido.
+- **E2-b (acrescentar uma linha ao rodapé)**, antes da linha de saída:
+  > "Encontrei este endereço no site da empresa. Pedidos sobre dados pessoais: rogeriopalhari@hotmail.com."
+
+  Efeito: muda o modelo para `id-pt-1.2.0`. Exige mudança de código, publicação e versão nova das 3 fichas, que voltam à revisão.
+
+### Supressões do OpenClaw (R21.8, R25.2)
+
+- **Opção A (importar):**
+  > "Recupero a base do OpenClaw da VPS e importo as supressões no Compass antes do primeiro envio, pela rota de importação (supressões primeiro)."
+
+  Hoje não há base acessível: a VPS foi reinstalada e não há cópia local.
+- **Opção B (exceção datada na Spec):**
+  > "R21.8/R25.2 — exceção registrada em [data] por Rogério Palhari: a base do OpenClaw não é recuperável (VPS reinstalada em 24/09/2026, sem cópia local). Antes do primeiro envio do piloto brasileiro, cadastro manualmente no Compass as supressões de que tenho conhecimento. Declaro que [nenhuma / as seguintes] empresas do piloto foram contatadas pelo OpenClaw. A exceção vale só para a base perdida e não dispensa a importação se ela for recuperada."
+
+  A declaração entre colchetes só pode ser feita por Rogério.
+
+### O7, O8 e O9 aplicados ao e-mail
+
+- **O7-e (pedidos de titulares):**
+  > "Recebo pedidos pela resposta ao próprio e-mail ou por rogeriopalhari@hotmail.com.
+  > - Confirmação e acesso: resposta simplificada imediata, ou declaração completa em até 15 dias (LGPD art. 19).
+  > - Correção, exclusão e oposição: execução no mesmo dia da decisão, com meta de resposta em até 15 dias. Se não puder atender de imediato, respondo com as razões (art. 18, § 4º).
+  > - Um 'sair' ou o clique de saída vale como oposição e é processado antes do próximo envio (R21.9)."
+- **O8-e (incidentes):**
+  > "Mesma regra do O8, com estes exemplos do e-mail:
+  > - envio a destinatário errado;
+  > - exposição de lista ou de conteúdo;
+  > - acesso indevido ao Compass ou à ponte.
+  >
+  > Um incidente na caixa corporativa fornecida pela EAG é tratado pela EAG; eu a informo do que souber."
+- **O9-e (sanções):**
+  > "A triagem é conferida pelo sistema antes de cada envio. As listas vencem 30 dias após a importação (atuais: 24/10/2026) e são reimportadas antes de envios posteriores. Uma correspondência confirmada bloqueia o envio."
+
+### D5. Cópia à EAG: o que o contrato diz
+
+- O contrato pede cópia ao e-mail de vendas da EAG em "todas as comunicações com os clientes" e nas "negociações". Pede também que as etapas da operação e da negociação sejam reportadas no CRM ou por esse e-mail.
+- O contrato separa "cliente em potencial" (antes do contato) de "cliente". Não diz expressamente se o primeiro e-mail de prospecção, enviado depois do registro no CRM, já é comunicação com cliente.
+- A cópia desse e-mail é também a prova mais direta de que as tratativas começaram em até 3 dias do registro, condição da exclusividade.
+- Alteração do contrato só por aditivo escrito. **Uma preferência de Rogério não muda o dever**; dispensá-lo exige autorização escrita da EAG.
+
+Opções de cumprimento, a decidir:
+- **D5-a:** cópia oculta a vendas@ em cada passo. Exige mudança na ponte e uma nota na R19.1, porque o destinatário aprovado continua único.
+- **D5-b:** encaminhar a vendas@ cada e-mail enviado, logo depois do aceite. Pode ser feito manualmente ou por uma função nova.
+- **D5-c:** pedir à EAG confirmação escrita de que o e-mail de identificação dispensa cópia até haver resposta.
+
+Referências e trechos estão na análise privada (fora do Git).
