@@ -830,3 +830,12 @@ Manuais e procedimentos operacionais citados no contrato não foram lidos.
 - supressões e demais bloqueios por tarefa, que continuam como estão.
 
 **A qualificação de controlador** (emenda, item 0) fica resolvida por esta seção. A ressalva é a empresa operadora (A2), que só muda o nome do responsável, não o que é feito.
+
+## 18. Mudança de escopo: piloto por e-mail (08/10/2026)
+
+- **Decisão de Rogério:** o piloto brasileiro passa a ser exclusivamente por e-mail. As ligações não serão executadas.
+- As 13 tarefas de ligação e o histórico delas ficam **preservados como estão**. Nada foi fechado nem apagado, e o bloqueio `t11_pending` continua nelas.
+- Esta revisão (§§0–17) fica como registro. A conclusão do piloto telefônico **saiu da prioridade**.
+- A emenda T11-BR-TEL e a proposta de registro de validação da §13.2 valem só para ligação manual. **Não servem para liberar e-mail.**
+- **A2 resolvido:** a franquia continua em nome de Rogério, pessoa física. O controlador do tratamento no Compass é Rogério, pessoa física (§17.2).
+- A prontidão do e-mail está em `PRONTIDAO-PILOTO-BR-EMAIL.md`.
