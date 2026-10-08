@@ -17,7 +17,7 @@
 - Não é parecer jurídico.
 - Não registra autorização institucional da EAG.
 - Não declara isenção da LGPD.
-- As referências legais são leitura de trabalho, com o artigo citado. Os números das resoluções da ANPD e os prazos devem ser conferidos no texto oficial antes da aprovação.
+- As referências legais são leitura de trabalho. Em 06–08/10/2026 os textos de L4, L6 e L9 foram conferidos nas fontes oficiais: LGPD (planalto.gov.br), Res. CD/ANPD 2/2022, 15/2024 e 19/2024 (gov.br/anpd e DOU), Agenda Regulatória 2025–2026 (gov.br/anpd) e DPA da Cloudflare 6.4.
 
 ## 0. Decisão registrada nesta data
 
@@ -58,8 +58,8 @@ O bloqueio de hoje vem da Spec, não diretamente da lei. A lei impõe obrigaçõ
 | O4 | Texto de transparência e oposição na ligação | Texto da §4 |
 | O5 | Telefones do cadastro da Receita que parecem pessoais (celulares) | Não ligar para celular do cadastro sem indicação de que é comercial. Hoje afeta Rural Forte, (64) 99295-1212, e Super-Bovi, (62) 99468-9092 |
 | O6 | Prazos de retenção A, B, C e D (`T11-VALIDACAO-PILOTO-BR.md` §3) | Escolher uma opção em cada. E e F são da ponte de e-mail e não entram no piloto por telefone. G (caixa da EAG) não é decisão de Rogério e não é usada nas ligações |
-| O7 | Prazos para atender pedidos | Resposta simplificada imediata; resposta completa em até 15 dias; exclusão executada pela rotina existente (ver L4) |
-| O8 | Incidente de segurança | Rogério avalia em até 24 h. Se houver risco relevante, comunica à ANPD e aos titulares no prazo legal (ver L6) |
+| O7 | Prazos para atender pedidos | Por tipo de pedido, conforme L4 (corrigido em 06/10/2026): não aplicar 15 dias a todos. Meta interna sugerida para pedidos sem prazo legal: resposta em até 15 dias, com execução da exclusão no mesmo dia da decisão |
+| O8 | Incidente de segurança | Meta interna (escolha, não lei): avaliar em até 24 h do conhecimento. Obrigação legal separada em L6 (corrigido em 06/10/2026) |
 | O9 | Triagem de sanções | Manter, como controle interno; refazer antes das ligações se elas ocorrerem depois de 24/10/2026 |
 
 ### 2.2 Obrigações legais aplicáveis
@@ -69,12 +69,12 @@ O bloqueio de hoje vem da Spec, não diretamente da lei. A lei impõe obrigaçõ
 | L1 | A LGPD se aplica. Nome, cargo, perfil e telefone de pessoa são dados pessoais; a exceção para uso particular não econômico não cabe, porque a finalidade é comercial. Dados só da empresa (CNPJ, endereço) não são dados pessoais | Art. 3, Art. 4 I, Art. 5 I | Tratado como dado pessoal: cifrado, com acesso restrito | — |
 | L2 | Base legal, finalidade e necessidade. Com legítimo interesse: finalidade legítima, situação concreta, só os dados necessários e transparência | Art. 6, Art. 7 IX, Art. 10 §§1–2 | Minimização praticada: nenhum e-mail ou telefone pessoal coletado ou deduzido | Teste de balanceamento não documentado (O3) |
 | L3 | Informar quem pergunta e respeitar a oposição | Art. 9, Art. 10 §2, Art. 18 §2 | Supressão por telefone existe (`POST /api/suppression`, canal `phone`) | ~~A supressão de telefone não suspende a ligação de nível 0~~: corrigido e não publicado (`PUBLICACAO-SUPRESSAO-TELEFONE.md`). Texto de transparência não aprovado (O4) |
-| L4 | Atender direitos do titular (acesso, correção, eliminação, oposição) nos prazos | Art. 18, Art. 19 (acesso: imediato simplificado ou 15 dias) | Exclusão implementada e testada só com dados fictícios | Canal do titular não definido (O2) |
+| L4 | Atender direitos do titular, com prazos diferentes por tipo (texto oficial conferido) | **Confirmação e acesso** (art. 19): formato simplificado imediatamente, ou declaração clara e completa (origem, critérios, finalidade) em até 15 dias do requerimento. **Agente de pequeno porte** (Res. CD/ANPD 2/2022, se enquadrado: art. 2º, I inclui pessoa natural; art. 3º exclui alto risco): simplificada em até 15 dias (art. 15) e completa em prazo em dobro, 30 dias (art. 14, III). **Correção, eliminação, anonimização, bloqueio, oposição e demais** (art. 18, §§ 3º–5º e § 2º): sem custo, "nos prazos e nos termos previstos em regulamento"; o regulamento de direitos dos titulares **não foi publicado** (Agenda Regulatória 2025–2026, item 1, "em andamento"): não há prazo legal fixo. Se não for possível atender de imediato, responder indicando as razões (art. 18, § 4º). Comunicar correção/eliminação a quem recebeu os dados por uso compartilhado (art. 18, § 6º) | Exclusão implementada; teste em produção com registro fictício pendente (§8) | Canal do titular (O2); enquadramento como pequeno porte não declarado |
 | L5 | Segurança adequada | Art. 46 | Access, cifragem de dados pessoais, auditoria sem dados pessoais legíveis | — |
-| L6 | Comunicar incidente relevante à ANPD e aos titulares | Art. 48; Res. CD/ANPD 15/2024 (prazo de 3 dias úteis) | Sem procedimento escrito | O8 |
+| L6 | Comunicar incidente relevante e manter registro (texto oficial conferido) | LGPD art. 48; Res. CD/ANPD 15/2024. **Quando:** incidente que possa afetar significativamente interesses e direitos fundamentais **e** envolva ao menos um critério: dados sensíveis; de crianças, adolescentes ou idosos; financeiros; de autenticação; protegidos por sigilo; ou em larga escala (art. 5º). **Prazo:** 3 dias úteis à ANPD (art. 6º) e aos titulares (art. 9º), contados do conhecimento pelo controlador de que o incidente afetou dados pessoais (art. 6º, § 1º); complementação fundamentada em até 20 dias úteis (art. 6º, § 3º); formulário eletrônico da ANPD, pelo encarregado ou representante constituído (art. 6º, §§ 4º–5º). **Exceção:** prazo diferente previsto em legislação específica (art. 6º); agente de pequeno porte tem prazos em dobro (art. 6º, § 8º; art. 9º, § 6º). **Registro:** todo incidente, comunicado ou não, registrado por no mínimo 5 anos a partir do registro (art. 10) | Sem procedimento escrito; sem registro de incidentes | O8 e opção I (§6) |
 | L7 | Registro das operações de tratamento | Art. 37; Res. CD/ANPD 2/2022 (agente de pequeno porte: registro simplificado; encarregado dispensado, mas canal de comunicação obrigatório; prazos em dobro; não vale para tratamento de alto risco) | Não existe | Registro simplificado (§4) |
 | L8 | Eliminar quando a finalidade acabar | Art. 15–16 | Rotina de exclusão existe | Prazos (O6) |
-| L9 | Transferência internacional: dados guardados na Cloudflare, fora do Brasil | Art. 33; Res. CD/ANPD 19/2024 (cláusulas-padrão) | Não verificado | Conferir se o contrato de tratamento de dados da Cloudflare (DPA) traz as cláusulas da ANPD ou outro mecanismo do Art. 33 |
+| L9 | Transferência internacional (conferida em 06/10/2026) | LGPD art. 33; Res. CD/ANPD 19/2024 (cláusulas-padrão da ANPD adotadas integralmente e sem alteração, em instrumento firmado entre exportador e importador, art. 16; prazo de incorporação de 12 meses, vencido em 08/2025); Res. CD/ANPD 32/2026 (UE adequada) | Banco D1 primário em **ENAM** (América do Norte, conforme "served_by_region" das consultas). **DPA da Cloudflare v6.4, de 03/04/2026**, faz parte do contrato da conta por incorporação (Self-Serve Subscription Agreement; página "Brazil LGPD FAQs" da Cloudflare). Mecanismos do DPA: cláusulas-padrão **europeias** (6.2), aditivo do Reino Unido, Suíça, Data Privacy Framework (6.4) e Global CBPR/PRP (7). **Não há cláusulas-padrão da ANPD**; o Brasil não participa do Global CBPR; a ANPD não reconheceu as cláusulas europeias como equivalentes (Res. 19/2024, arts. 18–20). A FAQ da Cloudflare afirma "proteção comparável", o que não é mecanismo do art. 33 | **Mecanismo do art. 33 não identificado** para a transferência aos EUA: decisão D-L9 (§3) |
 
 **Não se aplicam ao piloto por telefone:**
 - GDPR e UWG: Alemanha.
@@ -106,8 +106,9 @@ Em ordem. Nenhuma exige parecer externo.
    - Até a correção, o procedimento manual seria registrar a supressão **e** pausar a empresa e a commodity. Isso é mais sujeito a erro e não é recomendado.
 2. **Aprovar O1–O9**, ou responder com outras escolhas.
 3. **Aprovar o teste de balanceamento, o texto de transparência e o registro simplificado da §4.**
-4. **Conferir o mecanismo de transferência internacional da Cloudflare (L9).** É verificação documental; não depende de parecer.
-5. **Fazer o teste ponta a ponta da exclusão em produção** com registro fictício interno (S2).
+4. **Transferência internacional (L9): conferida; lacuna confirmada.** Escolher D-L9: (a) migrar D1 e R2 para a jurisdição `eu` da Cloudflare (definida só na criação; o Worker ainda acessa de qualquer lugar) e avaliar com base na adequação da UE (Res. 32/2026); (b) buscar com a Cloudflare a assinatura das cláusulas-padrão da ANPD; ou (c) não iniciar as ligações até haver mecanismo. Nenhuma das três foi testada.
+5. **Teste de exclusão em produção** com registro fictício (S2): autorizado em 06/10/2026; registros criados; exclusão ainda não executada (sessão do Access vencida). Ver §8.
+   - **D-EXC:** a exclusão de um contato suprime o e-mail, mas não o telefone. Decidir se a exclusão deve suprimir também o telefone do contato (mudança de código, com teste) ou se a oposição por telefone continua sendo registrada à parte.
 6. **Aprovar a emenda da Spec da §5**, que separa a T11-BR-TEL.
 7. **Relação com a EAG (decisão de Rogério):**
    - A ligação se apresenta "da EAG Agro" no trabalho comercial dele. A posição da EAG sobre a ferramenta pessoal não foi obtida.
@@ -161,3 +162,81 @@ Em ordem. Nenhuma exige parecer externo.
 3. **R28.18:** acrescentar "a supressão do telefone a ligar suspende a tarefa".
 4. **Premissa de uso:** "Uso individual por Rogério, como ferramenta pessoal de apoio ao trabalho comercial (decisão de 06/10/2026); não é autorização da EAG".
 5. **Constituição P7:** acrescentar a leitura de S3 sobre "política EAG", **somente** se Rogério aprovar.
+
+## 6. Retenção: opções A–D e o que é prazo legal
+
+**Prazo legal x escolha operacional.**
+- **Prazos fixados por norma:**
+  - registro de incidentes: no mínimo 5 anos (Res. CD/ANPD 15/2024, art. 10; opção I abaixo);
+  - prazos de resposta ao titular (L4).
+- **Retenção dos dados pessoais da prospecção:** nenhuma norma fixa prazo. Valem os limites gerais:
+  - só o necessário à finalidade (LGPD art. 6º, III);
+  - eliminação ao fim do tratamento (art. 15, art. 16 caput);
+  - conservação depois disso só nas hipóteses do art. 16. A do inciso IV exige anonimização, e o hash de supressão é pseudonimizado (R9.1.1), não anônimo.
+- **Por isso A–D são escolhas operacionais de Rogério**, a justificar pela finalidade. Fonte das opções: `T11-VALIDACAO-PILOTO-BR.md` §3. E e F tratam da ponte de e-mail e ficam fora do piloto por telefone.
+
+| Item | Opção | Prazo ou critério | Finalidade | Efeito | Fundamento |
+|---|---|---|---|---|---|
+| **A. Hash da lista de supressão** | A1 | Sem prazo fixo enquanto houver prospecção no canal; revisão registrada a cada 12 meses | Não voltar a contatar quem se opôs | Ninguém é recontatado por esquecimento; exige revisão anual | Escolha; a finalidade (respeitar a oposição, art. 18, § 2º) justifica guardar o mínimo enquanto ela existir. Proposta T11 §2.1 |
+| | A2 | Prazo fixo; exemplo: 5 anos após a última atividade de prospecção no canal | Idem, com fim certo | Apaga sozinho; depois disso, risco de recontato | Escolha; art. 15 (término do tratamento). O número é decisão, não lei |
+| | A3 | Até o fim definitivo da prospecção no canal; então eliminar | Idem, com guarda mínima | Não protege numa retomada futura | Escolha; art. 15–16 |
+| **B. Histórico de remoções de supressão** | B1 | Mesmo prazo da lista (A) mais um prazo de prova escolhido | Provar por que cada supressão foi removida | Prova disponível enquanto a remoção importa | Escolha; responsabilização (art. 6º, X) |
+| | B2 | Prazo próprio, sem vínculo com A | Idem | Mais simples; pode apagar prova ainda útil | Escolha |
+| **C. Dados de empresa descartada** (pessoas "a validar", notas) | C1 | Eliminar os dados pessoais no descarte; manter empresa, motivo e data | Não guardar o que não será usado | Atende R23.4 sem prazo a controlar | Escolha; necessidade (art. 6º, III); R23.4 |
+| | C2 | Revisão periódica (ex.: semestral); eliminar descartados há mais de N meses | Permitir reconsiderar o descarte | Exige rotina e N escolhido | Escolha; R23.4 |
+| **D. Exportações locais do D1** (`eag-compass-backups`) | D1 | Guardar só até a migração seguinte confirmada; apagar a anterior | Ponto de volta da última mudança | Menos cópias com dados pessoais; perde pontos antigos | Escolha; segurança e necessidade; EXCLUSAO-PURGA §2 |
+| | D2 | Guardar N meses (ex.: 3) e apagar | Pontos de volta mais antigos | Mais cópias a proteger e a purgar em exclusões | Escolha |
+| **I. Registro de incidentes** (novo) | — | **Mínimo de 5 anos a partir do registro**, inclusive dos não comunicados | Obrigação regulatória | Precisa existir um registro (hoje não existe) | **Prazo legal:** Res. CD/ANPD 15/2024, art. 10 |
+| **H. Time Travel do D1** | — | Limite da plataforma (janela do plano) | Recuperação | Um ponto anterior não pode ser apagado; informar no atendimento de exclusão | Limite técnico (EXCLUSAO-PURGA §3) |
+
+## 7. Emenda T11-BR-TEL (texto final para aprovação) e registro da validação
+
+**Texto da emenda à Spec** (tabela de dependências, linha nova; a linha T11 continua valendo para o resto):
+
+> **T11-BR-TEL — Contato manual por telefone no Brasil.** Contato real por ligação manual feita por Rogério a empresas no Brasil fica liberado, no Compass, somente quando houver registro de validação do escopo `br_manual_phone` contendo responsável, data, fundamento e evidências, e somente depois de cumpridos:
+> 1. aprovação, por Rogério, das decisões O1–O9 de `T11-REVISAO-PILOTO-BR-TELEFONE.md`, com o texto aprovado anexado;
+> 2. mecanismo de transferência internacional do art. 33 da LGPD identificado e registrado para os dados do Compass (L9), ou dados mantidos onde nenhum mecanismo adicional seja exigido;
+> 3. teste de exclusão em produção com registro fictício concluído e registrado (S2);
+> 4. supressão por telefone, oposição e bloqueio de tarefas comprovados por teste (R28.18; já implementados).
+>
+> A liberação não alcança e-mail automático, WhatsApp, LinkedIn, campanhas, outros países nem mudança de base legal, que continuam exigindo a T11 com responsável competente. Telefone ausente ou suprimido, pausas, triagem de sanções e demais bloqueios continuam valendo. A validação pode ser revogada a qualquer momento por novo registro.
+
+**Ajustes ligados à emenda:**
+- R26.6: acrescentar "para canais automáticos; na ligação manual vale o teste de supressão por telefone de R28.18".
+- R28.18: acrescentar "a supressão do telefone a ligar suspende a tarefa" (já implementado).
+- Premissa de uso: "uso individual por Rogério, como ferramenta pessoal (decisão de 06/10/2026); não é autorização da EAG".
+
+**Proposta de registro administrativo da validação** (não implementado; a tabela `compliance_validations` já existe, vazia, só com inclusão):
+- **Quem grava:** só o perfil Administrador, por rota própria (`POST /api/compliance/validations`). Nunca há botão de "validar a T11".
+- **Campos obrigatórios:**
+  - escopo, de uma lista fechada, sem "tudo": `br_manual_phone`;
+  - responsável: nome e papel (ex.: "Rogério Palhari, responsável pelo tratamento no Compass");
+  - data da decisão;
+  - fundamento: texto da decisão;
+  - evidências, cada uma com referência e SHA-256 do documento: O1–O9 aprovadas, emenda aprovada, registro do teste de exclusão e documento do mecanismo de L9;
+  - confirmação explícita de que os itens 1–4 da emenda estão cumpridos.
+- **Comportamento:**
+  - a gravação recusa evidência faltando;
+  - a auditoria guarda escopo e referências, sem dados pessoais;
+  - a revogação é uma linha nova, com motivo;
+  - a tela de Configurações mostra o histórico de validações, só para leitura.
+- **Efeito:** só o motivo "T11 pendente" sai das ligações do Brasil; os demais bloqueios continuam.
+
+## 8. Teste de exclusão em produção (registros fictícios)
+
+- **Autorização:** Rogério, 06/10/2026, só com registros fictícios, sem envio, sem dados reais e sem alterar supressões existentes.
+- **Criados em 06/10/2026:**
+  - empresa `98a50482` "TESTE EXCLUSÃO 2026-10-06 — registro fictício (não é prospect)";
+  - contato A `0c19f5d6`: nome, cargo, e-mail `@exemplo.invalid`, telefone fictício;
+  - pessoa de compras `af217a7e` aceita, que virou o contato B `c27b4aca` (nome, cargo, telefone fictício, fonte `teste.exemplo.invalid`).
+- **Exclusão: não executada.** A sessão do Access tinha vencido. As chamadas receberam a página de login (200, não JSON), e o banco confirmou que nada foi apagado. O script agora recusa resposta que não seja da API.
+- **Pendente:** novo login no Access, exclusão de A e B e conferência.
+- **Resíduos esperados depois da exclusão (pelo código):**
+  - contatos A e B sem nome, cargo, e-mail, telefone e fonte, com marca "dados excluídos em <data>";
+  - pessoa de compras com nome substituído pela marca, sem cargo, telefone e fontes, e status "descartada";
+  - **uma supressão nova** do hash do e-mail fictício de A (motivo `personal_data_deleted`), sem tocar nas 2 supressões existentes;
+  - duas linhas em `erasure_ledger` e dois registros de exclusão no R2;
+  - auditoria `contact.personal_data_deleted` sem dados pessoais;
+  - a empresa fictícia permanece (dado de empresa);
+  - cópias anteriores no Time Travel do D1. Os backups privados de 06/10 são anteriores à criação dos registros e não os contêm.
+- **Lacuna observada no código:** a exclusão suprime o e-mail, mas não o telefone da pessoa. Uma oposição por telefone precisa ser registrada à parte. Decisão D-EXC (§3).

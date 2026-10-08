@@ -1618,3 +1618,22 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 **Reversão:** `npx wrangler rollback 65fe3503-b40e-4e3c-bdae-bc6cc0972799` volta à versão lenta, que também tem o bloqueio T11. Não reverter para versão anterior a essa, porque ela não tem o bloqueio.
 
 **Sem validação T11, sem liberação de contatos, sem reversão.**
+
+## T11-BR-TEL: verificações pendentes (06–08/10/2026, sem aprovação registrada)
+
+- **Tarefas de teste encerradas (06/10):** as 2 tarefas "Responder" de TESTE INTERNO EAG A e G foram concluídas pela rota auditada (`task.completed`), com a nota "teste interno encerrado; nenhuma ação comercial necessária". Mensagens (35), histórico (35) e supressões (2) intactos; nenhuma tarefa aberta desses testes.
+- **Fontes conferidas:**
+  - LGPD, arts. 18, 19, 33 e 48 (planalto.gov.br);
+  - Res. CD/ANPD 2/2022 (arts. 2º, 3º, 14 e 15), 15/2024 (arts. 5º, 6º, 9º e 10) e 19/2024 (arts. 16 e 18–20);
+  - Agenda Regulatória 2025–2026 (direitos dos titulares "em andamento");
+  - Res. 32/2026 (UE adequada);
+  - DPA da Cloudflare v6.4, de 03/04/2026, e a página "Brazil LGPD FAQs";
+  - documentação do D1 (jurisdição `eu` só na criação).
+  - Resultado em `T11-REVISAO-PILOTO-BR-TELEFONE.md`: L4, L6, L9 e §§6–8.
+- **L9:** o DPA não tem cláusulas-padrão da ANPD; nenhum mecanismo do art. 33 foi identificado para os dados no D1 em ENAM. Decisão D-L9 pendente.
+- **Teste de exclusão (autorizado em 06/10):**
+  - registros fictícios criados em produção: empresa `98a50482`, contatos `0c19f5d6` e `c27b4aca`, pessoa `af217a7e`;
+  - **a exclusão não foi executada**: a sessão do Access tinha vencido, as chamadas receberam a página de login e o banco confirmou que nada foi apagado;
+  - o script agora recusa resposta que não seja JSON da API;
+  - falta o login para concluir.
+- **Conferido em 08/10 pelo wrangler, só leitura:** 13 ligações abertas e bloqueadas; 0 validações T11; 2 supressões; canais `planned`; campanhas inativas; outbox sem mudança; ponte com leitura bem-sucedida às 18:27 UTC.
