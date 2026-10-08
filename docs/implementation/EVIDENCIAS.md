@@ -1637,3 +1637,14 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - o script agora recusa resposta que não seja JSON da API;
   - falta o login para concluir.
 - **Conferido em 08/10 pelo wrangler, só leitura:** 13 ligações abertas e bloqueadas; 0 validações T11; 2 supressões; canais `planned`; campanhas inativas; outbox sem mudança; ponte com leitura bem-sucedida às 18:27 UTC.
+
+### Teste de exclusão concluído (08/10/2026)
+
+- Novo login no Access, feito por Rogério no navegador. A exclusão rodou nos registros fictícios existentes (contatos `0c19f5d6` e `c27b4aca`, pessoa `af217a7e`), sem recriá-los.
+- **Antes:** nenhuma exclusão anterior.
+- **Depois:**
+  - dados pessoais apagados;
+  - supressões 2 → 3 (só o hash do e-mail fictício);
+  - `erasure_ledger` com 2 linhas; registro no R2; 2 auditorias sem dados pessoais.
+- **Resíduos e achados:** o texto "relevância" e o hash do nome da pessoa ficaram. Detalhes em `T11-REVISAO-PILOTO-BR-TELEFONE.md` §8; proposta D-EXC na §9.
+- Dados reais, as 13 ligações, os canais e as campanhas não foram alterados.

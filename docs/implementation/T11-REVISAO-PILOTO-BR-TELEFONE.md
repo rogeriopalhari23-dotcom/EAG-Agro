@@ -229,7 +229,8 @@ Em ordem. Nenhuma exige parecer externo.
   - empresa `98a50482` "TESTE EXCLUSÃO 2026-10-06 — registro fictício (não é prospect)";
   - contato A `0c19f5d6`: nome, cargo, e-mail `@exemplo.invalid`, telefone fictício;
   - pessoa de compras `af217a7e` aceita, que virou o contato B `c27b4aca` (nome, cargo, telefone fictício, fonte `teste.exemplo.invalid`).
-- **Exclusão: não executada.** A sessão do Access tinha vencido. As chamadas receberam a página de login (200, não JSON), e o banco confirmou que nada foi apagado. O script agora recusa resposta que não seja da API.
+- **Exclusão executada em 08/10/2026** (18:37 UTC), depois de novo login no Access, pelos mesmos ids, sem recriar registros. Resultado na subseção abaixo.
+- **Tentativa anterior (06/10):** não executada. A sessão do Access tinha vencido. As chamadas receberam a página de login (200, não JSON), e o banco confirmou que nada foi apagado. O script agora recusa resposta que não seja da API.
 - **Pendente:** novo login no Access, exclusão de A e B e conferência.
 - **Resíduos esperados depois da exclusão (pelo código):**
   - contatos A e B sem nome, cargo, e-mail, telefone e fonte, com marca "dados excluídos em <data>";
@@ -240,3 +241,42 @@ Em ordem. Nenhuma exige parecer externo.
   - a empresa fictícia permanece (dado de empresa);
   - cópias anteriores no Time Travel do D1. Os backups privados de 06/10 são anteriores à criação dos registros e não os contêm.
 - **Lacuna observada no código:** a exclusão suprime o e-mail, mas não o telefone da pessoa. Uma oposição por telefone precisa ser registrada à parte. Decisão D-EXC (§3).
+
+### Resultado do teste (08/10/2026)
+
+- **Conferido antes:** nenhuma exclusão anterior (registro de exclusões vazio, nenhuma auditoria de exclusão, dados presentes).
+- **Eliminado:**
+  - contatos A e B: nome, cargo, e-mail, telefone, LinkedIn e fonte; o rótulo passou a "dados excluídos em 2026-10-08";
+  - pessoa de compras: nome trocado pela marca "[conteúdo excluído a pedido do titular]", cargo, telefone e as duas fontes apagados; status "descartada" (`personal_data_deleted`).
+- **Supressões:** 2 → 3. A nova é só do hash do e-mail fictício de A (motivo `personal_data_deleted`). B não tinha e-mail e não gerou supressão. As 2 supressões existentes não mudaram.
+- **Registros:**
+  - `erasure_ledger` com 2 linhas;
+  - R2 `erasures/eag-internal/<id>.json` com id, hash do e-mail (ou nulo), data e id da requisição;
+  - 2 auditorias `contact.personal_data_deleted` sem dados pessoais.
+- **Resíduos:**
+  - hash do e-mail no contato A (pseudônimo, necessário à supressão);
+  - **hash do nome** na pessoa de compras (pseudônimo);
+  - **texto livre "relevância" da pessoa mantido**, que pode conter dados pessoais em caso real (achado);
+  - empresa fictícia;
+  - cópias no Time Travel do D1.
+- **Fora do Compass:** nada (sem e-mail enviado, sem ponte envolvida).
+- **Achados para correção futura (código, com teste):** apagar "relevância" e o hash do nome na exclusão; D-EXC (§9).
+
+## 9. D-EXC: telefone depois da exclusão (proposta, não implementada)
+
+- **Exclusão x oposição:**
+  - a exclusão (LGPD art. 18, IV e VI) apaga os dados da pessoa;
+  - a oposição (art. 18, § 2º) é a recusa ao tratamento ou ao contato e não exige apagar.
+  - Depois de uma exclusão, só se guarda o mínimo necessário para não voltar a contatar a pessoa (R9.1.2), e não o motivo nem a conversa.
+- **Telefone pessoal da pessoa** (celular ou ramal direto, com fonte que o ligue a ela):
+  - na exclusão, gravar a supressão do número (HMAC do E.164 normalizado, canal `phone`, motivo `personal_data_deleted`, data);
+  - alcance: esse número em todas as tarefas e empresas, que ficam suspensas (já implementado);
+  - finalidade: não recontatar;
+  - retenção: a mesma escolhida para a lista de supressão (opção A).
+- **Número compartilhado da empresa** (recepção, telefone geral):
+  - não suprimir, porque suprimir bloquearia a empresa inteira, além do que a pessoa pediu;
+  - gravar na empresa um aviso sem identidade: "pedido de exclusão de uma pessoa desta empresa em <data>; ao ligar, pedir o setor sem citar nomes antigos";
+  - não usar nome nem hash do nome para bloquear um novo cadastro (R21.3 proíbe inferir identidade pelo nome).
+  - Retenção: a mesma da opção A.
+- **Classificação:** o pedido de exclusão passa a exigir que o Administrador marque cada telefone do contato como "pessoal" ou "compartilhado", com a fonte. Sem marcação, a exclusão não conclui; nada é decidido automaticamente.
+- **Oposição sem exclusão:** continua como está. "Registrar oposição" grava o resultado e a supressão do número da ligação. Se o número for compartilhado, o mesmo aviso na empresa é recomendado.
