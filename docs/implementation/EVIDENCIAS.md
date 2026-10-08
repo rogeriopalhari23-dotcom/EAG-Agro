@@ -1763,3 +1763,19 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 - Não restaurar backup nem Time Travel para reverter código: isso devolveria dados excluídos.
 
 **Retenção dos avisos e das supressões:** pendente da decisão A. Esta publicação não valida a T11 nem libera contatos.
+
+## Decisão de retenção (Rogério Palhari, 08/10/2026)
+
+- **Escolha:** A1, B1, C1 e D1; avisos da empresa seguem A. Texto completo de cada opção, tabela de dados, prazos, revisão e ação final em `T11-REVISAO-PILOTO-BR-TELEFONE.md` §12; registrada também na tabela de decisões da Spec.
+- **Conferência da implementação** (produção, só leitura):
+  - 3 supressões, todas com o critério antigo `until_t11_policy`;
+  - 2 linhas no registro de exclusões; 0 remoções de supressão; 0 avisos; 0 empresas descartadas.
+  - Backups locais: 6 exportações remotas (antes da 0032 até antes da 0037) e 9 cópias `d1-local-*`.
+- **Lacunas:**
+  - G1: texto do critério e registro da revisão anual;
+  - G1b: eliminação de avisos e supressões, só se a revisão decidir;
+  - G2: prazo de prova de B1, só se a lista for eliminada;
+  - G3: o descarte não elimina dados pessoais;
+  - G4: limpeza manual dos backups pela regra D1.
+- Corrigidas também barras invertidas indevidas antes de crases nas §§10–11 do mesmo documento (erro de formatação do commit `283b6fb`).
+- **Nada foi apagado ou alterado** em produção nem nos backups. T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas.

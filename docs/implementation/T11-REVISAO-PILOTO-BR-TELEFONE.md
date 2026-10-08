@@ -318,9 +318,9 @@ Em ordem. Nenhuma exige parecer externo.
 ## 10. Retenção: avisos da empresa e o que cada opção exige (08/10/2026)
 
 - **Mesmo critério da lista de supressão (A):**
-  - as supressões de telefone e e-mail, inclusive as criadas por exclusão (\`personal_data_deleted\`);
-  - os hashes do registro de exclusões (\`erasure_ledger\` e cópia no R2), que servem para não recontatar e para reaplicar exclusões depois de uma restauração.
-- **N. Avisos da empresa (\`company_notices\`)**:
+  - as supressões de telefone e e-mail, inclusive as criadas por exclusão (`personal_data_deleted`);
+  - os hashes do registro de exclusões (`erasure_ledger` e cópia no R2), que servem para não recontatar e para reaplicar exclusões depois de uma restauração.
+- **N. Avisos da empresa (`company_notices`)**:
   - só campos fechados e o hash do número geral (dado da empresa);
   - hoje **só inclusão**: gatilhos impedem alterar e apagar.
   - Proposta: seguir o prazo escolhido em A.
@@ -330,18 +330,67 @@ Em ordem. Nenhuma exige parecer externo.
 |---|---|---|
 | A1 | Supressões ficam; a revisão anual seria um registro manual em EVIDENCIAS | Registro da revisão no Compass (opcional) |
 | A2 / A3 | Remoção manual de supressão (rota existente, Administrador, motivo e base), uma a uma | Rotina de expiração das supressões, do registro de exclusões e dos avisos; permitir apagar aviso só pela rotina, com auditoria (migração que troca o gatilho, como na 0032) |
-| B1 / B2 | Nenhuma | Expiração do histórico de remoções (\`suppression_removals\`) |
+| B1 / B2 | Nenhuma | Expiração do histórico de remoções (`suppression_removals`) |
 | C1 | Excluir manualmente os contatos da empresa descartada pela rota de exclusão | Exclusão automática dos dados pessoais no descarte |
 | C2 | Revisão manual periódica | Rotina com prazo N |
-| D1 / D2 | Apagar exportações locais à mão, em \`eag-compass-backups\` | Nenhuma |
+| D1 / D2 | Apagar exportações locais à mão, em `eag-compass-backups` | Nenhuma |
 | N (com A1) | Nada a fazer enquanto houver prospecção | Revisão registrada (opcional) |
 | N (com A2/A3) | Impossível: o gatilho impede apagar | Rotina de expiração e troca do gatilho |
 
 ## 11. Mensagem à Cloudflare (pronta para envio por Rogério; não enviada)
 
 **Caminho sugerido:**
-- e-mail para \`privacyquestions@cloudflare.com\`, com cópia para \`dpo@cloudflare.com\`;
+- e-mail para `privacyquestions@cloudflare.com`, com cópia para `dpo@cloudflare.com`;
 - enviado a partir do e-mail cadastrado como dono da conta Cloudflare, para que possam verificar a conta;
-- substituir \`[Account ID]\` pelo ID da conta (painel da Cloudflare, Workers & Pages, coluna da direita).
+- substituir `[Account ID]` pelo ID da conta (painel da Cloudflare, Workers & Pages, coluna da direita).
 - Não aceitar nem assinar nada em resposta sem nova análise.
-- Texto: o mesmo apresentado a Rogério em 08/10/2026 (cinco perguntas: mecanismo do art. 33 com cláusula, versão e data; aditivo com as cláusulas-padrão da ANPD para conta self-serve; serviços abrangidos; locais e suboperadores; efeito da jurisdição \`eu\` com Regional Services).
+- Texto: o mesmo apresentado a Rogério em 08/10/2026 (cinco perguntas: mecanismo do art. 33 com cláusula, versão e data; aditivo com as cláusulas-padrão da ANPD para conta self-serve; serviços abrangidos; locais e suboperadores; efeito da jurisdição `eu` com Regional Services).
+
+## 12. Decisão de retenção (Rogério Palhari, 08/10/2026)
+
+**Decisão:** Rogério Palhari escolheu, em 08/10/2026, as opções **A1, B1, C1 e D1**, e decidiu que os **avisos da empresa seguem A**. Textos das opções escolhidas, na versão apresentada em 08/10/2026:
+- **A1, lista de supressão:** "Sem prazo fixo enquanto houver prospecção no canal; revisão registrada a cada 12 meses. Ninguém é recontatado por esquecimento; exige revisão anual."
+- **B1, histórico de remoções de supressão:** "Mesmo prazo da lista (A) mais um prazo de prova escolhido. Prova disponível enquanto a remoção importa."
+- **C1, dados pessoais de empresa descartada:** "Eliminar os dados pessoais no descarte; manter empresa, motivo e data. Atende R23.4 sem prazo a controlar."
+- **D1, exportações locais do D1:** "Guardar só até a migração seguinte confirmada; apagar a anterior. Menos cópias com dados pessoais; perde pontos antigos."
+- **Avisos da empresa:** seguem A (A1).
+
+**Alcance:** esta decisão resolve só as escolhas de retenção. A T11 continua pendente, as 13 ligações bloqueadas, os canais `planned` e as campanhas inativas. Fundamento: §6, e LGPD arts. 6º, III, 15 e 16. O único prazo fixado por norma neste conjunto é o do registro de incidentes (5 anos, item I), que não é escolha.
+
+| Item | Dados abrangidos | Prazo ou critério | Revisão | Ação ao final | A implementação cumpre hoje? |
+|---|---|---|---|---|---|
+| **A1** | Hashes de e-mail e telefone suprimidos (3 hoje, inclusive os criados por exclusão); hashes do registro de exclusões (`erasure_ledger`, 2 hoje, e cópias no R2) | Enquanto houver prospecção no canal; sem prazo fixo | A cada 12 meses, registrada; primeira até 08/10/2027 | Se a revisão concluir que a prospecção no canal acabou: eliminar os itens do canal | **Em parte.** Retenção sem expiração: sim. Revisão: não há registro nem lembrete. O critério gravado em cada supressão ainda diz "até a política T11" (lacuna G1) |
+| **Avisos (seguem A1)** | `company_notices`: tipo, classificação, fonte, motivo, pendência, hash do número geral (0 hoje) | Igual a A1 | Junto com A1 | Eliminar com A, quando a revisão decidir | **Em parte.** Guarda: sim (só inclusão). Eliminação: **impossível hoje**, porque o gatilho impede apagar (lacuna G1b, só relevante quando a revisão decidir eliminar) |
+| **B1** | `suppression_removals`: hash, motivo, base, autor e data de cada remoção (0 hoje) | Enquanto existir a lista (A1), mais um prazo de prova | Junto com A1 | Ao fim do prazo de prova depois da eliminação da lista: eliminar | **Sim, por ora:** nada expira enquanto A1 vigorar. **O prazo de prova ainda não foi escolhido** (G2); só será necessário se a lista for eliminada |
+| **C1** | Dados pessoais de contatos, pessoas de compras, roteiros e textos de fichas de empresa descartada | Eliminar no ato do descarte; manter empresa, motivo e data | Não se aplica | Eliminação imediata | **Não.** O descarte (`discardCompany`) cancela tarefas, envios e fichas, mas **não elimina** os dados pessoais (G3). Hoje há **0 empresas descartadas**, então não há pendência acumulada |
+| **D1** | Exportações do D1 em `C:\Users\Roger\eag-compass-backups` | Só até a migração seguinte confirmada | A cada migração | Apagar a exportação anterior quando a migração seguinte estiver confirmada | **Não automaticamente** (manual). Hoje existem 6 exportações remotas (antes da 0032 até antes da 0037) e 9 cópias locais `d1-local-*` de 23 a 25/09. Pela D1, ficaria só a anterior à 0037 (G4). **Nada foi apagado nesta etapa** |
+
+**Fora de A–D (sem decisão nova):**
+- **Diário e registro da ponte** (`%LOCALAPPDATA%\eag-mail-bridge`: `journal.sqlite`, `ponte.log`, `estado.json`): opções E e F, do canal de e-mail, ainda não decididas; ficam para quando o e-mail for considerado.
+- **Time Travel do D1** (H): janela da plataforma, não apagável; informado no atendimento de exclusão.
+- **Registro de incidentes** (I): 5 anos por norma; ainda não existe (pendência já registrada).
+- **Arquivo de segredos** (`segredos-producao-2026-09-24.txt`): não contém dados de titulares; segue procedimento próprio.
+
+### Lacunas e propostas (não executadas)
+
+- **G1. Critério e revisão de A1** (código e migração, com testes):
+  - trocar o texto do critério das supressões para "Mantido enquanto houver prospecção no canal; revisão anual registrada (decisão de 08/10/2026)";
+  - criar um registro de revisões de retenção (data, responsável, escopo, decisão de manter ou eliminar, fundamento), só inclusão;
+  - lembrete na tela Início 30 dias antes de completar 12 meses desde a última revisão.
+  - Até lá: registrar a revisão anual em EVIDENCIAS; a primeira vence em 08/10/2027.
+- **G1b. Eliminação dos avisos e das supressões quando a revisão decidir:**
+  - rotina acionada só pelo Administrador, com a revisão como fundamento;
+  - migração que permita apagar avisos e supressões só por essa rotina, com auditoria, no padrão da 0032.
+  - Não é necessária enquanto A1 vigorar.
+- **G2. Prazo de prova de B1:** escolher só se a lista for eliminada. Até lá, nada a fazer.
+- **G3. Eliminação no descarte (C1)** (código, com testes):
+  - ao descartar uma empresa, apagar nome, cargo, e-mail, telefone, LinkedIn e fonte dos contatos; dados das pessoas de compras (incluindo relevância e hash do nome); roteiros das tarefas; textos congelados das fichas (marcador de purga, como na exclusão);
+  - manter empresa, motivo, data e auditoria sem dados pessoais;
+  - **sem criar supressão**: descarte não é oposição;
+  - registro no R2 para reaplicar depois de uma restauração.
+  - Até a implementação: **não descartar empresa que tenha pessoas ou contatos**. Usar a pausa da empresa e, se for preciso eliminar, tratar caso a caso. Hoje não há empresa descartada.
+- **G4. Backups (D1)** (procedimento manual, sem código):
+  - depois de cada migração confirmada, apagar a exportação anterior;
+  - aplicado agora, ficaria só `d1-remoto-antes-0037-20261008`; as 5 exportações remotas anteriores e as 9 cópias locais `d1-local-*` seriam apagadas;
+  - executar só com confirmação de Rogério;
+  - um script de conferência pode listar o que a regra manda apagar, sem apagar.
