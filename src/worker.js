@@ -380,6 +380,8 @@ async function route(request, env, rid) {
   if (path === "/api/erasures/reapply" && method === "POST") return response(await erasure.reapplyErasures(request, env, actor, rid));
   const inbPurge = path.match(/^\/api\/inbound\/([^/]+)\/purge-content$/);
   if (inbPurge && method === "POST") return response(await erasure.purgeInboundContent(request, env, actor, rid, inbPurge[1]));
+  const erp = path.match(/^\/api\/contacts\/([^/]+)\/erasure-phones$/);
+  if (erp && method === "GET") return response(await erasure.erasurePhones(env, actor, erp[1]));
   const dpd = path.match(/^\/api\/contacts\/([^/]+)\/delete-personal-data$/);
   if (dpd && method === "POST") return response(await changes.deletePersonalData(request, env, actor, rid, dpd[1]));
   const contact = path.match(/^\/api\/contacts\/([^/]+)$/);

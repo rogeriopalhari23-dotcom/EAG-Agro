@@ -1703,3 +1703,20 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 - **A correção de dados da 0036 não é desfeita.** Não restaurar o backup nem o Time Travel para reverter código: isso devolveria dados pessoais já excluídos. Restauração do banco, só por outro motivo e seguida da reaplicação das exclusões (`POST /api/erasures/reapply`).
 
 **Não feito:** D-EXC não implementado; nenhuma validação T11 registrada.
+
+## D-EXC implementada (08/10/2026; não publicada, sem migração em produção)
+
+- **Decisão:** Rogério aprovou a D-EXC com a opção (a) em 08/10/2026.
+- **Código:**
+  - `src/phone-privacy.js`: classificação, supressão pelo fluxo existente e aviso;
+  - `src/erasure.js`: telefones do contato, terceiros, plano por número e rota de leitura;
+  - `src/tasks.js`: oposição com o tipo do número;
+  - `src/companies.js` e `src/tasks.js`: avisos na ficha e na ligação;
+  - `public/app.js`: tipo do número na oposição e exibição dos avisos;
+  - migração **0037** (`company_notices`, só inclusão).
+- **Testes:**
+  - 7 casos novos em `tests/dexc-telefone.test.mjs`;
+  - 2 testes antigos de oposição passaram a informar `phoneKind: "personal"`, porque testam o caminho que suprime; o caso sem tipo ganhou teste próprio.
+- **Verificações:** `npm run check` com 419 testes da suíte principal, 2 do Worker e 16 da ponte; `validate-deploy` e `npm run test:ui` passaram.
+- **Publicação:** pendente de autorização. A 0037 só cria uma tabela; o Worker atual não a usa.
+- **Estado:** T11 pendente; 13 ligações bloqueadas; canais `planned`.

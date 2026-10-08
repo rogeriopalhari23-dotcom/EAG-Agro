@@ -148,6 +148,10 @@ export async function getCompany(request, env, actor, id) {
       await s(env, "SELECT id,kind,commodity,due_date,script,channel_note,next_action,revision,ficha_id FROM tasks WHERE tenant_id=? AND company_id=? AND status='open' ORDER BY due_date,created_at LIMIT 5", actor.tenant_id, id).all()
     ).results.map(async (t) => ({ ...t, script: t.script?.startsWith("enc:") ? await decryptPii(t.script.slice(4), env) : t.script })),
   );
+  // Avisos D-EXC (exclusão ou oposição pelo número geral): sem identidade; orientam o operador.
+  out.notices = (
+    await s(env, "SELECT kind,classification,reason,source_kind,pending,created_at FROM company_notices WHERE tenant_id=? AND company_id=? ORDER BY created_at DESC", actor.tenant_id, id).all()
+  ).results;
   // Condições R12.10 (empresas no exterior): estado e evidência por commodity.
   out.conditions = (
     await s(env, "SELECT product_id,condition,status,evidence_id,note,updated_by,updated_at FROM company_conditions WHERE tenant_id=? AND company_id=? ORDER BY product_id,condition", actor.tenant_id, id).all()

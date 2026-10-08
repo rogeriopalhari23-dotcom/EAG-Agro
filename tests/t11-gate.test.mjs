@@ -101,7 +101,7 @@ test("Com 'T11 pendente' ainda é possível corrigir dados e registrar oposiçã
   const ed = await ctx.api(`/api/tasks/${id}`, "PATCH", { expectedRevision: 1, reason: "telefone oficial da unidade", phone: "+55 64 3615-9700", phoneSource: SOURCE, nextAction: "Aguardar a T11" });
   assert.equal(ed.status, 200);
   assert.deepEqual(await blockedOf(ctx, id), ["t11_pending"]);
-  const opp = await ctx.api(`/api/tasks/${id}/complete`, "POST", { outcome: "opposed", note: "Pediu para não ligarem (registro durante o bloqueio)." });
+  const opp = await ctx.api(`/api/tasks/${id}/complete`, "POST", { outcome: "opposed", note: "Pediu para não ligarem (registro durante o bloqueio).", phoneKind: "personal" });
   assert.equal(opp.status, 200);
   assert.equal(opp.data.suppressed, true);
   ctx.DB.raw.prepare("UPDATE tasks SET status='open',done_at=NULL WHERE id=?").run(id);

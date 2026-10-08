@@ -4,10 +4,11 @@ import { statement as s, commit, auditStatement, now, company } from "./store.js
 import { restrictionsFor } from "./restrictions.js";
 import { LEVEL0_SCRIPT } from "./templates/prospeccao-vendas.js";
 import { decryptPii, encryptPii, identifierHash, normalizeIdentifier } from "./crypto.js";
+import { PHONE_SUPPRESSED, PHONE_KINDS, isSuppressingKind, phoneSuppressionStatements, noticeStatements } from "./phone-privacy.js";
 
 const MANUAL = new Set(["call_l0", "call_l1", "call_l2", "linkedin"]);
 const CALLS = new Set(["call_l0", "call_l1", "call_l2"]);
-export const PHONE_SUPPRESSED = "telefone suprimido";
+export { PHONE_SUPPRESSED };
 const ICP_BADNESS = "CASE (SELECT bp.icp_status FROM buyer_profiles bp WHERE bp.tenant_id=t.tenant_id AND bp.company_id=t.company_id ORDER BY bp.unit_key='' DESC LIMIT 1) WHEN 'out_trader' THEN 10 WHEN 'in_icp' THEN 0 WHEN 'pending_size' THEN 1 WHEN 'out_small' THEN 2 WHEN 'out_giant' THEN 3 ELSE 4 END";
 
 // Telefone da ligação: mesma normalização e HMAC da supressão (R21.2), para que formatos equivalentes do mesmo número
@@ -115,21 +116,26 @@ export async function listTasks(request, env, actor) {
   // Tarefas em paralelo (a ordem da lista é preservada): em produção, a soma sequencial passava do tempo da tela.
   const items = await Promise.all(
     rows.slice(0, limit).map(async (t) => {
-      const [blocked, script, phone] = await Promise.all([
+      const [blocked, script, phone, notices] = await Promise.all([
         t.status === "open" ? taskBlocks(env, actor.tenant_id, t) : [],
         t.script?.startsWith("enc:") ? decryptPii(t.script.slice(4), env) : t.script,
         t.phone_enc ? decryptPii(t.phone_enc, env) : null,
+        // Avisos D-EXC da empresa (sem identidade), só nas tarefas de contato manual.
+        MANUAL.has(t.kind)
+          ? s(env, "SELECT kind,classification,pending,created_at FROM company_notices WHERE tenant_id=? AND company_id=? ORDER BY created_at DESC LIMIT 5", actor.tenant_id, t.company_id).all().then((r) => r.results)
+          : [],
       ]);
       const { phone_hash, phone_enc, ...rest } = t;
-      return { ...rest, phone, script, blocked };
+      return { ...rest, phone, script, blocked, notices };
     }),
   );
   return { items, nextOffset: rows.length > limit ? offset + limit : null };
 }
 
 // Conclusão sempre por ação humana; 3 perguntas da Level 2 viram dado registrado com método e data (R3.1.5).
-// "Oposição" grava o resultado da conversa e a supressão do número na mesma operação, mesmo com a ligação já
-// suspensa ou bloqueada: o registro nunca se perde, e as demais ligações para o número ficam suspensas.
+// "Oposição" grava o resultado da conversa na mesma operação, mesmo com a ligação já suspensa ou bloqueada: o registro
+// nunca se perde. D-EXC (opção a): só número pessoal ou ramal com discagem direta é suprimido (e as demais ligações a ele
+// suspensas). Número geral, ramal atrás do geral ou tipo não confirmado viram aviso na empresa, sem ampliar o pedido.
 export async function completeTask(request, env, actor, rid, id) {
   requireRole(actor, WRITE_ROLES);
   const t = await s(env, "SELECT * FROM tasks WHERE tenant_id=? AND id=?", actor.tenant_id, id).first();
@@ -150,36 +156,26 @@ export async function completeTask(request, env, actor, rid, id) {
     if (i.answers.monthlyVolumeT !== undefined) answers.monthlyVolumeT = number(i.answers.monthlyVolumeT, "consumo mensal (t)", 0, 1e9);
   }
   const at = now();
-  const suppress = opposed && !!t.phone_hash;
-  const others = suppress
-    ? (await s(env, "SELECT id,company_id FROM tasks WHERE tenant_id=? AND status='open' AND phone_hash=? AND id<>? AND kind IN ('call_l0','call_l1','call_l2')", actor.tenant_id, t.phone_hash, id).all()).results
-    : [];
+  // Tipo do número em que a oposição foi feita; sem tipo, "não confirmado" (tratado como compartilhado, não suprime).
+  const phoneKind = opposed ? (i.phoneKind == null || i.phoneKind === "" ? "unconfirmed" : oneOf(i.phoneKind, PHONE_KINDS, "tipo do número")) : null;
+  const suppress = opposed && !!t.phone_hash && isSuppressingKind(phoneKind);
+  const notice = opposed && !!t.phone_hash && !suppress;
+  const sup = suppress ? await phoneSuppressionStatements(env, actor, rid, t.phone_hash, "opt_out", { exceptTaskId: id, context: { taskId: id } }) : { statements: [], suspended: 0 };
   const statements = [
     s(env, "UPDATE tasks SET status='done',result_json=?,done_by=?,done_at=? WHERE id=? AND status IN ('open','suspended')",
-      JSON.stringify({ outcome, note: str(i.note, "nota", 2000, true), answers, method: t.kind.startsWith("call") ? "ligação" : t.kind, at, ...(opposed ? { suppressed: suppress } : {}) }), actor.id, at, id),
-    auditStatement(env, actor, rid, "task.completed", "task", id, { kind: t.kind, outcome, companyId: t.company_id, answered: Object.keys(answers) }),
+      JSON.stringify({ outcome, note: str(i.note, "nota", 2000, true), answers, method: t.kind.startsWith("call") ? "ligação" : t.kind, at, ...(opposed ? { suppressed: suppress, phoneKind, notice } : {}) }), actor.id, at, id),
+    auditStatement(env, actor, rid, "task.completed", "task", id, { kind: t.kind, outcome, companyId: t.company_id, answered: Object.keys(answers), ...(opposed ? { phoneKind } : {}) }),
+    ...sup.statements,
+    ...(notice
+      ? noticeStatements(env, actor, rid, {
+          companyId: t.company_id, kind: "opposition_shared_phone",
+          classification: phoneKind === "extension" ? "extension" : phoneKind === "shared" ? "shared" : "unconfirmed",
+          sourceKind: "call", reason: "opposition_on_shared", phoneHash: t.phone_hash,
+        })
+      : []),
   ];
-  if (suppress) {
-    const supId = crypto.randomUUID();
-    statements.push(
-      s(
-        env,
-        "INSERT INTO suppression_entries(id,tenant_id,identifier_hash,channel,reason,source,created_by) VALUES (?,?,?,'phone','opt_out','manual',?) ON CONFLICT(tenant_id,identifier_hash,channel) DO NOTHING",
-        supId, actor.tenant_id, t.phone_hash, actor.id,
-      ),
-      s(
-        env,
-        "INSERT INTO audit_log(id,tenant_id,actor_id,actor_role,action,entity_type,entity_id,new_value_json,request_id) SELECT ?,?,?,?,'suppression.added','suppression',?,?,? WHERE changes()>0",
-        crypto.randomUUID(), actor.tenant_id, actor.id, actor.role, supId, JSON.stringify({ channel: "phone", reason: "opt_out", taskId: id }), rid,
-      ),
-      ...others.flatMap((o) => [
-        s(env, "UPDATE tasks SET status='suspended',suspended_reason=? WHERE tenant_id=? AND id=? AND status='open'", PHONE_SUPPRESSED, actor.tenant_id, o.id),
-        auditStatement(env, actor, rid, "task.suspended", "task", o.id, { companyId: o.company_id, reason: "suppressed_phone" }),
-      ]),
-    );
-  }
   await commit(env, statements);
-  return { id, status: "done", ...(opposed ? { suppressed: suppress, tasksSuspended: others.length } : {}) };
+  return { id, status: "done", ...(opposed ? { suppressed: suppress, tasksSuspended: sup.suspended, notice, phoneKind } : {}) };
 }
 
 // Level 0: sem e-mail do decisor, a cadência começa pela ligação (skill; R28.6).

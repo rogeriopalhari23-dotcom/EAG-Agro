@@ -262,7 +262,7 @@ Em ordem. Nenhuma exige parecer externo.
 - **Fora do Compass:** nada (sem e-mail enviado, sem ponte envolvida).
 - **Achados:** a exclusão não apagava "relevância" nem o hash do nome. **Corrigido em 08/10/2026** na `v2-revisao-2`, não publicado: a exclusão passa a apagar os dois, e a migração 0036 corrige as linhas já excluídas, inclusive a do teste fictício, quando for aplicada. Pendente: D-EXC (§9).
 
-## 9. D-EXC: telefone depois da exclusão (proposta, não implementada)
+## 9. D-EXC: telefone depois da exclusão (aprovada em 08/10/2026 com a opção (a); implementada na `v2-revisao-2`, não publicada)
 
 - **Exclusão x oposição:**
   - a exclusão (LGPD art. 18, IV e VI) apaga os dados da pessoa;
@@ -280,3 +280,37 @@ Em ordem. Nenhuma exige parecer externo.
   - Retenção: a mesma da opção A.
 - **Classificação:** o pedido de exclusão passa a exigir que o Administrador marque cada telefone do contato como "pessoal" ou "compartilhado", com a fonte. Sem marcação, a exclusão não conclui; nada é decidido automaticamente.
 - **Oposição sem exclusão:** continua como está. "Registrar oposição" grava o resultado e a supressão do número da ligação. Se o número for compartilhado, o mesmo aviso na empresa é recomendado.
+
+### Implementação da D-EXC (08/10/2026, não publicada)
+
+**Regras aplicadas:**
+- **Pessoal ou ramal com discagem direta (número próprio):** supressão do número normalizado pelo fluxo existente. As ligações abertas a ele ficam suspensas e a auditoria não guarda o número.
+- **Número geral ou ramal atrás do número geral:** não suprime. O vínculo pessoal sai na exclusão: telefone do contato, da pessoa de compras e das ligações dele. Fica um **aviso na empresa**.
+- **Sem classificação (opção a):** tratado como compartilhado, com "classificação não confirmada", fonte "não informada" e pendência. Não é apresentado como prova de que o número é comercial. Os demais dados são excluídos normalmente.
+- **Marcado como pessoal, mas usado por terceiros** (outra ligação ou outro contato da empresa): não suprime; aviso de conflito com pendência.
+- **Oposição:** pelo fluxo próprio, com o tipo do número. Só "pessoal" ou "ramal direto" suprime; número geral, ramal atrás do geral ou tipo não confirmado viram aviso, sem ampliar o pedido à empresa.
+
+**O aviso** (tabela `company_notices`, migração 0037):
+- só campos fechados: tipo, classificação, fonte, URL, motivo, pendência e o hash do número geral (dado da empresa);
+- **sem nome, hash do nome ou texto pessoal**;
+- só inclusão;
+- orienta o operador e não garante que a pessoa não será reencontrada;
+- retenção pendente da decisão A.
+
+**Rotas:**
+- `GET /api/contacts/:id/erasure-phones` (só Administrador): telefones do contato, com origem, ramal e uso por terceiros, para classificar antes;
+- `POST /api/contacts/:id/delete-personal-data` aceita `phones: [{ phone, kind, sourceKind, sourceUrl }]`.
+
+**Tela:**
+- o formulário de oposição pede o tipo do número (padrão "não confirmado");
+- os avisos aparecem na ligação e na ficha da empresa.
+- Limite: a ficha da empresa mostra os avisos só quando há tarefa aberta.
+
+**Testes** (`tests/dexc-telefone.test.mjs`, 7 casos):
+- número pessoal, número geral com terceiros, dúvida, conflito;
+- ramal atrás do geral e ramal direto;
+- exclusão repetida;
+- supressões existentes preservadas;
+- aviso sem identidade e imutável;
+- oposição pelo número geral e sem tipo;
+- rota só para Administrador.

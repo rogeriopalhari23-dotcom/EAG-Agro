@@ -14,6 +14,90 @@ import { bodyJson, fail, str, requireRole } from "./http.js";
 import { statement as s, commit, auditStatement, now } from "./store.js";
 import { encryptPii, decryptPii, identifierHash } from "./crypto.js";
 import { nameHash, siteOrigin } from "./people.js";
+import { splitExtension, normalizePhone, isSuppressingKind, phoneSuppressionStatements, noticeStatements, parseClassification, phoneHashOf } from "./phone-privacy.js";
+
+// D-EXC (opção a): telefones ligados ao contato (no contato, na pessoa de compras vinculada e nas ligações dele), com
+// a origem de cada um e se o número também está ligado a terceiros (outras ligações ou outros contatos da empresa).
+async function contactPhones(env, tenant, contactId) {
+  const c = await s(env, "SELECT company_id,phone_encrypted FROM contacts WHERE tenant_id=? AND id=?", tenant, contactId).first();
+  if (!c) return [];
+  const [people, tasks, others, otherPeople] = await env.DB.batch([
+    s(env, "SELECT phone_encrypted FROM person_candidates WHERE tenant_id=? AND contact_id=? AND phone_encrypted IS NOT NULL", tenant, contactId),
+    s(env, "SELECT phone_enc FROM tasks WHERE tenant_id=? AND contact_id=? AND phone_enc IS NOT NULL", tenant, contactId),
+    s(env, "SELECT phone_encrypted FROM contacts WHERE tenant_id=? AND company_id=? AND id<>? AND phone_encrypted IS NOT NULL", tenant, c.company_id, contactId),
+    s(env, "SELECT phone_encrypted FROM person_candidates WHERE tenant_id=? AND company_id=? AND (contact_id IS NULL OR contact_id<>?) AND phone_encrypted IS NOT NULL", tenant, c.company_id, contactId),
+  ]);
+  const found = new Map();
+  const add = (raw, origin) => {
+    const { base, extension } = splitExtension(raw);
+    const normalized = normalizePhone(base);
+    const key = normalized ?? `raw:${base}`;
+    const e = found.get(key) ?? { normalized, origins: new Set(), extension: false };
+    e.origins.add(origin);
+    if (extension) e.extension = true;
+    found.set(key, e);
+  };
+  if (c.phone_encrypted) add(await decryptPii(c.phone_encrypted, env), "contato");
+  for (const r of people.results) add(await decryptPii(r.phone_encrypted, env), "pessoa de compras");
+  for (const r of tasks.results) add(await decryptPii(r.phone_enc, env), "ligação do contato");
+  const thirdParty = new Set();
+  for (const r of [...others.results, ...otherPeople.results]) {
+    const n = normalizePhone(splitExtension(await decryptPii(r.phone_encrypted, env)).base);
+    if (n) thirdParty.add(n);
+  }
+  const out = [];
+  for (const e of found.values()) {
+    const hash = e.normalized ? await phoneHashOf(env, tenant, e.normalized) : null;
+    const otherTasks = hash
+      ? (await s(env, "SELECT COUNT(*) n FROM tasks WHERE tenant_id=? AND phone_hash=? AND (contact_id IS NULL OR contact_id<>?)", tenant, hash, contactId).first()).n
+      : 0;
+    out.push({ normalized: e.normalized, hash, origins: [...e.origins], extension: e.extension, linkedToOthers: otherTasks > 0 || (e.normalized != null && thirdParty.has(e.normalized)) });
+  }
+  return out.map((p) => ({ ...p, companyId: c.company_id }));
+}
+
+// Plano de cada telefone na exclusão: suprimir (pessoal ou ramal direto, sem terceiros) ou aviso na empresa.
+// Falta de classificação não impede a exclusão: vira aviso "não confirmado", com pendência.
+async function phoneErasureStatements(env, actor, rid, contactId, phones, classified) {
+  const st = [];
+  const counts = { phonesSuppressed: 0, phoneNotices: 0, phonePending: 0, tasksSuspendedByPhone: 0 };
+  for (const p of phones) {
+    const given = p.normalized ? classified.get(p.normalized) : null;
+    const notice = (classification, reason) => {
+      st.push(...noticeStatements(env, actor, rid, { companyId: p.companyId, kind: "erasure_shared_phone", classification, sourceKind: given?.sourceKind ?? "not_informed", sourceUrl: given?.sourceUrl ?? null, reason, phoneHash: p.hash }));
+      counts.phoneNotices++;
+      if (classification === "unconfirmed" || classification === "conflict") counts.phonePending++;
+    };
+    if (!p.normalized) notice("unconfirmed", "unparseable");
+    else if (p.extension) {
+      // Ramal atrás do número geral: a base é da empresa e nunca é suprimida.
+      if (given?.kind === "extension" || given?.kind === "shared") notice("extension", "classified_extension");
+      else if (given && isSuppressingKind(given.kind)) notice("conflict", "classified_extension");
+      else notice("unconfirmed", "not_classified");
+    } else if (given && isSuppressingKind(given.kind)) {
+      if (p.linkedToOthers) notice("conflict", "linked_to_others");
+      else {
+        const sup = await phoneSuppressionStatements(env, actor, rid, p.hash, "personal_data_deleted", { exceptContactId: contactId, context: { contactId, kind: given.kind } });
+        st.push(...sup.statements);
+        counts.phonesSuppressed++;
+        counts.tasksSuspendedByPhone += sup.suspended;
+      }
+    } else if (given?.kind === "shared") notice("shared", "classified_shared");
+    else if (given?.kind === "extension") notice("extension", "classified_extension");
+    else notice("unconfirmed", "not_classified");
+  }
+  return { st, counts };
+}
+
+// GET /api/contacts/:id/erasure-phones — telefones ligados ao contato, para o Administrador classificar antes da
+// exclusão (pessoal, ramal direto, número geral, ramal atrás do geral).
+export async function erasurePhones(env, actor, contactId) {
+  requireRole(actor, ADMIN);
+  const c = await s(env, "SELECT id FROM contacts WHERE tenant_id=? AND id=?", actor.tenant_id, contactId).first();
+  if (!c) fail(404, "contact_not_found", "Contato não encontrado.");
+  const phones = await contactPhones(env, actor.tenant_id, contactId);
+  return { items: phones.map(({ normalized, origins, extension, linkedToOthers }) => ({ phone: normalized, unparseable: !normalized, origins, extension, linkedToOthers })) };
+}
 
 export const PURGED = "[conteúdo excluído a pedido do titular]";
 const ADMIN = new Set(["admin"]);
@@ -42,13 +126,15 @@ export async function erasuresConsistent(env, tenant) {
   return r2.every((id) => d1.has(id));
 }
 
-async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash: knownHash = null, erasedAt = null, reapply = false } = {}) {
+async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash: knownHash = null, erasedAt = null, reapply = false, phoneClassification = new Map() } = {}) {
   const tenant = actor.tenant_id;
   const at = now();
   const c = await s(env, "SELECT * FROM contacts WHERE tenant_id=? AND id=?", tenant, contactId).first();
   if (!c && !reapply) fail(404, "contact_not_found", "Contato não encontrado.");
   const hash = c?.email_hash ?? knownHash;
   if (!env.FILES) fail(503, "files_unavailable", "Armazenamento indisponível: a exclusão não pode ser registrada fora do banco (proteção contra restauração).");
+  // Telefones lidos antes da purga (depois dela não há mais número a classificar).
+  const phonePlan = await phoneErasureStatements(env, actor, rid, contactId, await contactPhones(env, tenant, contactId), phoneClassification);
 
   const [messages, own, shared, candidates, logs, resolved, company] = await env.DB.batch([
     s(env, "SELECT m.id,m.subject_enc FROM ficha_messages m JOIN ficha_versions v ON v.id=m.version_id JOIN fichas f ON f.id=v.ficha_id WHERE f.tenant_id=? AND m.contact_id=? AND m.purged_at IS NULL", tenant, contactId),
@@ -149,7 +235,9 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
   const pendingReview = company.results[0]
     ? (await s(env, `SELECT COUNT(*) n FROM tasks WHERE tenant_id=? AND company_id=? AND inbound_id IS NULL AND kind IN ${REPLY_KINDS}`, tenant, company.results[0].id).first()).n
     : 0;
+  st.push(...phonePlan.st);
   const counts = {
+    ...phonePlan.counts,
     replyTasksToReview: pendingReview,
     fichaMessagesPurged: messages.results.length,
     inboundPurged: ownIds.length,
@@ -166,7 +254,18 @@ export async function deletePersonalData(request, env, actor, rid, contactId) {
   requireRole(actor, ADMIN);
   const i = await bodyJson(request);
   const legalBasis = str(i.legalBasis, "base legal / pedido", 500);
-  const r = await purgeContact(env, actor, rid, contactId, legalBasis);
+  // Classificação opcional dos telefones (D-EXC): [{ phone, kind, sourceKind, sourceUrl }]. Sem classificação, o número
+  // é tratado como compartilhado não confirmado (aviso com pendência); a exclusão dos demais dados segue.
+  const phoneClassification = new Map();
+  if (i.phones !== undefined) {
+    if (!Array.isArray(i.phones) || i.phones.length > 20) fail(422, "invalid_phones", "Informe a classificação dos telefones como lista (até 20).");
+    for (const p of i.phones) {
+      const n = normalizePhone(splitExtension(str(p.phone, "telefone", 60)).base);
+      if (!n) fail(422, "invalid_identifier", "Use telefone com + e código do país.");
+      phoneClassification.set(n, parseClassification(p));
+    }
+  }
+  const r = await purgeContact(env, actor, rid, contactId, legalBasis, { phoneClassification });
   return {
     ...r,
     note: "Apagado do banco vigente e do R2. Fora do Compass: cópias de recuperação do D1 (Time Travel e exportações), a caixa de e-mail e o diário local da ponte — ver EXCLUSAO-PURGA-PLANO.md. Mensagens de outros remetentes na conversa (sharedRetained) ficam para revisão.",

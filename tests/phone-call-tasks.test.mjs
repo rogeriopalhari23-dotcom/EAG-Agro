@@ -137,7 +137,7 @@ test("Oposição: grava o resultado e a supressão juntos, suspende as outras li
   const a = (await mk("corn")).data.id;
   const b = (await mk("soy")).data.id;
   const note = "Atendente pediu para não ligarem mais para este número.";
-  const res = await ctx.api(`/api/tasks/${a}/complete`, "POST", { outcome: "opposed", note });
+  const res = await ctx.api(`/api/tasks/${a}/complete`, "POST", { outcome: "opposed", note, phoneKind: "personal" });
   assert.equal(res.status, 200, JSON.stringify(res.data));
   assert.equal(res.data.suppressed, true);
   assert.equal(res.data.tasksSuspended, 1);

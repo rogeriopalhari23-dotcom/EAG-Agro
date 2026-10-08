@@ -1253,6 +1253,7 @@ function companySummary(data, goTab) {
         el("p", {}, text("strong", "Próxima ação: "), `${TASK_KIND[task.kind] || task.kind} — vence ${task.due_date}. Registre o resultado em Tarefas.`),
         task.next_action ? el("p", {}, text("strong", "O que fazer: "), task.next_action) : null,
         task.channel_note ? el("p", {}, text("strong", "Canal: "), task.channel_note) : null,
+        ...(data.notices || []).map((n) => text("p", noticeLine(n), "notice-line")),
         task.script ? details("Roteiro", el("pre", { class: "message" }, task.script)) : null,
         button("Abrir Tarefas", () => (document.querySelector("dialog.drawer")?.close(), navigate("Tarefas")), true),
       ),
@@ -2768,6 +2769,18 @@ const BLOCK_LABEL = {
   t11_pending: "T11 pendente (validação do contato real para este país e canal)",
 };
 const CALL_KINDS = ["call_l0", "call_l1", "call_l2"];
+// Avisos D-EXC (sem identidade): orientam o operador; não garantem que a pessoa não será reencontrada.
+const NOTICE_KIND = {
+  erasure_shared_phone: "Pedido de exclusão de uma pessoa desta empresa: pedir o setor sem citar nomes antigos",
+  opposition_shared_phone: "Oposição de uma pessoa pelo número geral: não ampliar à empresa; não insistir com quem se opôs",
+};
+const NOTICE_CLASS = {
+  shared: "número geral da empresa",
+  extension: "ramal atrás do número geral",
+  unconfirmed: "classificação não confirmada (tratado como compartilhado; não prova que o número é comercial)",
+  conflict: "marcado como pessoal, mas usado por outros registros (não suprimido; a conferir)",
+};
+const noticeLine = (n) => `Aviso (${(n.created_at || "").slice(0, 10)}): ${NOTICE_KIND[n.kind] || n.kind} — ${NOTICE_CLASS[n.classification] || n.classification}${n.pending ? " · pendente" : ""}`;
 const TASK_KIND = { call_l0: "Ligação (nível 0)", call_l1: "Ligação (nível 1)", call_l2: "Ligação (nível 2)", linkedin: "LinkedIn", reply_followup: "Responder", meeting_confirm: "Confirmar reunião", return_suggested: "Retorno sugerido", provider_alert: "Alerta do provedor", review_ambiguous: "Revisar resposta" };
 async function tarefasView() {
   const today = new Date().toISOString().slice(0, 10);
@@ -2792,6 +2805,7 @@ async function tarefasView() {
     );
     if (t.phone) box.append(text("p", `Telefone da ligação: ${t.phone}${t.phone_source ? ` — fonte: ${t.phone_source}` : ""}`));
     else if (CALL_KINDS.includes(t.kind) && t.phone_source) box.append(text("p", `Telefone pendente: ${t.phone_source}`));
+    for (const n of t.notices || []) box.append(text("p", noticeLine(n), "notice-line"));
     if (t.channel_note) box.append(text("p", `Canal: ${t.channel_note}`));
     if (t.next_action) box.append(text("p", `Próxima ação: ${t.next_action}`));
     if (t.script) box.append(details("Roteiro", el("pre", { class: "message" }, t.script)));
@@ -2838,16 +2852,32 @@ async function tarefasView() {
           ),
         ),
       );
-    // Oposição: grava o resultado da conversa e a supressão do número juntos, mesmo com a ligação suspensa ou bloqueada.
+    // Oposição: grava o resultado da conversa mesmo com a ligação suspensa ou bloqueada. Só número pessoal ou ramal com
+    // discagem direta é suprimido; número geral, ramal atrás do geral ou "não confirmado" viram aviso na empresa.
     if (writable() && CALL_KINDS.includes(t.kind) && ["open", "suspended"].includes(t.status))
       box.append(
         details(
           "Registrar oposição (não quer ser contatado)",
           makeForm(
-            [input("O que foi dito (nota da conversa)", "note", "textarea", "", false)],
+            [
+              select("Tipo do número desta ligação", "phoneKind", [
+                ["", "Não confirmado (não suprime; registra aviso pendente)"],
+                ["personal", "Pessoal da pessoa (suprime o número)"],
+                ["direct_line", "Ramal com discagem direta, número próprio (suprime o número)"],
+                ["shared", "Número geral da empresa (não suprime; aviso na empresa)"],
+                ["extension", "Ramal atrás do número geral (não suprime; aviso na empresa)"],
+              ]),
+              input("O que foi dito (nota da conversa)", "note", "textarea", "", false),
+            ],
             async (v) => {
-              const r = await api(`/api/tasks/${t.id}/complete`, "POST", { outcome: "opposed", note: v.note || undefined });
-              notice(r.suppressed ? `Oposição registrada: número suprimido${r.tasksSuspended ? `; ${r.tasksSuspended} outra(s) ligação(ões) suspensa(s)` : ""}.` : "Oposição registrada. A tarefa não tinha telefone: registre a supressão pelo número em Configurações.");
+              const r = await api(`/api/tasks/${t.id}/complete`, "POST", { outcome: "opposed", note: v.note || undefined, phoneKind: v.phoneKind || undefined });
+              notice(
+                r.suppressed
+                  ? `Oposição registrada: número suprimido${r.tasksSuspended ? `; ${r.tasksSuspended} outra(s) ligação(ões) suspensa(s)` : ""}.`
+                  : r.notice
+                    ? "Oposição registrada com aviso na empresa; o número geral não foi suprimido."
+                    : "Oposição registrada. A tarefa não tinha telefone: registre a supressão pelo número em Configurações.",
+              );
               await navigate("Tarefas");
             },
             "Registrar oposição",
