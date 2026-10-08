@@ -442,3 +442,69 @@ Em ordem. Nenhuma exige parecer externo.
 4. Conferir: `/api/retention` com as 5 decisões e vencimento em 08/10/2027; Início com a linha da retenção; nenhuma empresa descartada nem supressão alterada.
 - **Compatibilidade:** o código publicado (`bcaea9a`, Worker bccbfb21) passou nos 419 testes com a 0038 aplicada.
 - **Reversão:** `npx wrangler rollback bccbfb21-5fe4-4b16-b36e-3eea8770d8ea`. As tabelas novas ficam e não são usadas pelo Worker anterior; com ele, o descarte volta a não eliminar dados pessoais. Não restaurar backup para reverter código.
+
+## 13. Textos finais pendentes de decisão (08/10/2026)
+
+Já concluídos e **não reabertos**:
+- uso individual do Compass (06/10);
+- retenção A1, B1, C1 e D1, com os avisos seguindo A1 (§12);
+- D-EXC, opção (a) (§9);
+- teste de exclusão em produção (§8);
+- bloqueio T11 por escopo, supressão por telefone e eliminação no descarte (publicados).
+
+Nada abaixo está aprovado.
+
+### 13.1 Decisões O (texto para aprovação)
+
+| # | Texto final proposto | O que falta |
+|---|---|---|
+| O1 | "Aprovo ligações manuais no Brasil, feitas por mim, às unidades aceitas no Compass, só pelo telefone geral de cada empresa ou pelo número definido na tarefa com fonte; sem e-mail automático, WhatsApp, LinkedIn, campanha ou Snov." | Aprovação |
+| O2 | "Sou o responsável pelo tratamento feito no Compass e atendo pedidos de titulares pelo endereço [ENDEREÇO]." | **O endereço** e a aprovação |
+| O3 | "Adoto o legítimo interesse (LGPD art. 7º, IX) para o piloto, com o teste de balanceamento da §4, revisável se houver orientação contrária." | Aprovação do texto da §4 |
+| O4 | "Na ligação, se perguntarem: 'O telefone é o geral da empresa, publicado no site ou no cadastro público. Seu nome e cargo vieram do perfil profissional público. Guardo só isso numa ferramenta minha de apoio comercial; você pode pedir acesso, correção ou exclusão por [ENDEREÇO DE O2].' Se a pessoa não quiser contato: 'Sem problema, registro agora e não volto a ligar.' Registro a oposição no mesmo dia, informando o tipo do número; se for o número geral, a empresa não é bloqueada." | O endereço de O2 e a aprovação. Depois, as falas entram nos roteiros pela edição auditada |
+| O5 | "Não ligo para celular do cadastro da Receita sem indicação de que é comercial." Efeito: Rural Forte e Super-Bovi seguem sem número até haver telefone comercial | Aprovação, ou outra regra |
+| O7 | "**Confirmação de existência e acesso:** resposta simplificada imediata, ou declaração completa (origem, critérios, finalidade) em até 15 dias do pedido (LGPD art. 19). **Correção, exclusão, oposição e demais pedidos:** sem prazo legal fixo enquanto a ANPD não regulamentar (art. 18, § 5º); meta interna de resposta em até 15 dias, com execução no mesmo dia da decisão; se não for possível atender de imediato, respondo com as razões (art. 18, § 4º). Prazos em dobro de pequeno porte só se o enquadramento for declarado e comprovável." | Aprovação; declarar ou não o enquadramento de pequeno porte |
+| O8 | "**Meta interna:** avaliar um incidente em até 24 h do conhecimento. **Obrigação legal:** se o incidente puder afetar significativamente os titulares e envolver dados sensíveis, de crianças, adolescentes ou idosos, financeiros, de autenticação, sob sigilo ou em larga escala (Res. CD/ANPD 15/2024, art. 5º), comunico à ANPD e aos titulares em até 3 dias úteis do conhecimento de que afetou dados pessoais (arts. 6º e 9º), complementando em até 20 dias úteis. **Registro:** todo incidente, comunicado ou não, registrado e guardado por no mínimo 5 anos (art. 10)." | Aprovação; **o registro de incidentes ainda não existe** e precisa ser criado |
+| O9 | "Mantenho a triagem de sanções como controle interno e a refaço antes das ligações se elas ocorrerem depois de 24/10/2026." | Aprovação |
+
+O6 (retenção) está concluída e não entra aqui.
+
+### 13.2 Emenda T11-BR-TEL (texto final para aprovação)
+
+> **T11-BR-TEL — Contato manual por telefone no Brasil.** Ligação manual feita por Rogério a empresas no Brasil só fica liberada no Compass quando houver registro de validação do escopo `br_manual_phone`, com responsável, data, fundamento e evidências, e depois de cumpridos:
+> 1. aprovação, por Rogério, das decisões O1–O5 e O7–O9 (§13.1), com o texto aprovado anexado; a retenção (O6) já foi decidida em 08/10/2026 (§12);
+> 2. mecanismo de transferência internacional do art. 33 da LGPD identificado e registrado para os dados do Compass (L9), ou dados mantidos onde nenhum mecanismo adicional seja exigido, com processamento e transferências posteriores verificados;
+> 3. registro de incidentes existente, com guarda mínima de 5 anos (O8);
+> 4. canal do titular (O2) informado nos roteiros.
+>
+> Já cumpridos e mantidos: teste de exclusão com registro fictício (08/10/2026); supressão por telefone que suspende a tarefa; oposição com tipo do número e aviso na empresa para número geral (D-EXC); bloqueio T11 por escopo; eliminação de dados pessoais no descarte (C1); revisão anual da retenção (A1).
+>
+> A liberação não alcança e-mail automático, WhatsApp, LinkedIn, campanhas, outros países nem mudança de base legal, que continuam exigindo a T11 com responsável competente. Telefone ausente, divergente ou suprimido, pausas, triagem de sanções e demais bloqueios continuam valendo. A validação pode ser revogada por novo registro.
+
+**Ajustes ligados:**
+- R26.6: "para canais automáticos; na ligação manual vale o teste de supressão por telefone de R28.18";
+- R28.18: "a supressão do telefone a ligar suspende a tarefa; o bloqueio T11 é calculado por escopo";
+- premissa de uso: "uso individual por Rogério (06/10/2026); não é autorização da EAG".
+
+**Registro da validação (proposta, a implementar só depois da aprovação):**
+- rota só para o Administrador, com escopo de lista fechada (nunca "tudo"), responsável, data e fundamento;
+- evidências obrigatórias, cada uma com referência e SHA-256: O aprovadas, emenda aprovada, documento do mecanismo de L9, registro de incidentes criado, teste de exclusão de 08/10;
+- confirmação explícita dos itens 1–4;
+- só inclusão; revogação é uma linha nova.
+
+### 13.3 Pendências que não são texto
+
+**Escolhas de Rogério:**
+- números da Cimilho, Sociagro e Ração Ituiutaba;
+- canal da BRF;
+- EAG: consultar e seguir sob sua responsabilidade, ou aguardar;
+- declarar ou não o enquadramento de pequeno porte;
+- D-L9, depois da resposta da Cloudflare.
+
+**Comprovação externa:**
+- Cloudflare: mecanismo do art. 33 (mensagem da §11, não enviada);
+- EAG: posição sobre controlador e ferramenta pessoal, se você consultar.
+
+**Implementação necessária antes da liberação:** registro de incidentes (O8) e rota de registro da validação (§13.2).
+
+**Prazo:** as listas de sanções vencem em 24/10/2026.
