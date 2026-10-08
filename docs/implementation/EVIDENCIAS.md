@@ -1799,3 +1799,46 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - compatibilidade: código publicado (`bcaea9a`) passou nos 419 testes com a 0038.
 - Resíduos de auditoria e plano de migração em `T11-REVISAO-PILOTO-BR-TELEFONE.md` §12.
 - **Não feito:** nenhuma migração em produção, nenhuma empresa real descartada, G4 não executado. T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas.
+
+## Publicação de G1 e G3 com a migração 0038 (08/10/2026, autorizada por Rogério)
+
+**Conferências antes:**
+- `v2-revisao-2` limpo e sincronizado em `00f3f01`;
+- Worker anterior **bccbfb21-5fe4-4b16-b36e-3eea8770d8ea** (100%);
+- só a 0038 pendente; nenhum servidor local aberto.
+
+**Ponto de restauração:**
+- bookmark do D1: `00000734-0000000c-000050fe-4b854cd9b07225f45fa4dbc05b58d377`;
+- backup privado: `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0038-20261008\eag_compass.sql`, 29.600.928 bytes, SHA-256 `376ec0b3ef40a4624ab25a5b01f7a3f4f3cbe59ef8361937367040bff0065ab7`, acesso só de `ROGERIONOTE\Roger`.
+
+**Migração 0038:**
+- aplicada;
+- impressão SHA-256 linha a linha antes e depois: **pessoas (13), supressões (3), tarefas (15) e empresas (25) sem nenhuma mudança**;
+- tabelas novas: 5 políticas (A1, B1, C1, D1 e avisos seguindo A1, todas "Rogério Palhari, 2026-10-08"), 0 revisões, 0 descartes;
+- depois: "No migrations to apply".
+
+**Publicação:** `npm run deploy` com check e validate-deploy (425 testes da suíte principal, 2 do Worker e 16 da ponte). Worker **663077c0-0065-4f1c-8f79-660d18cc106e**, 100% do tráfego, 2026-10-08T21:17:34Z.
+
+**Conferido depois (sem gravar):**
+- `GET /api/retention`: as cinco decisões com responsável e data; vencimento da revisão em 2027-10-08 (365 dias); lembrete ainda não ativo; 0 revisões.
+- `GET /api/dashboard` traz a situação da revisão.
+- **Início (navegador):** "Retenção A1: próxima revisão anual até 2027-10-08." Tarefas: "Para fazer (0)", "Bloqueadas (13)", sem erros.
+- **Permissões de revisão:**
+  - a rota recusa pedido inválido (422, data futura) antes de gravar;
+  - em produção só existem 2 usuários, ambos Administradores;
+  - a recusa a outros perfis (403) está coberta por teste.
+- **Nenhuma supressão removida** (as mesmas 3, idênticas).
+- **Nenhuma empresa descartada** (0 inativas; 0 descartes registrados).
+- **Nenhuma ligação liberada:** 13 com `t11_pending`, 6 também com `phone_missing`, 0 sem bloqueio.
+- 0 validações T11; canais `planned`; campanhas: 1 rascunho e 1 encerrada; outbox sem mudança (5 aceitos, 19 cancelados).
+- Ponte com leitura bem-sucedida às 21:18:57 UTC, depois do deploy.
+
+**Limite da eliminação no descarte (C1):** textos livres de **evidências** e do **perfil comprador** são tratados como dados da empresa e **não são eliminados automaticamente**. Quando contiverem dados pessoais (nome, cargo ou contato de alguém), exigem **revisão manual**. Num descarte de empresa com esses textos, a eliminação **não deve ser declarada completa** sem essa revisão.
+
+**Reversão:**
+- Código: `npx wrangler rollback bccbfb21-5fe4-4b16-b36e-3eea8770d8ea`. As tabelas da 0038 ficam e não são usadas pelo Worker anterior; com ele, o descarte volta a não eliminar dados pessoais e o Início perde a linha da retenção.
+- Não restaurar backup nem Time Travel para reverter código.
+
+**G4 (não executado):** lista exata em `G4-LISTA-BACKUPS-2026-10-08.md`. Ficaria só `d1-remoto-antes-0038-20261008`; seriam eliminados 135 arquivos em 15 pastas: as exportações remotas antes da 0032 até antes da 0037 e 9 cópias locais `d1-local-*`. Execução só com confirmação.
+
+T11 pendente; 13 ligações bloqueadas.

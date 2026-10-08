@@ -395,7 +395,7 @@ Em ordem. Nenhuma exige parecer externo.
   - executar só com confirmação de Rogério;
   - um script de conferência pode listar o que a regra manda apagar, sem apagar.
 
-### Implementação de G1 e G3 (08/10/2026; não publicada, sem migração em produção)
+### Implementação de G1 e G3 (08/10/2026; **publicada em 08/10/2026**, Worker `663077c0`, migração 0038)
 
 **G1, revisão anual de A1:**
 - Migração **0038**, `retention_policies`, só inclusão: as cinco decisões de 08/10/2026 (A1, B1, C1, D1 e avisos seguindo A1), cada uma com dados abrangidos, critério, revisão, ação ao final, texto completo, responsável (Rogério Palhari) e data.
@@ -422,7 +422,7 @@ Em ordem. Nenhuma exige parecer externo.
 - Auditorias anteriores (`task.*`, `company.*`, `suppression.*`) só com ids, nomes de campos e códigos: o histórico de auditoria é imutável e não tem dado pessoal legível.
 - `company_discard_ledger` e o marcador no R2: ids e data, para reaplicar a eliminação depois de uma restauração.
 - Contato e pessoa ficam como linhas sem dados ("dados excluídos no descarte…", marca de conteúdo excluído), para não quebrar o histórico (R23.6).
-- **Fora do alcance automático:** textos livres de evidências e do perfil comprador são dados da empresa; se contiverem nome de pessoa, a revisão é manual. Cópias no Time Travel e nos backups seguem H e D1.
+- **Fora do alcance automático:** textos livres de evidências e do perfil comprador são dados da empresa e não são eliminados automaticamente. Quando contiverem dados pessoais, exigem **revisão manual**; sem ela, a eliminação no descarte **não pode ser declarada completa**. Cópias no Time Travel e nos backups seguem H e D1.
 
 **Testes:** `tests/retencao-descarte.test.mjs`, 6 casos (falham com o código anterior):
 - políticas e lembrete;
