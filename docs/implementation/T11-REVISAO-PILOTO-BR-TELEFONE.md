@@ -314,3 +314,34 @@ Em ordem. Nenhuma exige parecer externo.
 - aviso sem identidade e imutável;
 - oposição pelo número geral e sem tipo;
 - rota só para Administrador.
+
+## 10. Retenção: avisos da empresa e o que cada opção exige (08/10/2026)
+
+- **Mesmo critério da lista de supressão (A):**
+  - as supressões de telefone e e-mail, inclusive as criadas por exclusão (\`personal_data_deleted\`);
+  - os hashes do registro de exclusões (\`erasure_ledger\` e cópia no R2), que servem para não recontatar e para reaplicar exclusões depois de uma restauração.
+- **N. Avisos da empresa (\`company_notices\`)**:
+  - só campos fechados e o hash do número geral (dado da empresa);
+  - hoje **só inclusão**: gatilhos impedem alterar e apagar.
+  - Proposta: seguir o prazo escolhido em A.
+- **Execução de cada opção** (nenhuma implementada):
+
+| Opção | Sem código novo | Exige implementação |
+|---|---|---|
+| A1 | Supressões ficam; a revisão anual seria um registro manual em EVIDENCIAS | Registro da revisão no Compass (opcional) |
+| A2 / A3 | Remoção manual de supressão (rota existente, Administrador, motivo e base), uma a uma | Rotina de expiração das supressões, do registro de exclusões e dos avisos; permitir apagar aviso só pela rotina, com auditoria (migração que troca o gatilho, como na 0032) |
+| B1 / B2 | Nenhuma | Expiração do histórico de remoções (\`suppression_removals\`) |
+| C1 | Excluir manualmente os contatos da empresa descartada pela rota de exclusão | Exclusão automática dos dados pessoais no descarte |
+| C2 | Revisão manual periódica | Rotina com prazo N |
+| D1 / D2 | Apagar exportações locais à mão, em \`eag-compass-backups\` | Nenhuma |
+| N (com A1) | Nada a fazer enquanto houver prospecção | Revisão registrada (opcional) |
+| N (com A2/A3) | Impossível: o gatilho impede apagar | Rotina de expiração e troca do gatilho |
+
+## 11. Mensagem à Cloudflare (pronta para envio por Rogério; não enviada)
+
+**Caminho sugerido:**
+- e-mail para \`privacyquestions@cloudflare.com\`, com cópia para \`dpo@cloudflare.com\`;
+- enviado a partir do e-mail cadastrado como dono da conta Cloudflare, para que possam verificar a conta;
+- substituir \`[Account ID]\` pelo ID da conta (painel da Cloudflare, Workers & Pages, coluna da direita).
+- Não aceitar nem assinar nada em resposta sem nova análise.
+- Texto: o mesmo apresentado a Rogério em 08/10/2026 (cinco perguntas: mecanismo do art. 33 com cláusula, versão e data; aditivo com as cláusulas-padrão da ANPD para conta self-serve; serviços abrangidos; locais e suboperadores; efeito da jurisdição \`eu\` com Regional Services).
