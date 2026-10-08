@@ -217,7 +217,18 @@ async function home() {
     [stuck, "Envios bloqueados ou indeterminados", "Precisam de decisão registrada antes de voltar à fila.", "Resolver envios", "Envios"],
     [p.qualifying || 0, "Empresas em qualificação", "Faltam evidências, demanda ou validações para qualificar.", "Revisar empresas", "Empresas"],
   ];
+  // G1: revisão anual da retenção A1 (decisão de 08/10/2026). Só lembra; nada expira nem é liberado sozinho.
+  const rr = d.retentionReview;
+  if (rr?.remind)
+    items.unshift([
+      1,
+      rr.overdue ? `Revisão anual da retenção atrasada (venceu em ${rr.due})` : `Revisão anual da retenção vence em ${rr.due}`,
+      "Registre a revisão da lista de supressão e dos avisos (manter ou avaliar eliminação). Nada expira nem é liberado sozinho.",
+      "Ver supressões",
+      "Supressão",
+    ]);
   const pending = items.filter(([n]) => n > 0);
+  if (rr?.due) node.append(text("p", `Retenção A1: próxima revisão anual até ${rr.due}${rr.lastReview ? ` (última em ${rr.lastReview.reviewed_on})` : ""}.`, "muted retention-line"));
   node.append(
     panel(
       "Próximas ações",

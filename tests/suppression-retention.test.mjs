@@ -23,7 +23,7 @@ test("Supressão nova registra alcance e critério de retenção; prazo não é 
   const row = ctx.DB.raw.prepare("SELECT scope,retention_criterion,retention_until FROM suppression_entries").get();
   assert.deepEqual({ ...row }, { scope: "channel_all", retention_criterion: "until_t11_policy", retention_until: null });
   const list = (await as("admin")("/api/suppression")).data.items[0];
-  assert.match(list.retention_label, /T11/);
+  assert.ok(list.retention_label.startsWith("A1 (decisão de Rogério Palhari em 08/10/2026)"));
   assert.match(list.retention_label, /sem prazo nem expiração automática/);
   assert.match(list.identifier_hash, /^hmac:.{4}….{4}$/);
 });

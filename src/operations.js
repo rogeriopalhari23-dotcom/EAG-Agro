@@ -568,7 +568,8 @@ export async function isSuppressed(env, tenant, channel, value) {
 // Critério de retenção por registro (R21.1). Só existe o critério provisório até a validação jurídica T11: nenhum prazo
 // ou fundamento é inventado e nada expira sozinho.
 export const RETENTION_CRITERIA = {
-  until_t11_policy: "Mantido para não recontatar (R9.1.2) até a política de retenção da validação jurídica T11; sem prazo nem expiração automática.",
+  // Valor gravado mantido (CHECK da 0031); o texto segue a decisão A1 de Rogério Palhari em 08/10/2026 (migração 0038).
+  until_t11_policy: "A1 (decisão de Rogério Palhari em 08/10/2026): mantido para não recontatar (R9.1.2) enquanto houver prospecção no canal; revisão anual registrada; sem prazo nem expiração automática.",
 };
 export const SUPPRESSION_SCOPES = { channel_all: "Identificador no canal inteiro: todas as empresas, campanhas e commodities." };
 const maskHash = (h) => `hmac:${h.slice(0, 4)}…${h.slice(-4)}`;

@@ -373,7 +373,7 @@ Em ordem. Nenhuma exige parecer externo.
 
 ### Lacunas e propostas (não executadas)
 
-- **G1. Critério e revisão de A1** (código e migração, com testes):
+- **G1. Critério e revisão de A1** (implementado em 08/10/2026, não publicado; ver abaixo):
   - trocar o texto do critério das supressões para "Mantido enquanto houver prospecção no canal; revisão anual registrada (decisão de 08/10/2026)";
   - criar um registro de revisões de retenção (data, responsável, escopo, decisão de manter ou eliminar, fundamento), só inclusão;
   - lembrete na tela Início 30 dias antes de completar 12 meses desde a última revisão.
@@ -383,7 +383,7 @@ Em ordem. Nenhuma exige parecer externo.
   - migração que permita apagar avisos e supressões só por essa rotina, com auditoria, no padrão da 0032.
   - Não é necessária enquanto A1 vigorar.
 - **G2. Prazo de prova de B1:** escolher só se a lista for eliminada. Até lá, nada a fazer.
-- **G3. Eliminação no descarte (C1)** (código, com testes):
+- **G3. Eliminação no descarte (C1)** (implementado em 08/10/2026, não publicado; ver abaixo):
   - ao descartar uma empresa, apagar nome, cargo, e-mail, telefone, LinkedIn e fonte dos contatos; dados das pessoas de compras (incluindo relevância e hash do nome); roteiros das tarefas; textos congelados das fichas (marcador de purga, como na exclusão);
   - manter empresa, motivo, data e auditoria sem dados pessoais;
   - **sem criar supressão**: descarte não é oposição;
@@ -394,3 +394,51 @@ Em ordem. Nenhuma exige parecer externo.
   - aplicado agora, ficaria só `d1-remoto-antes-0037-20261008`; as 5 exportações remotas anteriores e as 9 cópias locais `d1-local-*` seriam apagadas;
   - executar só com confirmação de Rogério;
   - um script de conferência pode listar o que a regra manda apagar, sem apagar.
+
+### Implementação de G1 e G3 (08/10/2026; não publicada, sem migração em produção)
+
+**G1, revisão anual de A1:**
+- Migração **0038**, `retention_policies`, só inclusão: as cinco decisões de 08/10/2026 (A1, B1, C1, D1 e avisos seguindo A1), cada uma com dados abrangidos, critério, revisão, ação ao final, texto completo, responsável (Rogério Palhari) e data.
+- `retention_reviews`, só inclusão: data, responsável, decisão (`keep` ou `elimination_to_assess`) e fundamento.
+- **Registrar uma revisão não expira, não remove e não libera supressão nem ligação.** "Avaliar eliminação" só registra; G1b não existe.
+- Rotas: `GET /api/retention` (políticas, revisões e situação) e `POST /api/retention/reviews` (só Administrador; recusa data futura e fundamento curto).
+- **Início:** linha com a próxima revisão; item de atenção a partir de 30 dias antes do vencimento ou com a revisão atrasada. Vencimento: 12 meses depois da última revisão ou da decisão (primeiro em 08/10/2027).
+- Texto do critério das supressões passou a citar A1. O valor gravado no banco não mudou.
+
+**G3, eliminação no descarte (C1):**
+- O descarte (`POST /api/companies/:id/discard`) passa a eliminar os dados pessoais **antes** de marcar a empresa como descartada.
+- **Ordem:**
+  1. marcador no R2 (`discards/<tenant>/<empresa>.json`, só id da empresa, data e id da requisição; sem motivo nem textos pessoais);
+  2. eliminação de cada contato de pessoa pela mesma rotina da exclusão, **sem supressão** e apagando também o hash do e-mail;
+  3. numa única gravação: pessoas de compras da empresa (com ou sem contato), tarefas (roteiro, canal, próxima ação, telefone, resultado e histórico de edição), aviso legal em cache **só se nenhuma outra empresa ativa usa o mesmo site**, envios cancelados, fichas descartadas, registro em `company_discard_ledger` e auditoria.
+- **Falha no meio:** a empresa não fica descartada; o marcador no R2 trava envio e aprovação (`erasure_reapply_required`) até o pedido ser repetido ou a reaplicação rodar; a repetição retoma com a data original.
+- **Restauração do banco:** `POST /api/erasures/reapply` refaz os descartes do R2 que o banco não tem.
+- **Descarte repetido:** devolve "já descartada" sem regravar nem auditar.
+- **Fica:** empresa, motivo (na auditoria e nas fichas), data, canais gerais da empresa (contato `company_channel`), avisos D-EXC, terceiros de outras empresas e conteúdo compartilhado (aviso legal de site usado por outra empresa ativa; mensagens de outros remetentes, listadas como hoje na exclusão).
+
+**Resíduos de auditoria que permanecem, e por quê:**
+- `company.discarded`: motivo, situação anterior e contagens. O motivo é necessário para "manter motivo e data" (C1); **não escreva nomes de pessoas no motivo**.
+- `contact.personal_data_deleted` por contato: id, base "Descarte da empresa (C1)" e contagens, sem nome, e-mail ou telefone (R8.1.1); prova a eliminação.
+- Auditorias anteriores (`task.*`, `company.*`, `suppression.*`) só com ids, nomes de campos e códigos: o histórico de auditoria é imutável e não tem dado pessoal legível.
+- `company_discard_ledger` e o marcador no R2: ids e data, para reaplicar a eliminação depois de uma restauração.
+- Contato e pessoa ficam como linhas sem dados ("dados excluídos no descarte…", marca de conteúdo excluído), para não quebrar o histórico (R23.6).
+- **Fora do alcance automático:** textos livres de evidências e do perfil comprador são dados da empresa; se contiverem nome de pessoa, a revisão é manual. Cópias no Time Travel e nos backups seguem H e D1.
+
+**Testes:** `tests/retencao-descarte.test.mjs`, 6 casos (falham com o código anterior):
+- políticas e lembrete;
+- revisão sem liberação;
+- descarte completo com terceiros, canal geral e avisos preservados;
+- aviso legal compartilhado;
+- repetição;
+- falha parcial;
+- reaplicação após restauração.
+- O teste de interface confere a linha da retenção no Início.
+- Teste antigo de descarte ajustado: o descarte agora exige o R2, como a exclusão.
+
+**Plano de migração e publicação (quando autorizado):**
+1. Backup privado e bookmark do Time Travel.
+2. `npm run db:migrate:remote`, que deve aplicar **só a 0038** (tabelas novas e as 5 decisões; nada existente muda). Conferir 5 políticas, 0 revisões, 0 descartes, supressões e pessoas idênticas.
+3. `npm run deploy`.
+4. Conferir: `/api/retention` com as 5 decisões e vencimento em 08/10/2027; Início com a linha da retenção; nenhuma empresa descartada nem supressão alterada.
+- **Compatibilidade:** o código publicado (`bcaea9a`, Worker bccbfb21) passou nos 419 testes com a 0038 aplicada.
+- **Reversão:** `npx wrangler rollback bccbfb21-5fe4-4b16-b36e-3eea8770d8ea`. As tabelas novas ficam e não são usadas pelo Worker anterior; com ele, o descarte volta a não eliminar dados pessoais. Não restaurar backup para reverter código.

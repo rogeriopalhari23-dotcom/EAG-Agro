@@ -23,6 +23,7 @@ import { handleBridge } from "./bridge.js";
 import * as sanctions from "./sanctions.js";
 import * as changes from "./changes.js";
 import * as erasure from "./erasure.js";
+import * as retention from "./retention.js";
 import * as sending from "./sending.js";
 import * as inbound from "./inbound.js";
 import * as tasks from "./tasks.js";
@@ -100,8 +101,12 @@ async function route(request, env, rid) {
       ),
       generatedAt: new Date().toISOString(),
       sendingEnabled: false,
+      // G1: lembrete da revisão anual da retenção A1 (só informa; nada expira).
+      retentionReview: await retention.retentionReviewStatus(env, actor.tenant_id),
     });
   }
+  if (path === "/api/retention" && method === "GET") return response(await retention.retentionOverview(env, actor));
+  if (path === "/api/retention/reviews" && method === "POST") return response(await retention.addRetentionReview(request, env, actor, rid), 201);
   if (path === "/api/companies") {
     if (method === "GET")
       return response(await companies.listCompanies(request, env, actor));

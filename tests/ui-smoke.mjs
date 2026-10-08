@@ -86,6 +86,8 @@ try {
   };
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.getByRole("heading", { name: "Início", exact: true }).waitFor();
+  // G1: o Início mostra a próxima revisão anual da retenção A1 (decisão de 08/10/2026).
+  await page.getByText(/^Retenção A1: próxima revisão anual até \d{4}-\d{2}-\d{2}/).waitFor({ timeout: 5000 });
   await mkdir("review-output", { recursive: true });
   await page.screenshot({
     path: "review-output/hoje-desktop.png",

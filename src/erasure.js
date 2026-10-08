@@ -105,6 +105,8 @@ const ADDRESS = /[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]+\.[a-z]{2,}/gi;
 // Endereço de e-mail em texto de servidor ou nota (ex.: "550 5.1.1 <x@y.de> unknown") vira "[endereço]".
 export const redactAddresses = (t) => (t == null ? t : String(t).replace(ADDRESS, "[endereço]"));
 const ledgerKey = (tenant, contactId) => `erasures/${tenant}/${contactId}.json`;
+// Descarte de empresa (C1): marcador sem textos pessoais nem motivo, escrito ANTES do D1, para reaplicar após restauração.
+const discardKey = (tenant, companyId) => `discards/${tenant}/${companyId}.json`;
 
 async function ledgerInR2(env, tenant) {
   const out = [];
@@ -118,15 +120,32 @@ async function ledgerInR2(env, tenant) {
 }
 
 // Falso se o R2 registra exclusão que o D1 não tem (D1 restaurado para antes dela).
-export async function erasuresConsistent(env, tenant) {
-  if (!env.FILES) return true;
-  const r2 = await ledgerInR2(env, tenant);
-  if (!r2.length) return true;
-  const d1 = new Set((await s(env, "SELECT contact_id FROM erasure_ledger WHERE tenant_id=?", tenant).all()).results.map((r) => r.contact_id));
-  return r2.every((id) => d1.has(id));
+async function discardsInR2(env, tenant) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.FILES.list({ prefix: `discards/${tenant}/`, cursor });
+    for (const o of page.objects) out.push(o.key.slice(`discards/${tenant}/`.length).replace(/\.json$/, ""));
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return out;
 }
 
-async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash: knownHash = null, erasedAt = null, reapply = false, phoneClassification = new Map() } = {}) {
+export async function erasuresConsistent(env, tenant) {
+  if (!env.FILES) return true;
+  const [r2, r2Discards] = await Promise.all([ledgerInR2(env, tenant), discardsInR2(env, tenant)]);
+  if (!r2.length && !r2Discards.length) return true;
+  const d1 = new Set((await s(env, "SELECT contact_id FROM erasure_ledger WHERE tenant_id=?", tenant).all()).results.map((r) => r.contact_id));
+  const d1Discards = new Set((await s(env, "SELECT company_id FROM company_discard_ledger WHERE tenant_id=?", tenant).all()).results.map((r) => r.company_id));
+  // Descarte iniciado (marcador no R2) e não concluído no D1 também trava envio e aprovação até ser refeito.
+  return r2.every((id) => d1.has(id)) && r2Discards.every((id) => d1Discards.has(id));
+}
+
+// mode "request": pedido do titular (supressão do e-mail, plano dos telefones, registro próprio de exclusão).
+// mode "discard": descarte da empresa (C1): mesma eliminação dos dados pessoais, SEM supressão (descarte não é
+// oposição), sem plano de telefone e sem registro individual (o descarte tem o seu).
+async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash: knownHash = null, erasedAt = null, reapply = false, phoneClassification = new Map(), mode = "request" } = {}) {
+  const request = mode === "request";
   const tenant = actor.tenant_id;
   const at = now();
   const c = await s(env, "SELECT * FROM contacts WHERE tenant_id=? AND id=?", tenant, contactId).first();
@@ -134,7 +153,7 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
   const hash = c?.email_hash ?? knownHash;
   if (!env.FILES) fail(503, "files_unavailable", "Armazenamento indisponível: a exclusão não pode ser registrada fora do banco (proteção contra restauração).");
   // Telefones lidos antes da purga (depois dela não há mais número a classificar).
-  const phonePlan = await phoneErasureStatements(env, actor, rid, contactId, await contactPhones(env, tenant, contactId), phoneClassification);
+  const phonePlan = request ? await phoneErasureStatements(env, actor, rid, contactId, await contactPhones(env, tenant, contactId), phoneClassification) : { st: [], counts: {} };
 
   const [messages, own, shared, candidates, logs, resolved, company] = await env.DB.batch([
     s(env, "SELECT m.id,m.subject_enc FROM ficha_messages m JOIN ficha_versions v ON v.id=m.version_id JOIN fichas f ON f.id=v.ficha_id WHERE f.tenant_id=? AND m.contact_id=? AND m.purged_at IS NULL", tenant, contactId),
@@ -179,7 +198,7 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
 
   // R2 primeiro: a cópia do registro de exclusão (sem PII) e a remoção do conteúdo recebido. Se o banco falhar depois,
   // o R2 já acusa a exclusão e o envio fica parado até a reaplicação terminar a purga.
-  if (!reapply) await env.FILES.put(ledgerKey(tenant, contactId), JSON.stringify({ contactId, emailHash: hash, erasedAt: at, requestId: rid }));
+  if (!reapply && request) await env.FILES.put(ledgerKey(tenant, contactId), JSON.stringify({ contactId, emailHash: hash, erasedAt: at, requestId: rid }));
   const stored = own.results.filter((m) => !m.content_purged_at).map((m) => m.r2_key).filter((k) => k && k.startsWith("inbound/"));
   if (stored.length) await env.FILES.delete(stored);
 
@@ -188,8 +207,9 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
   const st = [
     s(
       env,
-      "UPDATE contacts SET full_name_encrypted=NULL,job_title_encrypted=NULL,email_encrypted=NULL,phone_encrypted=NULL,linkedin_url_encrypted=NULL,relationship_note=NULL,source_url=NULL,source_label=?,updated_at=? WHERE tenant_id=? AND id=?",
-      `dados excluídos em ${at.slice(0, 10)}`, at, tenant, contactId,
+      // No descarte também sai o hash do e-mail: sem supressão, ele não teria finalidade (minimização).
+      `UPDATE contacts SET full_name_encrypted=NULL,job_title_encrypted=NULL,email_encrypted=NULL,phone_encrypted=NULL,linkedin_url_encrypted=NULL,relationship_note=NULL,source_url=NULL,source_label=?,updated_at=?${request ? "" : ",email_hash=NULL"} WHERE tenant_id=? AND id=?`,
+      request ? `dados excluídos em ${at.slice(0, 10)}` : `dados excluídos no descarte da empresa em ${at.slice(0, 10)}`, at, tenant, contactId,
     ),
     s(env, "UPDATE send_outbox SET status='cancelled',block_reason='personal_data_deleted',updated_at=? WHERE tenant_id=? AND contact_id=? AND status IN ('pending','blocked','waiting_sequence','temp_failed')", at, tenant, contactId),
     ...messages.results.map((m) => s(env, "UPDATE ficha_messages SET subject_enc=?,body_enc=?,body_html_enc=NULL,purged_at=? WHERE id=?", m.subject_enc == null ? null : marker, marker, at, m.id)),
@@ -221,17 +241,18 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
     ...resolved.results.map((r) => s(env, "UPDATE send_outbox SET resolved_reason=? WHERE id=?", redactAddresses(r.resolved_reason), r.id)),
   ];
   if (impressum) st.push(s(env, "UPDATE research_cache SET result_json=? WHERE source='impressum' AND external_id=?", impressum.json, impressum.origin));
-  if (hash)
+  if (hash && request)
     st.push(
       s(env, "INSERT OR IGNORE INTO suppression_entries(id,tenant_id,identifier_hash,channel,reason,source,created_by) VALUES (?,?,?,'email','personal_data_deleted','manual',?)", crypto.randomUUID(), tenant, hash, actor.id),
     );
-  st.push(
-    s(
-      env,
-      "INSERT INTO erasure_ledger(tenant_id,contact_id,email_hash,erased_at,request_id,reapplied_at) VALUES (?,?,?,?,?,?) ON CONFLICT(tenant_id,contact_id) DO UPDATE SET reapplied_at=COALESCE(excluded.reapplied_at,erasure_ledger.reapplied_at)",
-      tenant, contactId, hash, reapply ? (erasedAt ?? at) : at, rid, reapply ? at : null,
-    ),
-  );
+  if (request)
+    st.push(
+      s(
+        env,
+        "INSERT INTO erasure_ledger(tenant_id,contact_id,email_hash,erased_at,request_id,reapplied_at) VALUES (?,?,?,?,?,?) ON CONFLICT(tenant_id,contact_id) DO UPDATE SET reapplied_at=COALESCE(excluded.reapplied_at,erasure_ledger.reapplied_at)",
+        tenant, contactId, hash, reapply ? (erasedAt ?? at) : at, rid, reapply ? at : null,
+      ),
+    );
   const pendingReview = company.results[0]
     ? (await s(env, `SELECT COUNT(*) n FROM tasks WHERE tenant_id=? AND company_id=? AND inbound_id IS NULL AND kind IN ${REPLY_KINDS}`, tenant, company.results[0].id).first()).n
     : 0;
@@ -243,9 +264,9 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
     inboundPurged: ownIds.length,
     sendLogRedacted: logs.results.length + resolved.results.length,
     impressumCacheTrimmed: !!impressum,
-    suppressed: !!hash,
+    suppressed: !!hash && request,
   };
-  st.push(auditStatement(env, actor, rid, reapply ? "contact.personal_data_reapplied" : "contact.personal_data_deleted", "contact", contactId, { legalBasis, companyId: c?.company_id ?? null, ...counts, sharedRetained: shared.results.length }));
+  st.push(auditStatement(env, actor, rid, reapply ? "contact.personal_data_reapplied" : "contact.personal_data_deleted", "contact", contactId, { legalBasis, mode, companyId: c?.company_id ?? null, ...counts, sharedRetained: shared.results.length }));
   await commit(env, st);
   return { id: contactId, deleted: true, ...counts, sharedRetained: shared.results.map((r) => r.id) };
 }
@@ -309,6 +330,13 @@ export async function reapplyErasures(request, env, actor, rid) {
     const r = await purgeContact(env, actor, rid, id, `Reaplicação após restauração do banco (exclusão original em ${entry.erasedAt ?? "data não registrada"})`, { emailHash: entry.emailHash ?? null, erasedAt: entry.erasedAt ?? null, reapply: true });
     done.push({ contactId: id, ...r });
   }
+  const discarded = new Set((await s(env, "SELECT company_id FROM company_discard_ledger WHERE tenant_id=?", actor.tenant_id).all()).results.map((r) => r.company_id));
+  for (const companyId of (await discardsInR2(env, actor.tenant_id)).filter((x) => !discarded.has(x))) {
+    const obj = await env.FILES.get(discardKey(actor.tenant_id, companyId));
+    const entry = obj ? JSON.parse(await obj.text()) : {};
+    const r = await discardCompanyData(env, actor, rid, companyId, { reason: `reaplicação do descarte de ${entry.discardedAt ?? "data não registrada"} após restauração do banco`, discardedAt: entry.discardedAt ?? null, reapply: true });
+    done.push({ companyId, ...r });
+  }
   return { reapplied: done.length, items: done, consistent: await erasuresConsistent(env, actor.tenant_id) };
 }
 
@@ -351,4 +379,72 @@ export async function linkTaskToInbound(request, env, actor, rid, taskId) {
     auditStatement(env, actor, rid, "task.inbound_linked", "task", t.id, { inboundId: m.id, manual: true, reason }),
   ]);
   return { id: t.id, inboundId: m.id };
+}
+
+// Descarte de empresa (C1, decisão de Rogério Palhari em 08/10/2026): elimina os dados pessoais da empresa e só então
+// marca o descarte. Ordem: marcador no R2 (sem motivo nem textos pessoais) → eliminação de cada contato (mesma rotina da
+// exclusão, sem supressão) → eliminação no nível da empresa e marcação do descarte numa única gravação. Se algo falhar no
+// meio, a empresa NÃO fica descartada; o marcador no R2 trava envio e aprovação até o descarte ser refeito (repetir o
+// pedido ou reaplicar). Fica: empresa, motivo (na auditoria e nas fichas), data, canais gerais da empresa e avisos D-EXC.
+export async function discardCompanyData(env, actor, rid, companyId, { reason, discardedAt = null, reapply = false } = {}) {
+  const tenant = actor.tenant_id;
+  if (!env.FILES) fail(503, "files_unavailable", "Armazenamento indisponível: o descarte não pode ser registrado fora do banco (proteção contra restauração).");
+  const c = await s(env, "SELECT id,website,pipeline_status FROM companies WHERE tenant_id=? AND id=?", tenant, companyId).first();
+  if (!c) fail(404, "company_not_found", "Empresa não encontrada.");
+  const at = now();
+  // Descarte já concluído: repetir não muda nada (nem reescreve o marcador nem audita de novo).
+  const done = await s(env, "SELECT discarded_at FROM company_discard_ledger WHERE tenant_id=? AND company_id=?", tenant, companyId).first();
+  if (done && !reapply) return { id: companyId, status: "inactive", already: true, discardedAt: done.discarded_at, suppressionsCreated: 0 };
+  // Descarte interrompido antes: retoma com a data do marcador original.
+  const prior = reapply ? null : await env.FILES.get(discardKey(tenant, companyId));
+  const when = discardedAt ?? (prior ? JSON.parse(await prior.text()).discardedAt : null) ?? at;
+  if (!reapply && !prior) await env.FILES.put(discardKey(tenant, companyId), JSON.stringify({ companyId, discardedAt: when, requestId: rid }));
+  // Contatos de pessoas (os canais gerais da empresa ficam: são dado da empresa).
+  const people = (await s(env, "SELECT id FROM contacts WHERE tenant_id=? AND company_id=? AND (contact_kind IS NULL OR contact_kind<>'company_channel') AND (full_name_encrypted IS NOT NULL OR email_encrypted IS NOT NULL OR phone_encrypted IS NOT NULL OR job_title_encrypted IS NOT NULL OR linkedin_url_encrypted IS NOT NULL)", tenant, companyId).all()).results;
+  let contactsPurged = 0;
+  for (const p of people) {
+    await purgeContact(env, actor, rid, p.id, "Descarte da empresa (C1)", { mode: "discard", reapply });
+    contactsPurged++;
+  }
+  // Aviso legal em cache: só se nenhuma outra empresa ativa usa o mesmo site (conteúdo compartilhado fica).
+  const origin = siteOrigin(c.website);
+  let impressumPurged = false, impressumShared = false;
+  if (origin) {
+    const others = (await s(env, "SELECT id,website FROM companies WHERE tenant_id=? AND id<>? AND pipeline_status<>'inactive' AND website IS NOT NULL", tenant, companyId).all()).results;
+    impressumShared = others.some((o) => siteOrigin(o.website) === origin);
+    impressumPurged = !impressumShared && !!(await s(env, "SELECT 1 x FROM research_cache WHERE source='impressum' AND external_id=?", origin).first());
+  }
+  const marker = await encryptPii(PURGED, env);
+  const peopleLeft = (await s(env, "SELECT COUNT(*) n FROM person_candidates WHERE tenant_id=? AND company_id=? AND name_hash NOT LIKE 'purged:%'", tenant, companyId).first()).n;
+  const r = await commit(env, [
+    // Pessoas de compras sem contato (ou ainda não purgadas): mesmos campos da exclusão; terceiros de outras empresas não.
+    s(
+      env,
+      "UPDATE person_candidates SET name_encrypted=?,name_hash='purged:'||id,relevance=?,title_encrypted=NULL,email_encrypted=NULL,email_source_url=NULL,phone_encrypted=NULL,phone_source_url=NULL,purchase_note=NULL,purchase_source_url=NULL,source_url='purged',status='dismissed',dismiss_reason='company_discarded' WHERE tenant_id=? AND company_id=? AND name_hash NOT LIKE 'purged:%'",
+      marker, PURGED, tenant, companyId,
+    ),
+    // Tarefas da empresa: roteiro, canal, próxima ação, telefone, resultado (notas) e histórico de edição.
+    s(env, "DELETE FROM task_revisions WHERE tenant_id=? AND task_id IN (SELECT id FROM tasks WHERE tenant_id=? AND company_id=?)", tenant, tenant, companyId),
+    s(
+      env,
+      `UPDATE tasks SET status=CASE WHEN status IN ('open','suspended') THEN 'cancelled' ELSE status END,
+         suspended_reason=CASE WHEN status IN ('open','suspended') THEN 'empresa descartada' ELSE suspended_reason END,
+         script=NULL,result_json=NULL,channel_note=NULL,next_action=NULL,phone_hash=NULL,phone_enc=NULL,phone_source=NULL
+       WHERE tenant_id=? AND company_id=?`,
+      tenant, companyId,
+    ),
+    ...(impressumPurged ? [s(env, "DELETE FROM research_cache WHERE source='impressum' AND external_id=?", origin)] : []),
+    s(env, "UPDATE companies SET pipeline_status='inactive',revision=revision+1,updated_at=? WHERE tenant_id=? AND id=?", at, tenant, companyId),
+    s(env, "UPDATE send_outbox SET status='cancelled',block_reason='company_discarded',updated_at=? WHERE tenant_id=? AND company_id=? AND status IN ('pending','blocked','waiting_sequence','temp_failed')", at, tenant, companyId),
+    s(env, "UPDATE fichas SET status='discarded',status_reason=?,row_version=row_version+1,updated_at=? WHERE tenant_id=? AND company_id=? AND status<>'discarded'", `empresa descartada: ${reason}`, at, tenant, companyId),
+    s(
+      env,
+      "INSERT INTO company_discard_ledger(tenant_id,company_id,discarded_at,request_id,reapplied_at) VALUES (?,?,?,?,?) ON CONFLICT(tenant_id,company_id) DO UPDATE SET reapplied_at=COALESCE(excluded.reapplied_at,company_discard_ledger.reapplied_at)",
+      tenant, companyId, when, rid, reapply ? at : null,
+    ),
+    auditStatement(env, actor, rid, reapply ? "company.discard_reapplied" : "company.discarded", "company", companyId, {
+      reason, previousStatus: c.pipeline_status, contactsPurged, peopleWithoutContactPurged: peopleLeft, impressumPurged, impressumShared,
+    }),
+  ]);
+  return { id: companyId, status: "inactive", contactsPurged, peopleWithoutContactPurged: peopleLeft, impressumPurged, impressumShared, suppressionsCreated: 0, results: r.length };
 }

@@ -221,14 +221,16 @@ check("P2-T10: hard bounce ≥ 3% na semana para tudo e só a retomada da opera�
 
 check("P2-T13: descartar empresa e excluir dados pessoais cancelam o que falta enviar", async (ctx) => {
   const r = await ready(ctx);
-  const d = await ctx.api(`/api/companies/${r.companyId}/discard`, "POST", { reason: "Fora do perfil após visita" });
-  assert.equal(d.status, 200);
-  assert.ok(rows(ctx.DB).every((x) => x.status === "cancelled"));
-  ctx.env.FILES = memoryR2(); // a exclusão grava o registro também no R2 (proteção contra restauração)
+  // Exclusão a pedido do titular (antes do descarte): mantém o hash do e-mail para a supressão.
+  ctx.env.FILES = memoryR2(); // exclusão e descarte gravam o registro também no R2 (proteção contra restauração)
   const del = await ctx.api(`/api/contacts/${r.dm}/delete-personal-data`, "POST", { legalBasis: "Pedido do titular por e-mail em 2099-01-05" });
   assert.equal(del.status, 200);
   const c = ctx.DB.raw.prepare("SELECT full_name_encrypted,email_encrypted,email_hash FROM contacts WHERE id=?").get(r.dm);
   assert.equal(c.full_name_encrypted, null);
   assert.equal(c.email_encrypted, null);
   assert.match(c.email_hash, /^[0-9a-f]{64}$/);
+  // Descarte (sem R2 seria recusado: 503) cancela o que falta enviar.
+  const d = await ctx.api(`/api/companies/${r.companyId}/discard`, "POST", { reason: "Fora do perfil após visita" });
+  assert.equal(d.status, 200);
+  assert.ok(rows(ctx.DB).every((x) => x.status === "cancelled"));
 });

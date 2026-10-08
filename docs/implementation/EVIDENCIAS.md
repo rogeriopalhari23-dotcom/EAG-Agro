@@ -1779,3 +1779,23 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - G4: limpeza manual dos backups pela regra D1.
 - Corrigidas também barras invertidas indevidas antes de crases nas §§10–11 do mesmo documento (erro de formatação do commit `283b6fb`).
 - **Nada foi apagado ou alterado** em produção nem nos backups. T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas.
+
+## G1 e G3 implementados (08/10/2026; não publicados, sem migração em produção)
+
+- **G1:** migração 0038 (`retention_policies` com as 5 decisões de Rogério de 08/10/2026; `retention_reviews`); `src/retention.js`; rotas `/api/retention` e `/api/retention/reviews`; lembrete no Início; texto do critério das supressões citando A1. Registrar revisão não libera nem remove nada; G1b não implementado.
+- **G3:**
+  - `discardCompanyData` em `src/erasure.js`: elimina os dados pessoais antes de marcar o descarte; sem supressão;
+  - marcador no R2 e `company_discard_ledger`, com reaplicação;
+  - aviso legal só se não for compartilhado;
+  - falha parcial não marca o descarte e trava envio até concluir.
+- **Testes:**
+  - 6 casos em `tests/retencao-descarte.test.mjs`: falham com o código anterior e passam com o novo;
+  - `tests/sending.test.mjs` ajustado (descarte exige R2);
+  - `tests/suppression-retention.test.mjs` com o texto A1;
+  - `tests/ui-smoke.mjs` confere a linha da retenção no Início.
+- **Verificações:**
+  - `npm run check`: 425 testes da suíte principal, 2 do Worker e 16 da ponte;
+  - `validate-deploy` e `npm run test:ui` passaram;
+  - compatibilidade: código publicado (`bcaea9a`) passou nos 419 testes com a 0038.
+- Resíduos de auditoria e plano de migração em `T11-REVISAO-PILOTO-BR-TELEFONE.md` §12.
+- **Não feito:** nenhuma migração em produção, nenhuma empresa real descartada, G4 não executado. T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas.
