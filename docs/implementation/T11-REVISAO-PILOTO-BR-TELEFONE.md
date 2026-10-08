@@ -497,7 +497,7 @@ O6 (retenção) está concluída e não entra aqui.
 **Escolhas de Rogério:**
 - números da Cimilho, Sociagro e Ração Ituiutaba;
 - canal da BRF;
-- EAG: consultar e seguir sob sua responsabilidade, ou aguardar;
+- ~~EAG: consultar e seguir sob sua responsabilidade, ou aguardar~~ (substituído pela §14.1: o controlador é identificado pelos fatos; a consulta à EAG é fonte opcional de fatos);
 - declarar ou não o enquadramento de pequeno porte;
 - D-L9, depois da resposta da Cloudflare.
 
@@ -505,6 +505,138 @@ O6 (retenção) está concluída e não entra aqui.
 - Cloudflare: mecanismo do art. 33 (mensagem da §11, não enviada);
 - EAG: posição sobre controlador e ferramenta pessoal, se você consultar.
 
-**Implementação necessária antes da liberação:** registro de incidentes (O8) e rota de registro da validação (§13.2).
+**Implementação necessária antes da liberação:** rota de registro da validação (§13.2). O registro de incidentes é obrigação do controlador e pode ser documental (§14.2).
 
 **Prazo:** as listas de sanções vencem em 24/10/2026.
+
+## 14. Controlador e registro de incidentes (ajuste de 08/10/2026)
+
+Este ajuste corrige a §13 em dois pontos e não reabre nenhuma decisão aprovada: uso individual, retenção A1–D1 e D-EXC continuam como estão. A transferência internacional (L9) segue pendente até haver comprovação. Nada aqui valida a T11 nem libera ligações.
+
+### 14.1 Quem decide finalidades e meios
+
+**Critério legal.**
+- Controlador: "pessoa natural ou jurídica, de direito público ou privado, a quem competem as decisões referentes ao tratamento de dados pessoais" (LGPD art. 5º, VI).
+- Operador: quem trata dados "em nome do controlador" (art. 5º, VII), segundo as instruções dele (art. 39).
+- A qualificação decorre de **quem decide de fato** as finalidades e os elementos essenciais do tratamento: quais dados, de quem e por quanto tempo.
+- Ela **não** decorre de declaração, de consulta nem de uma escolha de consultar ou esperar alguém.
+
+**Fatos registrados até 08/10/2026:**
+
+| Decisão de tratamento no Compass | Quem decidiu | Registro |
+|---|---|---|
+| Criar e usar o Compass como ferramenta de apoio ao trabalho comercial | Rogério | Spec, decisões de 06/10/2026 |
+| Quais empresas buscar e aceitar; raio de 300 km, milho GMO | Rogério | aceites e ICP do piloto |
+| Quais dados pessoais entram: nome, cargo e telefone com fonte; minimização | Rogério | §2.2 L2; Spec |
+| Ferramentas e fornecedores: Cloudflare (Worker, D1, R2, Access), ponte local, caixa Hostinger | Rogério | Spec (R19.13, R19.14); publicações |
+| Retenção A1–D1, supressão, exclusão e D-EXC | Rogério | Spec, decisões de 08/10/2026; §§9 e 12 |
+| Infraestrutura, política de privacidade ou instruções da EAG sobre o Compass | Nenhuma registrada | a EAG não tem acesso nem dá instruções sobre o Compass |
+| Apresentação na ligação: "da EAG Agro"; oferta de commodities da EAG; método do curso EAG | Fato externo ao Compass | PV1, R28; `T11-VALIDACAO-PILOTO-BR.md` linha 13 |
+
+**Leitura dos fatos:**
+1. **Meios e elementos essenciais do tratamento no Compass.** Pelos registros, quem decide é Rogério: dados, fontes, prazos, ferramentas e fornecedores. Não há instrução da EAG sobre nenhum desses pontos.
+2. **Finalidade.** Rogério fixou a finalidade do Compass: apoio ao trabalho comercial dele. Os registros **não** mostram se a prospecção dessas empresas é decidida por ele, por conta própria, ou determinada pela EAG. Exemplos: contrato de franquia ou representação que reserve contatos e oportunidades à EAG, ou que defina alvos e uso de dados.
+3. **Conclusão atual, condicionada às respostas da §14.3:**
+   - Se a prospecção é decisão de Rogério e o contrato com a EAG não determina a finalidade nem o uso desses dados, **Rogério é o controlador** do tratamento feito no Compass.
+   - Se o vínculo com a EAG determina a finalidade, a EAG pode ser controladora, ou ambos podem ser. Rogério ainda responde pelas decisões de meios que tomou.
+   - Se Rogério atua como **empregado** da EAG, quem trata os dados é a empresa, e não ele como agente próprio.
+4. **Papel da EAG.** Consultar a EAG é opcional. A resposta dela é evidência de fato: contrato, instruções, titularidade dos contatos. Ela **não** cria nem transfere, por si só, a condição de controlador. Esperar ou não esperar a resposta também não define quem é o controlador.
+5. **Efeitos práticos:**
+   - o texto de O2;
+   - quem guarda o registro de incidentes (art. 10: "o controlador");
+   - quem comunica incidentes à ANPD;
+   - se cabe a análise de pequeno porte.
+
+### 14.2 Registro de incidentes: obrigação separada da implementação
+
+**Obrigação, que não é escolha.**
+- O controlador mantém o registro de todo incidente de segurança, comunicado ou não à ANPD e aos titulares.
+- A guarda é de no mínimo 5 anos, contados da data do registro, ou mais, se outra obrigação exigir (Res. CD/ANPD 15/2024, art. 10, caput; texto conferido no DOU em 08/10/2026).
+- Incidente de segurança é "qualquer evento adverso confirmado, relacionado à violação das propriedades de confidencialidade, integridade, disponibilidade e autenticidade da segurança de dados pessoais" (art. 3º, XII).
+- A obrigação existe independentemente do Compass e vale desde já, para qualquer incidente com dados pessoais do Compass.
+
+**Implementação, que é escolha.**
+- Pode ser um procedimento documental, fora do Compass, ou uma função no Compass.
+- Nenhuma tela ou rota nova nesta etapa.
+- O procedimento abaixo atende a obrigação **sem implementar nada no Compass**.
+- Implementar no Compass depois continua opcional e exigiria decisão e publicação próprias.
+
+**Procedimento documental mínimo (proposta para aprovação):**
+
+1. **Local protegido:**
+   - pasta própria fora do repositório e fora da Cloudflare, `C:\Users\Roger\eag-compass-registros\incidentes\`;
+   - permissão de acesso restrita ao usuário `ROGERIONOTE\Roger`, como nos backups;
+   - **cópia cifrada** em um segundo local escolhido por Rogério, para a guarda de 5 anos não depender de um só computador;
+   - o registro **nunca** vai para o Git: o repositório tem remoto no GitHub.
+2. **Sem dado pessoal em texto aberto:**
+   - números, categorias e referências internas (IDs do Compass ou caminhos de evidência);
+   - nunca nomes, telefones, e-mails ou conteúdo de mensagens.
+3. **Abertura:**
+   - ao saber de um evento suspeito, abrir o registro no mesmo dia;
+   - concluir a avaliação dentro da meta interna de O8 (24 h);
+   - eventos avaliados e descartados como não incidentes podem ser anotados no mesmo arquivo, marcados assim. Isso é opcional: o art. 10 cobra os incidentes confirmados.
+4. **Campos obrigatórios** (art. 10, § 1º, texto conferido):
+   - I. data de conhecimento do incidente;
+   - II. descrição geral das circunstâncias;
+   - III. natureza e categoria dos dados afetados;
+   - IV. número de titulares afetados;
+   - V. avaliação do risco e possíveis danos aos titulares;
+   - VI. medidas de correção e mitigação, quando aplicável;
+   - VII. forma e conteúdo da comunicação, se houve comunicação à ANPD e aos titulares;
+   - VIII. motivos da ausência de comunicação, quando for o caso.
+5. **Campos de controle** (não exigidos pelo art. 10; servem à prova):
+   - número sequencial;
+   - data do registro;
+   - "guardar até" (data do registro + 5 anos, no mínimo);
+   - controlador identificado (§14.1);
+   - quem registrou;
+   - critérios do art. 5º avaliados;
+   - prazo de comunicação calculado (3 dias úteis, ou em dobro se o enquadramento de pequeno porte estiver comprovado);
+   - referências às evidências.
+6. **Só acréscimo:**
+   - não editar nem apagar entradas;
+   - correção é uma entrada nova que cita a anterior;
+   - a cada entrada, anotar o SHA-256 do arquivo num índice separado da mesma pasta.
+7. **Guarda e eliminação:**
+   - nada é eliminado antes do "guardar até";
+   - depois disso, eliminar só por revisão registrada, verificando antes se há processo, pedido ou outra obrigação que exija prazo maior (art. 10, caput, parte final).
+8. **Cumprimento do item 3 da emenda:** existirem a pasta, o arquivo modelo vazio com os campos acima e a cópia cifrada.
+
+**Exigências adicionais da Spec e da Constituição.** A Spec não tem requisito próprio sobre registro de incidentes. Aplicam-se:
+- Constituição P7: dados pessoais protegidos, acesso restrito, "logs sem PII em texto aberto". Isso justifica os itens 1 e 2.
+- R8.1.1: o `audit_log` não copia conteúdo pessoal. A regra é do `audit_log`, e o procedimento a segue por analogia; não é exigência direta para um registro documental.
+- `OPERACAO.md`: em incidente, suspender alterações, restaurar o banco e o código da mesma versão em ambiente separado, validar e reabrir. É um passo de resposta operacional, não um campo do registro.
+- A guarda de 5 anos já constava da decisão de retenção como item I, prazo de norma e não escolha (§12).
+
+### 14.3 Respostas que faltam para finalizar O2, os textos operacionais e a emenda
+
+1. **Vínculo com a EAG** (§14.1): você atua como empregado, franqueado, representante ou autônomo?
+2. **Contrato e instruções:** algum contrato ou instrução da EAG define:
+   - quais empresas prospectar;
+   - de quem são os contatos e as oportunidades;
+   - como usar ou guardar dados de contatos?
+
+   Responda sim ou não e, se sim, indique o documento.
+3. **Decisão de prospectar:** a decisão de prospectar estas 13 unidades foi sua, por conta própria?
+4. **Canal do titular (O2):** qual endereço de e-mail atende pedidos de titulares?
+5. **Textos de O1, O3 (com o teste da §4), O4, O5, O7, O8 e O9:** aprova como estão na §13.1 ou indica mudanças?
+6. **Pequeno porte:** declarar ou não o enquadramento? Responda depois da resposta 1.
+7. **Registro de incidentes** (§14.2):
+   - aprova o procedimento documental?
+   - qual é o segundo local para a cópia cifrada?
+8. **Números das ligações:** qual número usar na Cimilho, na Sociagro e na Ração Ituiutaba, e qual canal para a BRF.
+9. **Emenda (§13.2 com os ajustes desta seção) e proposta de registro da validação:** aprova?
+
+**Continua pendente de comprovação, sem resposta sua que a substitua:**
+- transferência internacional (L9): mecanismo do art. 33 para os serviços da Cloudflare usados. A mensagem da §11 está pronta e não foi enviada.
+
+### 14.4 Ajustes na §13 (prevalecem sobre o texto anterior)
+
+- **O2:** "Sou o controlador do tratamento feito no Compass e atendo pedidos de titulares pelo endereço [ENDEREÇO]." Esse texto vale só se as respostas 1–3 confirmarem a primeira hipótese do item 3 da §14.1. Nas outras hipóteses, o texto indica o controlador identificado e o canal dele.
+- **O8, registro:** "Registro todo incidente conforme o procedimento da §14.2, por no mínimo 5 anos."
+- **Emenda §13.2, novo item 0:** "controlador do tratamento no Compass identificado pelos fatos de quem decide finalidades e meios (§14.1), com as respostas registradas".
+- **Emenda §13.2, item 3:** "registro de incidentes existente, documental (§14.2) ou no Compass, com guarda mínima de 5 anos".
+- **§13.3:**
+  - deixam de valer a linha "EAG: consultar e seguir sob sua responsabilidade, ou aguardar" e a pendência "Implementação necessária antes da liberação: registro de incidentes";
+  - a consulta à EAG passa a ser só uma fonte opcional de fatos para a §14.1;
+  - a única implementação ainda necessária antes da liberação é a rota de registro da validação, depois da aprovação da emenda.
