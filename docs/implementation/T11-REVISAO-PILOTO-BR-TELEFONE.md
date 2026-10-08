@@ -260,7 +260,7 @@ Em ordem. Nenhuma exige parecer externo.
   - empresa fictícia;
   - cópias no Time Travel do D1.
 - **Fora do Compass:** nada (sem e-mail enviado, sem ponte envolvida).
-- **Achados para correção futura (código, com teste):** apagar "relevância" e o hash do nome na exclusão; D-EXC (§9).
+- **Achados:** a exclusão não apagava "relevância" nem o hash do nome. **Corrigido em 08/10/2026** na `v2-revisao-2`, não publicado: a exclusão passa a apagar os dois, e a migração 0036 corrige as linhas já excluídas, inclusive a do teste fictício, quando for aplicada. Pendente: D-EXC (§9).
 
 ## 9. D-EXC: telefone depois da exclusão (proposta, não implementada)
 

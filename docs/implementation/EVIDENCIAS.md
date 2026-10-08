@@ -1648,3 +1648,22 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
   - `erasure_ledger` com 2 linhas; registro no R2; 2 auditorias sem dados pessoais.
 - **Resíduos e achados:** o texto "relevância" e o hash do nome da pessoa ficaram. Detalhes em `T11-REVISAO-PILOTO-BR-TELEFONE.md` §8; proposta D-EXC na §9.
 - Dados reais, as 13 ligações, os canais e as campanhas não foram alterados.
+
+### Correção da exclusão: relevância e hash do nome (08/10/2026; não publicada, sem migração em produção)
+
+- **Falha reproduzida:** novo caso em `tests/exclusao-purga.test.mjs`. A "relevância" da pessoa excluída continuava com o texto sobre ela.
+- **Correção em `src/erasure.js`:**
+  - a exclusão grava a marca de conteúdo excluído em `relevance` e troca `name_hash` por `purged:<id>`, um valor sem relação com o nome que respeita o NOT NULL e a unicidade;
+  - assim nenhum bloqueio por nome fica implícito (R21.3);
+  - linha já excluída não é regravada, então um pedido repetido não muda nada;
+  - linha restaurada de backup volta sem a marca e é excluída de novo na reaplicação (teste existente de restauração passou).
+- **Migração 0036:** aplica o mesmo às linhas já excluídas pelo código anterior; é repetível e não alcança terceiros. **Não aplicada em produção.**
+- **Testes:**
+  - relevância e hash apagados, sem nenhuma linha com o hash antigo;
+  - João (terceiro, mesma empresa) e uma homônima "Maria Souza" de outra empresa intactos, coluna a coluna;
+  - aviso legal compartilhado mantém o João e o telefone geral;
+  - exclusão repetida não altera a linha, os terceiros nem as supressões;
+  - novo cadastro com o mesmo nome é aceito como registro novo;
+  - migração 0036 corrige só a linha excluída e pode rodar de novo.
+- **Efeito a considerar:** sem o hash do nome, a pesquisa automática pode reencontrar a mesma pessoa e sugeri-la de novo, a validar por Rogério. Impedir novo contato depende da supressão do e-mail (já existe) e da decisão D-EXC sobre o telefone.
+- **Verificação:** `npm run check` com 412 testes da suíte principal, 2 do Worker e 16 da ponte. T11 pendente; 13 ligações bloqueadas; nada publicado.

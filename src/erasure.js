@@ -124,8 +124,11 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
     ),
     s(
       env,
-      "UPDATE person_candidates SET name_encrypted=?,title_encrypted=NULL,email_encrypted=NULL,email_source_url=NULL,phone_encrypted=NULL,phone_source_url=NULL,purchase_note=NULL,purchase_source_url=NULL,source_url='purged',status='dismissed',dismiss_reason='personal_data_deleted' WHERE tenant_id=? AND contact_id=?",
-      marker, tenant, contactId,
+      // Relevância é texto livre sobre a pessoa; o hash do nome é pseudônimo e serviria para reconhecê-la pelo nome
+      // (R21.3 veda bloquear por nome). Saem os dois; o hash vira um valor sem relação com o nome (NOT NULL e único).
+      // Linha já excluída não é regravada (pedido repetido não muda nada); linha restaurada de backup volta sem a marca.
+      "UPDATE person_candidates SET name_encrypted=?,name_hash='purged:'||id,relevance=?,title_encrypted=NULL,email_encrypted=NULL,email_source_url=NULL,phone_encrypted=NULL,phone_source_url=NULL,purchase_note=NULL,purchase_source_url=NULL,source_url='purged',status='dismissed',dismiss_reason='personal_data_deleted' WHERE tenant_id=? AND contact_id=? AND dismiss_reason IS NOT 'personal_data_deleted'",
+      marker, PURGED, tenant, contactId,
     ),
     s(env, "UPDATE contact_verifications SET source_reference=NULL WHERE tenant_id=? AND contact_id=?", tenant, contactId),
     ...logs.results.map((l) => s(env, "UPDATE send_log SET detail=? WHERE id=?", redactAddresses(l.detail), l.id)),

@@ -319,3 +319,63 @@ check("EXCLUSAO-PURGA: mensagem da pessoa relida depois da purga é reconhecida 
   assert.equal(DB.prepare("SELECT COUNT(*) n FROM tasks").get().n, before);
   assert.equal([...ctx.env.FILES.store.keys()].some((k) => k.startsWith("inbound/9/")), false);
 });
+
+check("EXCLUSAO-PURGA: relevância e hash do nome saem; terceiros, homônima de outra empresa e conteúdo compartilhado ficam; repetir não muda", async (ctx) => {
+  const r = await scenario(ctx);
+  const DB = ctx.DB.raw;
+  // Homônima: outra "Maria Souza", de outra empresa (outro hash, outra pessoa), que não pode ser alcançada.
+  const outra = (await ctx.api("/api/companies", "POST", { legalName: "Outra Indústria Fictícia Ltda.", countryCode: "BR", sourceLabel: "Registro fictício de teste" })).data.id;
+  DB.prepare(
+    `INSERT INTO person_candidates(id,tenant_id,company_id,name_encrypted,name_hash,title_encrypted,role_suggestion,relevance,source_kind,source_url,verified_at,refresh_after,status,created_by)
+     VALUES ('pc-homonima','eag-internal',?,?,?,?,'decision_maker','Compradora da outra indústria','manual','https://outra.exemplo.invalid/equipe','2099-01-01','2099-07-01','to_validate','teste')`,
+  ).run(outra, await encryptPii("Maria Souza", ctx.env), await nameHash(ctx.env, "eag-internal", outra, "Maria Souza"), await encryptPii("Compras", ctx.env));
+  DB.prepare("UPDATE person_candidates SET relevance='Maria Souza, compradora de açúcar desde 2020 (perfil público)' WHERE id='pc-maria'").run();
+  const originalHash = DB.prepare("SELECT name_hash FROM person_candidates WHERE id='pc-maria'").get().name_hash;
+  const before = (id) => ({ ...DB.prepare("SELECT * FROM person_candidates WHERE id=?").get(id) });
+  const joao = before("pc-joao"), homonima = before("pc-homonima");
+
+  assert.equal((await erase(ctx, r.dm)).status, 200);
+  const pm = before("pc-maria");
+  assert.equal(pm.relevance, PURGED, "relevância (texto livre sobre a pessoa) apagada");
+  assert.equal(pm.name_hash, "purged:pc-maria", "hash do nome trocado por valor sem relação com o nome");
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM person_candidates WHERE name_hash=?").get(originalHash).n, 0, "nenhuma linha guarda o hash do nome dela");
+  // Terceiros intactos: João (mesma empresa) e a homônima (outra empresa), coluna a coluna.
+  assert.deepEqual(before("pc-joao"), joao);
+  assert.deepEqual(before("pc-homonima"), homonima);
+  // Conteúdo compartilhado: o aviso legal mantém o João e o telefone geral.
+  const cache = await impressum(ctx);
+  assert.deepEqual(cache.people, [{ name: "João Lima", title: "Geschäftsführer" }]);
+  assert.equal(cache.phone, "+55 16 3333-0000");
+
+  // Exclusão repetida: nada muda na linha excluída, nos terceiros nem nas supressões.
+  const sup = DB.prepare("SELECT COUNT(*) n FROM suppression_entries").get().n;
+  assert.equal((await erase(ctx, r.dm, "Repetição fictícia do pedido")).status, 200);
+  assert.deepEqual(before("pc-maria"), pm);
+  assert.deepEqual(before("pc-joao"), joao);
+  assert.deepEqual(before("pc-homonima"), homonima);
+  assert.equal(DB.prepare("SELECT COUNT(*) n FROM suppression_entries").get().n, sup);
+
+  // Sem bloqueio pelo nome (R21.3): um novo cadastro com o mesmo nome é aceito como registro novo; o excluído não muda.
+  const again = await ctx.api(`/api/companies/${r.companyId}/people`, "POST", {
+    name: "Maria Souza", title: "Compradora", sourceKind: "manual", sourceUrl: "https://valeverde.exemplo.invalid/equipe", relevance: "Novo cadastro a validar",
+  });
+  assert.equal(again.status, 201, JSON.stringify(again.data));
+  assert.notEqual(again.data.id, "pc-maria");
+  assert.deepEqual(before("pc-maria"), pm);
+});
+
+check("EXCLUSAO-PURGA: migração 0036 corrige só pessoas já excluídas pelo código antigo e é repetível", async (ctx) => {
+  const r = await scenario(ctx);
+  const DB = ctx.DB.raw;
+  // Estado deixado pelo código anterior: excluída, mas com relevância e hash do nome.
+  DB.prepare("UPDATE person_candidates SET status='dismissed',dismiss_reason='personal_data_deleted',relevance='Maria Souza, compradora' WHERE id='pc-maria'").run();
+  const joao = { ...DB.prepare("SELECT * FROM person_candidates WHERE id='pc-joao'").get() };
+  const sql = readFileSync(new URL("../migrations/0036_exclusao_relevancia_nome.sql", import.meta.url), "utf8");
+  DB.exec(sql);
+  const pm = DB.prepare("SELECT relevance,name_hash FROM person_candidates WHERE id='pc-maria'").get();
+  assert.deepEqual({ ...pm }, { relevance: PURGED, name_hash: "purged:pc-maria" });
+  assert.deepEqual({ ...DB.prepare("SELECT * FROM person_candidates WHERE id='pc-joao'").get() }, joao, "terceiro intacto");
+  DB.exec(sql);
+  assert.deepEqual({ ...DB.prepare("SELECT relevance,name_hash FROM person_candidates WHERE id='pc-maria'").get() }, { ...pm });
+  assert.ok(r.companyId);
+});
