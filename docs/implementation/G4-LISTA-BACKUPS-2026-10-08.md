@@ -1,4 +1,4 @@
-# G4: arquivos que a regra D1 eliminaria (lista de 08/10/2026; NÃO executado)
+# G4: arquivos eliminados pela regra D1 (lista de 08/10/2026; **executada em 08/10/2026**: 135 de 135 excluídos, 0 falhas; ver EVIDENCIAS)
 
 **Regra (decisão D1 de Rogério Palhari, 08/10/2026):** guardar a exportação do D1 só até a migração seguinte confirmada; apagar a anterior. A migração 0038 foi confirmada em produção em 08/10/2026.
 

@@ -1858,3 +1858,20 @@ T11 pendente; 13 ligações bloqueadas.
   - T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas;
   - 3 supressões; 0 empresas descartadas.
 - **Se a limpeza for interrompida:** recomeçar pela comparação da lista; os arquivos já apagados aparecem como ausentes e não são recriados.
+
+## Limpeza G4 executada (08/10/2026, autorizada por Rogério)
+
+- **Antes de excluir:**
+  - backup que permanece (`d1-remoto-antes-0038-20261008\eag_compass.sql`) existente e legível, com 29.600.928 bytes e o SHA-256 da lista;
+  - os **135 arquivos** da `G4-LISTA-BACKUPS-2026-10-08.md` conferidos por caminho completo, tamanho e SHA-256: **135 conferem, 0 divergências**;
+  - nenhum arquivo fora da lista dentro das 15 pastas.
+- **Execução:** exclusão arquivo a arquivo, pelo caminho completo da lista, reconferindo tamanho e hash imediatamente antes de cada um; sem curingas nem exclusão por prefixo. Pastas removidas só quando vazias (remoção não recursiva, da mais funda para cima).
+- **Resultado:**
+  - **135 arquivos excluídos**, **0 falhas**, **200.322.768 bytes liberados** (cerca de 191 MiB);
+  - **83 pastas vazias removidas**: as 15 da lista e 68 subpastas internas das cópias locais; nenhuma pasta ficou com conteúdo.
+- **Conferido depois:**
+  - nenhum arquivo nem pasta da lista restou;
+  - em `C:\Users\Roger\eag-compass-backups` ficaram só `d1-remoto-antes-0038-20261008` (hash conferido de novo, igual), `ponte-config-antes-prazo-20261006` (1 arquivo) e `segredos-producao-2026-09-24.txt`.
+  - Nenhum conteúdo de backup foi lido além do cálculo de hash, nem exposto.
+- **Não feito:** suíte de testes, publicação de código e restauração do banco. T11 pendente; 13 ligações bloqueadas; canais `planned`; campanhas inativas.
+- **Próxima aplicação da regra D1:** depois da próxima migração confirmada, apagar `d1-remoto-antes-0038-20261008` e manter só a exportação nova.
