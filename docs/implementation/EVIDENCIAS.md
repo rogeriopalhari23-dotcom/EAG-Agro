@@ -1720,3 +1720,46 @@ Cada run registra a consulta (CNPJ, país, razão social) e as versões das 3 li
 - **Verificações:** `npm run check` com 419 testes da suíte principal, 2 do Worker e 16 da ponte; `validate-deploy` e `npm run test:ui` passaram.
 - **Publicação:** pendente de autorização. A 0037 só cria uma tabela; o Worker atual não a usa.
 - **Estado:** T11 pendente; 13 ligações bloqueadas; canais `planned`.
+
+## Publicação da D-EXC e da exibição dos avisos (08/10/2026, autorizada por Rogério)
+
+**Commits:**
+- `c85c71d`: D-EXC, migração 0037;
+- `bcaea9a`: avisos na tela da empresa com ou sem tarefa aberta.
+- O teste de interface reproduziu a ausência (falhava sem tarefa) e comprova os três estados: sem tarefa, com tarefa aberta e depois de a última ser encerrada. O teste da API confirma os avisos sem tarefa aberta.
+- `npm run check`: 419 testes da suíte principal, 2 do Worker e 16 da ponte. `validate-deploy` e `npm run test:ui` passaram.
+
+**Ponto de restauração:**
+- Worker anterior **22711368-72a1-43af-8fb3-286c2fc7b642** (100%);
+- bookmark do D1: `00000731-00000030-000050fe-f5b23fa92746a217c432d4c2843b5241`;
+- backup privado: `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0037-20261008\eag_compass.sql`, 29.586.941 bytes, SHA-256 `5276be7f5587a4f09b8253bea5ae184140480dbea6bfcf8baca29b71015c7836`, acesso só de `ROGERIONOTE\Roger`.
+
+**Migração:**
+- só a 0037 estava pendente e foi aplicada;
+- `company_notices` criada (índice e gatilhos contra alteração e exclusão), com **0 avisos**;
+- pessoas e supressões idênticas, por impressão SHA-256 linha a linha;
+- depois: "No migrations to apply".
+
+**Publicação:** Worker **bccbfb21-5fe4-4b16-b36e-3eea8770d8ea**, 100% do tráfego, 2026-10-08T20:35:10Z, pelo `npm run deploy`.
+
+**Conferido sem exclusão de contato real nem oposição real:**
+- **API:**
+  - `GET /api/tasks` em 2,2 s; 13 ligações, todas com `t11_pending` (6 também com `phone_missing`), nenhuma sem bloqueio; campo `notices` presente;
+  - ficha de empresa com `notices: []`;
+  - `GET /api/contacts/<contato fictício excluído>/erasure-phones` com resposta 200 e lista vazia.
+- **Navegador (produção):**
+  - Início em ~1,2 s e Tarefas em ~2,3 s, sem erros;
+  - "Para fazer (0)" e "Bloqueadas (13)";
+  - os 13 formulários de oposição com o tipo do número (não confirmado, pessoal, ramal direto, número geral, ramal atrás do geral);
+  - ficha de empresa aberta no painel sem erro.
+- **Estado:**
+  - pessoas e supressões sem mudança; 0 validações T11; 0 avisos;
+  - 15 tarefas; 35 linhas de histórico;
+  - canais `planned`; campanhas: 1 rascunho e 1 encerrada; outbox: 5 aceitos e 19 cancelados (nenhum envio novo);
+  - ponte com leitura bem-sucedida às 20:37:45 UTC, depois do deploy.
+
+**Reversão:**
+- Código: `npx wrangler rollback 22711368-72a1-43af-8fb3-286c2fc7b642`. É compatível com a 0037, que só cria uma tabela; o Worker anterior não a usa. Com ele, a oposição volta a suprimir sempre e a exclusão volta a não tratar o telefone.
+- Não restaurar backup nem Time Travel para reverter código: isso devolveria dados excluídos.
+
+**Retenção dos avisos e das supressões:** pendente da decisão A. Esta publicação não valida a T11 nem libera contatos.

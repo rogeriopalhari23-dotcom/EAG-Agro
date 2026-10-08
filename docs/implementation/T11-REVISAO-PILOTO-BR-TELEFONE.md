@@ -262,7 +262,7 @@ Em ordem. Nenhuma exige parecer externo.
 - **Fora do Compass:** nada (sem e-mail enviado, sem ponte envolvida).
 - **Achados:** a exclusão não apagava "relevância" nem o hash do nome. **Corrigido em 08/10/2026** na `v2-revisao-2`, não publicado: a exclusão passa a apagar os dois, e a migração 0036 corrige as linhas já excluídas, inclusive a do teste fictício, quando for aplicada. Pendente: D-EXC (§9).
 
-## 9. D-EXC: telefone depois da exclusão (aprovada em 08/10/2026 com a opção (a); implementada na `v2-revisao-2`, não publicada)
+## 9. D-EXC: telefone depois da exclusão (aprovada em 08/10/2026 com a opção (a); publicada em 08/10/2026, Worker `bccbfb21`)
 
 - **Exclusão x oposição:**
   - a exclusão (LGPD art. 18, IV e VI) apaga os dados da pessoa;
@@ -304,7 +304,7 @@ Em ordem. Nenhuma exige parecer externo.
 **Tela:**
 - o formulário de oposição pede o tipo do número (padrão "não confirmado");
 - os avisos aparecem na ligação e na ficha da empresa.
-- Limite: a ficha da empresa mostra os avisos só quando há tarefa aberta.
+- A ficha da empresa mostra os avisos com ou sem tarefa aberta (corrigido em `bcaea9a`).
 
 **Testes** (`tests/dexc-telefone.test.mjs`, 7 casos):
 - número pessoal, número geral com terceiros, dúvida, conflito;
