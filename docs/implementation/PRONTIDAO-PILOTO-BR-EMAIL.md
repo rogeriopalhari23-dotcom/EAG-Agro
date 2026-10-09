@@ -197,3 +197,56 @@ Opções de cumprimento, a decidir:
 - **D5-c:** pedir à EAG confirmação escrita de que o e-mail de identificação dispensa cópia até haver resposta.
 
 Referências e trechos estão na análise privada (fora do Git).
+
+### Efeito, recomendação e fundamento (09/10/2026)
+
+| Texto | Efeito se aprovado | Recomendação | Fundamento |
+|---|---|---|---|
+| E1 | Fixa a base legal do escopo "e-mail Brasil". Entra no futuro registro da validação desse escopo. Não aprova fichas | Aprovar | LGPD art. 7º, IX, e art. 10 (finalidade legítima, situação concreta, só dados necessários, transparência no § 2º); guia da ANPD sobre legítimo interesse (2024). Canal institucional publicado e salvaguardas R19.2, R19.10 e R21 já implementadas |
+| E2-a | Nada muda no modelo nem nas fichas | — | Art. 9º atendido a pedido |
+| E2-b | Modelo `id-pt-1.2.0`: mudança de código e publicação. As 3 fichas ganham versão nova e voltam à revisão | **E2-b** | Art. 9º (informação clara e facilitada) e art. 10, § 2º (transparência reforçada no legítimo interesse): a origem do endereço e o canal do titular vão na própria mensagem |
+| OpenClaw A | Exige a base, que hoje não existe | Não recomendada agora | R21.8 e R25.2 |
+| OpenClaw B | Registro datado na Spec (decisão de Rogério), mais o cadastro manual das supressões conhecidas | **B**, com a declaração preenchida por Rogério | R21.8 e R25.2 pedem importação ou exceção; a base é irrecuperável (VPS reinstalada em 24/09) |
+
+## 7. Plano da D5-a (cópia oculta; não implementado)
+
+**Desenho recomendado: mensagem de cópia separada, não Bcc no mesmo envelope.**
+- Com Bcc, a cópia leva os mesmos bytes, inclusive o link de descadastro do prospect e o cabeçalho `List-Unsubscribe`.
+- O GET do link só mostra a confirmação, mas o botão "cancelar inscrição" de um cliente de e-mail faz o POST one-click (RFC 8058).
+- Ou seja: um clique na caixa de vendas suprimiria o prospect.
+- A cópia separada continua invisível ao prospect e não carrega esse risco.
+
+1. **Destinatário fixo autorizado:**
+   - parâmetro `email_copy_to:email`, gravado só por Administrador, com motivo, vigência e referência ao contrato;
+   - na ponte, uma lista local de permitidos com o mesmo endereço (`COPY_TO`);
+   - se o Worker pedir cópia a um endereço diferente da lista local, ou se a configuração faltar com a cópia ligada, a ponte **não pega o passo** (falha fechada) e alerta;
+   - a ficha mostra "Cópia interna: vendas@ (contrato)"; o destinatário aprovado continua único (nota na R19.1).
+2. **Conteúdo da cópia:**
+   - mesmo texto e assunto, com o prefixo "[Cópia] ";
+   - link de descadastro trocado por "[link do destinatário omitido na cópia]";
+   - sem `List-Unsubscribe`;
+   - cabeçalho `X-EAG-Copy-Of` com o Message-ID original;
+   - `To` só vendas@ e `Reply-To` Rogério.
+3. **Ordem:** a cópia sai só depois do aceite SMTP do passo do prospect. Passo não aceito, indeterminado ou cancelado não gera cópia.
+4. **Proteção contra duplicidade na recuperação:**
+   - Message-ID da cópia determinístico pelo `outboxId`;
+   - no diário, estados `copy_pending → copy_started → copy_done → copy_reported`;
+   - após uma queda em `copy_started`, a ponte procura o Message-ID nos enviados: achou, conclui; não achou com leitura bem-sucedida, reenvia uma vez; leitura falhou, fica `indeterminate` e não reenvia sem decisão;
+   - o retorno ao Worker (`/api/bridge/copy-result`) é idempotente por `outboxId`;
+   - falha na cópia nunca reenvia o e-mail do prospect: gera alerta e tarefa.
+5. **Respostas:**
+   - mensagens vindas da caixa de vendas ou do domínio da EAG são internas;
+   - nunca contam como resposta do prospect, nunca suprimem e nunca abrem tarefa de resposta.
+6. **Testes internos (sem tocar vendas@ real):**
+   - **unitários da ponte:** montagem da cópia sem link nem cabeçalho de descadastro; Message-ID determinístico; todos os estados do diário; queda antes, durante e depois da cópia (achada ou não nos enviados, IMAP indisponível); lista local diferente → passo não pego; falha permanente da cópia → prospect continua `accepted` e alerta;
+   - **do Worker:** parâmetro só para Administrador e com motivo; retrato da ficha com a cópia; destinatário aprovado inalterado; classificação interna das respostas;
+   - **ponta a ponta:** campanha de teste, canal `internal_test`, cópia para um alias interno (por exemplo `+ponte-copia`); conferir 1 cópia por passo, inclusive depois de queda simulada;
+   - só depois, com autorização de Rogério, trocar o destino para vendas@.
+
+## 8. Estado das comprovações e da validação (conferido em 09/10/2026)
+
+| Item | Estado | Evidência |
+|---|---|---|
+| Cloudflare: mecanismo do art. 33 (L9) | **Pendente** | Mensagem pronta (revisão §11). Nenhum envio nem resposta registrados; busca no Gmail rogeriopalhari23@ em 09/10 sem resultado. D-L9 em aberto |
+| Procedimento de registro de incidentes | **Pendente** | Proposta na revisão §14.2, não aprovada. A pasta `eag-compass-registros\incidentes` não existe (09/10) |
+| Validação T11 | **Pendente** | Produção em 09/10: 13 tarefas com `t11_pending` (6 também com `phone_missing`); nenhuma validação registrada; escopo e-mail sem registro. Canal `planned`, campanha de milho `draft`, 3 fichas `in_approval` |
