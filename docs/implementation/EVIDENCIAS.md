@@ -1903,3 +1903,89 @@ T11 pendente; 13 ligações bloqueadas.
   - Nos testes, a cópia só vai a alias interno; o e-mail de vendas da EAG nunca é usado.
 - **Não feito:** migração em produção, publicação, novas versões das fichas em produção (dependem da publicação), Snov, envio, aprovação, ativação; canal `planned`; nenhuma validação T11 registrada.
 - **Plano de publicação:** `PRONTIDAO-PILOTO-BR-EMAIL.md` §11.
+
+## Publicação do Worker com a migração 0039 (2026-10-09, autorizada por Rogério)
+
+- **Commit publicado:** `cc407983a0d1eae120aa8ee73c009aebdde14a3d` (`v2-revisao-2`, igual ao remoto).
+- **Migrações pendentes antes:** só `0039_copia_interna_t11_email.sql`.
+- **Antes de mudar:**
+  - Worker vigente `663077c0-0065-4f1c-8f79-660d18cc106e` (100%);
+  - Time Travel `00000757-0000003c-000050ff-6ab6d1eabc40f2adbe3268ce4b521d39`;
+  - backup privado `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0039-20261009\eag_compass.sql` (29.889.064 bytes, SHA-256 `42f948b776f390dda8802a51736d58248ffdb8d3978259f5313750bd2ccf96a7`, acesso só de `ROGERIONOTE\Roger`).
+- **Execução:**
+  1. `validate-deploy` sem pendência; nenhum servidor local ativo.
+  2. `npm run db:migrate:remote`: 0039 aplicada (7 comandos).
+  3. **Esquema conferido:** `send_copies`, `idx_send_copies_ready`, `compliance_validation_evidence`, índice e 2 gatilhos de imutabilidade (6 objetos); "No migrations to apply".
+  4. `npm run deploy`: `check` 432/432, 2/2, 30/30. **Worker `64808403-3831-4004-a4ce-6d14ed2fe711` (100%)**, 09:35 UTC.
+- **Conferido em produção depois:**
+  - **T11:** `GET /api/compliance/t11` → `pending`, histórico vazio; `compliance_validations` = 0.
+  - **Cópia desligada:** `email_copy_to` ausente (definição publicada); as fichas mostram `internalCopy.enabled=false`.
+  - **Canais e campanhas:** canais email, linkedin e whatsapp `planned`; campanhas 2 `draft` + 1 `ended`, nenhuma ativa.
+  - **Fila sem novos envios:** 5 `accepted` + 19 `cancelled`, igual a antes; `sentToday` 0; fila vazia.
+  - **Preservados**, contagens iguais às de antes:
+    - fichas: 6 `in_approval` + 6 `discarded`; as 3 do piloto continuam na versão 1 (`id-pt-1.1.0`), sem nova versão;
+    - 3 supressões;
+    - tarefas: 13 abertas + 2 concluídas;
+    - 15 contatos;
+    - 0 avisos.
+  - **Telas** (Chrome headless pelo Access):
+    - Início carrega em cerca de 2,1 s;
+    - Tarefas carrega em cerca de 2,2 s: 13 bloqueadas, todas com "T11 pendente", 6 sem telefone;
+    - nenhum erro de página.
+  - **Ponte (não atualizada):** último ciclo 09:37:19 UTC, leitura OK, motivo `nothing_due`, nenhum envio desde 06/10; `reply_reader_state.last_read_ok_at` 09:37:18 UTC.
+- **Não feito (fora da autorização):**
+  - atualizar a ponte;
+  - novas versões das fichas;
+  - testes com mensagens;
+  - configurar vendas@;
+  - registrar validação T11;
+  - liberar envios.
+- **Reversão do código:** `npx wrangler rollback 663077c0-0065-4f1c-8f79-660d18cc106e`. As tabelas da 0039 podem ficar: o código anterior não as usa e elas estão vazias.
+- **Banco:** **não** restaurar o Time Travel nem o backup para reverter código, porque isso traria de volta dados já excluídos (regra da sessão). O bookmark e o backup servem só para recuperação de desastre.
+
+### Para a próxima etapa
+
+**1. Onde a validação T11 vira condição efetiva da sequência automática de e-mail no Brasil (proposta, não implementada):**
+- **No pré-envio** (`src/sending.js`, `preSendCheck`, R19.2 item 6 "ausência de bloqueio de compliance"):
+  - antes de cada passo, exigir a decisão vigente do escopo `<país da empresa>_email_automatic` (para o Brasil, `br_email_automatic`), com a mesma consulta de `src/compliance.js`;
+  - sem validação vigente, o passo fica `blocked` com `block_reason='t11_pending'`, sem cancelar e sem mudar a ficha;
+  - uma revogação passa a valer no passo seguinte.
+  - É o ponto autoritativo: vale também para passos já aprovados e para o dia em que a validação for revogada.
+- **Na aprovação da ficha** (`src/fichas.js`, `approvalGates`): o mesmo item como condição de aprovação para fichas de e-mail do país, para a tela mostrar o motivo antes de aprovar.
+- **Exceção:** canal `internal_test` com destinatários da lista interna (testes da ponte), que não são contato real.
+- O estado do canal (`planned` / `habilitado`) continua decisão separada de Rogério (R26.3); a validação não liga o canal.
+
+**2. Comportamento real da D5-a (implementado e publicado no Worker; a ponte ainda não foi atualizada):**
+- **Não é Bcc.** É uma **mensagem separada**, e só depois de o SMTP aceitar o passo do prospect. A mensagem original continua com um único destinatário no envelope; a ponte recusa enviar qualquer envelope com mais de um.
+- A cópia:
+  - vai ao endereço fixo do parâmetro `email_copy_to` (só Administrador), que também precisa estar na lista local da ponte (`BRIDGE_COPY_TO`);
+  - tem assunto "[Cópia] …" e uma linha de identificação com data, destinatário e passo;
+  - leva o corpo aprovado com o link de descadastro do prospect trocado por um aviso, sem `List-Unsubscribe`;
+  - leva `X-EAG-Copy-Of` com o Message-ID original e Message-ID próprio determinístico (`<copia-<outboxId>@…>`).
+- **Recuperação de falhas:**
+  - **Diário da ponte:** registra a cópia antes do SMTP. Queda antes do SMTP: volta à fila e sai uma vez depois.
+  - **Queda depois do aceite e antes de avisar o Compass:** ao voltar, informa "aceita", sem reenviar.
+  - **Queda durante o SMTP:** a ponte procura o Message-ID nos enviados. Achou: aceita. Não achou, ou enviados indisponíveis: `indeterminate`, **sem reenvio automático**, porque a pasta de enviados é gravada pela ponte e "não achada" não prova que não saiu.
+  - **Respostas do SMTP:** temporária tenta de novo (até 3, a cada 1 h); permanente para; aceitação parcial do envelope vira `indeterminate`.
+  - **Reserva vencida no Compass sem notícia da ponte:** `indeterminate`.
+  - **Isolamento:** nada disso reenvia nem altera o passo do prospect.
+- **Falha fechada:** com a cópia ligada e o endereço fora da lista local, o Compass não reserva nenhum passo.
+- **Mensagens internas:** respostas vindas do endereço da cópia ou do domínio da caixa não contam como resposta de prospect; devolução da cópia não suprime ninguém.
+- **Hoje:** cópia desligada em produção; a ponte local ainda é a versão antiga, que funciona normalmente enquanto a cópia estiver desligada.
+
+### Limpeza correspondente à D1 (lista; nada foi apagado)
+
+Regra D1: a exportação do D1 fica guardada só até a migração seguinte confirmada. Com a 0039 aplicada e conferida, fica elegível:
+
+| Arquivo | Bytes | SHA-256 |
+|---|---|---|
+| `d1-remoto-antes-0038-20261008\eag_compass.sql` | 29.600.928 | `376ec0b3ef40a4624ab25a5b01f7a3f4f3cbe59ef8361937367040bff0065ab7` |
+
+Depois do arquivo, a pasta `d1-remoto-antes-0038-20261008`, se ficar vazia.
+
+**Permanecem:**
+- `d1-remoto-antes-0039-20261009` (backup vigente);
+- `ponte-config-antes-prazo-20261006`;
+- `segredos-producao-2026-09-24.txt`.
+
+A exclusão depende de autorização de Rogério.
