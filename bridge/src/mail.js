@@ -18,7 +18,8 @@ export async function buildRaw(m) {
     text: m.text,
     ...(m.html ? { html: m.html } : {}),
     messageId: m.messageId,
-    headers: { "List-Unsubscribe": m.headers["List-Unsubscribe"], "List-Unsubscribe-Post": m.headers["List-Unsubscribe-Post"] },
+    // Só os cabeçalhos presentes (a cópia interna D5-a não leva os de descadastro); Message-ID vai pelo campo próprio.
+    headers: Object.fromEntries(Object.entries(m.headers ?? {}).filter(([k, v]) => v != null && k.toLowerCase() !== "message-id")),
   }).compile();
   return { raw: await node.build(), envelope: node.getEnvelope() };
 }
@@ -72,6 +73,9 @@ export function smtpClient({ host, port, user, pass, Connection = SMTPConnection
       }
       try {
         const info = await cb((done) => conn.send(envelope, raw, done));
+        // Aceitação parcial (algum destinatário aceito e outro recusado) não é "recusado": parte pode ter saído. Fica
+        // indeterminado e nunca é reenviado sem decisão. Cada mensagem da ponte tem um só destinatário no envelope.
+        if (info.rejected?.length && info.accepted?.length) return { kind: "indeterminate", code: null, text: "aceitação parcial do envelope" };
         if (info.rejected?.length) return { kind: "permanent", code: null, text: "destinatário recusado" };
         return { kind: "accepted", code: Number(String(info.response ?? "").slice(0, 3)) || 250, text: String(info.response ?? "").slice(0, 160) };
       } catch (err) {

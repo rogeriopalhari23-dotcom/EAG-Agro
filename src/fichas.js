@@ -15,6 +15,7 @@ import { unsubUrl } from "./unsub-token.js";
 import { erasuresConsistent } from "./erasure.js";
 import { complianceStatus } from "./scores.js";
 import { manualTaskStatements, recipientPhone, phoneSuppressed } from "./tasks.js";
+import { copyConfig, copiesFor } from "./internal-copy.js";
 
 const ROLES = ["decision_maker", "influencer", "provisional_decision_maker"];
 async function sha256(text) {
@@ -218,8 +219,13 @@ export async function getFicha(env, actor, id) {
     const [contactId, channel] = key.split("|");
     toApprove.push({ contactId, channel, messagesSha256: await approvalHash(list.sort((a, b) => a.step - b.step).map((m) => m.sha256)) });
   }
+  // D5-a: cópia interna configurada (endereço fixo do parâmetro) e estado da cópia de cada passo aceito.
+  const copyCfg = copyConfig(await parameters(env, actor.tenant_id));
+  const copies = await copiesFor(env, actor.tenant_id, outbox.results.map((o) => o.id));
+  for (const o of outbox.results) o.copy = copies.get(o.id) ? { status: copies.get(o.id).status, evidence: copies.get(o.id).evidence, acceptedAt: copies.get(o.id).accepted_at } : null;
   return {
     ficha: f,
+    internalCopy: copyCfg.enabled ? { enabled: true, address: copyCfg.address, contractRef: copyCfg.contractRef } : { enabled: false },
     version: { no: v.version_no, id: v.id, purpose: v.purpose, language: v.language, reviewOk: !!v.review_ok, findings: JSON.parse(v.pv_report_json), skill: v.skill_sha256, templates: v.templates_version, generator: v.generator_version, snapshot: JSON.parse(await decryptPii(v.snapshot_enc, env)) },
     messages, approvals: approvals.results, toApprove, outbox: outbox.results,
     approvalGates: await approvalGates(env, actor, f, v, toApprove, msgs.results),

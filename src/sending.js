@@ -9,6 +9,7 @@ import { restrictionsFor } from "./restrictions.js";
 import { erasuresConsistent, redactAddresses } from "./erasure.js";
 import { unsubUrl } from "./unsub-token.js";
 import { smtpTransport } from "./adapters/mailbox.js";
+import { copyOnAccept } from "./internal-copy.js";
 import { localDate, localParts, inWindow, addDays } from "./timezone.js";
 
 const LEASE_MS = 120000;
@@ -111,7 +112,7 @@ export async function preSendCheck(env, row, ctx) {
 }
 
 // Texto exato aprovado: decifra e confere o hash contra a mensagem e a outbox (R17.2, R19.1, AT25).
-async function approvedMessage(env, row) {
+export async function approvedMessage(env, row) {
   const m = await s(env, "SELECT * FROM ficha_messages WHERE id=?", row.message_row_id).first();
   const subject = await decryptPii(m.subject_enc, env);
   const body = await decryptPii(m.body_enc, env);
@@ -272,6 +273,7 @@ export async function settleFromBridge(env, tenant, outboxId, token, result, at,
     await env.DB.batch([
       s(env, "UPDATE send_outbox SET status='accepted',accepted_at=?,resolved_by='bridge',resolved_reason=?,updated_at=? WHERE id=? AND status='indeterminate' AND lease_token=?", at, result.detail ?? "aceito pelo SMTP (informado pela ponte)", at, row.id, token),
       log(env, row.id, "accepted_after_lease_expired", result.detail ?? null, token),
+      ...(await copyOnAccept(env, row, at)),
       s(env, "UPDATE sender_state SET day=?,sent_today=?,ramp_started_on=COALESCE(ramp_started_on,?) WHERE tenant_id=? AND sender=?", senderDay, sentToday + 1, senderDay, tenant, sender),
     ]);
     return { status: 200, outcome: "accepted", recovered: true };
@@ -305,6 +307,7 @@ async function settle(env, row, token, result, at, sentToday, senderDay, interva
       s(env, `UPDATE send_outbox SET status='accepted',accepted_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE ${fence}`, at, at, row.id, token),
       ...shift,
       log(env, row.id, "accepted", null, token),
+      ...(await copyOnAccept(env, row, at)),
       s(env, "UPDATE sender_state SET day=?,sent_today=?,next_send_at=?,ramp_started_on=COALESCE(ramp_started_on,?) WHERE tenant_id=? AND sender=?", senderDay, sentToday + 1, next, senderDay, row.tenant_id, sender),
       // Break enviado sem resposta: sugestão de retorno em 6 meses (ou no ciclo do ICP), sem nova sequência automática (R28.11, R17.7).
       ...(row.step_no === 4

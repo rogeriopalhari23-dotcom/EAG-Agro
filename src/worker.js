@@ -16,6 +16,7 @@ import * as catalog from "./catalog.js";
 import * as sectors from "./sectors.js";
 import * as search from "./search.js";
 import * as profiles from "./profiles.js";
+import * as compliance from "./compliance.js";
 import * as emailValidation from "./email-validation.js";
 import * as fichas from "./fichas.js";
 import { handleUnsubscribe } from "./unsubscribe.js";
@@ -104,6 +105,11 @@ async function route(request, env, rid) {
       // G1: lembrete da revisão anual da retenção A1 (só informa; nada expira).
       retentionReview: await retention.retentionReviewStatus(env, actor.tenant_id),
     });
+  }
+  // Validação T11 por escopo (só e-mail automático no Brasil nesta rota): registro só do Administrador, com evidências.
+  if (path === "/api/compliance/t11") {
+    if (method === "GET") return response(await compliance.listValidations(env, actor, u.searchParams.get("scope")));
+    if (method === "POST") return response(await compliance.recordValidation(request, env, actor, rid), 201);
   }
   if (path === "/api/retention" && method === "GET") return response(await retention.retentionOverview(env, actor));
   if (path === "/api/retention/reviews" && method === "POST") return response(await retention.addRetentionReview(request, env, actor, rid), 201);

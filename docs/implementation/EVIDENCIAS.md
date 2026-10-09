@@ -1889,3 +1889,17 @@ T11 pendente; 13 ligações bloqueadas.
 - **Não feito:** envio, aprovação, ativação, liberação do canal, Snov, testes (só documentação e gravações pela API).
 - **Observação:** a página oficial traz o telefone (64) 3514-1000 para a Unidade Boa Vista, diferente do (64) 3615-9700 registrado em 06/10. A tarefa de ligação não foi alterada.
 - Detalhes em `PRONTIDAO-PILOTO-BR-EMAIL.md` §§5–6.
+
+## E2-b, cópia D5-a e rota T11 do e-mail (2026-10-09, implementado sem publicar)
+
+- **Decisões de Rogério (09/10):** E1, E2-b, OpenClaw B (opção; declaração pendente), O7-e, O8-e, O9-e e D5-a. Ver `PRONTIDAO-PILOTO-BR-EMAIL.md` §9.
+- **Implementado:**
+  - modelo pt `id-pt-1.2.0` com a regra `TRANSP`;
+  - cópia interna separada (Worker: migração 0039, `src/internal-copy.js`, rotas da ponte, parâmetro `email_copy_to` só do Administrador, ficha e painel; ponte: lista local `BRIDGE_COPY_TO`, diário `copies`, recuperação, aceitação parcial indeterminada);
+  - rota `/api/compliance/t11` (só Administrador, só `br_email_automatic`, evidências obrigatórias com SHA-256, revogação por linha nova).
+- **Testes:**
+  - `npm run check`: principal 432/432, Worker 2/2, ponte 30/30; UI smoke OK;
+  - novos: `identificacao-transparencia` (5), `t11-email-validacao` (2), `bridge/test/copia-interna` (14).
+  - Nos testes, a cópia só vai a alias interno; o e-mail de vendas da EAG nunca é usado.
+- **Não feito:** migração em produção, publicação, novas versões das fichas em produção (dependem da publicação), Snov, envio, aprovação, ativação; canal `planned`; nenhuma validação T11 registrada.
+- **Plano de publicação:** `PRONTIDAO-PILOTO-BR-EMAIL.md` §11.

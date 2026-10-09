@@ -2574,6 +2574,7 @@ async function fichasView() {
   return node;
 }
 
+const COPY_LABEL = { pending: "aguardando envio", leased: "enviando", accepted: "aceita pelo servidor", temp_failed: "falha temporária (nova tentativa)", permanent_failed: "falhou — verificar", indeterminate: "resultado incerto — verificar nos enviados" };
 async function showFicha(id) {
   const d = await api(`/api/fichas/${id}`);
   const v = d.version;
@@ -2627,6 +2628,8 @@ async function showFicha(id) {
       item("Aprovações", `${approvedGroups} de ${d.toApprove.length}`, "Cada destinatário e canal é aprovado à parte."),
       item("Finalidade e idioma", `${v.purpose === "identify_buyer" ? "Identificar o responsável" : "Reunião com o comprador"} · ${String(v.language || "").toUpperCase()}`),
       item("Revisor PV", bad.length ? `${bad.length} violação(ões)` : "Sem violações", `modelos ${v.templates}`),
+      // D5-a: cópia interna separada de cada e-mail aceito, ao endereço fixo do contrato (parâmetro só do Administrador).
+      item("Cópia interna", d.internalCopy?.enabled ? d.internalCopy.address : "Desligada", d.internalCopy?.enabled ? "Mensagem separada, sem o link de descadastro do destinatário (contrato de franquia)." : "Nenhuma cópia é enviada."),
     ),
   );
   // Condições que o servidor confere na aprovação (lista calculada por ele, na mesma ordem); ele confere de novo ao aprovar.
@@ -2698,7 +2701,7 @@ async function showFicha(id) {
     node.append(box);
   }
   if (d.outbox.length)
-    node.append(panel("Envios desta ficha", rows(d.outbox, (o) => el("div", { class: "row" }, el("div", {}, text("strong", `Passo ${o.step_no} · ${o.planned_date}`), o.block_reason ? text("small", o.block_reason) : null), text("span", lbl(o.status), "tag")))));
+    node.append(panel("Envios desta ficha", rows(d.outbox, (o) => el("div", { class: "row" }, el("div", {}, text("strong", `Passo ${o.step_no} · ${o.planned_date}`), o.block_reason ? text("small", o.block_reason) : null, o.copy ? text("small", `Cópia interna: ${COPY_LABEL[o.copy.status] || o.copy.status}${o.copy.evidence ? ` — ${o.copy.evidence}` : ""}`) : null), text("span", lbl(o.status), "tag")))));
   node.append(details("Dados técnicos da versão", kv([["Skill", v.skill], ["Modelos", v.templates], ["Gerador", v.generator], ["Criada por", d.ficha.created_by]])));
   showScreen(node);
 }

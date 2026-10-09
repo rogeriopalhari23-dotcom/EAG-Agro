@@ -13,6 +13,10 @@ import { statement as s, now, auditStatement } from "./store.js";
 import { reserveForBridge, settleFromBridge, readerHealthy } from "./sending.js";
 import { processMessage, recordReaderOk, recordReaderError } from "./inbound.js";
 import { messageHash } from "./fichas.js";
+import { claimCopy, settleCopy, copyConfig } from "./internal-copy.js";
+import { parameters } from "./store.js";
+
+const allowedLocally = (list, address) => Array.isArray(list) && list.some((x) => String(x).trim().toLowerCase() === address);
 
 const MAX_BODY = 8 * 1024 * 1024; // mensagem recebida em base64 (limite de 5 MB por mensagem)
 const MAX_MESSAGE = 5 * 1024 * 1024;
@@ -98,6 +102,10 @@ export async function handleBridge(request, env, path, rid) {
   const at = now();
 
   if (path === "/api/bridge/claim") {
+    // D5-a: com a cópia interna ligada, a ponte precisa declarar o endereço na lista local; sem isso nada é reservado
+    // (falha fechada: nenhum passo sai sem a cópia exigida pelo contrato).
+    const copyCfg = copyConfig(await parameters(env, tenant));
+    if (copyCfg.enabled && !allowedLocally(input.copyAllow, copyCfg.address)) return response({ message: null, reason: "copy_target_not_allowed" });
     const next = await reserveForBridge(env, tenant, at);
     if (next.reason) return response({ message: null, reason: next.reason });
     await auditStatement(env, actor, rid, "bridge.claimed", "send_outbox", next.row.id, { leaseToken: next.token }).run();
@@ -126,6 +134,23 @@ export async function handleBridge(request, env, path, rid) {
     const r = await settleFromBridge(env, tenant, outboxId, token, { kind: input.outcome, detail }, at);
     await auditStatement(env, actor, rid, "bridge.result", "send_outbox", outboxId, { outcome: input.outcome, status: r.status, recovered: !!r.recovered }).run();
     if (r.status !== 200) fail(r.status, r.code, "Resultado não aplicado.", { current: r.current ?? null });
+    return response(r);
+  }
+
+  // Cópia interna D5-a: trabalho separado do passo do prospect (src/internal-copy.js). Só sai depois do aceite do passo.
+  if (path === "/api/bridge/copy-claim") {
+    const copyCfg = copyConfig(await parameters(env, tenant));
+    if (copyCfg.enabled && !allowedLocally(input.copyAllow, copyCfg.address)) return response({ copy: null, reason: "copy_target_not_allowed" });
+    const next = await claimCopy(env, tenant, at);
+    if (next.reason) return response({ copy: null, reason: next.reason });
+    await auditStatement(env, actor, rid, "bridge.copy_claimed", "send_copy", next.copy.outboxId, { leaseToken: next.copy.leaseToken }).run();
+    return response({ copy: { ...next.copy, from: { name: env.SENDER_NAME || "EAG Agro - Brasil", address: env.MAILBOX_USER }, replyTo: env.MAILBOX_USER } });
+  }
+
+  if (path === "/api/bridge/copy-result") {
+    const r = await settleCopy(env, tenant, input, at);
+    await auditStatement(env, actor, rid, "bridge.copy_result", "send_copy", String(input.outboxId || ""), { outcome: input.outcome ?? null, status: r.status, recovered: !!r.recovered }).run();
+    if (r.status !== 200) fail(r.status, r.code, "Resultado da cópia não aplicado.", { current: r.current ?? null });
     return response(r);
   }
 

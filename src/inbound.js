@@ -1,7 +1,8 @@
 // Respostas recebidas (P2-T11; R20, R21.2–R21.6, R19.7, R19.12, R28.13; errata itens 4 e 7).
 // Chave estável (caixa + UIDVALIDITY + UID); correlação por Message-ID e, sem thread, pelo remetente;
 // ambígua mantém pausa de todos os envolvidos; nenhuma resposta automática é enviada (R19.9).
-import { statement as s, now } from "./store.js";
+import { statement as s, now, parameters } from "./store.js";
+import { copyConfig } from "./internal-copy.js";
 import { identifierHash, messageKey } from "./crypto.js";
 import { parseMessage, header, addressOf, messageIds } from "./mime.js";
 import { imapClient } from "./adapters/imap.js";
@@ -123,9 +124,14 @@ async function pauseTargets(env, tenant, targets, at, kind, note, inboundId) {
 // Processa uma mensagem da caixa. Repetida (mesma chave) não produz efeito duplicado.
 export async function processMessage(env, tenant, { mailbox, uidValidity, uid, bytes }, at = now()) {
   const msg = parseMessage(bytes);
-  const c = classify(msg, env.MAILBOX_USER);
+  let c = classify(msg, env.MAILBOX_USER);
+  // D5-a: quem escreve do endereço da cópia interna ou do domínio da EAG (ex.: resposta à cópia na caixa de vendas) é
+  // interno — nunca é resposta de prospect, nunca suprime e nunca abre tarefa. Devolução da própria cópia não suprime.
+  const copy = copyConfig(await parameters(env, tenant));
+  if (internalSender(c.from, env.MAILBOX_USER, copy) && ["human", "auto_reply", "unclassified", "unsubscribe"].includes(c.kind)) c = { kind: "unclassified", from: c.from, internal: true };
+  const copyBounce = c.kind === "bounce_hard" && copy.enabled && c.target === copy.address;
   const fromHash = c.from ? await identifierHash(env, tenant, "email", c.from) : null;
-  const corr = ["human", "auto_reply", "unclassified", "unsubscribe"].includes(c.kind)
+  const corr = !c.internal && ["human", "auto_reply", "unclassified", "unsubscribe"].includes(c.kind)
     ? await correlate(env, tenant, msg, fromHash, at)
     : { correlation: "none", targets: [] };
   // A mesma mensagem pode voltar com outro UID (caixa renumerada, cópia entre pastas): o Message-ID já processado
@@ -173,7 +179,7 @@ export async function processMessage(env, tenant, { mailbox, uidValidity, uid, b
             : "Resposta recebida: leia na caixa e defina o próximo passo.";
     st.push(...(await pauseTargets(env, tenant, corr.targets, at, corr.correlation === "ambiguous" ? "ambiguous" : c.kind, note, id)));
   }
-  if (c.kind === "bounce_hard" && c.target) {
+  if (c.kind === "bounce_hard" && c.target && !copyBounce) {
     const h = await identifierHash(env, tenant, "email", c.target);
     st.push(
       s(env, "INSERT INTO suppression_entries(id,tenant_id,identifier_hash,channel,reason,source,created_by) VALUES (?,?,?,'email','hard_bounce','bounce','system-inbound') ON CONFLICT(tenant_id,identifier_hash,channel) DO NOTHING", crypto.randomUUID(), tenant, h),
@@ -233,4 +239,14 @@ export async function poll(env, tenant, deps = {}) {
   } finally {
     await s(env, "UPDATE inbound_cursor SET lease_owner=NULL,lease_until=NULL WHERE tenant_id=? AND mailbox=? AND lease_owner=?", tenant, mailbox, owner).run();
   }
+}
+
+// Remetente interno: o endereço da cópia interna ou outro endereço do domínio da caixa (a própria caixa já é "unclassified").
+export function internalSender(from, mailboxUser, copy = { enabled: false }) {
+  if (!from) return false;
+  const f = from.toLowerCase();
+  if (copy.enabled && f === copy.address) return true;
+  const mine = String(mailboxUser || "").toLowerCase();
+  const domain = mine.split("@")[1];
+  return !!domain && f !== mine && f.endsWith("@" + domain);
 }

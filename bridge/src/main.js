@@ -34,6 +34,9 @@ const cfg = {
   imapPort: Number(env.IMAP_PORT || 993),
   journalPath: env.BRIDGE_JOURNAL || "./data/journal.sqlite",
   intervalMs: Number(env.BRIDGE_INTERVAL_MS || 60000),
+  // D5-a: lista local de destinatários permitidos da cópia interna (separados por vírgula). Vazia = a ponte não envia
+  // cópias e, com a cópia ligada no Compass, nenhum passo é reservado (falha fechada).
+  copyAllow: String(env.BRIDGE_COPY_TO || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean),
 };
 const mailboxOnly = process.argv.includes("--mailbox-only");
 if (!cfg.mailboxUser || (!mailboxOnly && !cfg.compassUrl)) throw new Error("Defina MAILBOX_USER e COMPASS_URL.");
@@ -61,8 +64,9 @@ const deps = {
   }),
   smtp: smtpClient({ host: cfg.smtpHost, port: cfg.smtpPort, user: cfg.mailboxUser, pass }),
   imap: imapClient({ host: cfg.imapHost, port: cfg.imapPort, user: cfg.mailboxUser, pass }),
-  log, version: VERSION,
-  // Teste interno: BRIDGE_FAULT=before_smtp|after_smtp encerra o processo nesse ponto; imap_down simula a caixa fora do ar.
+  log, version: VERSION, copyAllow: cfg.copyAllow,
+  // Teste interno: BRIDGE_FAULT=before_smtp|after_smtp|before_copy_smtp|after_copy_smtp encerra o processo nesse ponto;
+  // imap_down simula a caixa fora do ar.
   fault: (point) => {
     if (env.BRIDGE_FAULT !== point) return;
     log("fault_injected", { point });
@@ -165,7 +169,7 @@ do {
   try {
     if (!authStopped) {
       const r = await runCycle(deps);
-      log("cycle", { readOk: r.readOk, sent: r.sent, reason: r.reason ?? null });
+      log("cycle", { readOk: r.readOk, sent: r.sent, reason: r.reason ?? null, copied: r.copied ?? false, copyReason: r.copyReason ?? null });
       Object.assign(state, { lastCycleAt: new Date().toISOString(), lastReason: r.reason ?? null });
       if (r.readOk) Object.assign(state, { lastReadOkAt: state.lastCycleAt, lastReadError: null });
       else state.lastReadError = r.reason ?? "leitura indisponível";

@@ -32,3 +32,13 @@ Todas as rotas `/api/*`, exceto GET health, exigem identidade autenticada e usu�
 Perfis operacionais: admin, commercial_manager, seller_analyst. Auditor_viewer consulta e não altera. Parâmetros só admin; exceções/qualificação/declarações gestor ou admin. `finalBuyerRequired` é condição comercial da demanda: alterar exige gestor/admin e `conditionReason`.
 
 Campanhas, fichas e mensagens planejadas não devem ser confundidas: não há endpoints de envio, ficha, pesquisa automatizada, geocodificação ou lista mensal nesta fundação. Os consumidores futuros devem aplicar os contratos atuais de autenticação, pausa, supressão, revisões e auditoria.
+
+## Acréscimos de 2026-10-09 (não publicados)
+
+| Rota | Contrato |
+| --- | --- |
+| GET /api/compliance/t11?scope=br_email_automatic | Admin, gestor e auditor: histórico, decisão vigente (`pending` sem registro) e evidências exigidas. |
+| POST /api/compliance/t11 | Só admin; só `br_email_automatic`. `decision` validated/revoked, `responsible`, `decidedOn` (não futura), `basis`, `confirm: true` e `evidence[]` (`kind`, `reference`, `sha256`). Validar exige decisions, legal_basis, transfer_mechanism, incident_register e erasure_test. Só inclusão: revogação é linha nova. Não libera canal, campanha nem ficha. |
+| PUT /api/parameters/email_copy_to | Admin, escopo `email`: `{"enabled":true,"address":"…","contractRef":"…"}` ou `{"enabled":false}`. Cópia interna separada (D5-a). |
+| POST /api/bridge/claim | Ponte: corpo `{ copyAllow: [...] }`; com cópia ligada e endereço fora da lista, devolve `copy_target_not_allowed` sem reservar. |
+| POST /api/bridge/copy-claim · /api/bridge/copy-result | Ponte: próxima cópia de passo aceito (sem link de descadastro do prospect, Message-ID determinístico) e resultado idempotente (accepted/temporary/permanent/indeterminate). Lease vencido vira indeterminado. |

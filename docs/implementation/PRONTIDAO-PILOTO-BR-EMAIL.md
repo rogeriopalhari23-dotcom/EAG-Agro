@@ -250,3 +250,112 @@ Referências e trechos estão na análise privada (fora do Git).
 | Cloudflare: mecanismo do art. 33 (L9) | **Pendente** | Mensagem pronta (revisão §11). Nenhum envio nem resposta registrados; busca no Gmail rogeriopalhari23@ em 09/10 sem resultado. D-L9 em aberto |
 | Procedimento de registro de incidentes | **Pendente** | Proposta na revisão §14.2, não aprovada. A pasta `eag-compass-registros\incidentes` não existe (09/10) |
 | Validação T11 | **Pendente** | Produção em 09/10: 13 tarefas com `t11_pending` (6 também com `phone_missing`); nenhuma validação registrada; escopo e-mail sem registro. Canal `planned`, campanha de milho `draft`, 3 fichas `in_approval` |
+
+## 9. Decisões de 09/10/2026 (Rogério Palhari)
+
+**Responsável:** Rogério Palhari, franqueado (pessoa física), controlador do tratamento no Compass.
+**Data:** 09/10/2026.
+**Alcance:** piloto brasileiro por e-mail, escopo `br_email_automatic`. Nada disto vale para ligação, LinkedIn, Alemanha ou outros países.
+**Não é:** aprovação de fichas, ativação de campanha, liberação do canal nem validação T11.
+
+| Decisão | Texto aprovado | Alcance e efeito |
+|---|---|---|
+| E1 | Base legal: legítimo interesse, com o teste de balanceamento da §6 | Base legal do e-mail de identificação no Brasil; vira evidência `legal_basis` do registro T11 |
+| E2-b | Linha no rodapé: "Encontrei este endereço no site da empresa. Pedidos sobre dados pessoais: rogeriopalhari@hotmail.com." | Modelo `id-pt-1.2.0` implementado (não publicado). Com fonte que não é o site, entra só "Pedidos sobre dados pessoais: …" (PV4) |
+| OpenClaw B | Exceção datada na Spec (§6) | **Aprovada a opção, mas a exceção não está concluída:** falta a declaração abaixo, que só Rogério pode preencher. Enquanto isso, R21.8/R25.2 continuam pendentes |
+| O7-e, O8-e, O9-e | Textos da §6 | Procedimentos do e-mail; vão como evidência `decisions` do registro T11 |
+| D5-a | Cópia interna separada (plano da §7) | Implementada (não publicada). Nos testes, só destinatários internos; vendas@ nunca usado |
+
+**Declaração que Rogério ainda precisa preencher (OpenClaw B):**
+
+> "Eu, Rogério Palhari, declaro em [data] que a base do OpenClaw não é recuperável (VPS reinstalada em 24/09/2026, sem cópia local). Das empresas do piloto brasileiro (Cimilho, Rei do Milho — Inhumas e São Martinho — Usina Boa Vista), [nenhuma foi contatada pelo OpenClaw / as seguintes foram contatadas pelo OpenClaw: ___]. As supressões de que tenho conhecimento são: [nenhuma / lista: ___], e eu as cadastrarei no Compass antes do primeiro envio. A exceção vale só para a base perdida e não dispensa a importação se ela for recuperada."
+
+Pendentes de decisão de Rogério (sem mudança):
+- procedimento de registro de incidentes e local da cópia cifrada;
+- comprovação da Cloudflare (art. 33).
+
+## 10. Implementação de 09/10/2026 (não publicada)
+
+Branch `v2-revisao-2`. Sem migração em produção, sem publicação, sem Snov, sem envio, sem aprovação; canal `planned`.
+
+**Worker** (`src/`, `public/`, `migrations/`):
+- **E2-b:**
+  - `src/templates/identificacao.js`: pt `id-pt-1.2.0`, linha de transparência antes da saída;
+  - `src/privacy-contact.js`: O2;
+  - `src/review.js`: regra `TRANSP` (canal do titular presente; "site" só com fonte no site).
+  - De e en não mudam.
+  - As 3 fichas ganham versão nova pela rota existente `POST /api/fichas/:id/versions`, **depois da publicação**: a versão 1 fica preservada (`superseded_at`) e a ficha volta a "em aprovação".
+- **D5-a:**
+  - migração `0039_copia_interna_t11_email.sql` (tabela `send_copies`);
+  - `src/internal-copy.js`;
+  - aceite do passo cria a cópia, em `src/sending.js`;
+  - rotas `/api/bridge/copy-claim` e `/api/bridge/copy-result` e reserva com lista local, em `src/bridge.js`;
+  - parâmetro `email_copy_to:email`, só Administrador, com motivo e referência do contrato;
+  - ficha mostra "Cópia interna" e o estado da cópia de cada passo (`src/fichas.js`, `public/app.js`);
+  - mensagens do endereço da cópia ou do domínio da caixa ficam `unclassified`, sem correlação, supressão ou tarefa; devolução da própria cópia não suprime (`src/inbound.js`).
+- **Rota T11** (`src/compliance.js`, migração 0039, tabela `compliance_validation_evidence`):
+  - `GET /api/compliance/t11`: histórico, decisão vigente e evidências exigidas;
+  - `POST /api/compliance/t11`: só Administrador e só o escopo `br_email_automatic`. Exige confirmação, fundamento, data não futura e as evidências `decisions`, `legal_basis`, `transfer_mechanism`, `incident_register` e `erasure_test`, cada uma com SHA-256. Só inclusão; revogação é linha nova.
+  - Nenhuma validação registrada.
+
+**Ponte local** (`bridge/src/`):
+- `BRIDGE_COPY_TO`: lista local de permitidos, enviada no pedido de reserva. Com a cópia ligada e o endereço fora da lista, o Compass não reserva nada.
+- `sendCopyOne`/`recoverCopies` em `cycle.js`; tabela `copies` no diário (criada sozinha no início).
+- Aceitação parcial do envelope vira `indeterminate` (`mail.js`).
+- Envelope com mais de um destinatário não sai.
+- `buildRaw` só leva os cabeçalhos presentes.
+
+**Ajustes ao plano da §7, por segurança:**
+- **Cópia não achada nos enviados depois de queda durante o SMTP:** fica `indeterminate`, **sem** reenvio automático. A pasta de enviados é gravada pela ponte depois do SMTP (a Hostinger não grava sozinha), então "não achada" não prova que não saiu.
+- **Classificação interna:** a coluna `classification` tem lista fixa; a mensagem interna entra como `unclassified` com correlação `none`.
+
+**Testes (09/10/2026):**
+- `npm run check`: suíte principal **432/432** (antes 425), Worker **2/2**, ponte **30/30** (antes 16);
+- UI smoke OK;
+- novos: `tests/identificacao-transparencia.test.mjs` (5), `tests/t11-email-validacao.test.mjs` (2), `bridge/test/copia-interna.test.mjs` (14).
+
+## 11. Plano de publicação (não executado; cada passo com autorização de Rogério)
+
+**Ordem: Worker primeiro, ponte depois.**
+- A ponte antiga funciona com o Worker novo enquanto a cópia estiver desligada.
+- A ponte nova contra o Worker antigo só registraria erro de cópia a cada ciclo.
+
+**A. Worker (Cloudflare)**
+1. Exportar o D1 para a pasta privada de backups e anotar o bookmark do Time Travel. Pela regra D1, apagar a exportação anterior depois da migração confirmada.
+2. `npm run db:migrate:remote` — migração 0039. Só cria 2 tabelas novas; não altera dados existentes.
+3. `npm run deploy`, que roda `check` e `validate-deploy` antes.
+4. **Conferir na produção:**
+   - `GET /api/compliance/t11` → `pending`;
+   - `email_copy_to` ausente, ou seja, cópia desligada;
+   - canal `planned`, campanha de milho `draft`, fichas `in_approval`;
+   - 13 tarefas com `t11_pending`.
+5. **Fichas (com autorização):** `POST /api/fichas/:id/versions` nas 3 (Cimilho `92203532…`, São Martinho `3bba38e2…`, Rei do Milho `5217599f…`). Conferir:
+   - versão 2 com `id-pt-1.2.0` e revisor sem violações;
+   - versão 1 preservada;
+   - status "em aprovação".
+6. **Reversão:** `npx wrangler rollback` para a versão atual (`663077c0-0065-4f1c-8f79-660d18cc106e`). As tabelas da 0039 podem ficar: o código anterior não as usa.
+
+**B. Ponte local (PC Windows)**
+1. Parar a ponte (`ponte.ps1` → parar) e copiar `data/journal.sqlite` para a pasta privada.
+2. Atualizar os arquivos de `bridge/src/` na pasta da ponte. Sem dependência nova; o diário ganha a tabela `copies` no próximo início.
+3. Iniciar com `--check` e depois em laço. Sem `BRIDGE_COPY_TO` e com a cópia desligada, o comportamento é igual ao de hoje.
+
+**C. Teste interno da cópia**, só com destinatários internos autorizados:
+1. `BRIDGE_COPY_TO` = alias interno, por exemplo `+ponte-copia`.
+2. `email_copy_to` = o mesmo alias, com motivo e referência ao contrato.
+3. Campanha de teste interna, canal `internal_test`, destinatários internos.
+4. **Conferir:**
+   - uma cópia por passo, sem o link de descadastro;
+   - queda simulada (`BRIDGE_FAULT=before_copy_smtp` / `after_copy_smtp`) sem duplicar;
+   - resposta da cópia tratada como interna.
+5. Ao terminar: `email_copy_to` volta a `{"enabled":false}`, o canal volta a `planned` e a campanha de teste é encerrada.
+
+**D. Destino real (vendas@):** só com autorização expressa de Rogério e antes do primeiro envio real. `BRIDGE_COPY_TO` e `email_copy_to` passam ao e-mail de vendas da EAG, com a referência do contrato.
+
+**Fora deste plano, pendente:**
+- validação T11, que exige evidências reais de art. 33 e de incidentes;
+- declaração do OpenClaw;
+- validação dos endereços pela Snov;
+- aprovação das fichas, ativação da campanha e liberação do canal.
+
+A rota T11 **não** bloqueia nada sozinha hoje. Ligar a validação como portão da aprovação de fichas de e-mail no Brasil é uma decisão separada, proposta aqui e não implementada.

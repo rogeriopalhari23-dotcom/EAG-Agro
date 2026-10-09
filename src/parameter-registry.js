@@ -29,6 +29,8 @@ export const DEFINITIONS = {
   send_step_up_max_hard_bounce_pct: { scopes: /^email$/, type: "number", min: 0, max: 100, label: "Subida de degrau: hard bounce abaixo de (%)", requiredBy: "envio" },
   send_window: { scopes: /^(national|international)$/, type: "window", label: "Janela de envio no fuso do destinatário", requiredBy: "envio" },
   send_timezone: { scopes: /^national$/, type: "timezone", label: "Fuso do mercado nacional", requiredBy: "envio nacional" },
+  // D5-a (decisão de Rogério, 2026-10-09): cópia interna separada de cada passo aceito ao endereço fixo do contrato.
+  email_copy_to: { scopes: /^email$/, type: "internal_copy", label: "Cópia interna de cada e-mail enviado (contrato de franquia)", requiredBy: "ponte (cópia D5-a)" },
   email_validation_max_age_days: { scopes: /^email$/, type: "integer", min: 1, max: 365, label: "Validade da validação de e-mail (dias)", requiredBy: "pré-envio (R19.2 item 11)" },
   campaign_review_days: { scopes: /^global$/, type: "integer", min: 1, max: 3650, label: "Revisão de campanha (dias)", requiredBy: "campanhas" },
   period_default_months: { scopes: /^international$/, type: "integer", min: 1, max: 60, label: "Período padrão da análise de país (meses)", requiredBy: "lista internacional (D1)" },
@@ -130,6 +132,16 @@ export function validateParameter(key, scope, value, current = {}) {
       if (value.enabled && !/^docs\/[\w./-]+\.md#[\w-]+$/.test(value.evidenceRef ?? ""))
         fail(422, "evidence_required", "Liberar exige a referência ao registro de validação (docs/…#…).");
       return value.enabled ? { enabled: true, evidenceRef: value.evidenceRef } : { enabled: false };
+    }
+    case "internal_copy": {
+      if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.enabled !== "boolean")
+        fail(422, "invalid_parameter_value", 'Informe {"enabled":true,"address":"…@…","contractRef":"cláusula do contrato"} ou {"enabled":false}.');
+      if (!value.enabled) return { enabled: false };
+      const address = String(value.address ?? "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) || address.length > 200) fail(422, "invalid_parameter_value", "Endereço da cópia inválido.");
+      const contractRef = String(value.contractRef ?? "").trim();
+      if (contractRef.length < 10 || contractRef.length > 300) fail(422, "evidence_required", "Informe a referência do contrato que exige a cópia (10 a 300 caracteres).");
+      return { enabled: true, address, contractRef };
     }
     case "timezone":
       if (!validTimezone(value)) fail(422, "invalid_parameter_value", "Fuso IANA inválido, ex.: America/Sao_Paulo.");

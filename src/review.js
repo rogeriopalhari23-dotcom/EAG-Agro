@@ -1,6 +1,7 @@
 // Revisor automático PV1–PV12 + R19.13 (P2-T8, R17.3). Regras determinísticas; violação impede aprovação.
 // Entrada: mensagens geradas (generateSequence) e contexto da ficha. Saída: { ok, findings: [{id, ok, detail, step?, contactId?}] }.
 import { ADDRESS_PENDING } from "./postal-address.js";
+import { DATA_REQUESTS_EMAIL } from "./privacy-contact.js";
 import { contactTargetFlag } from "./profiles.js";
 import { SIGNATURE, signatureText, LOGO_PLACEHOLDER } from "./templates/assinatura.js";
 
@@ -243,6 +244,13 @@ export function reviewIdentification(raw, ctx) {
   for (const m of raw.filter((x) => x.kind === "auto_email")) {
     const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
     if (!ok) finding(f, "R19.13", false, `E-mail passo ${m.step} sem endereço físico ou forma de saída.`, { step: m.step, contactId: m.contactId });
+  }
+  // E2-b (decisão de Rogério, 2026-10-09): em português, todo e-mail traz o canal do titular no rodapé; a origem do
+  // endereço ("site da empresa") só pode ser dita quando a fonte registrada do canal é o site (PV4).
+  if ((ctx.language || "pt-BR") === "pt-BR") {
+    const src = (m) => ctx.recipients.find((r) => r.contactId === m.contactId)?.sourceLabel || "";
+    const bad = raw.filter((m) => m.kind === "auto_email" && (!m.body.includes(DATA_REQUESTS_EMAIL) || (/no site da empresa/i.test(m.body) && !/\bsite\b|website/i.test(src(m)))));
+    finding(f, "TRANSP", !bad.length, bad.length ? `Passo ${bad.map((m) => m.step).join(", ")}: sem o canal do titular no rodapé, ou origem do endereço diferente da fonte registrada.` : "Origem do endereço e canal do titular no rodapé (E2-b).");
   }
   if (ctx.postalAddress && ctx.postalAddressConfirmed !== true) finding(f, "R19.13", false, ADDRESS_PENDING);
   if (!f.some((x) => x.id === "R19.13")) finding(f, "R19.13", !!ctx.postalAddress, ctx.postalAddress ? "Endereço físico confirmado por Rogério e saída em todos os e-mails." : "Endereço físico da EAG não configurado.");
