@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { setup } from "./helpers/db.mjs";
+import { t11Fixture } from "./helpers/t11.mjs";
 import { memoryR2 } from "./helpers/trade.mjs";
 import { tick, evaluateRamp } from "../src/sending.js";
 
@@ -12,6 +13,7 @@ function transport(result = { kind: "accepted" }) {
   return { sent, send: async (m) => (sent.push(m), typeof result === "function" ? result(m) : result) };
 }
 async function ready(ctx, { email = "compras@valeverde.com.br", internal = true, validated = true } = {}) {
+  t11Fixture(ctx.DB); // trava T11 do e-mail validada; o assunto destes testes é outro
   const { api, env, DB } = ctx;
   Object.assign(env, {
     EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP",

@@ -10,6 +10,7 @@ import { erasuresConsistent, redactAddresses } from "./erasure.js";
 import { unsubUrl } from "./unsub-token.js";
 import { smtpTransport } from "./adapters/mailbox.js";
 import { copyOnAccept } from "./internal-copy.js";
+import { emailT11Cleared, internalTestException } from "./compliance.js";
 import { localDate, localParts, inWindow, addDays } from "./timezone.js";
 
 const LEASE_MS = 120000;
@@ -99,6 +100,12 @@ export async function preSendCheck(env, row, ctx) {
   if (channel.state === "internal_test") {
     const allowed = String(env.INTERNAL_TEST_RECIPIENTS || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
     if (!allowed.includes(email.toLowerCase())) return { skip: "channel_internal_test_only" };
+  }
+  // Trava T11 (2026-10-09): validação vigente do e-mail automático do país da empresa em cada passo; revogação vale no
+  // passo seguinte. Só o teste interno reconhecido pelo sistema (canal internal_test + lista interna) fica de fora.
+  if (!internalTestException(env, channel.state, email)) {
+    const co = await s(env, "SELECT country_code FROM companies WHERE id=?", row.company_id).first();
+    if (!(await emailT11Cleared(env, row.tenant_id, co?.country_code, ctx.at))) return { skip: "t11_pending" };
   }
   // 12: nenhum outro e-mail da sequência ao mesmo endereço no mesmo dia ou no dia civil anterior, no fuso dele.
   const tz = contact.timezone;

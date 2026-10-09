@@ -89,3 +89,20 @@ export async function listValidations(env, actor, scope) {
     history: rows.map((r) => ({ ...r, evidence: ev.filter((e) => e.validation_id === r.id) })),
   };
 }
+
+// Trava T11 do e-mail automático (decisão de Rogério, 2026-10-09): aprovação de ficha de e-mail e cada envio exigem a
+// decisão vigente do escopo <país da empresa>_email_automatic. Sem registro, revogada ou outro país (escopo incompatível,
+// ex.: de_email_automatic, que esta rota nem grava): bloqueia. Liberar o canal continua decisão separada (R26.3).
+export async function emailT11Cleared(env, tenant, countryCode, at = now()) {
+  if (!countryCode || !/^[A-Za-z]{2}$/.test(countryCode)) return false;
+  const v = await latest(env, tenant, `${countryCode.toLowerCase()}_email_automatic`, at);
+  return v?.decision === "validated";
+}
+
+// Única exceção: teste interno reconhecido pelo sistema — canal de e-mail em "internal_test" E destinatário da lista
+// interna (INTERNAL_TEST_RECIPIENTS). Destinatário fora da lista nunca é exceção.
+export function internalTestException(env, channelState, email) {
+  if (channelState !== "internal_test" || !email) return false;
+  const allowed = String(env.INTERNAL_TEST_RECIPIENTS || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
+  return allowed.includes(String(email).toLowerCase());
+}

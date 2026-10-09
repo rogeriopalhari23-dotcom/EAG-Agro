@@ -164,7 +164,8 @@ test("Ficha mostra antes do clique cada bloqueio que approve() recusa, inclusive
   DB.raw.exec("UPDATE campaigns SET status='draft' WHERE id='cp-int'");
   DB.raw.prepare("UPDATE contacts SET timezone=NULL WHERE id=?").run(dm);
   v = await view();
-  assert.deepEqual(gateIds(v.approvalGates).sort(), ["campaign_active", "channel", "international", "timezone"]);
+  // Canal planejado: a exceção de teste interno não vale, e a trava T11 (jp_email_automatic, escopo sem validação) aparece.
+  assert.deepEqual(gateIds(v.approvalGates).sort(), ["campaign_active", "channel", "international", "t11", "timezone"]);
   assert.equal((await approve()).data.error.code, codeOf.timezone);
   // 3) Resolvendo um a um, a recusa acompanha o que a ficha mostra.
   DB.raw.prepare("UPDATE contacts SET timezone='Asia/Tokyo' WHERE id=?").run(dm);
@@ -173,7 +174,7 @@ test("Ficha mostra antes do clique cada bloqueio que approve() recusa, inclusive
   assert.equal((await approve()).data.error.code, codeOf.international);
   await release(api, "international_enabled", "international");
   v = await view();
-  assert.deepEqual(gateIds(v.approvalGates), ["channel"]);
+  assert.deepEqual(gateIds(v.approvalGates), ["channel", "t11"]);
   assert.equal((await approve()).data.error.code, codeOf.channel);
   DB.raw.exec("UPDATE channels SET state='internal_test' WHERE channel='email'");
   v = await view();

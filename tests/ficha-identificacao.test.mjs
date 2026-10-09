@@ -2,6 +2,7 @@ import "./helpers/signature.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
+import { t11Fixture } from "./helpers/t11.mjs";
 import { generateIdentification, IDENT_VERSION } from "../src/templates/identificacao.js";
 import { reviewIdentification } from "../src/review.js";
 import { SIGNATURE } from "../src/templates/assinatura.js";
@@ -16,6 +17,7 @@ const withSig = (fn) => async (t) => {
 
 // Mesmo cenário nacional de tests/fichas.test.mjs (açúcar, SP), com o canal geral publicado da empresa.
 async function ready(ctx) {
+  t11Fixture(ctx.DB); // trava T11 do e-mail validada; o assunto destes testes é outro
   const { api, env, DB } = ctx;
   Object.assign(env, { SENDER_NAME: "EAG Agro - Brasil", EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP", EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Exemplo, 100 — Sertãozinho/SP", PUBLIC_BASE_URL: "https://compass.exemplo", UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64") });
   await api("/api/parameters/send_timezone", "PUT", { scope: "national", value: "America/Sao_Paulo", reason: "Fuso do piloto" });

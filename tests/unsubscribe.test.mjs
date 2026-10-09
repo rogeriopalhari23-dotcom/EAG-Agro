@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/worker.js";
 import { setup } from "./helpers/db.mjs";
+import { t11Fixture } from "./helpers/t11.mjs";
 import { unsubToken } from "../src/unsub-token.js";
 
 async function ready(ctx) {
+  t11Fixture(ctx.DB); // trava T11 do e-mail validada; o assunto destes testes é outro
   const { api, env, DB } = ctx;
   Object.assign(env, {
     EAG_POSTAL_ADDRESS: "Rua Exemplo, 100",

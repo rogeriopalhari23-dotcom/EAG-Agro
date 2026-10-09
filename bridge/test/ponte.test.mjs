@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import worker from "../../src/worker.js";
 import { setup } from "../../tests/helpers/db.mjs";
+import { t11Fixture } from "../../tests/helpers/t11.mjs";
 import { compassClient, signature } from "../src/compass.js";
 import { openJournal } from "../src/journal.js";
 import { runCycle, readReplies, recover } from "../src/cycle.js";
@@ -245,6 +246,7 @@ test("Ponte: SMTP recusa o destinatário (550) — supressão por bounce, sem ou
 test("Ponte: canal em teste interno recusa destinatário externo", async (t) => {
   const ctx = setup();
   t.after(ctx.close);
+  t11Fixture(ctx.DB); // aprovação de destinatário externo exige a T11 (2026-10-09); o assunto aqui é o canal interno
   await ready(ctx, { email: "compras@valeverde.com.br" });
   const d = bridgeDeps(ctx);
   const r = await runCycle(d);

@@ -359,3 +359,32 @@ Branch `v2-revisao-2`. Sem migração em produção, sem publicação, sem Snov,
 - aprovação das fichas, ativação da campanha e liberação do canal.
 
 A rota T11 **não** bloqueia nada sozinha hoje. Ligar a validação como portão da aprovação de fichas de e-mail no Brasil é uma decisão separada, proposta aqui e não implementada.
+
+## 12. Plano de publicação da trava T11 e da correção dos nonces (não executado; depende de autorização)
+
+**Quando:** depois de 00:00 UTC, quando a cota diária de leituras do D1 reinicia (21:00 em Brasília, 20:00 em Cuiabá). Antes disso, nem a conferência funciona.
+
+**Ordem:**
+1. Conferir que a produção voltou a ler: `GET /api/compliance/t11` responde 200.
+2. **Antes da trava, gerar as versões 2 das 3 fichas (já autorizado).** A geração não depende da trava, e a ordem evita confundir a revisão.
+3. Backup e ponto de restauração:
+   - exportar o D1 para `eag-compass-backups\d1-remoto-antes-0040-<data>`, com acesso restrito;
+   - anotar o bookmark do Time Travel e a versão vigente (`64808403-3831-4004-a4ce-6d14ed2fe711`).
+   - A exportação lê o banco inteiro uma vez (cerca de 30 MB), bem abaixo do limite.
+4. Conferir que a única pendente é `0040_indice_nonces_ponte.sql` e aplicá-la (`npm run db:migrate:remote`). Ela só cria um índice e não muda dados.
+5. `npm run deploy`, que roda o `check` completo antes.
+6. **Conferir em produção:**
+   - as fichas de e-mail mostram "Validação T11 vigente (br_email_automatic)" como pendente;
+   - nenhuma validação registrada; canais `planned`; campanhas inativas;
+   - fila, fichas, supressões e tarefas iguais às de antes;
+   - Início e Tarefas carregando;
+   - ponte voltando a ler (`reply_reader_state` atualizado), sem atualizar seus scripts;
+   - no dia seguinte, `wrangler d1 insights` mostra a limpeza de nonces lendo poucas linhas e `rows_read_24h` muito abaixo de 5 milhões.
+7. **Reversão do código:** `npx wrangler rollback 64808403-3831-4004-a4ce-6d14ed2fe711`. O índice pode ficar: é inofensivo para o código anterior.
+
+**Efeito prático da trava depois de publicada:**
+- Nenhuma ficha de e-mail no Brasil é aprovada e nenhum passo sai sem uma validação `br_email_automatic` registrada pelo Administrador, com as 5 evidências.
+- Hoje faltam a comprovação do art. 33 (Cloudflare) e o registro de incidentes.
+- O teste interno da cópia D5-a continua possível, porque o canal `internal_test` com a lista interna é a única exceção.
+
+**Custo (decisão de Rogério, não necessária para a correção):** com o índice, o consumo deve cair bem abaixo do limite gratuito. O plano pago do Workers dá mais folga, mas não é preciso para corrigir o defeito.

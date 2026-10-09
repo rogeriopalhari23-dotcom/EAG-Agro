@@ -16,6 +16,7 @@ import { erasuresConsistent } from "./erasure.js";
 import { complianceStatus } from "./scores.js";
 import { manualTaskStatements, recipientPhone, phoneSuppressed } from "./tasks.js";
 import { copyConfig, copiesFor } from "./internal-copy.js";
+import { emailT11Cleared, internalTestException } from "./compliance.js";
 
 const ROLES = ["decision_maker", "influencer", "provisional_decision_maker"];
 async function sha256(text) {
@@ -285,6 +286,11 @@ export async function approve(request, env, actor, rid, id) {
   if (channel === "email") {
     const ch = await s(env, "SELECT state FROM channels WHERE tenant_id=? AND channel='email'", actor.tenant_id).first();
     if (!ch || ch.state === "planned") fail(409, "channel_not_ready", "Canal de e-mail ainda planejado: libere o teste interno antes (R26.2).");
+    // Trava T11 (2026-10-09): validação vigente do e-mail automático do país; só teste interno reconhecido fica de fora.
+    const to = await decryptPii((await s(env, "SELECT email_encrypted FROM contacts WHERE id=?", contactId).first())?.email_encrypted, env);
+    const co = await s(env, "SELECT country_code FROM companies WHERE id=?", f.company_id).first();
+    if (!internalTestException(env, ch.state, to) && !(await emailT11Cleared(env, actor.tenant_id, co?.country_code)))
+      fail(409, "t11_pending", `Validação T11 do e-mail automático (${String(co?.country_code || "?").toLowerCase()}_email_automatic) ausente ou revogada: o registro é do Administrador, com evidências.`);
   }
   const existing = await s(env, "SELECT * FROM ficha_approvals WHERE version_id=? AND contact_id=? AND channel=?", v.id, contactId, channel).first();
   if (existing?.status === "approved") return { approvalId: existing.id, idempotent: true };
@@ -400,6 +406,14 @@ export async function approvalGates(env, actor, f, v, toApprove, messageRows) {
   if (toApprove.some((g) => g.channel === "email")) {
     const ch = await s(env, "SELECT state FROM channels WHERE tenant_id=? AND channel='email'", actor.tenant_id).first();
     add("channel", "Canal de e-mail liberado (R26.2)", ch && ch.state !== "planned", "Canal de e-mail ainda planejado: a liberação é decisão de Rogério.");
+    // Trava T11 (2026-10-09): exceção só se TODOS os destinatários de e-mail forem teste interno reconhecido.
+    const co = await s(env, "SELECT country_code FROM companies WHERE id=?", f.company_id).first();
+    const emails = [];
+    for (const g of toApprove.filter((x) => x.channel === "email"))
+      emails.push(await decryptPii((await s(env, "SELECT email_encrypted FROM contacts WHERE id=?", g.contactId).first())?.email_encrypted, env));
+    const internal = emails.length > 0 && emails.every((e) => internalTestException(env, ch?.state, e));
+    const scope = `${String(co?.country_code || "?").toLowerCase()}_email_automatic`;
+    add("t11", `Validação T11 vigente (${scope})`, internal || (await emailT11Cleared(env, actor.tenant_id, co?.country_code)), `Sem validação T11 vigente para ${scope}: registro do Administrador, com evidências.`);
   }
   add("erasure", "Exclusões de dados reaplicadas após restauração", await erasuresConsistent(env, actor.tenant_id), "O banco voltou para antes de uma exclusão: reaplique as exclusões.");
   const compliance = await complianceStatus(env, actor.tenant_id, f.company_id);

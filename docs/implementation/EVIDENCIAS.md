@@ -1989,3 +1989,55 @@ Depois do arquivo, a pasta `d1-remoto-antes-0038-20261008`, se ficar vazia.
 - `segredos-producao-2026-09-24.txt`.
 
 A exclusão depende de autorização de Rogério.
+
+## Trava T11 do e-mail, limpeza D1 e limite de leituras do D1 (2026-10-09, tarde)
+
+- **Decisão de Rogério (09/10):** aceita a cópia à EAG como **mensagem separada** depois do aceite do e-mail original, no lugar do Bcc previsto. Ficam mantidos o resultado incerto sem reenvio automático e a regra de nunca reenviar ao prospect.
+
+### Limite diário de leituras do D1 estourado (produção)
+
+- **Sintoma:** a partir de cerca de 17:06 UTC, `GET /api/fichas/:id` e `GET /api/compliance/t11` respondiam 500.
+- **Log do Worker:** `D1_ERROR: Your account has exceeded D1's free tier daily row read limit … wait until tomorrow (midnight UTC)`.
+- **`wrangler d1 info`:** `rows_read_24h` = 5.917.387, acima do limite gratuito de 5 milhões por dia.
+- **Causa** (`wrangler d1 insights`, 24h): `DELETE FROM bridge_nonces WHERE seen_at<?`, em `src/bridge.js`, a cada chamada da ponte, com **5.520.192 linhas lidas em 3.358 execuções**. Sem índice em `seen_at`, cada limpeza varre a tabela de nonces das últimas 24h.
+  - É defeito antigo (desde a ponte, migração 0030), não da publicação 0039.
+  - A segunda maior consulta, a dos parâmetros, leu 211.200 linhas.
+- **Efeitos:**
+  - rotas que leem o banco falham até 00:00 UTC;
+  - a ponte (PID 6724, ativa desde 06/10, último ciclo 17:45 UTC) não consegue registrar leitura desde 17:06 UTC (`reply_reader_unavailable`), então nada sairia (R19.14); o canal já está `planned`;
+  - nenhum dado perdido nem alterado.
+- **Correção (não publicada):** migração `0040_indice_nonces_ponte.sql` com índice `idx_bridge_nonces_seen`; teste `tests/ponte-nonces-indice.test.mjs` confirma, pelo plano da consulta, que a limpeza usa o índice.
+- **Registro de incidentes:** é um evento de indisponibilidade temporária do tratamento, sem perda nem exposição de dados. O procedimento de registro ainda depende da decisão de Rogério (§14.2 da revisão); fica anotado como primeiro candidato.
+
+### Versões 2 (E2-b) das 3 fichas: não executadas
+
+- A leitura das fichas falhou pelo limite do D1 antes de qualquer gravação. Nada foi alterado: as 3 seguem na versão 1, em aprovação.
+- **Executar depois de 00:00 UTC**, com a autorização já dada:
+  - `POST /api/fichas/:id/versions` nas 3;
+  - conferir versão 2 com `id-pt-1.2.0`, versão 1 preservada e status em aprovação.
+
+### Limpeza D1 executada (autorizada por Rogério)
+
+- **Conferido antes:** `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0038-20261008\eag_compass.sql`, 29.600.928 bytes, SHA-256 `376ec0b3ef40a4624ab25a5b01f7a3f4f3cbe59ef8361937367040bff0065ab7`, iguais à lista.
+- **Feito:** arquivo excluído; pasta vazia removida.
+- **Preservados:**
+  - `d1-remoto-antes-0039-20261009` (SHA-256 conferido de novo, igual);
+  - `ponte-config-antes-prazo-20261006`;
+  - `segredos-producao-2026-09-24.txt`.
+
+### Trava T11 do e-mail automático (implementada, não publicada)
+
+- **Regra** (`src/compliance.js`, `emailT11Cleared`): exige a decisão vigente do escopo `<país da empresa>_email_automatic`.
+  - Sem registro, revogada ou de outro país (escopo incompatível): bloqueia.
+  - Vale a decisão mais recente cuja data já chegou.
+- **Na aprovação** (`src/fichas.js`):
+  - nova condição "Validação T11 vigente (<país>_email_automatic)" na ficha;
+  - `approve` recusa com `t11_pending`.
+- **Antes de cada envio** (`src/sending.js`, `preSendCheck`, R19.2 item 6): o passo fica em espera com `block_reason='t11_pending'`, sem cancelar nem mudar a ficha. Revogação vale no passo seguinte.
+- **Exceção única** (`internalTestException`): canal `internal_test` **e** destinatário em `INTERNAL_TEST_RECIPIENTS`. Fora disso não há exceção, inclusive destinatário da lista com canal `enabled`.
+- **Não muda:** os demais bloqueios e a liberação separada do canal. A validação não liga canal nem campanha.
+- **Testes:**
+  - `tests/t11-email-trava.test.mjs` (5): aprovação recusada e liberada; pré-envio sem validação, com revogação e com nova validação; escopo incompatível (DE); exceção só para teste interno reconhecido; canal continua `planned`;
+  - testes antigos cujo assunto é outro usam uma validação de teste em memória (`tests/helpers/t11.mjs`), e o teste internacional passou a esperar a condição `t11` com canal `planned`.
+- **Totais:** `npm run check` 438/438 (principal), 2/2 (Worker), 30/30 (ponte); UI smoke OK.
+- **Não feito:** publicação, atualização da ponte, mensagens de teste ou comerciais, vendas@, Snov e registro de validação T11. Canais `planned`, campanhas inativas.

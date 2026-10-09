@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
+import { t11Fixture } from "./helpers/t11.mjs";
 
 async function ready(ctx, { profileClass = "possible_final_consumer", channel = "internal_test", timezone = true } = {}) {
+  t11Fixture(ctx.DB); // trava T11 do e-mail validada; o assunto destes testes é outro
   const { api, env, DB } = ctx;
   Object.assign(env, {
     EAG_POSTAL_ADDRESS: "Rua Exemplo, 100 — Sertãozinho/SP",
