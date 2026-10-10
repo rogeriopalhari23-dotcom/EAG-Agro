@@ -2041,3 +2041,49 @@ A exclusão depende de autorização de Rogério.
   - testes antigos cujo assunto é outro usam uma validação de teste em memória (`tests/helpers/t11.mjs`), e o teste internacional passou a esperar a condição `t11` com canal `planned`.
 - **Totais:** `npm run check` 438/438 (principal), 2/2 (Worker), 30/30 (ponte); UI smoke OK.
 - **Não feito:** publicação, atualização da ponte, mensagens de teste ou comerciais, vendas@, Snov e registro de validação T11. Canais `planned`, campanhas inativas.
+
+## Versões 2 das fichas e publicação da trava T11 com a migração 0040 (2026-10-10, autorizada por Rogério)
+
+- **Condições conferidas antes de gravar (01:05 UTC):**
+  - limite diário do D1 restabelecido (consultas respondem);
+  - API respondendo: `GET /api/compliance/t11` 200;
+  - ponte com leitura bem-sucedida às 01:04:54 UTC.
+  - A sessão do Access tinha expirado; Rogério refez o login no navegador.
+- **Versões 2 (E2-b) das 3 fichas** (`POST /api/fichas/:id/versions`):
+  - Cimilho `92203532…`, São Martinho `3bba38e2…` e Rei do Milho `5217599f…` estão na versão 2 com `id-pt-1.2.0`: revisor sem achados, linha "Encontrei este endereço no site da empresa. Pedidos sobre dados pessoais: …" nos dois passos, status `in_approval`, 0 aprovações, 0 envios;
+  - versões 1 (`id-pt-1.1.0`) preservadas como substituídas, conferido no D1.
+- **Antes da publicação:**
+  - commit `ee970c6d3d26fad28d84ecadc5b795a6c1c6a6b1` (igual ao remoto);
+  - Worker anterior `64808403-3831-4004-a4ce-6d14ed2fe711`;
+  - Time Travel `0000077a-00000152-00005100-8152de3c41a7d1751d129ccb46d05eed`;
+  - backup privado `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0040-20261010\eag_compass.sql` (30.036.348 bytes, SHA-256 `8da54c6dcd0923998517eb6d863d7b403dc7c4510578de792a9ea3db637c5479`, acesso só de `ROGERIONOTE\Roger`).
+- **Migração:** só a `0040_indice_nonces_ponte.sql` estava pendente. Aplicada às 01:10 UTC (2 comandos).
+  - Índice conferido: `CREATE INDEX idx_bridge_nonces_seen ON bridge_nonces(seen_at)`.
+  - Plano da limpeza: `SEARCH bridge_nonces USING INDEX idx_bridge_nonces_seen (seen_at<?)`.
+- **Primeira tentativa de publicação (01:12 UTC) abortada pela própria verificação:** 25 testes da ponte falharam com `invalid_start`.
+  - Os testes usam a data de São Paulo como início, e `approve()` compara com a data UTC. Entre 00:00 e 03:00 UTC as duas diferem.
+  - Defeito de teste e do produto, **não** da trava. No produto, aprovar entre 21:00 e 24:00 de Brasília com início "hoje" seria recusado. Fica registrado para correção.
+  - Nada foi publicado nessa tentativa. O mesmo commit foi publicado depois de 03:00 UTC, sem pular a verificação.
+- **Publicação (03:11 UTC):** `npm run deploy` com `check` 438/438, 2/2 e 30/30. **Worker `4e6b14fc-9ec3-46da-985f-ebadce13cc53` (100%).**
+- **Conferido em produção depois:**
+  - **T11:** `GET /api/compliance/t11` → `pending`, histórico vazio.
+  - **Trava ativa:** nas 3 fichas (API e painel), "Validação T11 vigente (br_email_automatic)" **pendente**.
+  - **Painel:** a ficha da Cimilho abre na versão 2, com a linha E2-b. Início em cerca de 2,7 s e Tarefas em cerca de 2,3 s (13 bloqueadas, todas com T11 pendente, 6 sem telefone), sem erros de página.
+  - **Canais e campanhas:** canais email, linkedin e whatsapp `planned`; campanhas 2 `draft` + 1 `ended`.
+  - **Envios:** `sentToday` 0, fila vazia; `send_outbox` 5 `accepted` + 19 `cancelled`, igual a antes.
+  - **Contagens iguais às de antes da publicação:**
+    - fichas: 6 `in_approval` + 6 `discarded`;
+    - 3 supressões;
+    - tarefas: 13 abertas + 2 concluídas;
+    - 15 contatos; 0 avisos; cópia interna não configurada.
+  - **Ponte (scripts não atualizados):** leitura bem-sucedida às 03:20:29 UTC; Compass registrou 03:20:25 UTC.
+- **Reversão do código:** `npx wrangler rollback 64808403-3831-4004-a4ce-6d14ed2fe711`. O índice pode ficar.
+- **Não feito:** aprovação de fichas, registro de validação T11, atualização da ponte, envio de mensagens. Canais `planned`, campanhas inativas.
+- **Consumo de leituras observado (não declara resolvido o limite):**
+  - **Painel às 03:20 UTC:** `rows_read_24h` 5.863.471. É janela móvel de 24h e ainda inclui o período sem índice.
+  - **Duas amostras de `wrangler d1 insights` (03:21 e 03:32 UTC):**
+    - a limpeza de nonces rodou 27 vezes e leu 39 linhas, **média 1,4** por execução (antes: 1.914);
+    - consulta de parâmetros: 128 linhas por execução;
+    - total das 20 maiores consultas no intervalo: cerca de 770 linhas.
+  - Amostra curta e sujeita ao atraso de agregação do painel.
+  - **A confirmar:** `rows_read_24h` bem abaixo de 5 milhões depois de 24h completas com o índice (a partir de 10/10 cerca de 03:12 UTC).
