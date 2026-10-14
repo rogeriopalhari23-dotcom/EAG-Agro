@@ -2087,3 +2087,75 @@ A exclusão depende de autorização de Rogério.
     - total das 20 maiores consultas no intervalo: cerca de 770 linhas.
   - Amostra curta e sujeita ao atraso de agregação do painel.
   - **A confirmar:** `rows_read_24h` bem abaixo de 5 milhões depois de 24h completas com o índice (a partir de 10/10 cerca de 03:12 UTC).
+
+## Conferência de consumo, ponte e estado (2026-10-14, só leitura) e correção das datas de início (não publicada)
+
+### Consumo do D1 (fuso: UTC; limite gratuito: 5 milhões de linhas lidas por dia UTC)
+
+Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensão `date`):
+
+| Dia UTC | Linhas lidas | Consultas |
+|---|---|---|
+| 08/10 | 643.540 | 7.743 |
+| 09/10 | 5.853.510 | 16.342 |
+| 10/10 | 875.142 | 21.744 |
+| 11/10 | 857.721 | 18.062 |
+| 12/10 | 1.158.891 | 8.801 |
+| **13/10 (último dia completo, 00:00–24:00 UTC)** | **1.509.606** | 11.263 |
+| 14/10 (em curso, até cerca de 20:34 UTC) | 1.367.477 | 13.240 |
+
+- **Janela móvel de 24h** (`wrangler d1 info`, até 14/10 20:34 UTC): 1.367.196 linhas.
+- **Total do banco × limpeza das chaves (`wrangler d1 insights`):**
+  - **7 dias:** a limpeza (`DELETE FROM bridge_nonces`) leu 6.450.791 linhas em 8.886 execuções, quase tudo antes do índice (09–10/10);
+  - **1 dia:** 3.212 linhas em 32 execuções (cerca de 100 por execução);
+  - **total das 100 maiores consultas em 1 dia:** 2.449.924 linhas.
+  - O `insights` e o `d1 info` usam janelas e agregações diferentes: os números não somam entre si.
+  - A contagem de execuções do `insights` de 1 dia (32) é muito menor que a de ciclos da ponte, então não serve para medir a frequência.
+- **Maiores leitores atuais:** consultas da fila da lista mensal internacional (`trade_list_jobs`), com cerca de 1.240 linhas por execução, e 4.985 atualizações `data_unavailable` em `trade_list_status` em 1 dia.
+  - Não é a limpeza das chaves.
+  - Risco de custo a investigar à parte, porque a lista mensal ainda parece em repetição em 14/10.
+- **Recusas por limite:** nenhum dia desde 10/10 passou de 1,51 milhão de linhas, abaixo dos 5 milhões. Não houve condição para recusa por limite.
+  - Os logs do Worker não puderam ser consultados: o token do `wrangler` não tem permissão de observabilidade (403).
+- **Limitações:**
+  - a série por hora não ficou disponível (a API devolveu um ponto por dia);
+  - a amostra de 11 minutos de 10/10 não é usada como prova de um dia inteiro.
+
+### Ponte
+
+- **Estado:** processo PID 6724 ativo desde 06/10; tarefa agendada "EAG Compass - ponte de e-mail" em execução.
+- **Última leitura:** bem-sucedida às 20:35:42 UTC; o Compass registrou 20:35:32 UTC.
+- **Período sem leitura:** de antes de 19:40 até 20:16 UTC, com 31 de 47 ciclos com falha de leitura.
+  - O erro é do lado da ponte (`TypeError`, sem resposta HTTP), compatível com perda de rede no computador.
+  - Às 20:17 a ponte registrou 13 mensagens acumuladas, todas notificações automáticas (`auto_reply`, sem correlação), e voltou a ler a cada cerca de 70 s.
+  - **Início da falha não determinado:** o log local começa em 19:40 UTC (arquivo rotacionado) e o Compass guarda só o último erro (`TypeError` às 20:16:05 UTC).
+
+### Estado da produção (14/10 cerca de 20:40 UTC)
+
+- **Canais e campanhas:** canais email, linkedin e whatsapp `planned`; campanhas 2 `draft` + 1 `ended`.
+- **T11:** 0 validações.
+- **Envios:** `send_outbox` 5 `accepted` + 19 `cancelled`; último aceite em 01/10 (teste interno); nenhum envio novo.
+- **Fichas:** 6 `in_approval` + 6 `discarded`.
+- **Outros:** 3 supressões; tarefas 13 abertas + 2 concluídas; 15 contatos; cópia interna não configurada.
+- **Worker em produção:** `4e6b14fc-9ec3-46da-985f-ebadce13cc53`, com a trava T11.
+
+### Correção do descompasso de datas (implementada, não publicada)
+
+- **Regra aplicável:** a de 2026-09-25 — datas da sequência no **fuso confirmado do destinatário**. É a mesma do pré-envio, que compara `planned_date` com `localDate(agora, fuso do contato)`.
+- **Defeito:** `approve()` comparava o início com a data UTC (`at.slice(0, 10)`) e calculava a próxima segunda-feira pelo dia UTC. À noite no Brasil (00:00–03:00 UTC), "hoje" era recusado como passado. Foi o que barrou a publicação de 10/10.
+- **Correção** (`src/fichas.js`):
+  - "hoje" = `localDate(agora, fuso confirmado do destinatário)`, exigido antes (R18.6);
+  - o início padrão é a próxima segunda-feira desse dia;
+  - a data tem de existir (ida e volta), o que recusa, por exemplo, 30/02;
+  - a mensagem de erro informa o dia e o fuso.
+  - A trava T11 e os demais bloqueios não mudaram.
+- **Testes:**
+  - `tests/inicio-fuso-destinatario.test.mjs` (5, relógio simulado):
+    - noite no Brasil com "hoje" de São Paulo aceito e enviado no mesmo instante;
+    - ontem recusado; futuro aceito; formatos e datas inválidos recusados;
+    - início padrão domingo à noite em São Paulo dá 12/10 (pelo dia UTC daria 19/10);
+    - Tóquio à frente do UTC;
+    - meio do dia sem mudança.
+  - **Contra o código antigo:** 4 dos 5 falham. **Suíte da ponte com o relógio deslocado para 01:30 UTC:** código antigo 25 falhas; código novo 30/30.
+  - Os testes da ponte já usavam a data de São Paulo, o mesmo critério do produto agora: não precisaram mudar.
+  - `npm run check`: 443/443, 2/2, 30/30.
+- **Não feito:** publicação, atualização da ponte, aprovação de fichas, registro de validação T11, envio de mensagens, rollback.

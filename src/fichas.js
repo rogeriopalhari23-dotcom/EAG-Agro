@@ -16,6 +16,7 @@ import { erasuresConsistent } from "./erasure.js";
 import { complianceStatus } from "./scores.js";
 import { manualTaskStatements, recipientPhone, phoneSuppressed } from "./tasks.js";
 import { copyConfig, copiesFor } from "./internal-copy.js";
+import { localDate } from "./timezone.js";
 import { emailT11Cleared, internalTestException } from "./compliance.js";
 
 const ROLES = ["decision_maker", "influencer", "provisional_decision_maker"];
@@ -297,8 +298,13 @@ export async function approve(request, env, actor, rid, id) {
   if (existing) fail(409, "approval_invalidated", "Aprovação invalidada nesta versão: gere nova versão.");
   const at = now();
   const approvalId = crypto.randomUUID();
-  const start = i.startDate ? str(i.startDate, "início", 10) : nextMonday(at);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || start < at.slice(0, 10)) fail(422, "invalid_start", "Início em data futura (AAAA-MM-DD).");
+  // Datas da sequência valem no fuso CONFIRMADO do destinatário (regra de 2026-09-25, a mesma do pré-envio: planned_date ×
+  // localDate(agora, fuso do contato)). "Hoje" é o dia dele, não o dia UTC: à noite no Brasil o UTC já virou o dia.
+  const today = localDate(at, recipient.timezone);
+  const start = i.startDate ? str(i.startDate, "início", 10) : nextMonday(today);
+  const real = /^\d{4}-\d{2}-\d{2}$/.test(start) && !Number.isNaN(Date.parse(`${start}T00:00:00Z`)) && new Date(`${start}T00:00:00Z`).toISOString().slice(0, 10) === start;
+  if (!real || start < today)
+    fail(422, "invalid_start", `Início a partir de hoje no fuso do destinatário (${today}, ${recipient.timezone}), no formato AAAA-MM-DD.`);
   const contact = await s(env, "SELECT email_hash FROM contacts WHERE id=?", contactId).first();
   const statements = [
     s(env, "INSERT INTO ficha_approvals(id,version_id,contact_id,channel,messages_sha256,approved_by,approved_at) VALUES (?,?,?,?,?,?,?)", approvalId, v.id, contactId, channel, agg, actor.id, at),
