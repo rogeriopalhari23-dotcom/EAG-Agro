@@ -75,7 +75,9 @@ Decisão de Rogério em 2026-10-14, registrada na Spec: R28.20, R28.21, nota em 
 
 - **L1:** lista fechada da América Latina (Haiti, Belize, Guiana, Suriname, Guiana Francesa, Porto Rico, Caribe).
   - Até decidir: espanhol só nos países de língua oficial espanhola; os casos de dúvida ficam sem ficha.
-- **L2:** Portugal e os países lusófonos fora da América Latina em inglês, como diz a regra? Hoje o cadastro diz português.
-- **L3:** Alemanha em inglês, substituindo as fichas em alemão?
+- **L2 (decidida em 14/10):** Portugal e os países lusófonos fora da América Latina usam inglês.
+- **L3 (decidida em 14/10):** a Alemanha usa inglês. As 3 fichas alemãs ficam como estão até nova instrução.
 - **L4:** o país do destinatário é o da empresa cadastrada? O contato não tem país próprio.
-- **L5:** textos em espanhol e saudações em inglês para aprovação.
+- **L5:** textos em espanhol e saudações em inglês para aprovação, preparados em `TEXTOS-ES-EN-PARA-REVISAO.md` (14/10).
+
+Propostas para L1 e L4 (não decididas): `TEXTOS-ES-EN-PARA-REVISAO.md` §5.

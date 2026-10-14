@@ -2372,3 +2372,27 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - `d1-remoto-antes-0040-20261010\eag_compass.sql` (30.036.348 bytes, SHA-256 `8da54c6d…c5479`, igual ao registro).
 
   Fica o backup vigente `d1-remoto-antes-0041-20261014`. As cópias da ponte (`ponte-antes-0.2.0-20261014`, `ponte-config-antes-prazo-20261006`) não são exportações do D1 e ficam fora desta regra.
+
+## Limpeza D1 dos backups anteriores à 0039 e à 0040 (2026-10-14, autorizada por Rogério)
+
+- **Autorização:** exclusivamente `d1-remoto-antes-0039-20261009\eag_compass.sql` e `d1-remoto-antes-0040-20261010\eag_compass.sql` em `C:\Users\Roger\eag-compass-backups`. Regra D1: a 0041 foi aplicada e conferida.
+- **Conferência antes de excluir** (caminho completo, tamanho e SHA-256 completo contra este arquivo):
+
+| Arquivo | Tamanho | SHA-256 | Resultado |
+| --- | --- | --- | --- |
+| `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0039-20261009\eag_compass.sql` | 29.889.064 bytes | `42f948b776f390dda8802a51736d58248ffdb8d3978259f5313750bd2ccf96a7` | Conferiu; excluído, pasta vazia removida |
+| `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0040-20261010\eag_compass.sql` | 30.036.348 bytes | `8da54c6dcd0923998517eb6d863d7b403dc7c4510578de792a9ea3db637c5479` | Conferiu; excluído, pasta vazia removida |
+
+- **Nenhuma divergência.**
+- **Preservados:** `d1-remoto-antes-0041-20261014`, `ponte-antes-0.2.0-20261014` (4 arquivos), `ponte-config-antes-prazo-20261006` (1 arquivo) e `segredos-producao-2026-09-24.txt`.
+- **Backup vigente conferido depois:**
+  - `d1-remoto-antes-0041-20261014\eag_compass.sql`: 30.725.811 bytes, SHA-256 `9bc71f3f5956226327240a8b64ad6b8072ba310edf69fd55fd320748e5c702a5` (igual ao registro), acesso só de `ROGERIONOTE\Roger`;
+  - carregado num banco só em memória (chaves estrangeiras desligadas só na carga, porque a exportação cria as tabelas fora de ordem): `PRAGMA integrity_check` = ok, 0 violações de chave estrangeira, 87 tabelas, última migração `0040`, 13 fichas, 26 versões, 28 envios.
+- **Produção sem mudança:**
+  - fotos iguais;
+  - fichas brasileiras na v4 com 0 aprovações;
+  - T11 pendente, canais `planned`, campanhas inativas.
+- **Idiomas** (só documentação, nada implementado):
+  - textos em espanhol e inglês para revisão em `TEXTOS-ES-EN-PARA-REVISAO.md`;
+  - L2 e L3 registradas como decididas (inglês), com as fichas alemãs inalteradas;
+  - L1 e L4 só com propostas.
