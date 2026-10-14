@@ -113,7 +113,7 @@ export async function handleBridge(request, env, path, rid) {
       message: {
         outboxId: next.row.id, leaseToken: next.token, leaseUntil: next.leaseUntil, messageId: next.messageId,
         from: { name: env.SENDER_NAME || "EAG Agro - Brasil", address: env.MAILBOX_USER }, replyTo: env.MAILBOX_USER, to: next.email,
-        subject: next.msg.subject, text: next.msg.body, html: next.msg.html, headers: next.headers, sha256: next.row.message_sha256,
+        subject: next.msg.subject, text: next.msg.body, html: next.msg.html, headers: next.headers, sha256: next.msg.sha256,
       },
     });
   }
@@ -124,8 +124,12 @@ export async function handleBridge(request, env, path, rid) {
     if (!outboxId || !Number.isInteger(token) || !OUTCOMES.has(input.outcome)) fail(422, "invalid_result", "Resultado inválido.");
     const detail = input.smtp ? redactAddresses(`${input.smtp.code ?? ""} ${String(input.smtp.text ?? "").slice(0, 160)}`.trim()) : input.evidence ? String(input.evidence).slice(0, 200) : null;
     // Integridade: o que saiu tem de ser exatamente o aprovado; divergência para o remetente.
-    const row = await s(env, "SELECT message_sha256 FROM send_outbox WHERE tenant_id=? AND id=?", tenant, outboxId).first();
-    if (row && input.outcome === "accepted" && input.sentSha256 !== row.message_sha256) {
+    // Saudação pelo horário (A-ID8): qualquer um dos dois textos aprovados vale; a variante que saiu fica registrada para a
+    // cópia interna reproduzir o mesmo texto.
+    const row = await s(env, "SELECT message_sha256,message_am_sha256,lease_token FROM send_outbox WHERE tenant_id=? AND id=?", tenant, outboxId).first();
+    if (row && input.outcome === "accepted" && row.lease_token === token && input.sentSha256 && [row.message_sha256, row.message_am_sha256].includes(input.sentSha256))
+      await s(env, "UPDATE send_outbox SET greeting_variant=? WHERE id=?", input.sentSha256 === row.message_am_sha256 ? "am" : null, outboxId).run();
+    if (row && input.outcome === "accepted" && ![row.message_sha256, row.message_am_sha256].filter(Boolean).includes(input.sentSha256)) {
       await env.DB.batch([
         s(env, "UPDATE sender_state SET stopped_at=?,stopped_reason='ponte enviou conteúdo diferente do aprovado' WHERE tenant_id=? AND stopped_at IS NULL", at, tenant),
         auditStatement(env, actor, rid, "bridge.hash_mismatch", "send_outbox", outboxId, {}),

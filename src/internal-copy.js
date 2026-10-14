@@ -41,7 +41,7 @@ const replaceAll = (text, from, to) => (text == null ? text : text.split(from).j
 
 // Cópia montada a partir do texto aprovado do passo (mesmo conteúdo que saiu), sem o link de descadastro do prospect.
 export async function buildCopy(env, outbox, copy) {
-  const msg = await approvedMessage(env, outbox);
+  const msg = await approvedMessage(env, outbox, outbox.greeting_variant);
   if (!msg) return null;
   const link = await unsubUrl(env, msg.versionId, outbox.contact_id);
   const to = await decryptPii((await s(env, "SELECT email_encrypted FROM contacts WHERE id=?", outbox.contact_id).first())?.email_encrypted, env);

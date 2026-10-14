@@ -10,7 +10,7 @@ import { isSuppressed } from "./operations.js";
 import { canHaveFicha, contactTargetFlag } from "./profiles.js";
 import { generateSequence, commodityDisplay, SKILL_SHA256, TEMPLATES_VERSION, GENERATOR_VERSION } from "./templates/prospeccao-vendas.js";
 import { reviewSequence, reviewIdentification } from "./review.js";
-import { generateIdentification, commodityDisplayDe, companyDisplayName, IDENT_VERSION } from "./templates/identificacao.js";
+import { generateIdentification, commodityDisplayDe, companyDisplayName, morningVariant, IDENT_VERSION } from "./templates/identificacao.js";
 import { unsubUrl } from "./unsub-token.js";
 import { erasuresConsistent } from "./erasure.js";
 import { complianceStatus } from "./scores.js";
@@ -26,6 +26,8 @@ async function sha256(text) {
 }
 export const messageHash = (subject, body, html = null) => sha256(html ? `${subject ?? ""}\n\n${body}\n\n--html--\n${html}` : `${subject ?? ""}\n\n${body}`);
 export const approvalHash = (hashes) => sha256(hashes.join(","));
+// Hash de aprovação de uma mensagem: com variante "Bom dia" (A-ID8), a aprovação cobre os dois textos.
+export const approvalItem = (sha, amSha) => (amSha ? `${sha}+${amSha}` : sha);
 
 async function fichaRow(env, actor, id) {
   const f = await s(env, "SELECT * FROM fichas WHERE tenant_id=? AND id=?", actor.tenant_id, id).first();
@@ -120,11 +122,23 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
     if (e.subject !== undefined) m.subject = e.subject === null ? null : str(e.subject, "assunto", 200);
     m.body = str(e.body, "texto", 5000);
   }
-  const review = (ident ? reviewIdentification : reviewSequence)(msgs, {
+  // A-ID8 (2026-10-14): variante "Bom dia" do texto que começa com "Boa tarde", gerada depois das edições, revisada e
+  // aprovada junto; o envio só escolhe entre os dois textos congelados, pelo horário local do destinatário.
+  for (const m of msgs) if (m.channel === "email" && m.kind === "auto_email") m.am = morningVariant(m);
+  const reviewer = ident ? reviewIdentification : reviewSequence;
+  const reviewCtx = {
     market: ctx.campaign.market, commodity, otherCommodities: ctx.others, declarations: ctx.declarations, companyName: companyDisplayName(ctx.company),
     recipients: ctx.recipients, postalAddress: env.EAG_POSTAL_ADDRESS, postalAddressConfirmed: postalAddressConfirmed(env), unsubUrl: (id) => urls.get(id),
     language: ctx.language, languageGapNote: gapNote, translationApproved: ctx.translationApproved, templatesVersion,
-  });
+  };
+  let review = reviewer(msgs, reviewCtx);
+  if (msgs.some((m) => m.am)) {
+    const am = reviewer(msgs.map((m) => (m.am ? { ...m, body: m.am.body, html: m.am.html } : m)), reviewCtx);
+    // Só o que falha apenas na variante entra a mais (o que já falha no texto principal não se repete).
+    const same = (a, b) => a.id === b.id && a.step === b.step && a.contactId === b.contactId;
+    const extra = am.findings.filter((x) => !x.ok && !review.findings.some((y) => !y.ok && same(x, y))).map((x) => ({ ...x, detail: `Variante "Bom dia": ${x.detail}` }));
+    review = { ...review, ok: review.ok && am.ok, findings: [...review.findings, ...extra] };
+  }
   const snapshot = JSON.stringify({
     companyId: ctx.company.id, campaignId: ctx.campaign.id, campaignVersion: ctx.campaign.version,
     productId: ctx.product.id, commodity: ctx.product.commodity, profileId: ctx.profile?.id ?? null,
@@ -145,9 +159,10 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
     statements.push(
       s(
         env,
-        "INSERT INTO ficha_messages(id,version_id,contact_id,channel,step_no,kind,day_offset,subject_enc,body_enc,message_sha256,body_html_enc) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO ficha_messages(id,version_id,contact_id,channel,step_no,kind,day_offset,subject_enc,body_enc,message_sha256,body_html_enc,body_am_enc,body_html_am_enc,message_am_sha256) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         crypto.randomUUID(), versionId, m.contactId, m.channel, m.step, m.kind, m.day,
         m.subject == null ? null : await encryptPii(m.subject, env), await encryptPii(m.body, env), await messageHash(m.subject, m.body, m.html ?? null), m.html ? await encryptPii(m.html, env) : null,
+        m.am ? await encryptPii(m.am.body, env) : null, m.am?.html ? await encryptPii(m.am.html, env) : null, m.am ? await messageHash(m.subject, m.am.body, m.am.html ?? null) : null,
       ),
     );
   return { versionId, review, statements };
@@ -213,13 +228,15 @@ export async function getFicha(env, actor, id) {
     messages.push({
       id: m.id, contactId: m.contact_id, channel: m.channel, step: m.step_no, kind: m.kind, day: m.day_offset,
       subject: await decryptPii(m.subject_enc, env), body: await decryptPii(m.body_enc, env), html: m.body_html_enc ? await decryptPii(m.body_html_enc, env) : null, sha256: m.message_sha256,
+      // Variante "Bom dia" (A-ID8): sai antes das 12:00 no fuso do destinatário; aprovada junto com o texto principal.
+      morning: m.body_am_enc ? { body: await decryptPii(m.body_am_enc, env), html: m.body_html_am_enc ? await decryptPii(m.body_html_am_enc, env) : null, sha256: m.message_am_sha256 } : null,
     });
   const groups = {};
   for (const m of messages) (groups[`${m.contactId}|${m.channel}`] ||= []).push(m);
   const toApprove = [];
   for (const [key, list] of Object.entries(groups)) {
     const [contactId, channel] = key.split("|");
-    toApprove.push({ contactId, channel, messagesSha256: await approvalHash(list.sort((a, b) => a.step - b.step).map((m) => m.sha256)) });
+    toApprove.push({ contactId, channel, messagesSha256: await approvalHash(list.sort((a, b) => a.step - b.step).map((m) => approvalItem(m.sha256, m.morning?.sha256))) });
   }
   // D5-a: cópia interna configurada (endereço fixo do parâmetro) e estado da cópia de cada passo aceito.
   const copyCfg = copyConfig(await parameters(env, actor.tenant_id));
@@ -272,7 +289,7 @@ export async function approve(request, env, actor, rid, id) {
   // R18.6: destinatário sem fuso confirmado não é aprovado (e o pré-envio também segura, se o fuso for apagado depois).
   const recipient = await s(env, "SELECT timezone FROM contacts WHERE tenant_id=? AND id=?", actor.tenant_id, contactId).first();
   if (!recipient?.timezone) fail(409, "timezone_pending", "Confirme o fuso do destinatário antes de aprovar (R18.6).");
-  const agg = await approvalHash(list.map((m) => m.message_sha256));
+  const agg = await approvalHash(list.map((m) => approvalItem(m.message_sha256, m.message_am_sha256)));
   if (i.messagesSha256 !== agg) fail(409, "content_changed", "O conteúdo aprovado não confere com o atual. Recarregue a ficha.");
   const campaign = await s(env, "SELECT * FROM campaigns WHERE id=?", f.campaign_id).first();
   if (campaign.status !== "active") fail(409, "campaign_not_active", "Ative a campanha antes de aprovar.");
@@ -320,12 +337,12 @@ export async function approve(request, env, actor, rid, id) {
       statements.push(
         s(
           env,
-          `INSERT INTO send_outbox(id,tenant_id,ficha_id,message_row_id,approval_id,company_id,commodity,contact_id,email_hash,channel,step_no,planned_date,status,message_sha256)
-           VALUES (?,?,?,?,?,?,?,?,?,'email',?,?,?,?)
-           ON CONFLICT(ficha_id,contact_id,channel,step_no) DO UPDATE SET message_row_id=excluded.message_row_id,approval_id=excluded.approval_id,planned_date=excluded.planned_date,status=excluded.status,block_reason=NULL,message_sha256=excluded.message_sha256,attempts=0,updated_at=excluded.updated_at
+          `INSERT INTO send_outbox(id,tenant_id,ficha_id,message_row_id,approval_id,company_id,commodity,contact_id,email_hash,channel,step_no,planned_date,status,message_sha256,message_am_sha256)
+           VALUES (?,?,?,?,?,?,?,?,?,'email',?,?,?,?,?)
+           ON CONFLICT(ficha_id,contact_id,channel,step_no) DO UPDATE SET message_row_id=excluded.message_row_id,approval_id=excluded.approval_id,planned_date=excluded.planned_date,status=excluded.status,block_reason=NULL,message_sha256=excluded.message_sha256,message_am_sha256=excluded.message_am_sha256,greeting_variant=NULL,attempts=0,updated_at=excluded.updated_at
            WHERE send_outbox.status='superseded'`,
           crypto.randomUUID(), actor.tenant_id, id, m.id, approvalId, f.company_id, snap.commodity, contactId, contact.email_hash,
-          m.step_no, addDays(start, m.day_offset), busy ? "waiting_sequence" : "pending", m.message_sha256,
+          m.step_no, addDays(start, m.day_offset), busy ? "waiting_sequence" : "pending", m.message_sha256, m.message_am_sha256 ?? null,
         ),
       );
   }

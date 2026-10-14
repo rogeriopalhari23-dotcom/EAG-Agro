@@ -2674,7 +2674,20 @@ async function showFicha(id) {
       ),
     );
     msgs.forEach((m, i) => {
-      const msg = details(`Dia ${m.day} · passo ${m.step}${m.subject ? " · " + m.subject : ""}`, el("pre", { class: "message" }, m.body));
+      // Saudação pelo horário (A-ID8): os dois textos aparecem e são aprovados juntos; o envio escolhe pelo horário local.
+      const msg = m.morning
+        ? details(
+            `Dia ${m.day} · passo ${m.step}${m.subject ? " · " + m.subject : ""}`,
+            el(
+              "div",
+              {},
+              text("p", "A partir das 12:00 no fuso do destinatário:", "muted"),
+              el("pre", { class: "message" }, m.body),
+              text("p", "Antes das 12:00 no fuso do destinatário (só a saudação muda):", "muted"),
+              el("pre", { class: "message" }, m.morning.body),
+            ),
+          )
+        : details(`Dia ${m.day} · passo ${m.step}${m.subject ? " · " + m.subject : ""}`, el("pre", { class: "message" }, m.body));
       if (i === 0 && !approved) msg.open = true;
       box.append(msg);
     });
@@ -2685,7 +2698,7 @@ async function showFicha(id) {
         el(
           "div",
           { class: "approve" },
-          text("p", `A aprovação vale exatamente para ${msgs.length === 1 ? "o texto acima" : `os ${msgs.length} textos acima`} (versão ${v.no}). Qualquer mudança gera nova versão e pede nova aprovação; no envio nada é regenerado.`, "muted"),
+          text("p", `A aprovação vale exatamente para ${msgs.length === 1 ? "o texto acima" : `os ${msgs.length} ${msgs.some((m) => m.morning) ? "passos" : "textos"} acima`}${msgs.some((m) => m.morning) ? ", incluindo as duas saudações (Bom dia antes das 12:00, Boa tarde a partir das 12:00)" : ""} (versão ${v.no}). Qualquer mudança gera nova versão e pede nova aprovação; no envio nada é regenerado.`, "muted"),
           makeForm(
             [input("Início da cadência (segunda-feira, AAAA-MM-DD)", "startDate", "date", "", false)],
             async (x) => {

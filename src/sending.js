@@ -12,6 +12,7 @@ import { smtpTransport } from "./adapters/mailbox.js";
 import { copyOnAccept } from "./internal-copy.js";
 import { emailT11Cleared, internalTestException } from "./compliance.js";
 import { localDate, localParts, inWindow, addDays } from "./timezone.js";
+import { AFTERNOON_FROM } from "./templates/identificacao.js";
 
 const LEASE_MS = 120000;
 const SENDER_TZ = "America/Sao_Paulo";
@@ -118,16 +119,23 @@ export async function preSendCheck(env, row, ctx) {
   return { ok: true, email, tz };
 }
 
-// Texto exato aprovado: decifra e confere o hash contra a mensagem e a outbox (R17.2, R19.1, AT25).
-export async function approvedMessage(env, row) {
+// Texto exato aprovado: decifra e confere o hash contra a mensagem e a outbox (R17.2, R19.1, AT25). variant "am": a
+// variante "Bom dia" (A-ID8), congelada e aprovada junto, com o próprio hash; sem ela, o texto principal.
+export async function approvedMessage(env, row, variant = null) {
   const m = await s(env, "SELECT * FROM ficha_messages WHERE id=?", row.message_row_id).first();
+  const am = variant === "am";
+  if (am && !(m.body_am_enc && m.message_am_sha256 && row.message_am_sha256)) return null;
   const subject = await decryptPii(m.subject_enc, env);
-  const body = await decryptPii(m.body_enc, env);
-  const html = m.body_html_enc ? await decryptPii(m.body_html_enc, env) : null;
+  const body = await decryptPii(am ? m.body_am_enc : m.body_enc, env);
+  const htmlEnc = am ? m.body_html_am_enc : m.body_html_enc;
+  const html = htmlEnc ? await decryptPii(htmlEnc, env) : null;
   const h = await messageHash(subject, body, html);
-  if (h !== m.message_sha256 || h !== row.message_sha256) return null;
-  return { subject, body, html, versionId: m.version_id };
+  if (am ? h !== m.message_am_sha256 || h !== row.message_am_sha256 : h !== m.message_sha256 || h !== row.message_sha256) return null;
+  return { subject, body, html, versionId: m.version_id, sha256: h };
 }
+
+// Saudação pelo horário (A-ID8): com variante aprovada, antes das 12:00 no fuso do destinatário sai "Bom dia".
+export const greetingVariant = (row, at, tz) => (row.message_am_sha256 && localParts(at, tz).time < AFTERNOON_FROM ? "am" : null);
 
 // Leitura de respostas saudável (ponte de e-mail, 2026-09-30): sem leitura bem-sucedida da caixa nos últimos
 // READER_MAX_AGE_MS, nenhum envio sai — uma resposta não lida nunca fica para trás de um novo toque.
@@ -189,7 +197,8 @@ async function prepareNext(env, tenant, at, owner, state, leaseMs = LEASE_MS) {
       await s(env, "UPDATE send_outbox SET block_reason='outside_window',updated_at=? WHERE id=?", at, row.id).run();
       continue;
     }
-    const msg = await approvedMessage(env, row);
+    const variant = greetingVariant(row, at, check.tz);
+    const msg = await approvedMessage(env, row, variant);
     if (!msg) {
       await env.DB.batch([
         s(env, "UPDATE send_outbox SET status='blocked',block_reason='content_mismatch',updated_at=? WHERE id=?", at, row.id),
@@ -202,8 +211,8 @@ async function prepareNext(env, tenant, at, owner, state, leaseMs = LEASE_MS) {
     const leaseUntil = new Date(Date.parse(at) + leaseMs).toISOString();
     const took = await s(
       env,
-      "UPDATE send_outbox SET status='leased',lease_owner=?,lease_until=?,lease_token=lease_token+1,attempts=attempts+1,message_id=?,block_reason=NULL,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')",
-      owner, leaseUntil, messageId, at, row.id,
+      "UPDATE send_outbox SET status='leased',lease_owner=?,lease_until=?,lease_token=lease_token+1,attempts=attempts+1,message_id=?,greeting_variant=?,block_reason=NULL,updated_at=? WHERE id=? AND status IN ('pending','temp_failed')",
+      owner, leaseUntil, messageId, variant, at, row.id,
     ).run();
     if (!took.meta.changes) continue;
     const token = (await s(env, "SELECT lease_token FROM send_outbox WHERE id=?", row.id).first()).lease_token;

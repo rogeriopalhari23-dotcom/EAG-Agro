@@ -212,7 +212,7 @@ async function purgeContact(env, actor, rid, contactId, legalBasis, { emailHash:
       request ? `dados excluídos em ${at.slice(0, 10)}` : `dados excluídos no descarte da empresa em ${at.slice(0, 10)}`, at, tenant, contactId,
     ),
     s(env, "UPDATE send_outbox SET status='cancelled',block_reason='personal_data_deleted',updated_at=? WHERE tenant_id=? AND contact_id=? AND status IN ('pending','blocked','waiting_sequence','temp_failed')", at, tenant, contactId),
-    ...messages.results.map((m) => s(env, "UPDATE ficha_messages SET subject_enc=?,body_enc=?,body_html_enc=NULL,purged_at=? WHERE id=?", m.subject_enc == null ? null : marker, marker, at, m.id)),
+    ...messages.results.map((m) => s(env, "UPDATE ficha_messages SET subject_enc=?,body_enc=?,body_html_enc=NULL,body_am_enc=CASE WHEN body_am_enc IS NULL THEN NULL ELSE ? END,body_html_am_enc=NULL,purged_at=? WHERE id=?", m.subject_enc == null ? null : marker, marker, marker, at, m.id)),
     ...ownIds.map((id) => s(env, "UPDATE inbound_messages SET r2_key='purged',message_id=NULL,in_reply_to=NULL,references_json='[]',content_purged_at=? WHERE id=?", at, id)),
     // Histórico de edição (0033) pode conter o roteiro antigo: sai junto com o roteiro da tarefa.
     s(

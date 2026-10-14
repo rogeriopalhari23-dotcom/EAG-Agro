@@ -23,7 +23,7 @@ const E1 = [
 ].join("\n");
 
 test("E-mail 1 (pt 1.3.0): texto de Rogério, canal geral sem nome, empresa citada; revisor sem violações", () => {
-  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.3.0");
+  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.4.0");
   const msgs = gen([CH]);
   assert.ok(msgs[0].body.startsWith(E1 + "\n\n"), msgs[0].body.slice(0, 400));
   assert.equal(msgs[0].subject, "Responsável pela compra de milho");

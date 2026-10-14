@@ -2301,3 +2301,31 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Ponte:** leituras bem-sucedidas depois da publicação, a última conferida às 22:15:02 UTC (`readOk`, `nothing_due`, cópia não configurada).
 - **Não feito:** janela de envio e saudação não alteradas; nenhuma validação T11; nenhuma aprovação; Snov não usado.
 - **Revisão de Rogério:** painel → Abordagem → Fichas → "Revisar e aprovar" em cada uma das três.
+
+## Saudação pelo horário do envio (2026-10-14, pedido de Rogério; não publicado)
+
+- **Pedido:** E-mail 1 com "Bom dia" quando o envio for antes das 12:00 no horário local, "Boa tarde" a partir das 12:00.
+- **Como ficou (A-ID8, modelo pt `id-pt-1.4.0`):**
+  - **Geração:** o E-mail 1 que começa com "Boa tarde" ganha a variante "Bom dia", com texto e HTML idênticos fora a saudação (`morningVariant`).
+  - **Revisão:** o revisor confere as duas variantes. O que falhar só na variante "Bom dia" aparece marcado assim.
+  - **Painel:** mostra os dois textos no passo 1.
+  - **Aprovação:** cobre os dois. O hash de aprovação inclui a variante (`approvalItem`), e a outbox congela os dois hashes.
+- **No envio:**
+  - **Escolha:** `greetingVariant` decide só entre os dois textos aprovados: antes das 12:00 no fuso do destinatário sai "Bom dia"; nada é regenerado.
+  - **Integridade:** o hash da variante é conferido como o do texto principal (`approvedMessage`). A ponte recebe e devolve o hash do texto que saiu, e o resultado aceita qualquer um dos dois hashes aprovados.
+  - **Registro:** o passo grava a variante (`greeting_variant`), e a cópia interna reproduz a mesma saudação.
+  - **E-mail 2:** começa com "Olá", não tem variante e não muda.
+- **Migração 0041** (não aplicada):
+  - colunas da variante em `ficha_messages` e `send_outbox`;
+  - trigger de imutabilidade passa a proteger também o hash da variante;
+  - a exclusão de dados pessoais apaga a variante junto.
+- **Testes:**
+  - `tests/saudacao-horario.test.mjs` (12): 09:00, 11:59, 12:00 e 16:30 em São Paulo; fuso de Manaus; aprovação sem a variante recusada; variante adulterada bloqueada; imutabilidade; cópia interna; exclusão;
+  - `bridge/test/saudacao-horario.test.mjs` (2): a ponte real às 10:00 e às 14:00, com hash conferido e remetente sem parada.
+  - `npm run check`: 461 + 2 + 32, 0 falhas; `validate-deploy` ok.
+- **Produção:** nada publicado nem aplicado. As fichas continuam na v3 (`id-pt-1.3.0`, só "Boa tarde"), aguardando revisão; 0 aprovações, T11 pendente, nada enviado.
+- **Próximo passo, se Rogério autorizar:**
+  1. aplicar a 0041 (antes do código);
+  2. publicar o Worker (a ponte não muda);
+  3. gerar as versões 4 das três fichas, preservando v1–v3;
+  4. deixar as três aguardando revisão.

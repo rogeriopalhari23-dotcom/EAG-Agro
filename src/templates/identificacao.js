@@ -19,7 +19,17 @@
 //        franqueado da EAG Agro que trabalha com originação, o nome da empresa e o pedido de quem cuida da área e do melhor
 //        canal. Nome do remetente como Rogério escreveu ("Rogerio Palhari", igual à assinatura). E-mail 2, assinatura,
 //        transparência (E2-b) e descadastro não mudam.
-export const IDENT_VERSION = { "pt-BR": "id-pt-1.3.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
+//  A-ID8 (2026-10-14, pedido de Rogério, versão pt 1.4.0) Saudação pelo horário: o E-mail 1 que começa com "Boa tarde"
+//        ganha na geração a variante "Bom dia" (só a saudação muda). As duas são revisadas e aprovadas juntas; no envio,
+//        antes das 12:00 no fuso do destinatário sai "Bom dia", a partir das 12:00 sai "Boa tarde" (src/sending.js).
+export const IDENT_VERSION = { "pt-BR": "id-pt-1.4.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
+// Hora local a partir da qual a saudação é "Boa tarde" (antes dela, "Bom dia").
+export const AFTERNOON_FROM = "12:00";
+// Variante "Bom dia" de um texto que começa com "Boa tarde" (texto e HTML; só a primeira ocorrência, a saudação).
+export function morningVariant(m) {
+  if (!/^Boa tarde\b/.test(m.body || "")) return null;
+  return { body: m.body.replace(/^Boa tarde/, "Bom dia"), html: m.html ? m.html.replace("Boa tarde", "Bom dia") : null };
+}
 
 import { emailParts } from "./assinatura.js";
 import { DATA_REQUESTS_EMAIL } from "../privacy-contact.js";

@@ -18,7 +18,7 @@ const review = (msgs, sourceLabel) =>
   reviewIdentification(msgs, { market: "national", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel }], postalAddress: sig.postalAddress, postalAddressConfirmed: true, unsubUrl: () => UNSUB, language: "pt-BR" });
 
 test("E2-b (mantido no pt 1.3.0): com fonte no site, a linha completa fica no rodapé antes da saída, nos dois passos e no HTML", () => {
-  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.3.0");
+  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.4.0");
   assert.equal(DATA_REQUESTS_EMAIL, "rogeriopalhari@hotmail.com", "O2 decidido em 08/10/2026");
   const msgs = gen("Canal geral publicado no site da empresa (site) — verificado em 2026-10-08");
   assert.equal(msgs.length, 2);
@@ -93,7 +93,7 @@ test("E2-b: nova versão da ficha usa o modelo novo, fica aguardando revisão e 
   const f = (await api(`/api/fichas/${c.data.id}`)).data;
   assert.equal(f.ficha.status, "in_approval", "aguardando revisão; nada aprovado");
   assert.equal(f.version.no, 2);
-  assert.equal(f.version.templates, "id-pt-1.3.0");
+  assert.equal(f.version.templates, "id-pt-1.4.0");
   assert.ok(f.messages.every((m) => m.body.includes(LINE_SITE)), "texto novo nos dois passos");
   const old = DB.raw.prepare("SELECT snapshot_sha256,templates_version,superseded_at FROM ficha_versions WHERE id=?").get(v1.id);
   assert.equal(old.snapshot_sha256, v1.snapshot_sha256, "versão anterior intacta");

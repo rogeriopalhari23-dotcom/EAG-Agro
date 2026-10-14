@@ -59,8 +59,9 @@ const IDENT_ASK = {
   de: /für den Einkauf von[\s\S]*zuständig[\s\S]*(weiterleiten|Kontaktadresse)/i,
 };
 // Saudação do E-mail 1 da identificação: pt 1.3.0 (2026-10-14) "Boa tarde, tudo bem?" (com nome só se confirmado);
-// versões anteriores começavam com "Olá,".
-const IDENT_HELLO = { "pt-BR": /^(Boa tarde(, [^,\n]+)?, tudo bem\?|Olá)/ };
+// versões anteriores começavam com "Olá,". Desde 2026-10-14 (pt 1.4.0) há também a variante "Bom dia", escolhida no envio
+// pelo horário local do destinatário (antes das 12:00).
+const IDENT_HELLO = { "pt-BR": /^((Boa tarde|Bom dia)(, [^,\n]+)?, tudo bem\?|Olá)/ };
 // Assunto da ficha de identificação (PV9 aplicado a esta ficha, 2026-09-30): diz o objetivo do contato — encontrar o
 // responsável pela compra da commodity —, sem número nem título "criativo". Textos pt/de escritos por Rogério (id-*-1.1.0).
 const IDENT_SUBJECT = {
@@ -260,13 +261,14 @@ export function reviewIdentification(raw, ctx) {
     const greet = step1.filter((m) => {
       const r = ctx.recipients.find((x) => x.contactId === m.contactId);
       const first = m.body.split("\n")[0];
-      if (r?.kind === "company_channel" && /^Boa tarde/.test(first)) return first !== "Boa tarde, tudo bem?";
+      const hello = first.match(/^(Boa tarde|Bom dia)/)?.[1];
+      if (r?.kind === "company_channel" && hello) return first !== `${hello}, tudo bem?`;
       return false;
     });
     const leftover = raw.filter((m) => m.kind === "auto_email" && /\{\{|\}\}/.test(`${m.subject ?? ""}\n${m.body}`));
-    const noCompany = ctx.companyName ? step1.filter((m) => /^Boa tarde/.test(m.body) && !m.body.includes(`na ${ctx.companyName.trim().replace(/\.+$/, "")}.`)) : [];
+    const noCompany = ctx.companyName ? step1.filter((m) => /^(Boa tarde|Bom dia)/.test(m.body) && !m.body.includes(`na ${ctx.companyName.trim().replace(/\.+$/, "")}.`)) : [];
     finding(f, "SAUDACAO", !greet.length && !leftover.length && !noCompany.length,
-      greet.length ? "Canal geral recebeu saudação com nome: use \"Boa tarde, tudo bem?\"." : leftover.length ? "Marcador {{…}} não substituído no texto." : noCompany.length ? `E-mail 1 sem o nome da empresa (${ctx.companyName}).` : "Saudação sem nome inventado, marcadores substituídos e empresa citada.");
+      greet.length ? "Canal geral recebeu saudação com nome: use \"Boa tarde, tudo bem?\" ou \"Bom dia, tudo bem?\"." : leftover.length ? "Marcador {{…}} não substituído no texto." : noCompany.length ? `E-mail 1 sem o nome da empresa (${ctx.companyName}).` : "Saudação sem nome inventado, marcadores substituídos e empresa citada.");
     const gmo = raw.filter((m) => m.kind === "auto_email" && /\bGMO\b|transg[eê]nic/i.test(m.body));
     finding(f, "AFIRMACAO", !gmo.length, gmo.length ? `Passo ${gmo.map((m) => m.step).join(", ")} fala de GMO/transgênico: aceitação não comprovada.` : "Sem afirmação sobre GMO ou transgênico.");
     finding(f, "TRANSP", !bad.length, bad.length ? `Passo ${bad.map((m) => m.step).join(", ")}: sem o canal do titular no rodapé, ou origem do endereço diferente da fonte registrada.` : "Origem do endereço e canal do titular no rodapé (E2-b).");
