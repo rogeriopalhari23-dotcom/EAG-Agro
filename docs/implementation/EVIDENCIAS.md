@@ -2329,3 +2329,46 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   2. publicar o Worker (a ponte não muda);
   3. gerar as versões 4 das três fichas, preservando v1–v3;
   4. deixar as três aguardando revisão.
+
+## Publicação da saudação pelo horário, migração 0041 e versões 4 das fichas (2026-10-14, autorizada por Rogério)
+
+- **Conjunto publicado (de `792f07b` para `f34a14c`):**
+  - saudação pelo horário (`fe4b1e2`): modelo, revisor, fichas, envio, ponte (rota do Worker), cópia interna, exclusão, painel, migração 0041 e testes;
+  - `f34a14c` só traz documentação e comentários nos modelos, conferido linha a linha. A implementação internacional de idiomas **não** entrou.
+- **Antes:**
+  - Worker vigente `a2ecdb7d-e9f0-4e5c-adbd-9f5463f8a496`;
+  - Time Travel `000007ff-000001d4-00005104-be41f78d4682638bb0aad532d17dde8c` (22:51 UTC);
+  - backup privado `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0041-20261014\eag_compass.sql`: 30.725.811 bytes, SHA-256 `9bc71f3f5956226327240a8b64ad6b8072ba310edf69fd55fd320748e5c702a5`, acesso só de `ROGERIONOTE\Roger`.
+- **Pendências e compatibilidade:**
+  - só a `0041_saudacao_por_horario.sql` estava pendente;
+  - compatibilidade conferida: o código publicado (`de0acf3`), com a 0041 acrescentada, passou a própria suíte inteira (449 + 2 + 30).
+- **Migração** (22:56 UTC, 8 comandos), esquema conferido:
+  - `ficha_messages`: `body_am_enc`, `body_html_am_enc`, `message_am_sha256`;
+  - `send_outbox`: `message_am_sha256`, `greeting_variant` (CHECK `'am'`);
+  - trigger `ficha_messages_immutable` protegendo também `message_am_sha256`;
+  - "No migrations to apply" depois.
+- **Publicação:** `npm run deploy` (22:59 UTC), com o predeploy completo: `check` 461 + 2 + 32, 0 falhas, e `validate-deploy` ok.
+  - Worker **`22ec08e9-9a4d-4abb-ae9c-c98ae83db56b`**.
+  - **Reversão do código:** `wrangler rollback a2ecdb7d-e9f0-4e5c-adbd-9f5463f8a496`. O código anterior é compatível com o esquema novo (suíte acima). Nunca `64808403`.
+  - **Banco:** Time Travel e backup só para desastre, nunca para reverter código.
+- **Versões 4** (`POST /api/fichas/:id/versions`, 23:00 UTC):
+  - Cimilho `92203532`, São Martinho `3bba38e2`, Rei do Milho `5217599f`: v4 `id-pt-1.4.0`, revisor sem violações;
+  - v1 (`1.1.0`), v2 (`1.2.0`) e v3 (`1.3.0`) preservadas como substituídas;
+  - todas `in_approval`, 0 aprovações, 0 envios.
+- **Textos** (API e painel, Chrome sem interface, só leitura):
+  - passo 1 com "Boa tarde, tudo bem?" (a partir das 12:00) e "Bom dia, tudo bem?" (antes das 12:00), idênticos fora a saudação;
+  - nome da empresa nos dois; nenhum `{{…}}`, `[empresa]` ou `[nome]`;
+  - transparência E2-b e descadastro nos dois textos do passo 1 e no passo 2; passo 2 sem variante;
+  - painel com "versão 4", "0 de 1" e a frase "incluindo as duas saudações"; nenhum erro na página.
+- **Estado depois** (igual à foto de antes, fora as versões novas):
+  - T11 `pending` com histórico vazio (API), 0 validações;
+  - canais `planned`; campanhas 2 `draft` + 1 `ended`;
+  - cópia `{"enabled":false}`, `send_copies` 1 (a do teste);
+  - `send_outbox` 28, nenhum pendente, último de 21:12 UTC; nenhum envio novo; supressões 3.
+- **Ponte** (não atualizada; continua 0.2.0): leituras bem-sucedidas às 23:00:15 e 23:01:40 UTC (`readOk`, `nothing_due`).
+- **Não feito:** atualizar a ponte, aprovar fichas, registrar T11, enviar, implementar idiomas internacionais.
+- **Regra D1, só a lista, nada excluído:** com a 0041 aplicada e conferida, ficam elegíveis à limpeza:
+  - `d1-remoto-antes-0039-20261009\eag_compass.sql` (29.889.064 bytes, SHA-256 `42f948b7…f96a7`, igual ao registro);
+  - `d1-remoto-antes-0040-20261010\eag_compass.sql` (30.036.348 bytes, SHA-256 `8da54c6d…c5479`, igual ao registro).
+
+  Fica o backup vigente `d1-remoto-antes-0041-20261014`. As cópias da ponte (`ponte-antes-0.2.0-20261014`, `ponte-config-antes-prazo-20261006`) não são exportações do D1 e ficam fora desta regra.
