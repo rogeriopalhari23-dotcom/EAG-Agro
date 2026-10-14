@@ -2193,3 +2193,63 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - **Consumo do D1:** dia UTC 14/10 até 20:57 UTC = 1.379.937 linhas lidas (13.997 consultas); `rows_read_24h` = 1.381.809. Abaixo do limite diário de 5 milhões.
 - **Reversão:** `npx wrangler rollback 4e6b14fc-9ec3-46da-985f-ebadce13cc53`, que mantém a trava T11. Não voltar para `64808403`, que não tem a trava.
 - **Não feito:** atualização da ponte, migração, registro de validação T11, aprovação de fichas, envios.
+
+## Atualização da ponte (0.2.0) e teste interno da cópia D5-a (2026-10-14, autorizados por Rogério)
+
+**Versões:**
+- Worker em produção: `21d31f2b-8d02-409f-a667-820880f1a463` (sem mudança nesta etapa).
+- Ponte local: `eag-mail-bridge/0.2.0` (antes 0.1.0). Versão marcada em `bridge/src/main.js` e `bridge/package.json`.
+  - A tarefa agendada roda os scripts direto de `C:\Users\Roger\eag-compass\bridge`. "Atualizar" foi parar o processo antigo (PID 6724, rodando desde 06/10 com o código 0.1.0) e iniciar o novo.
+
+**Antes:**
+- Sessão do Access válida.
+- Ponte parada por `ponte.ps1 parar`, ao fim do ciclo.
+- Cópias em `C:\Users\Roger\eag-compass-backups\ponte-antes-0.2.0-20261014` (acesso só de `ROGERIONOTE\Roger`): `config.json`, `segredos.json` (segredos cifrados pela DPAPI do Windows), `journal.sqlite` e `estado.json`. Sem WAL/SHM depois da parada limpa.
+- Testes da ponte: 30/30.
+
+**Início da 0.2.0:**
+- PID 4848, leitura OK às 21:07:05 UTC.
+- O diário ganhou a tabela `copies` sozinho.
+- Os ciclos registram `copyReason: copy_not_configured_locally`.
+
+**Teste** (destinatários da lista interna, não suprimidos, conferidos por `/api/integrations/suppression/check`):
+- **Valores guardados antes:** janela nacional `{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}`; `email_copy_to` ausente; campanha de teste `5069cc54…` `ended`; canal `planned`.
+- **Registro fictício:** empresa "TESTE INTERNO EAG H — cópia interna D5-a (não é prospect)" (`362bdd5c…`); contato `b3dd4d36…` com `rogeriopalhari23+ponte-a@gmail.com`, fuso America/Cuiaba. Validação interna marcada no D1 só para esse contato (`email_validation_provider='teste-interno'`), sem Snov.
+- **Script:** `bridge/scripts/teste-copia-d5a.mjs` (preparar/abrir/estado/encerrar); IDs em `teste-interno-ponte/registros.json`, caso H.
+- **Abertura (decisão de Rogério: alargar a janela, porque eram 17:07 em Cuiabá):**
+  - `send_window` nacional temporário 00:00–23:59, todos os dias;
+  - `email_copy_to` = `rogeriopalhari23+ponte-b@gmail.com` (alias interno; não é vendas@);
+  - `BRIDGE_COPY_TO` com o mesmo alias no `config.json` da ponte, que foi reiniciada (PID 17680);
+  - campanha de teste ativa e canal `internal_test`;
+  - ficha `a6feeea4-5a8a-4b43-9dd6-675bf0527b2b` aprovada só no e-mail, início 14/10.
+  - A trava T11 não foi registrada: valeu a exceção de teste interno reconhecido (canal `internal_test` + lista interna).
+- **Resultado:**
+  - **Original:** passo 1 (`a2a769a7-5083-4906-b204-321771327d4d`) aceito pelo SMTP às 21:13:19 UTC (250); chegou ao Gmail às 21:13:11 UTC, para `+ponte-a`.
+  - **Cópia:** mensagem separada "[Cópia] Fornecedor açúcar", aceita às 21:14:56 UTC (250 "queued as 4j4kVc3QC6zyNl"); chegou às 21:14:48 UTC, para `+ponte-b`. Traz o aviso de link de descadastro omitido.
+  - **Diário da ponte:** `sends` 1 linha (reserva 1, `reported`/`accepted`, 250); `copies` 1 linha (reserva 1, `reported`/`accepted`, 250). Sem duplicidade.
+  - **Compass:** passo 1 `accepted`; `send_copies` `accepted`, 1 tentativa.
+  - **Painel:** a ficha mostra "Cópia interna: rogeriopalhari23+ponte-b@gmail.com — Mensagem separada, sem o link de descadastro…" e, no passo 1, "Cópia interna: aceita pelo servidor — 250 …".
+- **Ocorrência durante o teste:**
+  - Às 21:13:33 UTC o ciclo falhou com `TypeError`, sem resposta HTTP, ao avisar o Compass do aceite do original, 14 s depois do SMTP.
+  - No ciclo seguinte (21:14:40) a ponte recuperou pelo diário ("recovered … accepted") **sem reenviar**, e a cópia saiu em seguida. É o cenário de queda já coberto pelos testes.
+  - A causa da falha de rede não está comprovada: mesmo padrão das falhas de leitura do fim da tarde, início ainda desconhecido.
+  - **Efeito visível:** a linha da cópia diz "enviado em 21:14 UTC", porque usa o horário em que o Compass registrou o aceite, não o do SMTP (21:13). Fica para ajuste: usar o horário do SMTP informado pela ponte, quando houver.
+- **Resposta interna:**
+  - Enviada pelo Gmail de Rogério (`rogeriopalhari23@gmail.com`, endereço principal; o Gmail não envia pelo alias `+ponte-b`) em resposta à cópia, para `rogeriopalhari@eagagro.com`, com texto neutro, sem "sair".
+  - Lida pela ponte às 21:21 UTC: `human`, correlação `none`, sem `outbox_id` nem empresa. 0 tarefas criadas; supressões continuam 3.
+  - Não passou pela regra de remetente interno (que reconhece o endereço da cópia ou o domínio da caixa). Ficou sem efeito porque não se liga a nenhum envio.
+- **Encerramento:**
+  - ficha de teste descartada (passos 2–4 `cancelled`);
+  - `email_copy_to` = `{"enabled":false}`;
+  - janela restaurada a 09:00–17:00, de segunda a sexta (conferido);
+  - campanha de teste `ended` (versão 7);
+  - canal `planned`;
+  - `BRIDGE_COPY_TO` retirado do `config.json` e ponte reiniciada (PID 2220).
+- **Estado final** (conferido no D1 e na API):
+  - nenhum envio pendente;
+  - `send_outbox` 6 `accepted` + 22 `cancelled`; `send_copies` 1 `accepted`;
+  - fichas 6 `in_approval` + 7 `discarded`; 0 aprovações nas 3 fichas comerciais;
+  - 0 validações T11; 3 supressões; tarefas 13 + 2;
+  - canais `planned`; campanhas 2 `draft` + 1 `ended`.
+- **Ponte depois do encerramento:** leitura bem-sucedida às 21:24:21 UTC (motivo `interval`, intervalo depois do envio do teste).
+- **Não feito:** vendas@, Snov, aprovação de fichas comerciais, validação T11, remoção de supressões. Os testes de falha não foram repetidos: a recuperação real funcionou como testado.
