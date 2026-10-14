@@ -2271,3 +2271,33 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   1. publicar o Worker;
   2. gerar as versões 3 das três fichas (`POST /api/fichas/:id/versions`), preservando as versões 1 e 2;
   3. deixar as três aguardando revisão.
+
+## Publicação do novo E-mail 1 e versões 3 das fichas (2026-10-14, autorizada por Rogério)
+
+- **Antes de publicar:**
+  - commit `de0acf3` conferido: 10 arquivos (modelo, revisor, fichas, prévias, 3 testes, EVIDENCIAS, sequence); árvore limpa;
+  - produção em `21d31f2b`; nenhuma migração pendente;
+  - foto do estado tirada.
+- **Publicação:**
+  - `npm run deploy`, com o predeploy completo: `check` 449 + 2 + 30, 0 falhas, e `validate-deploy` ok;
+  - Worker **`a2ecdb7d-e9f0-4e5c-adbd-9f5463f8a496`**;
+  - reversão, se precisar: `wrangler rollback 21d31f2b-8d02-409f-a667-820880f1a463` (nunca 64808403, sem a trava T11).
+- **Versões 3** (`POST /api/fichas/:id/versions`, ~22:11 UTC):
+  - Cimilho `92203532`, São Martinho `3bba38e2`, Rei do Milho `5217599f`: v3 `id-pt-1.3.0`;
+  - revisor sem violações; v1 (`id-pt-1.1.0`) e v2 (`id-pt-1.2.0`) preservadas como substituídas;
+  - todas `in_approval`, 0 aprovações, 0 envios.
+- **Conferência dos textos** (API e painel, Chrome sem interface, só leitura):
+  - E-mail 1 com "Boa tarde, tudo bem?", "…compra de milho na Cimilho." / "na São Martinho." / "na Rei do Milho." e o pedido "quem cuida dessa área…";
+  - nenhum `{{…}}`, `[empresa]` ou `[nome]`;
+  - E-mail 2 (dia 4) igual ao da v2;
+  - linha de transparência E2-b e descadastro nos dois passos; assinatura, aviso de confidencialidade e endereço mantidos;
+  - painel: "versão 3", "0 de 1" aprovações, "Validação T11 vigente: pendente"; nenhum erro na página.
+- **Estado depois** (igual à foto de antes, fora as versões novas):
+  - 0 validações T11;
+  - canais `planned`; campanhas 2 `draft` + 1 `ended`;
+  - cópia `{"enabled":false}` (`send_copies` continua 1, a do teste);
+  - `send_outbox` 28, o último de 21:12 UTC (teste D5-a); nenhum envio novo;
+  - supressões 3.
+- **Ponte:** leituras bem-sucedidas depois da publicação, a última conferida às 22:15:02 UTC (`readOk`, `nothing_due`, cópia não configurada).
+- **Não feito:** janela de envio e saudação não alteradas; nenhuma validação T11; nenhuma aprovação; Snov não usado.
+- **Revisão de Rogério:** painel → Abordagem → Fichas → "Revisar e aprovar" em cada uma das três.
