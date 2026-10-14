@@ -1,6 +1,11 @@
-# Textos em espanhol e inglês para revisão de Rogério (revisão 2, 2026-10-14)
+# Textos em espanhol e inglês para revisão de Rogério (revisão 3, 2026-10-14)
 
 **Situação:** rascunho para revisão, **não aprovado**. Nada foi implementado, publicado ou gerado como ficha. Base: Spec R28.20 e R28.21, `IDIOMA-POR-PAIS.md`.
+
+**Revisão 3** (ajustes de Rogério em 14/10):
+- mantidos "en Brasil"/"in Brazil" e o motivo do contato;
+- E-mail 2 com o texto de Rogério, pedindo pessoa, departamento ou e-mail da área, sem exigir e-mail individual;
+- rodapé com a origem do endereço fiel à fonte registrada (§2.1).
 
 **Revisão 2:** redação própria de cada idioma, sem tradução literal do português. Mantém a intenção e os fatos dos textos de Rogério (`id-pt-1.4.0`):
 - quem escreve: Rogerio Palhari, franqueado da EAG Agro;
@@ -49,11 +54,13 @@ Destinatário pessoa com nome confirmado (nunca no canal geral):
 ```text
 Hola:
 
-Le escribí hace unos días buscando a la persona responsable de las compras de maíz en {{empresa}}.
+Retomo mi correo anterior sobre las compras de maíz de {{empresa}}.
 
-Si puede compartirme su nombre y correo electrónico, me comunico directamente con esa persona. Si la empresa no compra maíz, una breve respuesta indicándolo también me ayuda.
+¿Podría indicarme qué persona o departamento se encarga de estas compras, o facilitarme el correo del área correspondiente?
 
-Gracias.
+Si su empresa no compra maíz, le agradecería que me lo indicara para actualizar mis registros.
+
+Muchas gracias.
 ```
 
 ### Rodapé (todos os e-mails, depois da assinatura)
@@ -65,7 +72,7 @@ Encontré esta dirección en el sitio web de su empresa. Para solicitudes sobre 
 Para dejar de recibir estos mensajes, responda "baja" o use este enlace: {{link}}
 ```
 
-A frase "Encontré esta dirección…" só entra quando a fonte registrada do canal é o site da empresa. Em outra fonte, fica só "Para solicitudes sobre datos personales: …" (PV4).
+A primeira frase depende da fonte registrada do canal (§2.1).
 
 ### Página de descadastro
 
@@ -106,9 +113,11 @@ Destinatário pessoa com nome confirmado:
 ```text
 Hello,
 
-I wrote a few days ago looking for the person who handles corn purchasing at {{company}}.
+I’m following up on my previous email about corn procurement at {{company}}.
 
-If you can share their name and email address, I will contact them directly. If your company does not buy corn, a short reply saying so is also helpful.
+Could you direct me to the person or department responsible, or share the appropriate purchasing email address?
+
+If your company does not purchase corn, please let me know so I can update my records.
 
 Thank you,
 ```
@@ -122,9 +131,32 @@ I found this address on your company's website. For requests about personal data
 To stop receiving these messages, reply "unsubscribe" or use this link: {{link}}
 ```
 
-A linha de descadastro é a mesma já usada nos modelos em inglês. A origem do endereço segue a mesma regra do português.
+A linha de descadastro é a mesma já usada nos modelos em inglês. A primeira frase depende da fonte registrada do canal (§2.1).
 
 **Página de descadastro:** já tem inglês e não muda.
+
+### 2.1 Origem do endereço no rodapé (os três idiomas)
+
+A frase de origem é escolhida pela fonte **registrada** no cadastro do canal (`sourceKind`: `company_site` ou `directory`) e pela URL da fonte. Nunca é deduzida nem inventada.
+
+| Fonte registrada | Português | Espanhol | Inglês |
+| --- | --- | --- | --- |
+| Site da empresa (`company_site`) | Encontrei este endereço no site da empresa. | Encontré esta dirección en el sitio web de su empresa. | I found this address on your company's website. |
+| Diretório (`directory`) | Encontrei este endereço no diretório de empresas {{fonte}}. | Encontré esta dirección en el directorio de empresas {{fuente}}. | I found this address in the business directory {{source}}. |
+| Sem fonte classificada | (sem frase de origem) | (sin frase de origen) | (no source sentence) |
+
+- **`{{fonte}}`/`{{fuente}}`/`{{source}}`:** só o domínio da URL registrada como fonte (por exemplo, `kompass.com`), nunca um nome escrito à mão. Sem URL registrada, a linha de diretório não é usada e vale a última linha da tabela.
+- **Depois da frase de origem, em todos os casos:**
+  - pt: "Pedidos sobre dados pessoais: rogeriopalhari@hotmail.com.";
+  - es: "Para solicitudes sobre datos personales: rogeriopalhari@hotmail.com.";
+  - en: "For requests about personal data: rogeriopalhari@hotmail.com.".
+- **A instrução de descadastro não muda.**
+
+**O que existe hoje (conferido no código):**
+- Em português, a frase do site aparece quando o rótulo da fonte contém "site" ou "website" (`fromSite`, `src/templates/identificacao.js`). Em diretório, fica só a linha do canal do titular.
+- O revisor (TRANSP) recusa a frase do site quando a fonte registrada não é o site.
+- **Risco:** a decisão lê o texto livre do rótulo, não o tipo registrado. Um rótulo editado com a palavra "site" por outro motivo ativaria a frase. Na implementação dos idiomas, a escolha deve usar o tipo da fonte (`company_site`/`directory`) gravado no cadastro.
+- As três fichas brasileiras têm fonte no site da empresa, então o texto aprovado para elas não muda.
 
 ## 3. Escolhas de termo que mudam o sentido comercial
 
@@ -139,7 +171,10 @@ A linha de descadastro é a mesma já usada nos modelos em inglês. A origem do 
    - dá a quem lê o e-mail geral um motivo para encaminhar, sem oferecer produto;
    - "insumo" e "sources" tratam o milho como matéria-prima do comprador, sem afirmar que ele compra.
    - Se preferir sem motivo, a frase termina em "{{empresa}}"/"{{company}}".
-4. **E-mail 2 pede nome e e-mail e diz "me comunico directamente"/"I will contact them directly":** em português o pedido é "com quem devo falar". A versão nova reduz o trabalho de quem recebe e deixa claro o próximo passo, que já é o que acontece. A saída "não compra milho" ficou igual.
+4. **E-mail 2 (texto de Rogério, revisão 3):**
+   - pede a pessoa **ou o departamento** responsável, ou o e-mail da área de compras, sem exigir e-mail individual;
+   - a saída "não compra milho" vem com o motivo ("update my records"/"actualizar mis registros"), que corresponde ao registro feito no Compass.
+   - No espanhol, o marcador `{{company}}` do texto de Rogério foi escrito `{{empresa}}`, por coerência com o resto do texto em espanhol; o significado é o mesmo.
 5. **Assuntos curtos ("Contacto de compras de maíz", "Corn purchasing contact"):** dizem o objetivo do contato (identificar o contato de compras) em vez de "responsável pela compra".
    - Hoje o revisor só tem regra de assunto para português e alemão. A regra para espanhol e inglês entra na implementação.
 
