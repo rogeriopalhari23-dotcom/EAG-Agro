@@ -2159,3 +2159,37 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Os testes da ponte já usavam a data de São Paulo, o mesmo critério do produto agora: não precisaram mudar.
   - `npm run check`: 443/443, 2/2, 30/30.
 - **Não feito:** publicação, atualização da ponte, aprovação de fichas, registro de validação T11, envio de mensagens, rollback.
+
+## Publicação da correção das datas de início (2026-10-14, autorizada por Rogério)
+
+- **Antes:**
+  - commit `a951f08` (igual ao remoto). Diferença de código em relação ao publicado (`ee970c6`): só `src/fichas.js`; o resto são documentos e o teste novo;
+  - nenhuma migração pendente;
+  - Worker vigente `4e6b14fc-9ec3-46da-985f-ebadce13cc53`;
+  - Time Travel `000007f7-00000182-00005104-2f2d5cbae87fc698166b522587875014`;
+  - sem backup novo (sem migração; regra D1).
+  - **Conferido:** API respondendo depois de novo login do Access feito por Rogério; T11 pendente nas 3 fichas; canais `planned`; nada enviado; ponte com leitura bem-sucedida às 20:50:02 UTC.
+- **Publicação (20:55 UTC):** `npm run deploy` com `check` 443/443, 2/2 e 30/30. **Worker `21d31f2b-8d02-409f-a667-820880f1a463` (100%).**
+- **Conferido depois:**
+  - **Contagens idênticas às de antes:**
+    - fichas: 6 `in_approval` + 6 `discarded`; 22 versões de ficha; 6 aprovações (todas antigas, do teste interno);
+    - `send_outbox`: 24 (5 `accepted` + 19 `cancelled`);
+    - 15 contatos; 3 supressões; tarefas 13 abertas + 2 concluídas;
+    - canais `planned`; campanhas 2 `draft` + 1 `ended`;
+    - 0 validações T11; cópia interna não configurada.
+  - **API:** as 3 fichas na versão 2 com "Validação T11 vigente (br_email_automatic)" pendente, 0 aprovações, 0 envios; `sentToday` 0; fila vazia.
+  - **Painel (Chrome headless):**
+    - Início em cerca de 2,2 s; Tarefas em cerca de 2,9 s (13 bloqueadas, todas com T11 pendente, 6 sem telefone);
+    - ficha da Cimilho na versão 2 com a condição T11 pendente e a linha E2-b;
+    - nenhum erro de página.
+  - **Correção das datas:**
+    - Em produção ela não pode ser exercitada sem aprovar ficha real: a checagem do início vem depois do canal, da campanha e da T11, que hoje bloqueiam antes. Nada foi aprovado nem criado.
+    - **Validação:** os 5 testes de `inicio-fuso-destinatario` rodaram no `check` da publicação.
+    - O script implantado (lido pela API da Cloudflare, 777.572 bytes) contém a regra nova ("…a partir de hoje no fuso do destinatário…" e a checagem de ida e volta da data), não contém a comparação antiga com a data UTC (`start < at.slice(0, 10)`) e mantém a trava T11.
+  - **Ponte (scripts não atualizados):** leitura bem-sucedida às 20:57:33 UTC; Compass registrou 20:57:23 UTC.
+    - O último erro registrado continua o `TypeError` das 20:16:05 UTC.
+    - O início da falha de leitura de hoje continua **desconhecido**: o log local começa às 19:40 UTC.
+    - A causa não está comprovada. O erro é do lado da ponte, sem resposta HTTP, o que é compatível com problema de rede, mas não o prova.
+  - **Consumo do D1:** dia UTC 14/10 até 20:57 UTC = 1.379.937 linhas lidas (13.997 consultas); `rows_read_24h` = 1.381.809. Abaixo do limite diário de 5 milhões.
+- **Reversão:** `npx wrangler rollback 4e6b14fc-9ec3-46da-985f-ebadce13cc53`, que mantém a trava T11. Não voltar para `64808403`, que não tem a trava.
+- **Não feito:** atualização da ponte, migração, registro de validação T11, aprovação de fichas, envios.
