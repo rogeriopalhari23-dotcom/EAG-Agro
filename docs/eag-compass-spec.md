@@ -460,7 +460,7 @@ Origem: ESC §2.4 (LinkedIn e decisores); BEN §4; T12 módulos 2 e 8.
 
 Origem: ESC §2.2 (Campanha, Oferta), §2.6, decisão 4 da Fase 3; PER regra da revisão 3.
 
-- **R16.1:** O sistema DEVE permitir criar campanha com commodity, mercado, contexto de busca (origem/raio ou país/análise), público, idioma, duração/revisão e modelo de sequência, **sem oferta específica**.
+- **R16.1:** O sistema DEVE permitir criar campanha com commodity, mercado, contexto de busca (origem/raio ou país/análise), público, idioma, duração/revisão e modelo de sequência, **sem oferta específica**. *(2026-10-14: o idioma não é escolha livre; segue o país do destinatário, R28.20.)*
 - **R16.2:** Busca, ficha, aprovação e envio da sequência inicial NÃO DEVEM exigir oferta, lote, estoque, preço, cotação ou cadastro completo de fornecedor.
 - **R16.3:** QUANDO uma oferta específica for criada, o sistema DEVE versioná-la com produto/variante, fornecedor quando identificado, especificação, disponibilidade, mínimo, condições, exigência de comprador final e validade.
 - **R16.4:** Uma oferta PODE ser vinculada a várias campanhas ou fichas; o vínculo é explícito e opcional.
@@ -494,7 +494,7 @@ Origem: ESC D8, §2.11; T12 §2–§6.
 | PV9 | Assunto diz o que o comprador busca ("Fornecedor [commodity]"); sem título estatístico/"criativo" | I8 |
 | PV10 | Tom de consultor, direto, sem formalidade de vendedor nem pedido de desculpas; português (ou idioma da campanha) revisado | Voz do instrutor; eval 36 |
 | PV11 | Mensagem ao influenciador (E-mail 3) mantém o pedido de conversa e não repete o texto do decisor | Cadência, semana 2 |
-| PV12 | Internacional: mesma estrutura no idioma do país (inglês por padrão), lacuna 🔴 registrada na ficha | Lacuna declarada |
+| PV12 | Internacional: mesma estrutura no idioma do país do destinatário (R28.20), lacuna 🔴 registrada na ficha | Lacuna declarada; idioma por R28.20 (2026-10-14) |
 
 - **R17.4:** Textos DEVEM seguir os roteiros de `references/scripts-abordagem.md` da skill, trocando `[SUA EMPRESA]` e `[COMMODITY]` e mantendo a estrutura; conteúdo específico vem do catálogo, das evidências, da campanha e das declarações aprovadas (K6). Frameworks 📚 (SPIN, Gap, Voss) NÃO DEVEM ser usados em texto automático: servem à reunião conduzida por Rogério.
 - **R17.5:** QUANDO a skill for atualizada, o sistema NÃO DEVE reescrever mensagens aprovadas; DEVE marcar as fichas afetadas para revisão, e SE houver conflito identificado, ENTÃO DEVE impedir novos envios da ficha até nova versão aprovada.
@@ -682,7 +682,25 @@ Origem: diretriz de Rogério de 2026-09-22; T12 rev. 3 (§2, §3).
 - **R28.12:** Os dashboards DEVEM mostrar o funil da skill: empresas prospectadas → reuniões agendadas → negócios, por campanha e período.
 - **R28.13:** SE o comprador pedir preço, tabela ou apresentação na resposta, ENTÃO a tarefa aberta para Rogério DEVE exibir a orientação da skill (qualificar e propor a reunião; sem preço ou proposta antes dela). O sistema não responde (R19.9).
 - **R28.14:** Contexto de mercado em textos ou tarefas DEVE citar fonte e data; os números de `contexto-mercado.md` da skill (maio/2026) DEVEM ser reconferidos antes de qualquer uso.
-- **R28.15:** No Internacional, o sistema DEVE aplicar o mesmo processo no idioma da campanha (inglês por padrão) e registrar na ficha que a skill não tem método específico para exportação (lacuna 🔴).
+- **R28.15:** No Internacional, o sistema DEVE aplicar o mesmo processo no idioma definido pelo R28.20 e registrar na ficha que a skill não tem método específico para exportação (lacuna 🔴). *(2026-10-14: "idioma da campanha, inglês por padrão" substituído pela regra de idioma por país do R28.20.)*
+- **R28.20 (idioma, decisão de Rogério em 2026-10-14):** O idioma de toda a sequência de e-mail DEVE ser definido pelo país do destinatário:
+  - Brasil: português (pt-BR);
+  - demais países da América Latina (lista fechada a aprovar, §6): espanhol;
+  - países fora da América Latina: inglês.
+
+  O país vem do código ISO registrado. O idioma NÃO DEVE ser deduzido do nome da pessoa, do domínio ou da terminação do e-mail.
+
+  A regra vale para assunto, apresentação, acompanhamentos, linha de transparência e instruções de descadastro. Nomes próprios, marcas e endereços DEVEM ser preservados sem tradução.
+
+  SE não houver modelo aprovado no idioma exigido, ENTÃO a ficha NÃO DEVE ser gerada: o sistema não troca para outro idioma.
+- **R28.21 (saudação por horário, 2026-10-14):** QUANDO o E-mail 1 abrir com saudação do período, a ficha DEVE guardar as duas variantes no idioma do R28.20:
+  - português: "Bom dia" / "Boa tarde";
+  - espanhol: "Buenos días" / "Buenas tardes";
+  - inglês: "Good morning" / "Good afternoon".
+
+  As duas variantes são revisadas e aprovadas juntas, cada uma com o próprio hash. No envio, o horário local do destinatário escolhe a variante: antes das 12:00, a da manhã; a partir das 12:00, a da tarde. Nada é regenerado no envio (R17.2).
+
+  A cópia interna (D5-a) DEVE reproduzir o texto efetivamente enviado.
 - **R28.16:** SE uma regra da skill conflitar com um controle do Compass (supressão, aprovação, LGPD, compliance, veracidade, integração comprovada), ENTÃO vale a regra mais restritiva até a decisão de Rogério registrada nesta Spec. Nenhum controle do Compass é afrouxado pela skill, e nenhum inviolável da skill é descumprido sem exceção registrada na Constituição.
 - **R28.17 (K2):** O sistema DEVE permitir no máximo 2 commodities com campanhas ativas por mercado (Nacional, Internacional). SE uma terceira for ativada, ENTÃO ela DEVE ficar em espera com aviso. A análise de país (R12) continua mostrando todas as commodities, e a seleção de mais de duas é registrada.
 - **R28.18 (K4):** Tarefas manuais (ligação, LinkedIn) DEVEM obedecer às mesmas interrupções dos envios: supressão, pausas, resposta (R20.1), bloqueio de sanção/compliance e aprovação vigente. SE alguma se aplicar, ENTÃO a tarefa DEVE ser suspensa antes de aparecer a Rogério, com o motivo.
@@ -838,6 +856,8 @@ Retirado da lista v1.3: "automação completa de follow-up" (agora permitida par
 | 2026-10-09 | Decisões do piloto brasileiro por e-mail? | Rogério Palhari aprovou **E1** (legítimo interesse, teste de balanceamento), **E2-b** (linha de transparência com o canal do titular rogeriopalhari@hotmail.com), **O7-e, O8-e, O9-e** e **D5-a** (cópia interna separada de cada passo aceito ao endereço fixo do contrato; parâmetro só do Administrador). **OpenClaw B** aprovada como opção, mas a exceção **não está registrada**: falta a declaração de Rogério (texto em `implementation/PRONTIDAO-PILOTO-BR-EMAIL.md` §9). Alcance: só `br_email_automatic`. Implementação em §10, não publicada. **Não** aprova fichas, não ativa campanha, não libera canal e **não** valida a T11; incidentes e Cloudflare seguem pendentes. | R19, R21, R25, R26, T11 |
 | 2026-10-08 | Canal do piloto brasileiro? | Exclusivamente **e-mail**. Ligações não serão executadas; as 13 tarefas e o histórico ficam preservados; a conclusão do piloto telefônico sai da prioridade. A emenda T11-BR-TEL (proposta, ligação manual) **não** libera e-mail. Franquia em nome de Rogério (pessoa física). Prontidão em `implementation/PRONTIDAO-PILOTO-BR-EMAIL.md`. **T11 continua pendente.** | T11, R19, R26 |
 | 2026-10-08 | Qual é a finalidade do Compass? | Ferramenta pessoal de Rogério (franqueado da EAG) de apoio à pesquisa, à organização de informações e à preparação da prospecção. Não é ferramenta da EAG, não é implantação de sistema oficial da franquia e não substitui CRM, sistema ou procedimento da rede; cadastro oficial, comunicação de oportunidades e procedimentos contratuais seguem pelos canais da EAG. Responsabilidade pelo tratamento e pendências da T11 tratadas à parte (`implementation/T11-REVISAO-PILOTO-BR-TELEFONE.md` §16). **T11 continua pendente.** | Premissas (uso), P7; T11 |
+| 2026-10-14 | Saudação do E-mail 1 pelo horário? | "Bom dia" antes das 12:00 e "Boa tarde" a partir das 12:00, no horário local do destinatário. As duas variantes ficam na ficha e são aprovadas juntas; o envio só escolhe entre elas. Implementado (modelo id-pt-1.4.0, migração 0041), não publicado. | R28.21, R17.2 |
+| 2026-10-14 | Idioma dos e-mails? | Pelo país do destinatário: **Brasil, português**; **demais países da América Latina, espanhol**; **fora da América Latina, inglês**. Nunca deduzido de nome ou domínio. Vale para a sequência inteira (assunto, apresentação, acompanhamentos, transparência, descadastro), preservando nomes próprios, marcas e endereços. A saudação por horário acompanha o idioma. As fichas brasileiras de Cimilho, São Martinho e Rei do Milho continuam em português. **Não** autoriza publicar, aplicar a 0041, aprovar fichas ou enviar. Ajustes e pendências em `implementation/IDIOMA-POR-PAIS.md`. | R28.20, R28.21, R28.15, PV12, R16.1 |
 | 2026-10-08 | Retenção dos dados pessoais (T11, opções A–D)? | Rogério Palhari escolheu: **A1**, supressões e hashes do registro de exclusões mantidos enquanto houver prospecção no canal, com revisão registrada a cada 12 meses; **B1**, histórico de remoções pelo prazo da lista mais um prazo de prova (a escolher se a lista for eliminada); **C1**, dados pessoais eliminados no descarte, mantendo empresa, motivo e data; **D1**, exportação do D1 guardada só até a migração seguinte confirmada. Avisos da empresa seguem A1. Resolve só a retenção; **T11 continua pendente**. Lacunas G1–G4 em `implementation/T11-REVISAO-PILOTO-BR-TELEFONE.md` §12. | Premissas (retenção), R9.1, R21.1, R23.4, P7 |
 
 ## 6. Decisões pendentes
@@ -865,6 +885,11 @@ Retirado da lista v1.3: "automação completa de follow-up" (agora permitida par
 | ID | Decisão | Regra vigente até a decisão | Bloqueia |
 | --- | --- | --- | --- |
 | **B1** | Exceção para ausência automática | Pausa por resposta da revisão 3 (empresa + commodity); nenhuma retomada automática (R20.7, R20.8) | Nada: a regra conservadora já está especificada |
+| **L1** | Lista fechada da "América Latina" do R28.20 (casos de dúvida: Haiti, Belize, Guiana, Suriname, Guiana Francesa, Porto Rico e territórios do Caribe) | Espanhol só nos países de língua oficial espanhola; os casos de dúvida ficam sem ficha até a decisão | Fichas desses países |
+| **L2** | Portugal e países lusófonos fora da América Latina (Angola, Cabo Verde, Guiné-Bissau, Moçambique, São Tomé e Príncipe, Timor-Leste): o cadastro atual diz português; o R28.20 diz inglês | Inglês (texto literal da decisão), sem ficha gerada antes da confirmação | Fichas desses países |
+| **L3** | Alemanha: fichas de identificação em alemão (textos de Rogério, 2026-09-30); o R28.20 diz inglês | Nenhuma ficha nova em alemão; as existentes continuam como rascunho, sem aprovação | Fichas da Alemanha |
+| **L4** | "País do destinatário": o contato não tem país próprio; vale o país da empresa cadastrada? | País da empresa cadastrada (código ISO), nunca nome ou domínio | Nada |
+| **L5** | Textos em espanhol e saudações em inglês: textos para aprovação de Rogério | Sem modelo aprovado no idioma, a ficha não é gerada (R28.20) | Fichas em espanhol; saudação por horário em inglês |
 
 Pendências comerciais que **não** são decisões da Spec: commodity, cidade/UF e raio do piloto (bloqueia Etapa 1); identidade de CSO (bloqueia só o item); valores `M_N` por commodity e demais parâmetros pendentes (R7.1); declarações aprovadas de volume disponível e prova social por campanha (R16.7); validação jurídica da retenção (T11).
 

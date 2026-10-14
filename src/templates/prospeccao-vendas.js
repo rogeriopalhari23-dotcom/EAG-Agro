@@ -10,6 +10,8 @@
 //  A-R19 Assinatura com endereço físico e forma de saída (R19.13, R21.7).
 //  A-G1  Break sem gênero: "ou com projetos mais urgentes" no lugar de "ou envolvido em projetos mais urgentes"
 //        (decisão de Rogério em 2026-09-24; serve para qualquer contato sem inferir gênero). Versão pv-1.1.0.
+// Idioma (2026-10-14, Spec R28.20/R28.21): português só para destinatário no Brasil; América Latina em espanhol, demais
+// países em inglês, pelo país registrado (nunca nome ou domínio). Ver implementation/IDIOMA-POR-PAIS.md.
 import { emailParts } from "./assinatura.js";
 export const SKILL_SHA256 = "33bd093f5dcb87a7d4aa51d31597c6d6ddfc637097693e3830a38f9b219f9dd8";
 export const TEMPLATES_VERSION = "pv-1.1.0";

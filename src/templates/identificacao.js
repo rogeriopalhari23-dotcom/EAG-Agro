@@ -22,6 +22,13 @@
 //  A-ID8 (2026-10-14, pedido de Rogério, versão pt 1.4.0) Saudação pelo horário: o E-mail 1 que começa com "Boa tarde"
 //        ganha na geração a variante "Bom dia" (só a saudação muda). As duas são revisadas e aprovadas juntas; no envio,
 //        antes das 12:00 no fuso do destinatário sai "Bom dia", a partir das 12:00 sai "Boa tarde" (src/sending.js).
+//  A-ID9 (2026-10-14, decisão de Rogério; Spec R28.20 e R28.21) Idioma pelo país do destinatário: Brasil, português;
+//        demais países da América Latina, espanhol; fora da América Latina, inglês. Nunca deduzido de nome ou domínio.
+//        Vale para a sequência inteira (assunto, apresentação, acompanhamento, transparência, descadastro); nomes
+//        próprios, marcas e endereços não se traduzem. A saudação por horário acompanha o idioma (Bom dia/Boa tarde,
+//        Buenos días/Buenas tardes, Good morning/Good afternoon). Ainda não aplicado ao código: só o português está
+//        conforme; espanhol não existe, inglês sem saudação por horário nem transparência, alemão fora da regra
+//        (implementation/IDIOMA-POR-PAIS.md). Sem modelo aprovado no idioma exigido, a ficha não deve ser gerada.
 export const IDENT_VERSION = { "pt-BR": "id-pt-1.4.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
 // Hora local a partir da qual a saudação é "Boa tarde" (antes dela, "Bom dia").
 export const AFTERNOON_FROM = "12:00";

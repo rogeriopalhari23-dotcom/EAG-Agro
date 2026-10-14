@@ -4,6 +4,8 @@
 // ✋ Portão humano: a tradução só vale depois de Rogério aprová-la lado a lado com o português
 // (docs/implementation/AMOSTRAS-TEXTOS-EN.md). Até lá o revisor marca a ficha em inglês como não aprovável.
 // A-EN1 Prova social declarada (texto em português) não entra no texto em inglês: nunca misturar idiomas.
+// Idioma (2026-10-14, Spec R28.20/R28.21): inglês para destinatário fora da América Latina, pelo país registrado; na
+// América Latina (exceto Brasil) o texto é em espanhol. Saudação por horário ainda não aplicada (IDIOMA-POR-PAIS.md).
 import { emailParts } from "./assinatura.js";
 export const TEMPLATES_EN_VERSION = "pv-en-1.0.0";
 export const GAP_NOTE =
