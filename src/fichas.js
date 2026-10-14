@@ -10,7 +10,7 @@ import { isSuppressed } from "./operations.js";
 import { canHaveFicha, contactTargetFlag } from "./profiles.js";
 import { generateSequence, commodityDisplay, SKILL_SHA256, TEMPLATES_VERSION, GENERATOR_VERSION } from "./templates/prospeccao-vendas.js";
 import { reviewSequence, reviewIdentification } from "./review.js";
-import { generateIdentification, commodityDisplayDe, IDENT_VERSION } from "./templates/identificacao.js";
+import { generateIdentification, commodityDisplayDe, companyDisplayName, IDENT_VERSION } from "./templates/identificacao.js";
 import { unsubUrl } from "./unsub-token.js";
 import { erasuresConsistent } from "./erasure.js";
 import { complianceStatus } from "./scores.js";
@@ -112,7 +112,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   const gapNote = ctx.campaign.market === "international" ? GAP_NOTE : null;
   const sig = { senderName: env.SENDER_PERSON_NAME || "Rogério Palhari", postalAddress: env.EAG_POSTAL_ADDRESS };
   const msgs = ident
-    ? generateIdentification({ language: ctx.language, commodity, recipients: ctx.recipients, sig, unsub: (id) => urls.get(id) })
+    ? generateIdentification({ language: ctx.language, commodity, recipients: ctx.recipients, sig, unsub: (id) => urls.get(id), company: companyDisplayName(ctx.company) })
     : (en ? generateSequenceEn : generateSequence)({ commodity, recipients: ctx.recipients, declarations: ctx.declarations, sig, unsub: (id) => urls.get(id) });
   for (const e of edits) {
     const m = msgs.find((x) => x.contactId === e.contactId && x.channel === e.channel && x.step === e.step);
@@ -121,7 +121,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
     m.body = str(e.body, "texto", 5000);
   }
   const review = (ident ? reviewIdentification : reviewSequence)(msgs, {
-    market: ctx.campaign.market, commodity, otherCommodities: ctx.others, declarations: ctx.declarations,
+    market: ctx.campaign.market, commodity, otherCommodities: ctx.others, declarations: ctx.declarations, companyName: companyDisplayName(ctx.company),
     recipients: ctx.recipients, postalAddress: env.EAG_POSTAL_ADDRESS, postalAddressConfirmed: postalAddressConfirmed(env), unsubUrl: (id) => urls.get(id),
     language: ctx.language, languageGapNote: gapNote, translationApproved: ctx.translationApproved, templatesVersion,
   });

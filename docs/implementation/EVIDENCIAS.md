@@ -2253,3 +2253,21 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - canais `planned`; campanhas 2 `draft` + 1 `ended`.
 - **Ponte depois do encerramento:** leitura bem-sucedida às 21:24:21 UTC (motivo `interval`, intervalo depois do envio do teste).
 - **Não feito:** vendas@, Snov, aprovação de fichas comerciais, validação T11, remoção de supressões. Os testes de falha não foram repetidos: a recuperação real funcionou como testado.
+
+## Novo E-mail 1 das fichas de identificação (2026-10-14, texto de Rogério; não publicado)
+
+- **Pedido:** corrigir só a primeira mensagem das fichas de Cimilho, São Martinho Boa Vista e Rei do Milho, com o texto escrito por Rogério.
+- **Modelo:** `src/templates/identificacao.js`, versão pt `id-pt-1.3.0` (A-ID7).
+  - Saudação "Boa tarde, {{nome}}, tudo bem?" só quando o destinatário é pessoa com nome confirmado; canal geral recebe "Boa tarde, tudo bem?", sem nome inventado.
+  - `{{empresa}}` vem do nome fantasia cadastrado, sem o rótulo interno da unidade (`companyDisplayName`); ponto final do nome não gera ponto duplo.
+  - E-mail 2, assinatura, linha de transparência (E2-b), endereço e descadastro sem mudança.
+- **Revisor** (`src/review.js`):
+  - pedido aceito com "quem cuida dessa área… melhor canal";
+  - `SAUDACAO`: canal geral sem nome, nenhum `{{…}}` sobrando, nome da empresa presente;
+  - `AFIRMACAO`: sem GMO/transgênico. Preço, volume e condição continuam barrados pela PV7.
+- **Testes:** `tests/identificacao-saudacao.test.mjs` (novo) e os dois testes de identificação atualizados. `npm run check`: 449 + 2 + 30, 0 falhas.
+- **Produção:** nada publicado, nenhuma ficha nova gerada, nada aprovado, 0 validações T11, nada enviado; canais `planned`, campanhas inativas, cópia desligada.
+- **Próximo passo, se Rogério autorizar a publicação:**
+  1. publicar o Worker;
+  2. gerar as versões 3 das três fichas (`POST /api/fichas/:id/versions`), preservando as versões 1 e 2;
+  3. deixar as três aguardando revisão.

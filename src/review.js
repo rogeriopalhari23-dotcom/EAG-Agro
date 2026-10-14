@@ -54,10 +54,13 @@ const LANG = {
 };
 // Pergunta da ficha de identificação: quem responde pela compra + canal profissional (A-ID1–A-ID3).
 const IDENT_ASK = {
-  "pt-BR": /(quem é )?respons[aá]vel pela compra[\s\S]*(encaminhar|indicar)[\s\S]*(contato profissional|canal)/i,
+  "pt-BR": /respons[aá]vel pela compra[\s\S]*(encaminhar|indicar)[\s\S]*(contato profissional|canal)/i,
   en: /responsible for purchasing[\s\S]*who is responsible[\s\S]*channel/i,
   de: /für den Einkauf von[\s\S]*zuständig[\s\S]*(weiterleiten|Kontaktadresse)/i,
 };
+// Saudação do E-mail 1 da identificação: pt 1.3.0 (2026-10-14) "Boa tarde, tudo bem?" (com nome só se confirmado);
+// versões anteriores começavam com "Olá,".
+const IDENT_HELLO = { "pt-BR": /^(Boa tarde(, [^,\n]+)?, tudo bem\?|Olá)/ };
 // Assunto da ficha de identificação (PV9 aplicado a esta ficha, 2026-09-30): diz o objetivo do contato — encontrar o
 // responsável pela compra da commodity —, sem número nem título "criativo". Textos pt/de escritos por Rogério (id-*-1.1.0).
 const IDENT_SUBJECT = {
@@ -210,7 +213,8 @@ export function reviewIdentification(raw, ctx) {
   for (const r of ctx.recipients) {
     const list = messages.filter((m) => m.contactId === r.contactId && m.kind === "auto_email").sort((a, b) => a.day - b.day);
     const e1 = list.find((m) => m.step === 1);
-    const ok1 = !!e1 && L.hello.test(e1.body) && ask.test(e1.body) && !L.minutes.test(e1.body);
+    const hello = IDENT_HELLO[ctx.language || "pt-BR"] ?? L.hello;
+    const ok1 = !!e1 && hello.test(e1.body) && ask.test(e1.body) && !L.minutes.test(e1.body);
     finding(f, "PV3", ok1, ok1 ? "E-mail 1 pergunta quem responde pela compra e o canal profissional (descobrir a pessoa certa), sem pedir reunião." : "E-mail 1 não pergunta pelo responsável e pelo canal, ou já pede reunião.", { contactId: r.contactId });
     const gaps = list.slice(1).map((m, i) => m.day - list[i].day);
     const ok2 = list.length >= 1 && gaps.every((g) => g >= 2);
@@ -250,6 +254,21 @@ export function reviewIdentification(raw, ctx) {
   if ((ctx.language || "pt-BR") === "pt-BR") {
     const src = (m) => ctx.recipients.find((r) => r.contactId === m.contactId)?.sourceLabel || "";
     const bad = raw.filter((m) => m.kind === "auto_email" && (!m.body.includes(DATA_REQUESTS_EMAIL) || (/no site da empresa/i.test(m.body) && !/\bsite\b|website/i.test(src(m)))));
+    // Texto de 2026-10-14 (pt 1.3.0): canal geral nunca recebe nome inventado; nenhum marcador {{…}} sobra; o E-mail 1
+    // cita a empresa pelo nome da ficha. Nada sobre GMO/transgênico (aceitação de GMO não comprovada).
+    const step1 = raw.filter((m) => m.kind === "auto_email" && m.step === 1);
+    const greet = step1.filter((m) => {
+      const r = ctx.recipients.find((x) => x.contactId === m.contactId);
+      const first = m.body.split("\n")[0];
+      if (r?.kind === "company_channel" && /^Boa tarde/.test(first)) return first !== "Boa tarde, tudo bem?";
+      return false;
+    });
+    const leftover = raw.filter((m) => m.kind === "auto_email" && /\{\{|\}\}/.test(`${m.subject ?? ""}\n${m.body}`));
+    const noCompany = ctx.companyName ? step1.filter((m) => /^Boa tarde/.test(m.body) && !m.body.includes(`na ${ctx.companyName.trim().replace(/\.+$/, "")}.`)) : [];
+    finding(f, "SAUDACAO", !greet.length && !leftover.length && !noCompany.length,
+      greet.length ? "Canal geral recebeu saudação com nome: use \"Boa tarde, tudo bem?\"." : leftover.length ? "Marcador {{…}} não substituído no texto." : noCompany.length ? `E-mail 1 sem o nome da empresa (${ctx.companyName}).` : "Saudação sem nome inventado, marcadores substituídos e empresa citada.");
+    const gmo = raw.filter((m) => m.kind === "auto_email" && /\bGMO\b|transg[eê]nic/i.test(m.body));
+    finding(f, "AFIRMACAO", !gmo.length, gmo.length ? `Passo ${gmo.map((m) => m.step).join(", ")} fala de GMO/transgênico: aceitação não comprovada.` : "Sem afirmação sobre GMO ou transgênico.");
     finding(f, "TRANSP", !bad.length, bad.length ? `Passo ${bad.map((m) => m.step).join(", ")}: sem o canal do titular no rodapé, ou origem do endereço diferente da fonte registrada.` : "Origem do endereço e canal do titular no rodapé (E2-b).");
   }
   if (ctx.postalAddress && ctx.postalAddressConfirmed !== true) finding(f, "R19.13", false, ADDRESS_PENDING);

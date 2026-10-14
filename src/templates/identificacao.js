@@ -14,7 +14,12 @@
 //  A-ID6 (2026-10-09, decisão E2-b de Rogério, versão pt 1.2.0) Transparência no próprio e-mail (LGPD art. 9º e art. 10,
 //        § 2º): uma linha no rodapé, antes da saída, com a origem do endereço e o canal do titular (O2). A origem só é
 //        dita quando a fonte registrada do canal é o site da empresa; em outra fonte entra só o canal do titular (PV4).
-export const IDENT_VERSION = { "pt-BR": "id-pt-1.2.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
+//  A-ID7 (2026-10-14, texto de Rogério, versão pt 1.3.0) Só o E-mail 1 muda: "Boa tarde, tudo bem?" (com o nome só quando
+//        o destinatário for pessoa com nome confirmado; canal geral nunca recebe nome inventado), apresentação como
+//        franqueado da EAG Agro que trabalha com originação, o nome da empresa e o pedido de quem cuida da área e do melhor
+//        canal. Nome do remetente como Rogério escreveu ("Rogerio Palhari", igual à assinatura). E-mail 2, assinatura,
+//        transparência (E2-b) e descadastro não mudam.
+export const IDENT_VERSION = { "pt-BR": "id-pt-1.3.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
 
 import { emailParts } from "./assinatura.js";
 import { DATA_REQUESTS_EMAIL } from "../privacy-contact.js";
@@ -25,11 +30,19 @@ const fromSite = (sourceLabel) => /\bsite\b|website/i.test(sourceLabel || "");
 // Termo de mercado da commodity em alemão (sem entrada → a ficha em alemão não é gerada).
 const COMMODITY_DE = { coffee: "Rohkaffee", sugar: "Zucker", soy: "Sojabohnen", corn: "Mais", soy_meal: "Sojaschrot", soy_oil: "Sojaöl", ethanol: "Ethanol" };
 export const commodityDisplayDe = (product) => COMMODITY_DE[product.commodity] ?? null;
+// Nome da empresa no texto: nome fantasia cadastrado sem o rótulo interno da unidade ("Rei do Milho — fábrica, Inhumas"
+// → "Rei do Milho"); sem nome fantasia, a razão social.
+export const companyDisplayName = (c) => String(c?.trade_name || c?.legal_name || "").split(" — ")[0].trim();
 
 const TEXT = {
   "pt-BR": {
     subject: (c) => `Responsável pela compra de ${c}`,
-    e1: (c, s) => ["Olá,", `Meu nome é ${s.senderName}, da ${COMPANY}, no Brasil. Atuamos na intermediação de commodities agrícolas, incluindo ${c} brasileiro.`, `Quem é responsável pela compra de ${c} na empresa? Poderia encaminhar esta mensagem à pessoa responsável ou indicar um contato profissional adequado?`, "Obrigado pela atenção."],
+    e1: (c, s, x) => [
+      x.name ? `Boa tarde, ${x.name}, tudo bem?` : "Boa tarde, tudo bem?",
+      `Meu nome é Rogerio Palhari e trabalho com originação de commodities agrícolas. Atuo como franqueado da ${COMPANY} e estou buscando o contato da pessoa responsável pela compra de ${c} na ${x.company}.`,
+      "Você poderia me indicar quem cuida dessa área e qual seria o melhor canal para conversar?",
+      "Obrigado pela atenção.",
+    ],
     e2: (c) => ["Olá,", `Retomo brevemente minha mensagem anterior. Poderia indicar com quem devo falar sobre a compra de ${c}?`, `Se a empresa não compra ${c}, uma breve confirmação já ajuda.`, "Obrigado."],
     unsub: (u) => `Para não receber mais mensagens, responda "sair" ou use este link: ${u}`,
     privacy: (site) => `${site ? "Encontrei este endereço no site da empresa. " : ""}Pedidos sobre dados pessoais: ${DATA_REQUESTS_EMAIL}.`,
@@ -53,13 +66,18 @@ const TEXT = {
 };
 
 // recipients: canais gerais da empresa [{ contactId, sourceLabel }]. Mesma saída de generateSequence (passos e dias).
-export function generateIdentification({ language = "pt-BR", commodity, recipients, sig, unsub }) {
+// company: nome de exibição da empresa (obrigatório em português, para o "na <empresa>" do E-mail 1).
+// recipients[].confirmedName: só para destinatário pessoa com nome confirmado; canal geral nunca recebe nome.
+export function generateIdentification({ language = "pt-BR", commodity, recipients, sig, unsub, company }) {
   const t = TEXT[language];
   if (!t) throw new Error(`Idioma sem modelo de identificação: ${language}`);
+  if (language === "pt-BR" && !(typeof company === "string" && company.trim())) throw new Error("Nome da empresa obrigatório no E-mail 1 em português.");
   const out = [];
   for (const r of recipients) {
     // Versão 1.1.0 (pt/de): parágrafos separados por linha em branco; versão 1.0.0 (en): linhas simples.
-    const e1 = t.e1 ? t.e1(commodity, sig).join("\n\n") : [t.hello, ...(/\bsite\b|website/i.test(r.sourceLabel || "") ? [t.found] : []), t.who(commodity), t.ask].join("\n");
+    const name = r.kind !== "company_channel" && typeof r.confirmedName === "string" && r.confirmedName.trim() ? r.confirmedName.trim() : null;
+    // Nome terminado em ponto ("Ltda.") não gera ponto duplo no fim da frase.
+    const e1 = t.e1 ? t.e1(commodity, sig, { name, company: company?.trim().replace(/\.+$/, "") }).join("\n\n") : [t.hello, ...(/\bsite\b|website/i.test(r.sourceLabel || "") ? [t.found] : []), t.who(commodity), t.ask].join("\n");
     const e2 = t.e2 ? t.e2(commodity).join("\n\n") : [t.hello, t.follow(commodity)].join("\n");
     // Texto: corpo, assinatura oficial (uma vez) e rodapé separado; HTML com a assinatura original, quando importada.
     const foot = footer(sig, t.unsub(unsub(r.contactId)), t.privacy?.(fromSite(r.sourceLabel)));

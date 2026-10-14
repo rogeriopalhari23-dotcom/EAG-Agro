@@ -57,9 +57,12 @@ test("Identificação do responsável: canal geral com fonte vira destinatário 
   assert.equal(f.version.purpose, "identify_buyer");
   const emails = f.messages.filter((m) => m.kind === "auto_email");
   assert.deepEqual(emails.map((m) => m.day), [0, 4], "E-mail 2 no dia 4, como na skill; dias não seguidos (R19.2 item 12)");
-  assert.match(emails[0].body, /Quem é responsável pela compra de açúcar na empresa\?/);
-  assert.match(emails[0].body, /contato profissional adequado/);
-  assert.match(emails[0].body, /Meu nome é Rogério Palhari, da EAG Agro/, "SENDER_NAME é só o nome do campo De; o texto usa o nome da pessoa");
+  // Texto de Rogério de 2026-10-14 (pt 1.3.0): canal geral sem nome; empresa pelo nome da ficha, sem ponto duplo.
+  assert.equal(emails[0].body.split("\n")[0], "Boa tarde, tudo bem?");
+  assert.match(emails[0].body, /pessoa responsável pela compra de açúcar na Doces Vale Verde Ltda\.\n/);
+  assert.doesNotMatch(emails[0].body, /Ltda\.\./);
+  assert.match(emails[0].body, /quem cuida dessa área e qual seria o melhor canal para conversar\?/);
+  assert.match(emails[0].body, /Meu nome é Rogerio Palhari e trabalho com originação de commodities agrícolas\. Atuo como franqueado da EAG Agro/, "SENDER_NAME é só o nome do campo De; o texto usa o nome da pessoa");
   assert.doesNotMatch(emails[0].body, /EAG Agro - Brasil/);
   assert.equal(emails[1].subject, emails[0].subject, "acompanhamento sem Re:");
   assert.doesNotMatch(emails.map((m) => m.body).join("\n"), /20 minutos|preço|lote|volume/i, "sem reunião nem condição comercial");

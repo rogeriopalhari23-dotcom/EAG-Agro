@@ -9,7 +9,7 @@ const UNSUB = "[link de descadastro próprio, gerado na ficha]";
 const rec = [{ contactId: "canal", sourceLabel: "Canal geral publicado no site da empresa (site)" }];
 // Português só como referência lado a lado (a campanha da Alemanha envia em alemão); "café verde" = Rohkaffee.
 const de = generateIdentification({ language: "de", commodity: "Rohkaffee", recipients: rec, sig, unsub: () => UNSUB });
-const pt = generateIdentification({ language: "pt-BR", commodity: "café verde", recipients: rec, sig, unsub: () => UNSUB });
+const pt = generateIdentification({ language: "pt-BR", commodity: "café verde", recipients: rec, sig, unsub: () => UNSUB, company: "[empresa]" });
 const review = reviewIdentification(de, { market: "international", recipients: [{ contactId: "canal", kind: "company_channel", sourceLabel: "site" }], postalAddress: sig.postalAddress, unsubUrl: () => UNSUB, language: "de", languageGapNote: "lacuna", templatesVersion: IDENT_VERSION.de });
 const cell = (s) => s.replace(/\|/g, "\\|");
 const side = (a, b) => {

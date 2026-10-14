@@ -96,7 +96,7 @@ export async function getReview(env, actor, searchId) {
   const rec = [{ contactId: "canal", sourceLabel: "site" }];
   const unsub = () => "[link de descadastro próprio, gerado na ficha]";
   const de = deCommodity ? generateIdentification({ language: "de", commodity: deCommodity, recipients: rec, sig, unsub }) : [];
-  const pt = generateIdentification({ language: "pt-BR", commodity: ptCommodity, recipients: rec, sig, unsub });
+  const pt = generateIdentification({ language: "pt-BR", commodity: ptCommodity, recipients: rec, sig, unsub, company: "[empresa]" });
 
   // Candidatas: dados gravados, cache do diretório e aviso legal (cifrado).
   const rows = (await s(env, "SELECT * FROM discovery_candidates WHERE search_id=? ORDER BY name", x.id).all()).results;
