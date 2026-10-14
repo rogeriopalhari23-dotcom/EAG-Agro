@@ -1,54 +1,57 @@
-# Textos em espanhol e inglês para revisão de Rogério (2026-10-14)
+# Textos em espanhol e inglês para revisão de Rogério (revisão 2, 2026-10-14)
 
-**Situação:** rascunho para revisão. Nada foi implementado, publicado ou aprovado. Base: Spec R28.20 e R28.21, `IDIOMA-POR-PAIS.md`.
+**Situação:** rascunho para revisão, **não aprovado**. Nada foi implementado, publicado ou gerado como ficha. Base: Spec R28.20 e R28.21, `IDIOMA-POR-PAIS.md`.
 
-**Base dos textos:** tradução fiel dos textos de Rogério já em produção (identificação `id-pt-1.4.0`: E-mail 1 com "Bom dia"/"Boa tarde", E-mail 2, transparência E2-b e descadastro).
+**Revisão 2:** redação própria de cada idioma, sem tradução literal do português. Mantém a intenção e os fatos dos textos de Rogério (`id-pt-1.4.0`):
+- quem escreve: Rogerio Palhari, franqueado da EAG Agro;
+- objetivo do E-mail 1: identificar quem compra milho e o canal adequado;
+- E-mail 2: retomada curta, com a saída "não compramos milho".
+
+**O que nenhum texto afirma:** disponibilidade, preço, volume, qualidade, certificação, aceitação de GMO ou condição comercial.
 
 **O que não é traduzido:**
 - nomes próprios: Rogerio Palhari, EAG Agro e o nome da empresa;
-- assinatura oficial ("Broker | EAG AGRO", contatos, aviso de confidencialidade, que já está em inglês);
+- assinatura oficial;
 - endereço físico.
 
-**Marcadores:** `{{empresa}}`/`{{company}}`, `{{nome}}`/`{{name}}` e `{{link}}` aparecem aqui só para a revisão. Na ficha, o sistema troca cada um pelo valor real antes da aprovação, e o revisor recusa marcador que sobrar.
-
-**Commodity do exemplo:** milho, em espanhol "maíz" e em inglês "corn". As outras commodities usam o termo de mercado de cada idioma, a confirmar quando houver campanha.
+**Marcadores:** `{{empresa}}`/`{{company}}`, `{{nome}}`/`{{name}}` e `{{link}}` aparecem aqui só para a revisão. Na ficha, o sistema troca cada um pelo valor real antes da aprovação.
 
 ## 1. Espanhol (América Latina, exceto Brasil)
 
-Tratamento formal ("usted"), espanhol neutro, sem regionalismos.
+Tratamento "usted", espanhol neutro de negócios.
 
-**Assunto (os dois e-mails, sem "Re:"):** `Responsable de la compra de maíz`
+**Assunto (os dois e-mails, sem "Re:"):** `Contacto de compras de maíz`
 
 ### E-mail 1 (dia 0)
 
 Antes das 12:00 no horário do destinatário:
 
 ```text
-Buenos días, ¿cómo está?
+Buenos días:
 
-Mi nombre es Rogerio Palhari y trabajo en la originación de commodities agrícolas. Soy franquiciado de EAG Agro y estoy buscando el contacto de la persona responsable de la compra de maíz en {{empresa}}.
+Mi nombre es Rogerio Palhari. Soy franquiciado de EAG Agro y trabajo en la originación de commodities agrícolas en Brasil.
 
-¿Podría indicarme quién se encarga de esta área y cuál sería el mejor canal para conversar?
+Estoy buscando a la persona responsable de las compras de maíz en {{empresa}}, para presentarme y conocer cómo se abastecen de este insumo.
 
-Gracias por su atención.
+¿Podría indicarme quién está a cargo de esa área y cuál es la mejor vía de contacto?
+
+Muchas gracias.
 ```
 
-A partir das 12:00: o mesmo texto com a primeira linha `Buenas tardes, ¿cómo está?`.
+A partir das 12:00: o mesmo texto com a primeira linha `Buenas tardes:`.
 
 Destinatário pessoa com nome confirmado (nunca no canal geral):
-- `Buenos días, {{nome}}, ¿cómo está?`
-- `Buenas tardes, {{nome}}, ¿cómo está?`
+- `Buenos días, {{nome}}:`
+- `Buenas tardes, {{nome}}:`
 
 ### E-mail 2 (dia 4)
-
-Sem saudação por horário, como em português.
 
 ```text
 Hola:
 
-Retomo brevemente mi mensaje anterior. ¿Podría indicarme con quién debo hablar sobre la compra de maíz?
+Le escribí hace unos días buscando a la persona responsable de las compras de maíz en {{empresa}}.
 
-Si la empresa no compra maíz, una breve confirmación ya me ayuda.
+Si puede compartirme su nombre y correo electrónico, me comunico directamente con esa persona. Si la empresa no compra maíz, una breve respuesta indicándolo también me ayuda.
 
 Gracias.
 ```
@@ -58,13 +61,13 @@ Gracias.
 ```text
 —
 [endereço físico da EAG, sem tradução]
-Encontré esta dirección en el sitio web de la empresa. Solicitudes sobre datos personales: rogeriopalhari@hotmail.com.
-Para no recibir más mensajes, responda "baja" o use este enlace: {{link}}
+Encontré esta dirección en el sitio web de su empresa. Para solicitudes sobre datos personales: rogeriopalhari@hotmail.com.
+Para dejar de recibir estos mensajes, responda "baja" o use este enlace: {{link}}
 ```
 
-A frase "Encontré esta dirección…" só entra quando a fonte registrada do canal é o site da empresa. Em outra fonte, fica só "Solicitudes sobre datos personales: …", como no português (PV4).
+A frase "Encontré esta dirección…" só entra quando a fonte registrada do canal é o site da empresa. Em outra fonte, fica só "Para solicitudes sobre datos personales: …" (PV4).
 
-### Página de descadastro (link do rodapé)
+### Página de descadastro
 
 - **Pergunta:** "¿No desea recibir más mensajes de EAG Agro?"
 - **Botão:** "Confirmar baja"
@@ -74,40 +77,40 @@ A frase "Encontré esta dirección…" só entra quando a fonte registrada do ca
 
 ## 2. Inglês (fora da América Latina, incluindo Portugal, os países lusófonos fora da América Latina e a Alemanha)
 
-**Assunto (os dois e-mails, sem "Re:"):** `Person responsible for corn purchasing`
-
-Substitui o `Corn supplier` do modelo `id-en-1.0.0`, nunca revisado, para dizer o mesmo que o assunto em português.
+**Assunto (os dois e-mails, sem "Re:"):** `Corn purchasing contact`
 
 ### E-mail 1 (dia 0)
 
 Antes das 12:00 no horário do destinatário:
 
 ```text
-Good morning, I hope you are well.
+Good morning,
 
-My name is Rogerio Palhari and I work in the origination of agricultural commodities. I am a franchisee of EAG Agro and I am looking for the contact of the person responsible for purchasing corn at {{company}}.
+My name is Rogerio Palhari. I am an EAG Agro franchisee working in agricultural commodity origination in Brazil.
 
-Could you let me know who handles this area and what would be the best channel to talk?
+I am trying to reach the person responsible for corn procurement at {{company}}, to introduce myself and learn how your team sources corn.
 
-Thank you for your attention.
+Could you let me know who handles corn purchasing and the best way to contact them?
+
+Thank you,
 ```
 
-A partir das 12:00: o mesmo texto com a primeira linha `Good afternoon, I hope you are well.`.
+A partir das 12:00: o mesmo texto com a primeira linha `Good afternoon,`.
 
 Destinatário pessoa com nome confirmado:
-- `Good morning {{name}}, I hope you are well.`
-- `Good afternoon {{name}}, I hope you are well.`
+- `Good morning {{name}},`
+- `Good afternoon {{name}},`
 
 ### E-mail 2 (dia 4)
 
 ```text
 Hello,
 
-Following up briefly on my previous message. Could you let me know who I should speak with about corn purchasing?
+I wrote a few days ago looking for the person who handles corn purchasing at {{company}}.
 
-If your company does not buy corn, a short confirmation already helps.
+If you can share their name and email address, I will contact them directly. If your company does not buy corn, a short reply saying so is also helpful.
 
-Thank you.
+Thank you,
 ```
 
 ### Rodapé
@@ -115,23 +118,35 @@ Thank you.
 ```text
 —
 [endereço físico da EAG, sem tradução]
-I found this address on the company's website. Requests regarding personal data: rogeriopalhari@hotmail.com.
+I found this address on your company's website. For requests about personal data: rogeriopalhari@hotmail.com.
 To stop receiving these messages, reply "unsubscribe" or use this link: {{link}}
 ```
 
 A linha de descadastro é a mesma já usada nos modelos em inglês. A origem do endereço segue a mesma regra do português.
 
-**A página de descadastro já tem inglês:** "Don't want to receive messages from EAG Agro?", "Unsubscribe", "Done. You will not receive further messages."
+**Página de descadastro:** já tem inglês e não muda.
 
-## 3. Pontos para a revisão
+## 3. Escolhas de termo que mudam o sentido comercial
 
-1. **"originación" e "origination":** traduzem "originação", que é jargão do mercado. Se preferir algo mais claro para o leitor de fora, sugestões:
-   - espanhol: "comercialización de commodities agrícolas";
-   - inglês: "agricultural commodity trading".
-2. **"franquiciado de EAG Agro" e "franchisee of EAG Agro":** sem artigo, porque é nome próprio de empresa. Em português ficou "da EAG Agro".
-3. **Transparência:** é a tradução da linha E2-b, aprovada para o Brasil (LGPD). Se ela basta em cada país (GDPR art. 14 na União Europeia e em Portugal, leis de cada país da América Latina) depende da T11 do país (`<país>_email_automatic`). A tradução não libera nenhum país.
-4. **"baja":** a ponte e o Compass ainda não reconhecem "baja" como pedido de saída. Isso tem de ser implementado antes de qualquer envio em espanhol (ajuste 6 de `IDIOMA-POR-PAIS.md`).
-5. **E-mail 2 sem saudação por horário:** começa com "Hola:" e "Hello,", como o português começa com "Olá,". O R28.21 vale para o E-mail 1.
+1. **"originación de commodities agrícolas en Brasil" e "agricultural commodity origination in Brazil":**
+   - mantido "originação": no mercado de grãos, o termo descreve quem capta o produto na origem, junto a produtores, para compradores;
+   - não promete fornecimento;
+   - "trading" não foi usado, porque sugere compra e venda por conta própria.
+   - "en Brasil"/"in Brazil" situa a origem para o comprador estrangeiro. O fato já estava no texto alemão escrito por Rogério ("in Brasilien tätig"). Confirmar se quer mantê-lo.
+2. **"compras de maíz" e "corn procurement / corn purchasing":** nomeiam a função de compras, não um cargo. "Procurement" é o termo de suprimentos no E-mail 1; "purchasing" é a forma mais comum no pedido e no E-mail 2. Evita supor que existe um "comprador de milho" com esse título.
+3. **Motivo do contato ("para presentarme y conocer cómo se abastecen de este insumo" / "to introduce myself and learn how your team sources corn"):**
+   - não existe no português;
+   - dá a quem lê o e-mail geral um motivo para encaminhar, sem oferecer produto;
+   - "insumo" e "sources" tratam o milho como matéria-prima do comprador, sem afirmar que ele compra.
+   - Se preferir sem motivo, a frase termina em "{{empresa}}"/"{{company}}".
+4. **E-mail 2 pede nome e e-mail e diz "me comunico directamente"/"I will contact them directly":** em português o pedido é "com quem devo falar". A versão nova reduz o trabalho de quem recebe e deixa claro o próximo passo, que já é o que acontece. A saída "não compra milho" ficou igual.
+5. **Assuntos curtos ("Contacto de compras de maíz", "Corn purchasing contact"):** dizem o objetivo do contato (identificar o contato de compras) em vez de "responsável pela compra".
+   - Hoje o revisor só tem regra de assunto para português e alemão. A regra para espanhol e inglês entra na implementação.
+
+**Sem mudança de sentido** (só adaptação ao idioma):
+- saudação com dois-pontos em espanhol ("Buenos días:") e vírgula em inglês;
+- "Muchas gracias."/"Thank you,";
+- "Para dejar de recibir estos mensajes" e "For requests about personal data". A transparência continua dizendo só a origem do endereço e o canal do titular, sem afirmação jurídica nova.
 
 ## 4. Textos de reunião ainda não aprovados (separados)
 
