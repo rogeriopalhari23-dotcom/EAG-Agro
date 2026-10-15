@@ -18,20 +18,23 @@ export function renderReport(run, { title } = {}) {
   lines.push(`# ${title ?? `Rodada ${config.id}`}`, "");
   lines.push(`- Commodity: ${config.commodity.label ?? config.commodity.code}${config.commodity.variety ? ` (${config.commodity.variety})` : ""}`);
   lines.push(`- Origem: ${origin.label}; raio ${config.radius.value} ${config.radius.unit} (${config.radius.method}); perto do limite a partir de ${Math.round(config.nearLimit.fromKm * 10) / 10} km`);
+  if (config.nearLimit.criterion) lines.push(`- Critério de proximidade do limite: ${config.nearLimit.criterion}`);
   lines.push(`- Idioma ${config.locale.language}, fuso ${config.locale.timezone}, compliance ${config.compliance.scope}`);
   lines.push(`- Estabelecimentos: ${results.length} (novos ${counters.created}, alterados ${counters.updated}, sem mudança ${counters.unchanged})`, "");
   lines.push("## Resumo", "");
   for (const s of Object.keys(LABEL)) lines.push(`- ${LABEL[s]}: ${by(s).length}`);
-  lines.push("", "## Exceções para análise", "");
-  if (!by("exception").length) lines.push("Nenhuma.");
-  for (const r of by("exception")) lines.push(`- **${cell(r.names[0])}** (${cell(r.registrationId ?? "sem identificador")}): ${r.reasons.join("; ")}`);
+  lines.push("", "## Exceções e conferências para análise", "");
+  const review = results.filter((r) => r.status === "exception" || r.checks?.length);
+  if (!review.length) lines.push("Nenhuma.");
+  for (const r of review)
+    lines.push(`- **${cell(r.names[0])}** (${cell(r.registrationId ?? "sem identificador")}): ${[...(r.status === "exception" ? r.reasons : []), ...(r.checks ?? []).map((c) => `conferir: ${c}`)].join("; ")}`);
   lines.push("", "## Estabelecimentos", "");
   lines.push("| Situação | Estabelecimento | Identificador | Município | Distância | Operação | Uso | Compra de terceiros | Papel | Restrição | Canais | Pendências |");
   lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|");
   for (const r of results) {
     const a = r.assessment;
     const ch = a.channels.map((c) => `${c.type}: ${c.value}${c.verified ? "" : " (não verificado)"}`).join("; ") || "nenhum";
-    lines.push(`| ${LABEL[r.status]} | ${cell(r.names.join(" / "))} | ${cell(r.registrationId ?? "provisório")} | ${cell(r.municipality)} | ${cell(r.distance.label)} | ${st(a.operation.status)} | ${st(a.commodityUse.status)} | ${st(a.purchase.status)} | ${a.role} | ${a.restriction.status} | ${cell(ch)} | ${cell(r.pending.join("; "))} |`);
+    lines.push(`| ${LABEL[r.status]}${r.checks?.length ? ` (conferir: ${r.checks.join(", ")})` : ""} | ${cell(r.names.join(" / "))} | ${cell(r.registrationId ?? "provisório")} | ${cell(r.municipality)} | ${cell(r.distance.label)} | ${st(a.operation.status)} | ${st(a.commodityUse.status)} | ${st(a.purchase.status)} | ${a.role} | ${a.restriction.status} | ${cell(ch)} | ${cell(r.pending.join("; "))} |`);
   }
   return lines.join("\n") + "\n";
 }

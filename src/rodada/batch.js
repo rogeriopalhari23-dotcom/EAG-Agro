@@ -19,21 +19,22 @@ export function rateLimiter(perMinute, { now = () => Date.now(), sleep = (ms) =>
 
 const fingerprint = (o) => JSON.stringify(o);
 
-// Status do resultado (automático) ou exceção (precisa de análise humana).
+// Status do resultado (automático) ou exceção (precisa de análise humana). "Perto do limite" não é exceção: é uma
+// CONFERÊNCIA (checks) que acompanha qualquer situação e nunca exclui a unidade sozinha.
 function classify(est, d, a, pendingConc, fetchProblem) {
   const reasons = [];
+  const checks = d.nearLimit ? ["perto do limite do raio"] : [];
   if (a.restriction.status === "conflict") reasons.push("restrição conflita com a variedade");
   if (pendingConc.some((p) => /Situação cadastral/.test(p))) reasons.push("situação cadastral não ativa");
   if (pendingConc.some((p) => /divergentes|difere/.test(p))) reasons.push("dados divergentes entre fontes");
   if (est.provisional) reasons.push("unidade sem identificador cadastral");
-  if (d.nearLimit) reasons.push("perto do limite do raio");
   if (fetchProblem) reasons.push("consulta cadastral pendente");
-  if (d.inside === "outside") return { status: "outside", reasons: ["fora do raio"] };
-  if (a.role === "trader" || a.role === "reseller") return { status: "separated", reasons: [a.role === "trader" ? "trader/originadora" : "revendedora"], exceptionReasons: reasons };
-  if (reasons.length) return { status: "exception", reasons };
-  if (a.commodityUse.status === "proved" && a.purchase.status === "proved") return { status: "qualified_purchase", reasons: [] };
-  if (a.commodityUse.status === "proved") return { status: "qualified_use", reasons: [] };
-  return { status: "discovery", reasons: [] };
+  if (d.inside === "outside") return { status: "outside", reasons: ["fora do raio"], checks: [] };
+  if (a.role === "trader" || a.role === "reseller") return { status: "separated", reasons: [a.role === "trader" ? "trader/originadora" : "revendedora"], exceptionReasons: reasons, checks };
+  if (reasons.length) return { status: "exception", reasons, checks };
+  if (a.commodityUse.status === "proved" && a.purchase.status === "proved") return { status: "qualified_purchase", reasons: [], checks };
+  if (a.commodityUse.status === "proved") return { status: "qualified_use", reasons: [], checks };
+  return { status: "discovery", reasons: [], checks };
 }
 
 const PRIORITY = { qualified_purchase: 0, qualified_use: 1, exception: 2, discovery: 3, separated: 4, outside: 5 };
@@ -74,8 +75,11 @@ export async function runRound({ config: raw, municipalities, candidates, fetche
           registry = rec ? { ...rec, source: src.id, fetchedAt: now } : null;
           if (!rec) fetchProblem = `Identificador não encontrado em ${src.id}.`;
         } catch (err) {
-          if (err?.status === 429) blocked.add(src.id);
-          fetchProblem = `Consulta a ${src.id} falhou (${err?.status ?? err?.code ?? "erro"}): pendente.`;
+          if (err?.code === "rate_budget") fetchProblem = `Consulta a ${src.id} adiada pelo limite de ${src.rateLimitPerMinute ?? "?"}/min: reexecutar para continuar.`;
+          else {
+            if (err?.status === 429) blocked.add(src.id);
+            fetchProblem = `Consulta a ${src.id} falhou (${err?.status ?? err?.code ?? "erro"}): pendente.`;
+          }
         }
       }
     }
@@ -89,8 +93,9 @@ export async function runRound({ config: raw, municipalities, candidates, fetche
     const pending = [...pendingConc, ...(fetchProblem ? [fetchProblem] : []), ...(d.pending ? [d.pending] : []), ...a.pending];
     const result = {
       key: est.key, provisional: est.provisional, country: est.country, registrationId: est.registrationId, names: est.names,
-      municipality: munName ?? null, registry, distance: d, assessment: a, status: c.status, reasons: c.reasons,
+      municipality: munName ?? null, registry, distance: d, assessment: a, status: c.status, reasons: c.reasons, checks: c.checks,
       siblings, sizeHint: est.hints?.size ?? registry?.size ?? "unknown", segment: est.hints?.segment ?? null, pending,
+      intake: [...new Set(est.sources.map((x) => x.mode).filter(Boolean))], conciliatedFrom: est.conciliatedFrom ?? [],
     };
     const fp = fingerprint({ input: est, registry: registry && { ...registry, fetchedAt: undefined }, status: result.status, pending });
     counters[!old ? "created" : old.fingerprint === fp ? "unchanged" : "updated"]++;
@@ -101,5 +106,5 @@ export async function runRound({ config: raw, municipalities, candidates, fetche
   const sizeRank = (s) => { const i = config.priorities.size.indexOf(s); return i < 0 ? 99 : i; };
   const segRank = (s) => { const i = config.priorities.segments.indexOf(s); return i < 0 ? 99 : i; };
   results.sort((x, y) => PRIORITY[x.status] - PRIORITY[y.status] || sizeRank(x.sizeHint) - sizeRank(y.sizeHint) || segRank(x.segment) - segRank(y.segment) || (x.distance.km ?? 1e9) - (y.distance.km ?? 1e9));
-  return { ok: true, config, origin, results, exceptions: results.filter((r) => r.status === "exception"), counters, state: next };
+  return { ok: true, config, origin, results, exceptions: results.filter((r) => r.status === "exception"), review: results.filter((r) => r.status === "exception" || r.checks?.length), counters, state: next };
 }

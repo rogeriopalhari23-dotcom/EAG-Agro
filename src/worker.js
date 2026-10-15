@@ -40,6 +40,7 @@ import * as discovery from "./discovery.js";
 import * as people from "./people.js";
 import * as decisionReview from "./decision-review.js";
 import * as integrations from "./integrations.js";
+import * as rounds from "./rounds.js";
 import { handleQueue } from "./queue.js";
 import { mapInfo, mapTiles } from "./map-tiles.js";
 import { geocodeUnitRoute } from "./geocoding.js";
@@ -191,6 +192,38 @@ async function route(request, env, rid) {
       return response(
         await catalog.updateCharacteristic(request, env, actor, rid, id, subId),
       );
+  }
+  // Rodadas de descoberta e qualificação (fluxo geral, configurado por rodada).
+  if (path === "/api/rounds" && method === "GET") return response(await rounds.listRounds(env, actor));
+  if (path === "/api/rounds" && method === "POST") return response(await rounds.createRound(request, env, actor, rid), 201);
+  const rnd = path.match(/^\/api\/rounds\/([0-9a-f-]{36})(?:\/(area|osm-query|preflight-ack|candidates|run|decisions|register|export))?$/);
+  if (rnd) {
+    const [, rid2, sub] = rnd;
+    if (!sub && method === "GET") return response(await rounds.getRound(env, actor, rid2));
+    if (!sub && method === "PUT") return response(await rounds.updateRoundConfig(request, env, actor, rid, rid2));
+    if (sub === "area" && method === "GET") return response(await rounds.getArea(env, actor, rid2));
+    if (sub === "osm-query" && method === "GET") return response(await rounds.osmQuery(env, actor, rid2));
+    if (sub === "export" && method === "GET") return response(await rounds.exportRound(env, actor, rid2));
+    if (sub === "preflight-ack" && method === "POST") return response(await rounds.acknowledgePreflight(request, env, actor, rid, rid2));
+    if (sub === "candidates" && method === "POST") return response(await rounds.addCandidates(request, env, actor, rid, rid2), 201);
+    if (sub === "run" && method === "POST") return response(await rounds.executeRound(request, env, actor, rid, rid2));
+    if (sub === "decisions" && method === "POST") return response(await rounds.decide(request, env, actor, rid, rid2), 201);
+    if (sub === "register" && method === "POST") {
+      // Cadastro pelas rotas existentes, com a identidade e a origem desta requisição (mesmas regras do cadastro manual).
+      const dispatch = async (p, m, body) => {
+        const headers = new Headers(request.headers);
+        headers.set("content-type", "application/json");
+        headers.delete("content-length");
+        try {
+          const res = await route(new Request(new URL(p, request.url), { method: m, headers, body: JSON.stringify(body) }), env, rid);
+          return { status: res.status, data: await res.json() };
+        } catch (e) {
+          if (e instanceof ApiException) return { status: e.status, data: { error: { code: e.code, message: e.message, details: e.details } } };
+          throw e;
+        }
+      };
+      return response(await rounds.registerFromRound(request, env, actor, rid, rid2, dispatch));
+    }
   }
   if (path === "/api/searches") {
     if (method === "POST")

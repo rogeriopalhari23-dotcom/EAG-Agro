@@ -1,5 +1,22 @@
 // Conjunto de municípios da rodada: JSON [{code,name,region,country,lat,lon,bbox_*}] ou CSV com cabeçalho
 // (código;nome;uf;lat;lon). O conjunto é da rodada; o código não conhece nenhum município.
+// Conjunto nacional oficial do Brasil a partir do seed versionado do IBGE (migrations/0008_seed_municipios.sql), para uso
+// local sem rede (CLI e testes). O Worker lê a mesma informação da tabela municipalities.
+// Colunas: ibge_code,name,name_normalized,uf,lat,lon,source,source_version,bbox_min_lat,bbox_max_lat,bbox_min_lon,bbox_max_lon,area_km2
+export function parseIbgeSeedSql(sql) {
+  const out = [];
+  const row = /^\((\d{7}),'((?:[^']|'')*)','(?:[^']|'')*','([A-Z]{2})',(-?[\d.]+),(-?[\d.]+),'(?:[^']|'')*','((?:[^']|'')*)',(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),/;
+  for (const line of sql.split(/\r?\n/)) {
+    const m = row.exec(line);
+    if (!m) continue;
+    out.push({
+      code: m[1], name: m[2].replace(/''/g, "'"), region: m[3], country: "BR", lat: Number(m[4]), lon: Number(m[5]), source: m[6].replace(/''/g, "'"),
+      bbox_min_lat: Number(m[7]), bbox_max_lat: Number(m[8]), bbox_min_lon: Number(m[9]), bbox_max_lon: Number(m[10]),
+    });
+  }
+  return out;
+}
+
 export function parseMunicipalities(text, { format, country }) {
   const clean = text.replace(/^﻿/, "").trim();
   if (format === "json") return JSON.parse(clean).map((m) => ({ country, ...m }));

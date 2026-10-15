@@ -2663,3 +2663,26 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Bug corrigido:** na reexecução, um estabelecimento que só estava no estado anterior perdia nome e município.
 - **Não feito:** nada publicado, nenhuma migração aplicada, nenhum registro real alterado, nenhum contato, crédito ou Snov. T11, fichas, canais e campanhas sem mudança.
 - Lacunas e uso em `rodadas/FLUXO-RODADAS.md`.
+
+## Rodadas: lacunas operacionais fechadas (15/10/2026, sem publicar)
+
+- **Geografia:** qualquer município brasileiro serve de origem pelo conjunto oficial do IBGE (migração 0008). A área é calculada pela origem, pelo raio e pela unidade, com municípios inteiros e parciais.
+  - Não há CSV montado à mão. O CSV antigo do piloto está contido na área calculada: 258 municípios contra 224.
+  - O critério perto do limite aparece por extenso e gera conferência, não exclusão.
+- **Painel (tela Rodadas):** criar e configurar, ver a área e as limitações, registrar ciência, trazer candidatas, executar, revisar exceções e conferências, decidir em lote, cadastrar e exportar.
+  - As decisões guardam responsável, data, observação e a foto do resultado avaliado, com histórico.
+  - O cadastro usa as rotas existentes, é idempotente, é feito em partes e fica ligado à decisão que o autorizou.
+- **Descoberta integrada, com o modo de entrada visível em cada resultado:**
+  - automática: OpenStreetMap, pelo navegador; Receita, com limite de taxa entre execuções;
+  - importação: SIPEAGRO, CSV e JSON;
+  - pesquisa assistida: URL obrigatória.
+  - Fonte paga, país ou segmento sem fonte aparecem antes da execução, e executar exige ciência.
+- **Conciliação:** candidata provisória junta na unidade identificada quando nome e município batem, conferindo também a máscara de CNPJ do SIPEAGRO.
+- **Formatos antigos:** há adaptação explícita, sem reescrever o original. Quem adapta precisa informar o produto, e a ligação de nível 0 é retirada e registrada.
+- **Triagem de sanções:** o cadastro em descoberta pode vir antes dela. Qualificar a empresa sem triagem continua bloqueado (409 `sanctions`), e isso está testado.
+- **Testes:**
+  - novos: `rodada-fontes` (8) e `rodadas-worker` (2, fluxo completo pelo Worker, com lote de revisão não vazio e 3 empresas cadastradas);
+  - de tela, opcional: `tests/ui-rodadas.mjs`, no Chrome headless.
+  - Suíte completa: 494 + 2 + 37, 0 falhas. O teste workerd aplica a migração 0044.
+- **Não feito:** migração 0044 aplicada em produção, publicação, uso de serviço pago, chamada real a fontes externas (os testes usam respostas simuladas), contato, ou alteração de registros reais do piloto.
+- Matriz completa (operacional, parcial, dependência externa) em `rodadas/FLUXO-RODADAS.md`.

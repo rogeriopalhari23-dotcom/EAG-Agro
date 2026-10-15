@@ -141,7 +141,7 @@ function section(title, subtitle) {
 }
 
 // Navegação principal curta; telas de apoio ficam sob o item "pai" (abas ou Configurações).
-const MAIN_NAV = ["Início", "Radar Nacional", "Radar Internacional", "Empresas", "Abordagem", "Configurações"];
+const MAIN_NAV = ["Início", "Radar Nacional", "Radar Internacional", "Rodadas", "Empresas", "Abordagem", "Configurações"];
 const PARENT = {
   Hoje: "Início",
   Radar: "Radar Nacional",
@@ -3971,10 +3971,452 @@ function internationalPanels(id, data) {
   return nodes;
 }
 
+// ===== Rodadas de descoberta e qualificação (fluxo geral; configuração por rodada) =====
+const ROUND_STATUS = {
+  qualified_purchase: ["Uso e compra comprovados", "ok"],
+  qualified_use: ["Uso comprovado", "ok"],
+  discovery: ["Descoberta", ""],
+  exception: ["Exceção", "warn"],
+  separated: ["Revenda/trader (separada)", ""],
+  outside: ["Fora do raio", ""],
+};
+const LEVEL_TAG = { supported: ["Suportado", "ok"], partial: ["Parcial", "warn"], unsupported: ["Sem suporte", "bad"] };
+const INTAKE_LABEL = { automatic: "descoberta automática", import: "importação", assisted: "pesquisa assistida", legacy: "formato antigo" };
+const DECISION_LABEL = { accept: "Aceita para cadastro", include: "Exceção incluída", reject: "Recusada", defer: "Adiada" };
+const PROOF_LABEL = { proved: "comprovado", indication: "indício", none: "sem evidência" };
+const tag = (label, cls = "") => text("span", label, `tag ${cls}`.trim());
+
+function roundConfigTemplate() {
+  return {
+    id: "nova-rodada",
+    commodity: { code: "", label: "", segments: {} },
+    buyer: { roles: ["final_consumer", "processor"], separate: ["reseller", "trader"] },
+    origin: { country: "BR", region: "", municipality: "" },
+    radius: { value: 150, unit: "km", method: "haversine" },
+    nearLimit: { fraction: 0.1 },
+    priorities: { size: [], segments: [] },
+    sources: [
+      { id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 },
+      { id: "osm-overpass", kind: "discovery" },
+      { id: "mapa-sipeagro", kind: "discovery" },
+    ],
+    evidence: { confirming: ["own_source", "official_record"] },
+    locale: { language: "pt-BR", timezone: "America/Sao_Paulo" },
+    compliance: { scope: "br_email_automatic" },
+  };
+}
+
+// Campos principais em formulário; segmentos, fontes e prioridades no bloco avançado (JSON).
+function roundConfigForm(initial, roundName, onSubmit, label) {
+  const c = initial;
+  const f = {
+    name: input("Nome da rodada", "name", "text", roundName ?? ""),
+    code: input("Commodity (código)", "code", "text", c.commodity?.code ?? ""),
+    clabel: input("Commodity (nome no relatório)", "clabel", "text", c.commodity?.label ?? "", false),
+    variety: input("Variedade ou especificação (ex.: GMO)", "variety", "text", c.commodity?.variety ?? "", false),
+    country: input("País (ISO, 2 letras)", "country", "text", c.origin?.country ?? "BR"),
+    region: input("UF / região", "region", "text", c.origin?.region ?? "", false),
+    municipality: input("Município de origem", "municipality", "text", c.origin?.municipality ?? "", false),
+    code7: input("Código IBGE (opcional)", "municipalityCode", "text", c.origin?.municipalityCode ?? "", false),
+    lat: input("Latitude (fora do Brasil)", "lat", "text", c.origin?.lat ?? "", false),
+    lon: input("Longitude (fora do Brasil)", "lon", "text", c.origin?.lon ?? "", false),
+    radius: input("Raio", "radius", "number", c.radius?.value ?? 150),
+    unit: select("Unidade", "unit", [["km", "km"], ["mi", "milhas"]], c.radius?.unit ?? "km"),
+    nearKind: select("Perto do limite", "nearKind", [["fraction", "Proporcional ao raio (%)"], ["distance", "Margem fixa (na unidade do raio)"]], c.nearLimit?.distance != null ? "distance" : "fraction"),
+    nearValue: input("Valor (% do raio ou margem)", "nearValue", "number", c.nearLimit?.distance ?? Math.round((c.nearLimit?.fraction ?? 0.1) * 100)),
+    language: input("Idioma", "language", "text", c.locale?.language ?? "pt-BR"),
+    timezone: input("Fuso", "timezone", "text", c.locale?.timezone ?? "America/Sao_Paulo"),
+    scope: input("Escopo de compliance", "scope", "text", c.compliance?.scope ?? ""),
+  };
+  const advanced = input(
+    "Segmentos (com regras de descoberta), fontes, prioridades e perfil do comprador (JSON)",
+    "advanced",
+    "textarea",
+    JSON.stringify({ segments: c.commodity?.segments ?? {}, nameHints: c.commodity?.nameHints ?? [], restrictionHints: c.commodity?.restrictionHints ?? [], buyer: c.buyer, sources: c.sources, priorities: c.priorities, evidence: c.evidence }, null, 2),
+  );
+  advanced.control.rows = 14;
+  advanced.control.maxLength = 20000;
+  return makeForm(
+    [
+      { group: "Rodada e commodity", fields: [f.name, f.code, f.clabel, f.variety] },
+      { group: "Origem", hint: "No Brasil, qualquer município do IBGE (nome + UF, ou o código). Fora do Brasil, informe a coordenada.", fields: [f.country, f.region, f.municipality, f.code7, f.lat, f.lon] },
+      { group: "Raio e proximidade do limite", hint: "A faixa perto do limite pede conferência da localização; não exclui ninguém.", fields: [f.radius, f.unit, f.nearKind, f.nearValue] },
+      { group: "Idioma, fuso e compliance", fields: [f.language, f.timezone, f.scope] },
+      { group: "Avançado", collapsed: true, fields: [advanced] },
+    ],
+    async (v) => {
+      let adv;
+      try {
+        adv = JSON.parse(v.advanced || "{}");
+      } catch {
+        throw new Error("O bloco avançado não é um JSON válido.");
+      }
+      const num = (x) => (x === "" || x == null ? undefined : Number(String(x).replace(",", ".")));
+      const origin = { country: v.country.trim().toUpperCase() };
+      if (v.region) origin.region = v.region.trim().toUpperCase();
+      if (v.municipality) origin.municipality = v.municipality.trim();
+      if (v.municipalityCode) origin.municipalityCode = v.municipalityCode.trim();
+      if (num(v.lat) != null && num(v.lon) != null) Object.assign(origin, { lat: num(v.lat), lon: num(v.lon) });
+      const slug = (v.name || "rodada").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+      const config = {
+        ...c,
+        id: c.id && c.id !== "nova-rodada" ? c.id : slug || "rodada",
+        commodity: { ...(c.commodity ?? {}), code: v.code.trim(), label: v.clabel.trim() || undefined, variety: v.variety.trim() || undefined, segments: adv.segments ?? {}, nameHints: adv.nameHints ?? [], restrictionHints: adv.restrictionHints ?? [] },
+        buyer: adv.buyer ?? c.buyer,
+        sources: adv.sources ?? [],
+        priorities: adv.priorities ?? { size: [], segments: [] },
+        evidence: adv.evidence ?? c.evidence,
+        origin,
+        radius: { value: num(v.radius), unit: v.unit, method: "haversine" },
+        nearLimit: v.nearKind === "fraction" ? { fraction: num(v.nearValue) / 100 } : { distance: num(v.nearValue) },
+        locale: { language: v.language.trim(), timezone: v.timezone.trim() },
+        compliance: { ...(c.compliance ?? {}), scope: v.scope.trim() },
+      };
+      await onSubmit(v.name.trim(), config);
+    },
+    label,
+  );
+}
+
+async function rodadasView() {
+  const node = section("Rodadas", "Descoberta e qualificação configuradas por rodada: commodity, origem, raio, fontes e critérios. Nada aqui faz contato ou libera envio.");
+  const list = (await api("/api/rounds")).items;
+  const where = (o) => (o?.municipality ? `${o.municipality}/${o.region ?? ""}` : `${o?.lat ?? "?"}, ${o?.lon ?? "?"}`);
+  node.append(
+    panel(
+      "Rodadas",
+      rows(list, (r) =>
+        el(
+          "div",
+          { class: "row" },
+          el("div", {}, text("strong", r.name), text("small", `${r.commodity ?? "—"}${r.variety ? ` ${r.variety}` : ""} · ${where(r.origin)} · ${r.radius?.value} ${r.radius?.unit} · ${r.lastRun ? `${r.lastRun.total} estabelecimentos, ${r.lastRun.review} para revisar` : "ainda não executada"}`)),
+          tag(r.status === "draft" ? "Rascunho" : r.status === "closed" ? "Encerrada" : "Ativa", r.status === "active" ? "ok" : ""),
+          button("Abrir", () => showRound(r.id)),
+        ),
+      ),
+    ),
+  );
+  if (writable())
+    node.append(
+      details(
+        "Nova rodada",
+        roundConfigForm(roundConfigTemplate(), "", async (name, config) => {
+          const r = await api("/api/rounds", "POST", { name, config });
+          notice("Rodada criada. Confira a área e as limitações antes de executar.");
+          await showRound(r.id);
+        }, "Criar rodada"),
+      ),
+    );
+  return node;
+}
+
+function downloadFile(name, content, type) {
+  const link = el("a", { href: URL.createObjectURL(new Blob([content], { type })), download: name });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+// Envia linhas em partes de até ~48 KB (limite de 64 KB por requisição), repetindo o cabeçalho em cada parte.
+async function postInParts(path, lines, header, makeBody) {
+  const totals = { added: 0, duplicates: 0, received: 0, errors: [], skipped: null };
+  let part = [], size = 0;
+  const flush = async () => {
+    if (!part.length) return;
+    const r = await api(path, "POST", makeBody([header, ...part].join("\n")));
+    totals.added += r.added;
+    totals.duplicates += r.duplicates;
+    totals.received += r.received;
+    totals.errors.push(...(r.errors ?? []));
+    if (r.skipped) totals.skipped = Object.fromEntries(Object.entries(r.skipped).map(([k, v]) => [k, (totals.skipped?.[k] ?? 0) + v]));
+    part = [];
+    size = 0;
+  };
+  for (const l of lines) {
+    if (size + l.length > 48000) await flush();
+    part.push(l);
+    size += l.length + 1;
+  }
+  await flush();
+  return totals;
+}
+
+const normKey = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+async function showRound(id) {
+  const r = await api(`/api/rounds/${id}`);
+  const base = `/api/rounds/${id}`;
+  const o = r.config.origin ?? {};
+  const node = section(r.name, `${r.config.commodity?.label ?? r.config.commodity?.code}${r.config.commodity?.variety ? ` ${r.config.commodity.variety}` : ""} · origem ${o.municipality ? `${o.municipality}/${o.region ?? ""}` : `${o.lat}, ${o.lon}`} (${o.country}) · raio ${r.config.radius?.value} ${r.config.radius?.unit} · configuração revisão ${r.revision}`);
+  const pf = r.preflight;
+
+  // 1. Limitações antes da execução
+  node.append(
+    panel(
+      "Antes de executar: o que esta configuração cobre",
+      el("div", { class: pf.overall === "supported" ? "callout" : "callout warn" }, text("p", pf.overall === "supported" ? "Tudo suportado." : "Há limitações. O que é parcial ou sem suporte não é tratado como completo: registre ciência antes de executar.")),
+      rows(pf.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", x.area), text("small", x.message)), tag(...LEVEL_TAG[x.level]))),
+      r.acknowledged
+        ? text("small", `Ciência registrada por ${r.acknowledged.by} em ${fmtDate(r.acknowledged.at)} (revisão ${r.revision}).`, "muted")
+        : writable() && pf.requiresAcknowledgement
+          ? button("Registrar ciência das limitações", async () => {
+              await api(`${base}/preflight-ack`, "POST", { revision: r.revision });
+              notice("Ciência registrada.");
+              await showRound(id);
+            }, true)
+          : null,
+    ),
+  );
+
+  // 2. Área calculada
+  const areaBody = el("div", {}, text("p", "Calculando a área…", "muted"));
+  node.append(panel("Área da rodada", areaBody));
+  api(`${base}/area`)
+    .then((a) =>
+      areaBody.replaceChildren(
+        kv([
+          ["Base", a.dataset ?? "sem conjunto oficial de municípios (distância só pela coordenada da unidade)"],
+          ["Raio", `${a.radiusKm} km`],
+          ["Perto do limite", a.criterion],
+          ["Municípios", `${a.summary.municipalities} (inteiros ${a.summary.full}, parciais ${a.summary.partial}, a conferir ${a.summary.review})`],
+          ["UFs", a.summary.regions.join(", ") || "—"],
+        ]),
+        details(
+          "Ver municípios",
+          el("div", { class: "rows" }, ...a.municipalities.map((m) => el("div", { class: "row" }, el("div", {}, text("strong", `${m.name}/${m.region}`), text("small", `centroide ${m.centroidKm} km (estimativa) · alcance ${m.minKm}–${m.maxKm} km`)), m.review ? tag("conferir", "warn") : tag(m.coverage === "full" ? "inteiro" : "parcial")))),
+        ),
+      ),
+    )
+    .catch((e) => areaBody.replaceChildren(text("p", e.message, "error")));
+
+  // 3. Candidatas: automática, importação e pesquisa assistida
+  const counts = r.candidates.length ? r.candidates.map((c) => `${INTAKE_LABEL[c.intake] ?? c.intake} · ${r.sources[c.source_id]?.label ?? c.source_id}: ${c.n}`) : ["Nenhuma candidata ainda."];
+  const cand = panel("Candidatas", el("ul", {}, ...counts.map((x) => text("li", x))));
+  if (writable()) {
+    if ((r.config.sources ?? []).some((x) => x.id === "osm-overpass"))
+      cand.append(
+        el(
+          "div",
+          { class: "toolbar" },
+          button("Descoberta automática: OpenStreetMap", async () => {
+            const q = await api(`${base}/osm-query`);
+            // O servidor público do OSM recusa a Cloudflare: a consulta sai deste navegador.
+            const res = await fetch(q.endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: `data=${encodeURIComponent(q.query)}` });
+            if (!res.ok) throw new Error(`O OpenStreetMap respondeu ${res.status}. Nada foi gravado; tente mais tarde.`);
+            const data = await res.json();
+            const els = (data.elements ?? []).map((e) => ({ type: e.type, id: e.id, lat: e.lat, lon: e.lon, center: e.center, tags: e.tags }));
+            let added = 0, dup = 0, part = [];
+            const send = async () => {
+              if (!part.length) return;
+              const x = await api(`${base}/candidates`, "POST", { intake: "automatic", source: "osm-overpass", elements: part });
+              added += x.added;
+              dup += x.duplicates;
+              part = [];
+            };
+            for (const e of els) {
+              if (JSON.stringify(part).length + JSON.stringify(e).length > 45000) await send();
+              part.push(e);
+            }
+            await send();
+            notice(`OpenStreetMap: ${els.length} objetos lidos; ${added} candidatas novas, ${dup} já existentes. Entram como indício, provisórias até conciliar.`);
+            await showRound(id);
+          }),
+          text("small", "A consulta sai deste navegador (o servidor público do OSM recusa a Cloudflare).", "muted"),
+        ),
+      );
+    const file = el("input", { type: "file", accept: ".csv,.json,.txt", "aria-label": "Arquivo para importar" });
+    const kind = select("Formato do arquivo", "kind", [["mapa-sipeagro", "MAPA SIPEAGRO (CSV oficial)"], ["csv", "Candidatas em CSV"], ["json", "Candidatas em JSON"]], "csv");
+    cand.append(
+      el(
+        "div",
+        { class: "toolbar" },
+        kind.node,
+        el("label", {}, "Arquivo", file),
+        button("Importar", async () => {
+          const f = file.files?.[0];
+          if (!f) throw new Error("Escolha um arquivo.");
+          const content = await f.text();
+          let t;
+          if (kind.control.value === "json") {
+            const items = JSON.parse(content);
+            t = { added: 0, duplicates: 0, errors: [] };
+            for (let i = 0; i < items.length; i += 50) {
+              const x = await api(`${base}/candidates`, "POST", { intake: "import", source: "import-file", format: "json", text: JSON.stringify(items.slice(i, i + 50)), label: f.name });
+              t.added += x.added;
+              t.duplicates += x.duplicates;
+              t.errors.push(...x.errors);
+            }
+          } else {
+            const [header, ...lines] = content.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
+            let keep = lines;
+            if (kind.control.value === "mapa-sipeagro") {
+              // Só as linhas dos municípios da área seguem para o servidor (que confere de novo).
+              const a = await api(`${base}/area`);
+              const inArea = new Set(a.municipalities.map((m) => `${m.region}|${normKey(m.name)}`));
+              keep = lines.filter((l) => {
+                const p = l.split(";");
+                return inArea.has(`${p[0]}|${normKey(p[1])}`);
+              });
+            }
+            t = await postInParts(`${base}/candidates`, keep, header, (txt) =>
+              kind.control.value === "mapa-sipeagro" ? { intake: "import", source: "mapa-sipeagro", text: txt } : { intake: "import", source: "import-file", format: "csv", text: txt, label: f.name },
+            );
+          }
+          notice(`Importação: ${t.added} novas, ${t.duplicates} já existentes${t.skipped ? `; deixadas de fora: ${Object.entries(t.skipped).map(([k, v]) => `${k} ${v}`).join(", ")}` : ""}${t.errors.length ? `; avisos: ${t.errors.slice(0, 3).join(" ")}` : ""}.`);
+          await showRound(id);
+        }),
+      ),
+    );
+    cand.append(
+      details(
+        "Pesquisa assistida: registrar candidata com fonte",
+        makeForm(
+          [
+            input("Nome", "name"),
+            input("CNPJ / identificador", "registrationId", "text", "", false),
+            input("Município", "municipality", "text", "", false),
+            input("UF", "region", "text", "", false),
+            input("Segmento (código da configuração)", "segment", "text", "", false),
+            input("Fonte (URL)", "sourceUrl", "url"),
+            select("O que a fonte mostra", "kind", [["", "Só a existência"], ["operation", "Operação"], ["commodity_use", "Uso da commodity"], ["purchase", "Compra de terceiros"], ["resale", "Revenda"], ["restriction", "Restrição"]], ""),
+            select("Tipo da fonte", "strength", [["own_source", "Fonte própria da empresa"], ["official_record", "Registro oficial"], ["press", "Imprensa"], ["directory", "Diretório"], ["search_summary", "Resumo de busca"]], "own_source"),
+            input("Trecho que comprova", "quote", "textarea", "", false),
+          ],
+          async (v) => {
+            await api(`${base}/candidates`, "POST", { intake: "assisted", candidate: { name: v.name, registrationId: v.registrationId, municipality: v.municipality, region: v.region, segment: v.segment, sourceUrl: v.sourceUrl, evidence: v.kind ? { kind: v.kind, strength: v.strength, quote: v.quote } : undefined } });
+            notice("Candidata registrada.");
+            await showRound(id);
+          },
+          "Registrar candidata",
+        ),
+      ),
+    );
+    cand.append(
+      el(
+        "div",
+        { class: "toolbar" },
+        button("Executar rodada", async () => {
+          const s = await api(`${base}/run`, "POST", {});
+          notice(`Rodada executada: ${s.total} estabelecimentos (novos ${s.counters.created}, alterados ${s.counters.updated}, sem mudança ${s.counters.unchanged}); ${s.review} para revisar${s.deferred ? `; ${s.deferred} consulta(s) adiada(s) pelo limite da fonte: execute de novo em 1 minuto` : ""}.`);
+          await showRound(id);
+        }, true),
+      ),
+    );
+  }
+  node.append(cand);
+
+  // 4. Resultados, revisão e decisão em lote
+  const results = r.results;
+  const filter = select("Mostrar", "filter", [["review", "Exceções e conferências"], ["all", "Todos"], ["undecided", "Sem decisão"], ["registered", "Cadastrados"]], state.roundFilter ?? "review");
+  const listBody = el("div", {});
+  const selected = new Set();
+  const render = () => {
+    const v = (state.roundFilter = filter.control.value);
+    const items = results.filter((x) => v === "all" || (v === "review" && x.needsReview) || (v === "undecided" && !x.decision) || (v === "registered" && x.registration));
+    selected.clear();
+    listBody.replaceChildren(
+      rows(items, (x) => {
+        const [stLabel, stCls] = ROUND_STATUS[x.status] ?? [x.status, ""];
+        const box = el("input", { type: "checkbox", "aria-label": `Selecionar ${x.names[0]}`, onchange: (e) => (e.target.checked ? selected.add(x.key) : selected.delete(x.key)) });
+        const a = x.assessment;
+        const info = [
+          `${x.registrationId ?? "sem identificador (provisória)"} · ${x.municipality ?? "município não informado"} · ${x.distance?.label ?? "distância desconhecida"}`,
+          `Operação: ${PROOF_LABEL[a.operation.status] ?? a.operation.status} · uso: ${PROOF_LABEL[a.commodityUse.status] ?? a.commodityUse.status} · compra de terceiros: ${PROOF_LABEL[a.purchase.status] ?? a.purchase.status}${a.restriction.status !== "none_found" ? ` · restrição: ${a.restriction.status}` : ""}`,
+          `Entrada: ${(x.intake ?? []).map((i) => INTAKE_LABEL[i] ?? i).join(", ") || "—"}${x.conciliatedFrom?.length ? ` · conciliada com ${x.conciliatedFrom.length} candidata(s) provisória(s)` : ""}`,
+          x.status === "exception" ? `Exceção: ${x.reasons.join("; ")}` : null,
+          x.checks?.length ? `Conferir: ${x.checks.join("; ")}` : null,
+          x.decision ? `Decisão: ${DECISION_LABEL[x.decision.decision]} por ${x.decision.decided_by} em ${fmtDate(x.decision.decided_at)}${x.decision.note ? ` (${x.decision.note})` : ""}` : null,
+          x.registration ? `Cadastro: ${x.registration.outcome} (${x.registration.mode}) em ${fmtDate(x.registration.registered_at)}` : null,
+        ].filter(Boolean);
+        return el(
+          "div",
+          { class: "row" },
+          el("div", { class: "round-lines" }, el("label", { class: "round-pick" }, writable() ? box : null, text("strong", x.names.join(" / "))), ...info.map((l) => text("small", l)), details("Pendências", el("ul", {}, ...x.pending.map((p) => text("li", p))))),
+          tag(stLabel, stCls),
+          x.checks?.length ? tag("conferir", "warn") : null,
+        );
+      }),
+    );
+  };
+  filter.control.addEventListener("change", render);
+  render();
+  const resPanel = panel(
+    "Resultados",
+    text("small", r.lastRun ? `Última execução ${fmtDate(r.lastRunAt)}: ${r.lastRun.total} estabelecimentos, ${r.lastRun.exceptions} exceções, ${r.lastRun.review} para revisar.` : "Rodada ainda não executada.", "muted"),
+    filter.node,
+    listBody,
+  );
+  if (writable()) {
+    const decision = select("Decisão para os selecionados", "decision", [["accept", "Aceitar para cadastro"], ["include", "Incluir exceção na descoberta"], ["defer", "Adiar"], ["reject", "Recusar"]], "accept");
+    const note = input("Observação", "note", "text", "", false);
+    resPanel.append(
+      el(
+        "div",
+        { class: "toolbar" },
+        decision.node,
+        note.node,
+        button("Registrar decisão em lote", async () => {
+          if (!selected.size) throw new Error("Selecione ao menos um estabelecimento.");
+          const out = await api(`${base}/decisions`, "POST", { decisions: [...selected].map((key) => ({ key, decision: decision.control.value, note: note.control.value || undefined })) });
+          const refused = out.outcomes.filter((x) => !x.ok);
+          notice(`${out.outcomes.length - refused.length} decisão(ões) registrada(s) por ${out.decidedBy} em ${fmtDate(out.decidedAt)}.${refused.length ? ` Não registradas: ${refused.map((x) => `${x.key} (${x.reason})`).join("; ")}.` : ""}`, refused.length > 0);
+          await showRound(id);
+        }),
+      ),
+    );
+    const prod = productSelect("productId");
+    const mode = select("Cadastro", "mode", [["discovery", "Descoberta (sem aprovação individual; sem exceções nem recusadas)"], ["accept", "Só as aceitas"]], "discovery");
+    const screen = el("input", { type: "checkbox", name: "screening" });
+    resPanel.append(
+      el(
+        "div",
+        { class: "toolbar" },
+        prod.node,
+        mode.node,
+        el("label", {}, screen, " Rodar a triagem de sanções logo após o cadastro"),
+        button("Cadastrar no Compass", async () => {
+          // O servidor cadastra em partes; repete até não restar nenhuma.
+          const out = { items: [], mode: mode.control.value };
+          for (let round = 0; round < 100; round++) {
+            const part = await api(`${base}/register`, "POST", { mode: mode.control.value, productId: prod.control.value, screening: screen.checked });
+            out.items.push(...part.items.filter((x) => x.outcome !== "skipped" || round === 0));
+            notice(`Cadastrando… ${out.items.filter((x) => x.outcome === "created").length} criada(s) até agora.`);
+            if (!part.remaining) break;
+          }
+          const n = (k) => out.items.filter((x) => x.outcome === k).length;
+          notice(`Cadastro (${out.mode === "accept" ? "só as aceitas" : "descoberta"}): ${n("created")} criada(s), ${n("already_exists")} já existiam, ${n("skipped")} já cadastrada(s) por esta rodada, ${n("failed")} falha(s). Nenhum contato, ficha ou envio foi criado.`, n("failed") > 0);
+          await showRound(id);
+        }),
+      ),
+    );
+  }
+  resPanel.append(
+    el(
+      "div",
+      { class: "toolbar" },
+      button("Exportar (JSON)", async () => downloadFile(`rodada-${r.config.id}.json`, JSON.stringify(await api(`${base}/export`), null, 1), "application/json")),
+      button("Relatório (markdown)", async () => downloadFile(`relatorio-${r.config.id}.md`, (await api(`${base}/export`)).report, "text/markdown")),
+    ),
+  );
+  node.append(resPanel);
+  if (writable() && r.status !== "closed")
+    node.append(
+      details(
+        "Editar configuração",
+        roundConfigForm(r.config, r.name, async (name, config) => {
+          await api(base, "PUT", { expectedRevision: r.revision, config });
+          notice("Configuração salva. As limitações foram recalculadas: registre ciência de novo antes de executar.");
+          await showRound(id);
+        }, "Salvar configuração"),
+      ),
+    );
+  showScreen(node, "Rodadas", r.name);
+}
+
 const views = {
   Início: home,
   "Radar Nacional": radarView,
   "Radar Internacional": () => internacionalView(),
+  Rodadas: rodadasView,
   Empresas: companiesView,
   Abordagem: () => abordagemView("Fichas"),
   Configurações: settingsView,

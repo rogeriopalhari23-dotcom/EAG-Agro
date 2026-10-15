@@ -1421,3 +1421,13 @@ details.group > summary small {
 .settings-list button > small.tag {
   justify-self: start;
 }
+
+/* Rodadas: cada informação do estabelecimento numa linha. */
+.round-lines > small {
+  display: block;
+}
+.round-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

@@ -4,7 +4,7 @@
 import { normalizeName } from "../geo.js";
 
 // Regras de identificador por país (formato e raiz da empresa). País sem regra → identificador aceito como texto, sem raiz.
-const ID_RULES = {
+export const ID_RULES = {
   BR: { type: "CNPJ", normalize: (v) => String(v).replace(/\D/g, ""), valid: (v) => /^\d{14}$/.test(v), root: (v) => v.slice(0, 8) },
 };
 
@@ -43,14 +43,57 @@ export function mergeCandidates(list) {
     cur.sources = uniqBy([...cur.sources, ...(c.sources ?? [])], (s) => `${s.id}|${s.ref ?? ""}`);
     cur.evidence = uniqBy([...cur.evidence, ...(c.evidence ?? [])], (e) => `${e.kind}|${e.url ?? ""}|${e.quote ?? ""}`);
     cur.hints = { ...cur.hints, ...(c.hints ?? {}) };
+    if (c.conciliatedFrom) cur.conciliatedFrom = [...new Set([...(cur.conciliatedFrom ?? []), ...c.conciliatedFrom])];
   }
-  return [...map.values()];
+  return conciliateProvisional([...map.values()]);
+}
+
+// Nome para comparação: sem acento, caixa e sufixos societários (LTDA, S/A, EIRELI, ME, EPP).
+export const nameKey = (n) => normalizeName(n ?? "").replace(/\b(ltda|s a|sa|eireli|me|epp|cia|companhia)\b/g, " ").replace(/\s+/g, " ").trim();
+
+// Máscara pública de identificador (ex.: SIPEAGRO "**.***.379/***-**") compatível com o identificador completo?
+export function idMaskMatches(country, mask, id) {
+  if (!mask || !id) return true;
+  if (country === "BR") {
+    const m = /^\*\*\.\*\*\*\.(\d{3})\//.exec(mask);
+    return !m || id.slice(5, 8) === m[1];
+  }
+  return true;
+}
+
+// Candidata provisória (sem identificador) com o mesmo nome e município de UMA unidade identificada é a mesma unidade:
+// junta nela e registra de onde veio. Mais de uma unidade possível → continua provisória, com as opções para conciliar.
+function conciliateProvisional(ests) {
+  const identified = ests.filter((e) => !e.provisional);
+  const out = [];
+  for (const e of ests) {
+    if (!e.provisional) { out.push(e); continue; }
+    const names = new Set(e.names.map(nameKey).filter(Boolean)), muns = new Set(e.municipalities.map((m) => normalizeName(m)));
+    const matches = identified.filter((x) => x.country === e.country && (!e.region || !x.region || String(x.region).toUpperCase() === String(e.region).toUpperCase())
+      && x.municipalities.some((m) => muns.has(normalizeName(m))) && x.names.some((n) => names.has(nameKey(n))) && idMaskMatches(e.country, e.hints?.idMask, x.registrationId));
+    if (matches.length !== 1) {
+      if (matches.length > 1) e.hints = { ...e.hints, conciliationOptions: matches.map((x) => x.key) };
+      out.push(e);
+      continue;
+    }
+    const t = matches[0];
+    for (const n of e.names) if (!t.names.includes(n)) t.names.push(n);
+    t.sources = uniqBy([...t.sources, ...e.sources], (s) => `${s.id}|${s.ref ?? ""}`);
+    t.evidence = uniqBy([...t.evidence, ...e.evidence], (x) => `${x.kind}|${x.url ?? ""}|${x.quote ?? ""}`);
+    t.hints = { ...e.hints, ...t.hints };
+    delete t.hints.idMask;
+    t.conciliatedFrom = [...new Set([...(t.conciliatedFrom ?? []), e.key])];
+  }
+  return out;
 }
 
 // Conciliação empresa ↔ unidade ↔ identificador ↔ localização. Só registra pendências; não corrige nada sozinha.
 export function conciliate(est, registryRecord) {
   const pending = [];
-  if (est.provisional) pending.push("Sem identificador cadastral completo da unidade: conciliar antes de qualificar.");
+  if (est.provisional)
+    pending.push(est.hints?.conciliationOptions?.length
+      ? `Sem identificador cadastral: ${est.hints.conciliationOptions.length} unidades identificadas com o mesmo nome e município (${est.hints.conciliationOptions.join(", ")}); escolher na conciliação.`
+      : "Sem identificador cadastral completo da unidade: conciliar antes de qualificar.");
   if (est.municipalities.length > 1) pending.push(`Municípios divergentes entre fontes: ${est.municipalities.join(" / ")}.`);
   if (registryRecord) {
     if (registryRecord.status && !/^ativ/i.test(registryRecord.status)) pending.push(`Situação cadastral "${registryRecord.status}": fora da qualificação ativa até mudar.`);

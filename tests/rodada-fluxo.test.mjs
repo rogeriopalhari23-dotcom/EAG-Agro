@@ -38,9 +38,9 @@ test("Configuração: piloto e exemplos válidos; perto do limite deriva do raio
   assert.equal(bad.ok, false);
   assert.ok(bad.errors.length >= 7, bad.errors.join(" | "));
   // Nenhum valor do piloto no código da rodada.
-  for (const f of ["config", "distance", "establishment", "qualify", "batch", "report", "acceptance", "municipalities"]) {
-    const src = readFileSync(new URL(`../src/rodada/${f}.js`, import.meta.url), "utf8");
-    assert.doesNotMatch(src, /indiara|milho|\b270\b|\b300\b|goi[aá]s/i, `src/rodada/${f}.js sem valores do piloto`);
+  for (const f of ["rodada/config", "rodada/distance", "rodada/establishment", "rodada/qualify", "rodada/batch", "rodada/report", "rodada/acceptance", "rodada/municipalities", "rodada/area", "rodada/sources/catalog", "rodada/sources/osm", "rodada/sources/sipeagro", "rodada/sources/import", "rounds"]) {
+    const src = readFileSync(new URL(`../src/${f}.js`, import.meta.url), "utf8");
+    assert.doesNotMatch(src, /indiara|milho|\b270\b|\b300\b|goi[aá]s/i, `src/${f}.js sem valores do piloto`);
   }
 });
 
@@ -197,11 +197,14 @@ test("Exceções automáticas: cadastro não ativo, municípios divergentes, per
   const by = (n) => run.results.find((r) => r.names[0] === n);
   assert.ok(by("Suspensa").reasons.includes("situação cadastral não ativa"));
   assert.ok(by("Diverge").reasons.includes("dados divergentes entre fontes"));
-  assert.ok(!by("Diverge").reasons.includes("perto do limite do raio"), "Uberlândia a 268,1 km fica antes da faixa [270, 300] do piloto");
+  assert.ok(!by("Diverge").checks.includes("perto do limite do raio"), "Uberlândia a 268,1 km fica antes da faixa [270, 300] do piloto");
   assert.equal(by("Limite").distance.km, 271.8);
-  assert.ok(by("Limite").reasons.includes("perto do limite do raio"), "Doverlândia a 271,8 km: dentro da faixa derivada do raio");
+  assert.ok(by("Limite").checks.includes("perto do limite do raio"), "Doverlândia a 271,8 km: dentro da faixa derivada do raio");
+  assert.notEqual(by("Limite").status, "exception", "perto do limite gera conferência, não exceção nem exclusão");
+  assert.ok(run.review.some((r) => r.names[0] === "Limite"), "aparece para conferência");
   assert.ok(by("Sem CNPJ").reasons.includes("unidade sem identificador cadastral"));
-  assert.equal(run.exceptions.length, 4);
+  assert.equal(run.exceptions.length, 3);
+  assert.equal(run.review.length, 4);
   // A mesma unidade, numa rodada de 500 km, não é exceção de limite.
   const wide = await runRound({ config: { ...PILOT, radius: { value: 500, unit: "km" } }, municipalities: BR_MUN, candidates: [candidates[2]], fetchers, clock: fakeClock(), now: NOW });
   assert.equal(wide.results[0].distance.nearLimit, false);
@@ -227,7 +230,8 @@ test("Relatório: destaca só exceções, mostra distância ESTIMADA e não afir
   const run = await runRound({ config: PILOT, municipalities: BR_MUN, candidates: [{ country: "BR", registrationId: "00000000000191", name: "Fábrica", municipality: "Abadiânia", region: "GO", evidence: [{ kind: "commodity_use", strength: "directory", url: "https://d.example" }] }], fetchers: { "br-cnpj-ws": async () => reg() }, clock: fakeClock(), now: NOW });
   const md = renderReport(run);
   assert.match(md, /ESTIMADA/);
-  assert.match(md, /## Exceções para análise/);
+  assert.match(md, /## Exceções e conferências para análise/);
+  assert.match(md, /Critério de proximidade do limite: proporcional: últimos 10% do raio \(de 270 a 300 km\); gera conferência, não exclusão/);
   assert.match(md, /\| indício \|/);
   assert.doesNotMatch(md, /\| comprovado \| comprovado \|/);
 });

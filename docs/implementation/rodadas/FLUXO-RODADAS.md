@@ -1,179 +1,153 @@
 # Fluxo geral de rodadas de descoberta e qualificação
 
-Data: 15/10/2026. Situação: implementado e testado localmente. Nada foi publicado. Nenhuma migração foi aplicada. Nenhum registro real foi alterado.
+Situação em 15/10/2026: implementado e testado localmente, **sem publicação**.
 
-## Objetivo
+Restrições respeitadas nesta etapa:
 
-O processo de descoberta e qualificação do piloto passa a ser um fluxo único do Compass.
+- A migração `0044_rodadas.sql` foi aplicada só nos testes locais; não foi aplicada em produção.
+- Nenhum registro real do piloto foi alterado.
+- Nenhum serviço pago foi usado.
+- Nenhum contato foi liberado.
 
-Milho GMO, Indiara/GO e 300 km agora são só uma configuração (`exemplos/milho-gmo-indiara-300km.json`). O código em `src/rodada/` não contém cidade, empresa, commodity ou distância do piloto. Um teste garante isso: ele procura esses valores no código-fonte e falha se encontrar algum.
+Milho GMO, Indiara/GO e 300 km são só uma configuração (`exemplos/milho-gmo-indiara-300km.json`). O código não contém cidade, empresa, commodity ou distância do piloto, e um teste confere isso em todos os módulos da rodada.
 
-O fluxo:
+## Matriz de situação
 
-- não faz contato;
-- não consome crédito;
-- não usa LLM para score, deduplicação, distância ou parse;
-- não cadastra nada sozinho.
+### Funcionalidade operacional
 
-O cadastro continua sendo um passo separado, feito por `scripts/cadastrar-lote-aceito.mjs`. Ele roda em simulação por padrão e usa as rotas da API com as regras existentes.
+Implementado e coberto por teste.
 
-## Auditoria do que já era parametrizado
-
-| Parte | Situação antes | Agora |
+| Item | Onde | Teste |
 |---|---|---|
-| Radar do Worker (`src/search.js`, `src/geo.js`, mapa de descoberta, raio nas operações) | Já recebia origem e raio como parâmetro | Sem mudança |
-| Scripts de descoberta do piloto (`docs/.../descoberta-milho-indiara/scripts/`) | Corte fixo em 270 km, nomes de milho e candidatas no código | Mantidos como registro histórico; o fluxo novo os substitui |
-| `scripts/cadastrar-lote-aceito.mjs` | Produto padrão "Milho GMO" | Sem padrão: o lote precisa declarar `produto`. Opção `--triagem` adicionada. Aceita lotes com `rastreio` |
-| Regra "perto do limite" | 270 km fixo | Deriva do raio configurado: fração (`fraction`) ou margem em km/mi (`distance`) |
+| Configuração da rodada:<br>commodity, variedade, perfil, origem, raio em km ou mi, critério perto do limite, fontes, evidência, idioma, fuso e compliance | `src/rodada/config.js`; painel → Rodadas → Nova rodada / Editar configuração (com revisão e conflito de edição) | `rodada-fluxo`, `rodadas-worker` |
+| Origem em qualquer município brasileiro (nome + UF ou código IBGE), sem CSV montado à mão | `src/rodada/area.js` + tabela `municipalities` (IBGE, migração 0008); na linha de comando, o mesmo conjunto lido da migração | `rodada-fontes` (Boa Vista/RR em milhas; o CSV antigo do piloto está contido na área calculada) |
+| Área calculada:<br>municípios inteiros e parciais, distância do centroide marcada como estimativa e alcance mínimo e máximo | `roundArea`; painel → Área da rodada | `rodada-fontes`, `rodadas-worker` |
+| Critério de proximidade do limite explícito (proporcional ou margem fixa), que gera **conferência**, não exclusão | `config.nearLimit.criterion`; resultado ganha `checks` e entra em "Exceções e conferências", mas continua elegível ao cadastro em descoberta | `rodada-fluxo` (Doverlândia, 271,8 km), `rodadas-worker` (unidade na faixa é cadastrada) |
+| Distinção entre centroide municipal e localização da unidade | `distance.js`: centroide = ESTIMADA; só a coordenada da unidade ou o contorno do município afirmam dentro/fora | `rodada-fluxo` |
+| Limitações mostradas **antes** da execução, com ciência registrada por revisão da configuração | `sources/catalog.js` (`preflight`); a rota `/run` recusa sem ciência; mudar a configuração anula a ciência | `rodada-fontes`, `rodadas-worker`, `ui-rodadas` |
+| Três modos de entrada, identificados em cada candidata e no resultado | automática (OSM, Receita), importação (SIPEAGRO, CSV/JSON), assistida (registro manual com URL obrigatória) | `rodada-fontes`, `rodadas-worker`, `ui-rodadas` |
+| Conciliação:<br>candidata provisória (sem CNPJ) junta na unidade identificada com mesmo nome e município. A máscara de CNPJ do SIPEAGRO precisa bater. Com duas opções, fica provisória e mostra as opções | `establishment.js` (`conciliateProvisional`) | `rodada-fontes`, `rodadas-worker` |
+| Consulta cadastral com limite de taxa entre execuções:<br>o que passar do limite fica **adiado**, não falha. Erro 500 vira pendência; 429 bloqueia a fonte naquela execução | `rounds.js` (`round_source_calls`), `batch.js` | `rodadas-worker`, `rodada-fontes`, `rodada-fluxo` |
+| Reexecução sem duplicidade:<br>estado por estabelecimento, reimportação ignorada por hash, contadores novos / alterados / sem mudança | `round_establishments`, `round_candidates` (único por hash) | `rodadas-worker`, `rodada-fluxo` |
+| Revisão só de exceções e conferências | painel → Resultados → filtro | `rodadas-worker`, `ui-rodadas` |
+| Decisão em lote (aceitar, incluir exceção, adiar, recusar):<br>responsável, data, observação e foto do resultado avaliado; histórico preservado; recusas explicadas por item | `round_decisions`; painel → seleção + "Registrar decisão em lote" | `rodadas-worker`, `ui-rodadas` |
+| Cadastro no Compass pelas rotas existentes, com as mesmas regras do cadastro manual:<br>modo descoberta (sem aprovação individual) ou só as aceitas; idempotente; em partes de 25; ligado à decisão | `registerFromRound` + `round_registrations` | `rodadas-worker`, `ui-rodadas` |
+| Cadastro em descoberta **antes** da triagem de sanções, com os avanços sujeitos à triagem bloqueados | qualificar a empresa cadastrada sem triagem → 409 `sanctions`. Triagem opcional logo após o cadastro (rotina interna, sem custo) | `rodadas-worker` |
+| Exportação:<br>configuração, limitações, resultados, histórico de decisões, cadastros e relatório em markdown | painel → Exportar; `GET /api/rounds/:id/export` | `rodadas-worker` |
+| Adaptação explícita de formatos antigos, sem reescrever o original | `src/rodada/legacy.js`; `rodada.mjs adaptar-candidatas` / `adaptar-lote` (recusa gravar sobre o original ou trocar o produto em silêncio; retira a ligação de nível 0 e registra isso) | `rodada-fontes` |
 
-## Configuração da rodada
+### Suporte parcial
 
-Um arquivo JSON por rodada. Validação: `node scripts/rodada.mjs validar <config>`. A validação lista todos os erros de uma vez.
+Funciona, com limite conhecido e exibido.
 
-| Bloco | Campos | Observação |
-|---|---|---|
-| `commodity` | `code`, `label`, `variety`, `spec`, `nameHints`, `restrictionHints`, `segments` | Restrição conflitante com a variedade vira exceção. Segmento sem regra vira pendência explícita. |
-| `buyer` | `roles`, `uses` | Perfil do comprador e uso |
-| `origin` | `country` (ISO2) + `lat`/`lon` **ou** `municipality`/`municipalityCode`/`region` | Município resolvido pelo conjunto de municípios da rodada |
-| `radius` | `value`, `unit` (`km`/`mi`), `method` (`haversine`) | Milhas convertidas para km internamente |
-| `nearLimit` | `fraction` (0–1) ou `distance` | Padrão: 10% do raio |
-| `priorities` | `size`, `segments` | Só ordenam o relatório; não excluem ninguém |
-| `sources` | `id`, `kind` (`registry`…), `countries`, `rateLimitPerMinute`, `maxAgeDays` | País sem fonte cadastral → pendência explícita |
-| `evidence.confirming` | Padrão: `own_source`, `official_record` | Só essas forças comprovam. As demais são indício. |
-| `locale` | `language`, `timezone` | |
-| `compliance` | `scope`, `sanctionsMaxAgeHours` (padrão 720) | O escopo é só registrado; as regras de envio continuam no Compass |
-| `countryRules` | opcional | Se existir e o país da unidade não estiver nela, vira pendência |
+| Item | Limite |
+|---|---|
+| OpenStreetMap (descoberta automática) | Cobertura irregular. Quase nunca traz CNPJ, então as candidatas ficam provisórias até a conciliação. É indício, não prova. No painel a consulta sai do navegador, porque o servidor público recusa a Cloudflare. |
+| MAPA SIPEAGRO (importação) | CNPJ mascarado no arquivo público. O arquivo é baixado pela pessoa; o painel filtra pela área e envia em partes. O registro indica a atividade, não prova uso nem compra. |
+| Receita (publica.cnpj.ws) | Só consulta CNPJ já conhecido (não busca por nome). 3 consultas por minuto, ou cerca de 180 por hora: rodadas grandes precisam de várias execuções. Não há fila automática. |
+| Segmentos sem regra de descoberta (no piloto: cooperativa, confinamento, integração, etanol no SIPEAGRO) | Ficam só com importação e pesquisa assistida, e isso aparece antes da execução. |
+| Prova de uso e de compra de terceiros | Sempre por pesquisa assistida (fonte própria ou registro oficial). Nada é automatizado e nenhum LLM é usado. |
+| Países fora do Brasil | Sem conjunto de municípios: a distância sai só pela coordenada da unidade. Sem fonte cadastral nem regra de identificador. O painel mostra "Sem suporte" e exige ciência. |
+| Formatos antigos | As provas do arquivo antigo entram como indício até serem reconfirmadas, porque o arquivo não guarda a força de cada prova. |
 
-### Exemplos (todos validados)
+### Dependência externa
 
-| Arquivo | Commodity | Origem | Raio | Perto do limite a partir de |
-|---|---|---|---|---|
-| `exemplos/milho-gmo-indiara-300km.json` | milho GMO | Indiara/GO | 300 km | 270,0 km (fração 0,1) |
-| `exemplos/soja-rio-verde-150km.json` | soja | Rio Verde/GO | 150 km | 135,0 km (margem de 15 km) |
-| `exemplos/sorgo-uberlandia-300mi.json` | sorgo | Uberlândia/MG | 300 mi (482,8 km) | 458,7 km (fração 0,05) |
-| `exemplos/cafe-verde-hamburgo-200km.json` | café verde (HS 090111) | Hamburgo, DE (coordenada) | 200 km | 180,0 km; sem fonte cadastral, idioma `en` |
+Fora do alcance do código local.
 
-Os três primeiros são exemplos de configuração. O quarto é só uma ilustração: ainda não há fonte cadastral nem conjunto de municípios da Alemanha.
+| Item | O que falta |
+|---|---|
+| Uso em produção | Aplicar a migração 0044 e publicar o Worker e o painel. Ambos exigem autorização explícita. |
+| Overpass, publica.cnpj.ws e dados.agricultura.gov.br | Disponibilidade e termos dos serviços públicos (nenhum foi chamado de verdade nesta etapa; os testes usam respostas simuladas). |
+| Casa dos Dados | Serviço pago: fica bloqueado até haver autorização de despesa. |
+| Registros e conjuntos de municípios de outros países | Fonte, termos e regra de identificador por país (ex.: Handelsregister/Impressum na Alemanha, já mapeados em `FONTES-EMPRESAS-EXTERIOR.md`). |
+| Listas de sanções | Validade das listas de 24/09/2026, até cerca de 24/10/2026. |
+| Portões existentes | Sem mudança: aprovação de ficha, autorização de despesa, validação T11, liberação de envio, L1/L4 pendentes, canais `planned`, campanhas inativas e cópia desligada. |
 
-## Fluxo comum
+## Como usar
 
-1. **Entrada.** Candidatas de qualquer fonte, em JSON. Campos: `country`, `registrationId`, `name`, `municipality`, `region`, `unit`, `sources`, `evidence`, `hints`. Novas candidatas entram como descoberta, sem aprovação individual.
-2. **Estabelecimento.** A chave é a unidade, não a empresa.
-   - Com identificador completo (no Brasil, o CNPJ de 14 dígitos): chave = país + identificador. CNPJ com ou sem pontuação gera a mesma chave.
-   - Sem identificador: chave **provisória** (nome + município + UF). Nunca é tratada como unidade confirmada.
-   - Unidades com a mesma raiz de CNPJ ficam separadas e ligadas como `siblings`.
-3. **Conciliação.**
-   - Consulta cadastral pela fonte configurada para o país, com limite de taxa. A consulta anterior é reaproveitada dentro de `maxAgeDays`.
-   - Erro de consulta vira pendência. HTTP 429 bloqueia aquela fonte pelo resto da execução.
-   - Situação cadastral não ativa e município divergente viram exceção.
-4. **Distância.**
-   - A distância sai sempre com a base declarada.
-   - Pelo centroide do município, aparece como **ESTIMADA**.
-   - Só a coordenada da unidade (ou o contorno do município) afirma se está dentro ou fora.
-5. **Qualificação** (`assess`). Separa:
-   - operação comprovada;
-   - uso/processamento da commodity;
-   - compra de terceiros;
-   - revenda/trading;
-   - restrição.
+### Painel (Rodadas)
 
-   Regras:
+1. **Nova rodada.** Preencha nome, commodity, origem (município + UF, ou código IBGE; fora do Brasil, a coordenada), raio e unidade, critério perto do limite, idioma, fuso e compliance. Em "Avançado", configure segmentos com regras de descoberta e fontes.
+2. **Antes de executar.** Confira o que é suportado, parcial ou sem suporte e registre ciência.
+3. **Área da rodada.** Confira os municípios inteiros e parciais e os que pedem conferência.
+4. **Candidatas.** Use "Descoberta automática: OpenStreetMap", "Importar" (SIPEAGRO, CSV ou JSON) ou "Pesquisa assistida".
+5. **Executar rodada.** Repita para continuar as consultas adiadas; a repetição não duplica nada.
+6. **Resultados.** Filtre por "Exceções e conferências", selecione e registre a decisão em lote.
+7. **Cadastrar no Compass.** Escolha o produto do catálogo e o modo. Opcionalmente, rode a triagem logo após. Nenhum contato, ficha ou envio é criado.
+8. **Exportar.** Baixe o JSON ou o relatório em markdown.
 
-   - Código de atividade e situação ativa são **indício**, nunca prova de uso.
-   - A aceitação da variedade fica sempre "não confirmada".
-   - Só entram canais publicados com fonte.
-6. **Classificação.** Cada estabelecimento recebe uma situação:
-   - `qualified_purchase`: uso e compra de terceiros comprovados;
-   - `qualified_use`: uso comprovado;
-   - `discovery`: evidência insuficiente;
-   - `exception`: precisa de análise;
-   - `separated`: revendedora ou trader;
-   - `outside`: fora do raio.
-
-   Só as exceções pedem atenção humana. São elas:
-
-   - conflito de restrição;
-   - cadastro não ativo;
-   - dados divergentes;
-   - unidade sem identificador;
-   - perto do limite;
-   - consulta cadastral pendente.
-7. **Relatório** (`relatorio-<id>.md`).
-   - Resumo por situação.
-   - Seção "Exceções para análise".
-   - Tabela por estabelecimento: distância rotulada, situação de cada prova ("comprovado" ou "indício") e pendências.
-8. **Reexecução.** Um arquivo de estado (`--estado`) guarda as entradas e a última consulta. Rodar de novo não duplica nada. Os contadores mostram novos, alterados e sem mudança.
-9. **Lote para cadastro** (`lote`).
-   - Modo `discovery`: inclui quem não é exceção, sem decisão individual. Exceções entram só com decisão `include`.
-   - Modo `accept`: só entra quem tem decisão `accept`, com `--por` (quem decidiu) e data.
-   - Ficam sempre de fora: unidade provisória, fora do raio e revendedora/trader.
-   - Cada empresa leva um `rastreio`: rodada, chave, situação, modo, decisão, quem decidiu, quando e pendências.
-   - Evidência só de fonte própria ou registro oficial com URL. Canal só de e-mail publicado em fonte própria.
-   - Sem pessoas, sem ligação de nível 0 e sem ficha.
-
-## Uso
+### Linha de comando
 
 ```sh
-node scripts/rodada.mjs validar docs/implementation/rodadas/exemplos/soja-rio-verde-150km.json
-node scripts/rodada.mjs executar <config.json> <candidatas.json> --municipios <municipios.csv|json> \
-     --estado <estado.json> --saida <pasta> [--rede]
-node scripts/rodada.mjs lote <pasta>/resultado-<id>.json --modo discovery --produto "<variante do catálogo>" --saida lote.json
-node scripts/cadastrar-lote-aceito.mjs lote.json            # simulação; nada é gravado
+node scripts/rodada.mjs validar <config.json>          # validação + limitações
+node scripts/rodada.mjs area <config.json>             # área pelo IBGE (sem CSV)
+node scripts/rodada.mjs executar <config.json> [candidatas.json] [--importar x.csv] [--sipeagro arquivo.csv] [--osm] [--rede] \
+     --estado estado.json --saida pasta
+node scripts/rodada.mjs lote pasta/resultado-<id>.json --modo discovery --produto "<variante>"
+node scripts/rodada.mjs adaptar-candidatas docs/.../candidatas.csv --saida nova.json
+node scripts/rodada.mjs adaptar-lote docs/.../cadastro-lote-aceito.json --produto "Milho GMO" --saida novo.json
 ```
 
-- **`--rede`:** consulta as fontes cadastrais configuradas, com o limite de taxa da configuração. Sem `--rede`, a consulta vira pendência e a unidade fica como exceção.
-- **CSV de municípios:** separado por `;`, com as colunas `ibge_code|code|codigo`, `municipio|name|nome`, `uf|region|estado`, `lat` e `lon`.
+## Configuração
 
-## O que continua igual (portões existentes)
+O bloco `commodity.segments.<segmento>.discovery` define o que cada fonte procura:
 
-Esta generalização não altera:
+- `osm`: lista de `[chave, valor]` ou `[chave, "~regex"]`;
+- `sipeagro`: `{ activity: [...], classification: [...] }`.
 
-- aprovação de ficha;
-- autorização de despesa;
-- validação T11;
-- liberação de envio;
-- canais `planned`;
-- campanhas inativas;
-- cópia desligada;
-- L1 e L4 pendentes.
+Fontes do catálogo:
 
-Ela não autoriza contato nem consumo de créditos.
+| Fonte | Papel | Modo |
+|---|---|---|
+| `br-cnpj-ws` | cadastro | automática |
+| `osm-overpass` | descoberta | automática |
+| `mapa-sipeagro` | descoberta | importação |
+| `casadosdados` | descoberta | paga, bloqueada |
+| `import-file` | descoberta | importação |
+| `assisted` | descoberta | pesquisa assistida |
 
-Um lote `accept` registra quem aceitou o cadastro. Esse registro não aprova ficha nem envio.
+Uma fonte fora do catálogo aparece como "sem suporte".
 
-## Lacunas restantes
+Exemplos validados:
 
-1. **Fontes cadastrais.** Só o Brasil tem fonte cadastral implementada (`br-cnpj-ws`, publica.cnpj.ws, 3 consultas por minuto). Outros países ficam com pendência explícita até haver fonte e regra de identificador (`ID_RULES`). O caso da Alemanha, por exemplo, depende do Handelsregister/Impressum, que já está em `FONTES-EMPRESAS-EXTERIOR.md`, mas ainda não ligado ao fluxo.
-2. **Municípios.** Cada país e cada raio precisam de um conjunto com centroides e, de preferência, contorno (bbox). Hoje só existe o CSV do piloto (300 km de Indiara). Uma rodada com origem fora dessa área precisa de um conjunto novo; não há conjunto nacional versionado.
-3. **Coleta de candidatas.** Continua manual ou assistida. O fluxo começa de um JSON de candidatas. A busca por fonte (SIPEAGRO, diretórios, sites) não está automatizada.
-4. **Triagem de sanções.** Continua no Compass (`POST /screening`, opção `--triagem` no cadastro). A rodada não roda a triagem antes do cadastro. A validade das listas (720 h) é checada pelo Compass, não pela rodada.
-5. **Regras por país e segmento.** `countryRules` e `segments` só registram a ausência como pendência. Não há regras de qualificação específicas por segmento além do rótulo.
-6. **Lote histórico de 06/10.** `descoberta-milho-indiara/cadastro-lote-aceito.json` não declara `produto`. Como o script não tem mais produto padrão, reaplicá-lo agora falha com mensagem explícita, em vez de usar "Milho GMO" em silêncio. O arquivo não foi alterado porque é registro real do piloto.
-7. **Integração com a interface do Compass.** O fluxo roda por linha de comando. A revisão em lote pela interface, com decisões por empresa, não foi implementada; as decisões entram por arquivo (`--decisoes`).
+| Arquivo | Commodity | Origem | Raio |
+|---|---|---|---|
+| `exemplos/milho-gmo-indiara-300km.json` | milho GMO | Indiara/GO | 300 km |
+| `exemplos/soja-rio-verde-150km.json` | soja | Rio Verde/GO | 150 km (margem fixa) |
+| `exemplos/sorgo-uberlandia-300mi.json` | sorgo | Uberlândia/MG | 300 mi |
+| `exemplos/cafe-verde-hamburgo-200km.json` | café verde | Hamburgo, DE (coordenada) | 200 km |
+
+## Banco (migração 0044, só local)
+
+| Tabela | Conteúdo |
+|---|---|
+| `discovery_rounds` | Configuração, revisão, limitações, ciência e última execução |
+| `round_candidates` | Candidata, modo de entrada, fonte e hash (único por rodada) |
+| `round_establishments` | Estado e resultado por estabelecimento; marca de revisão |
+| `round_decisions` | Histórico de decisões com foto do resultado; a decisão nova substitui sem apagar |
+| `round_registrations` | Cadastro feito, empresa, modo, decisão que autorizou e rastreio |
+| `round_source_calls` | Chamadas às fontes externas (limite de taxa e auditoria) |
 
 ## Testes
 
-Arquivo: `tests/rodada-fluxo.test.mjs`. São 12 testes, todos locais, sem rede e sem API. Fontes e relógio são falsos.
+- `tests/rodada-fluxo.test.mjs`: 12 testes.
+- `tests/rodada-fontes.test.mjs`: 8 testes.
+- `tests/rodadas-worker.test.mjs`: 2 testes, com o fluxo completo pelo Worker e banco em memória com todas as migrações.
 
-| Tema | O que o teste verifica |
-|---|---|
-| Configuração | Piloto com perto do limite em 270 km derivado do raio. Soja com margem de 15 km. Sorgo em milhas. Alemanha válida. Vários erros listados juntos. Nenhum valor do piloto no código. |
-| Distância | Raios de 100 e 500 km, centroide ESTIMADA, coordenada da unidade decide fora, contorno dentro/fora, sem coordenada → desconhecida. |
-| Piloto como configuração | Abadiânia a 173,8 km (estimada). Origem em outro estado (Uberlândia/MG) resolvida pelo mesmo código. |
-| Estabelecimentos | CNPJ formatado igual ao CNPJ só com dígitos. Filiais separadas. Unidade sem CNPJ e CNPJ incompleto são provisórios. |
-| Qualificação | Código de atividade e diretório são indício. Fonte própria comprova. Revenda e trader separados. Restrição não transgênica conflita com milho GMO, mas não com soja. Segmento sem regra vira pendência. Canal sem fonte é descartado. |
-| Limite de taxa | 3 por minuto = 20 s entre consultas. |
-| Lote com pendências parciais | Erro 500 e 429 não param a rodada. Depois do 429, a fonte não é mais chamada. |
-| Reexecução | Mesma entrada não cria nada. Nova candidata entra. Evidência nova conta como alteração. Estabelecimento que só está no estado mantém nome e município (bug encontrado pelo teste e corrigido). |
-| Exceções | Cadastro suspenso. Município divergente. Doverlândia a 271,8 km perto do limite em 300 km, mas não em 500 km. Unidade sem CNPJ. |
-| Internacional | Alemanha, origem por coordenada, sem fonte cadastral → pendência explícita, idioma `en`. |
-| Relatório | ESTIMADA, seção de exceções, "indício" em vez de "comprovado". |
-| Lote | Produto obrigatório. `discovery` sem exceções. `accept` com decisor e rastreio. Evidência e canal filtrados. Sem nível 0. |
+O teste pelo Worker usa uma configuração fora do piloto: soja, Rio Verde, 150 km. Ele percorre:
 
-Suíte completa (`npm run check`, 15/10/2026): **484 + 2 + 37 testes, 0 falhas**.
+- os três modos de entrada;
+- a conciliação SIPEAGRO × CSV;
+- erro 500, unidade suspensa e consultas adiadas pelo limite;
+- três execuções e uma reimportação sem duplicidade;
+- decisões com histórico;
+- cadastro em descoberta em duas partes, com **3 empresas criadas**;
+- o bloqueio por triagem de sanções;
+- exportação, conflito de edição e a garantia de que os arquivos reais do piloto ficam intactos (o teste compara o SHA-256 antes e depois).
 
-Também foi feito um teste da linha de comando sem rede, com saída na pasta temporária da sessão:
+Há também um teste de tela opcional, fora do `npm run check`: `node tests/ui-rodadas.mjs [captura.png]`. Ele roda no Chrome headless, com o Worker local e a Receita simulada, e cobre:
 
-- `executar` duas vezes: na primeira, 2 novos; na segunda, 2 sem mudança;
-- `lote`: 0 empresas, porque sem `--rede` ambas ficam como exceção;
-- `cadastrar-lote-aceito.mjs`: simulação, nada gravado.
+- criar a rodada, ver a área e as limitações, ser recusado sem ciência e registrar a ciência;
+- importar arquivo e registrar uma candidata por pesquisa assistida;
+- executar, decidir em lote e cadastrar;
+- largura de celular sem rolagem horizontal e ausência de erro de JavaScript.

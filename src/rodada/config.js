@@ -71,13 +71,21 @@ export function validateRoundConfig(cfg) {
       commodity: { nameHints: [], restrictionHints: [], segments: {}, ...c },
       buyer: { uses: [], separate: ["reseller", "trader"], ...b },
       radius: { value: r.value, unit, method, km: radiusKm },
-      // Faixa "perto do limite": [raio − margem, raio]. Fora do raio é outra situação ("fora").
-      nearLimit: { ...nl, km: nearKm, fromKm: radiusKm - nearKm },
+      // Faixa "perto do limite": [raio − margem, raio]. Gera CONFERÊNCIA da localização, nunca exclusão automática.
+      // Fora do raio é outra situação ("fora").
+      nearLimit: { ...nl, km: nearKm, fromKm: radiusKm - nearKm, effect: "review", criterion: nearLimitCriterion(nl, r.value, unit) },
       priorities: { size: [], segments: [], ...p },
       evidence: { confirming, ...ev },
       compliance: { sanctionsMaxAgeHours: 720, ...comp },
     },
   };
+}
+
+// Critério explícito, para relatório e painel: proporcional (fração do raio) ou margem fixa.
+function nearLimitCriterion(nl, radius, unit) {
+  const fmt = (x) => (Math.round(x * 10) / 10).toLocaleString("pt-BR");
+  if (isNum(nl.fraction)) return `proporcional: últimos ${fmt(nl.fraction * 100)}% do raio (de ${fmt(radius * (1 - nl.fraction))} a ${fmt(radius)} ${unit}); gera conferência, não exclusão`;
+  return `margem fixa: últimos ${fmt(nl.distance)} ${unit} do raio (de ${fmt(radius - nl.distance)} a ${fmt(radius)} ${unit}); gera conferência, não exclusão`;
 }
 
 // Distância na unidade da rodada (para exibir como a configuração pediu).

@@ -5,27 +5,169 @@
     "code": "corn",
     "label": "milho",
     "variety": "GMO",
-    "spec": { "form": "grão" },
-    "nameHints": ["MILHO", "MILHAO", "CORN", "FUBA", "CANJIC"],
-    "restrictionHints": ["n[ãa]o[- ]?transg[eê]nic", "non[- ]?gmo", "livre de transg"],
+    "spec": {
+      "form": "grão"
+    },
+    "nameHints": [
+      "MILHO",
+      "MILHAO",
+      "CORN",
+      "FUBA",
+      "CANJIC"
+    ],
+    "restrictionHints": [
+      "n[ãa]o[- ]?transg[eê]nic",
+      "non[- ]?gmo",
+      "livre de transg"
+    ],
     "segments": {
-      "feed_mill": { "label": "fábrica de ração" },
-      "cooperative_feed": { "label": "cooperativa com fabricação própria" },
-      "poultry_swine_integration": { "label": "integração de aves e suínos" },
-      "feedlot": { "label": "confinamento" },
-      "ethanol": { "label": "etanol de milho" }
+      "feed_mill": {
+        "label": "fábrica de ração",
+        "discovery": {
+          "osm": [
+            [
+              "industrial",
+              "feed"
+            ],
+            [
+              "product",
+              "~ração|racao|animal feed"
+            ]
+          ],
+          "sipeagro": {
+            "activity": [
+              "FABRICANTE"
+            ],
+            "classification": [
+              "RAÇÃO",
+              "CONCENTRADO",
+              "NÚCLEO",
+              "SUPLEMENTO",
+              "ALIMENTO"
+            ]
+          }
+        }
+      },
+      "cooperative_feed": {
+        "label": "cooperativa com fabricação própria"
+      },
+      "poultry_swine_integration": {
+        "label": "integração de aves e suínos",
+        "discovery": {
+          "osm": [
+            [
+              "industrial",
+              "slaughterhouse"
+            ]
+          ]
+        }
+      },
+      "feedlot": {
+        "label": "confinamento"
+      },
+      "ethanol": {
+        "label": "etanol de milho",
+        "discovery": {
+          "osm": [
+            [
+              "product",
+              "~etanol|ethanol"
+            ]
+          ]
+        }
+      }
     }
   },
-  "buyer": { "roles": ["final_consumer", "processor"], "uses": ["ração", "etanol", "moagem", "confinamento"], "separate": ["reseller", "trader"] },
-  "origin": { "country": "BR", "region": "GO", "municipality": "Indiara", "municipalityCode": "5209952" },
-  "radius": { "value": 300, "unit": "km", "method": "haversine" },
-  "nearLimit": { "fraction": 0.1 },
-  "priorities": { "size": ["medium", "small", "unknown", "large", "micro"], "segments": ["feed_mill", "cooperative_feed", "poultry_swine_integration", "feedlot", "ethanol"] },
+  "buyer": {
+    "roles": [
+      "final_consumer",
+      "processor"
+    ],
+    "uses": [
+      "ração",
+      "etanol",
+      "moagem",
+      "confinamento"
+    ],
+    "separate": [
+      "reseller",
+      "trader"
+    ]
+  },
+  "origin": {
+    "country": "BR",
+    "region": "GO",
+    "municipality": "Indiara",
+    "municipalityCode": "5209952"
+  },
+  "radius": {
+    "value": 300,
+    "unit": "km",
+    "method": "haversine"
+  },
+  "nearLimit": {
+    "fraction": 0.1
+  },
+  "priorities": {
+    "size": [
+      "medium",
+      "small",
+      "unknown",
+      "large",
+      "micro"
+    ],
+    "segments": [
+      "feed_mill",
+      "cooperative_feed",
+      "poultry_swine_integration",
+      "feedlot",
+      "ethanol"
+    ]
+  },
   "sources": [
-    { "id": "br-cnpj-ws", "kind": "registry", "countries": ["BR"], "rateLimitPerMinute": 3, "maxAgeDays": 30 },
-    { "id": "mapa-sipeagro", "kind": "list", "countries": ["BR"] }
+    {
+      "id": "br-cnpj-ws",
+      "kind": "registry",
+      "countries": [
+        "BR"
+      ],
+      "rateLimitPerMinute": 3,
+      "maxAgeDays": 30
+    },
+    {
+      "id": "osm-overpass",
+      "kind": "discovery",
+      "countries": [
+        "*"
+      ]
+    },
+    {
+      "id": "mapa-sipeagro",
+      "kind": "discovery",
+      "countries": [
+        "BR"
+      ]
+    },
+    {
+      "id": "casadosdados",
+      "kind": "discovery",
+      "countries": [
+        "BR"
+      ]
+    }
   ],
-  "evidence": { "confirming": ["own_source", "official_record"] },
-  "locale": { "language": "pt-BR", "timezone": "America/Sao_Paulo" },
-  "compliance": { "scope": "br_email_automatic", "sanctionsMaxAgeHours": 720 }
+  "evidence": {
+    "confirming": [
+      "own_source",
+      "official_record"
+    ]
+  },
+  "locale": {
+    "language": "pt-BR",
+    "timezone": "America/Sao_Paulo"
+  },
+  "compliance": {
+    "scope": "br_email_automatic",
+    "sanctionsMaxAgeHours": 720
+  }
 }
