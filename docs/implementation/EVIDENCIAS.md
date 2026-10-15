@@ -2491,3 +2491,27 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - 30.876.835 bytes, SHA-256 `d36512526a9420a21d7955adbff04340d62608870565bd672c170f64f6601259` (igual ao registro);
   - carregado num banco só em memória: `integrity_check` ok, 0 violações de chave estrangeira, 87 tabelas, última migração `0041`, 13 fichas, 29 versões, 28 envios.
 - Alteração só documental; a suíte não foi rodada.
+
+## T11 do piloto brasileiro e horário da cópia (2026-10-15; nada publicado)
+
+- **Cloudflare:** envio da consulta informado por Rogério; aguardando resposta. Mecanismo não comprovado.
+- **Incidentes:**
+  - procedimento para aprovação (`REGISTRO-INCIDENTES-PROCEDIMENTO.md`);
+  - rascunho fora do Git, com acesso só de `ROGERIONOTE\Roger`;
+  - evento de 09/10 "em avaliação", sem classificação.
+- **OpenClaw:** rascunho da declaração (`DECLARACAO-OPENCLAW-RASCUNHO.md`).
+  - Conferido em produção: 0 importações do OpenClaw; 3 supressões (link e resposta do teste de 01/10, manual da exclusão de 08/10).
+- **Evidências T11:** `t11-evidencias/INDICE.md`.
+  - SHA-256 conferidos contra o Git no commit `ad858f3`: `decisions` `2335da59…d184`, `legal_basis` `2eb23810…08f6`, `erasure_test` `7a497e3e…0dc`.
+  - Faltam `transfer_mechanism` e `incident_register`.
+- **Horário da cópia (commit `e60b328`):**
+  - migração 0043 (`send_outbox.smtp_accepted_at`);
+  - ponte 0.2.1 grava o instante do SMTP no diário antes de qualquer chamada de rede e o informa no resultado e na recuperação;
+  - o Compass valida o horário (não no futuro, até 30 dias) e mantém `accepted_at` como registro;
+  - a cópia diz "aceito pelo servidor de envio em … (aceite registrado no Compass em …)" ou, sem o horário SMTP, só o registro, sem apresentá-lo como envio.
+  - Testes: aceite normal; queda depois do SMTP com o relógio 95 s adiante (instante original preservado, sem reenvio, uma cópia); ponte antiga; aceite achado só nos enviados (sem horário inventado); horário no futuro ignorado; diário antigo migrado sem perda. `npm run check`: 472 + 2 + 37, 0 falhas.
+  - Publicação futura exige aplicar a 0043, publicar o Worker e atualizar a ponte para 0.2.1. A ponte em produção (0.2.0) continua funcionando: sem o horário, a cópia mostra só o registro.
+- **Piloto:**
+  - 3 fichas brasileiras na v4, 0 aprovações;
+  - relação para o CRM da EAG entregue no relatório (razão social, nome fantasia, CNPJ, unidade e município, das fontes do lote aceito);
+  - Snov não usado.
