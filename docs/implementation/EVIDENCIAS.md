@@ -2555,3 +2555,18 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Drive de `rogeriopalhari23@gmail.com`: nenhum `.7z`, nenhum título com `eagc` ou `verificacao`.
 - **Nada verificado:** relatório, SHA-256 e correspondência com o Drive. A evidência `incident_register` continua incompleta; o local da senha continua pendente.
 - **Hipótese principal:** os arquivos estão em outro computador ou em outra conta Google; o Compass e o Claude rodam em `ROGERIONOTE`.
+
+## Cópia cifrada do registro de incidentes: verificada (2026-10-15)
+
+- **Local:**
+  - `C:\Users\Roger\eag-compass-registros\copia-cifrada\eagc-ri-20261015T0307Z.7z`, 2.655 bytes, SHA-256 `409b7fcaf0a27786f6b8c9e0fae35f40e0f82db142c24c8607c9c2fca7eab8be`, igual ao registrado no relatório;
+  - relatório `verificacao-20261015T0307Z.txt` (03:07:33Z): criar, testar e recuperar com código 0, "CÓPIA VERIFICADA";
+  - SHA-256 recuperados iguais aos originais e aos arquivos atuais (registro `4363ebd9…791b`, índice `04ceb868…3db5`).
+  - A abertura e a recuperação foram feitas por Rogério com a senha dele; Claude conferiu o relatório e os hashes, sem decifrar.
+- **Drive** (só leitura): `eagc-ri-20261015T0307Z.7z`, ID `1qkTlcIhfNSzhyOYILcyAJmjyTn8OTszq`, 2.655 bytes, enviado em 03:13:01Z.
+  - Conteúdo cifrado baixado: bytes idênticos ao local (`cmp`), mesmo SHA-256;
+  - permissão só do dono (`rogeriopalhari23@gmail.com`);
+  - cópia temporária apagada; nada no Git.
+- **Pendente:** local da senha (Rogério). Evidência `incident_register` incompleta só por isso.
+- **Continuam pendentes:** Cloudflare (aguardando resposta) e declaração do OpenClaw.
+- **Não feito:** validação T11, aprovação de fichas, liberação de envios.
