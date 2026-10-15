@@ -252,3 +252,23 @@ test("Bloqueios preservados: modelo aprovado não dispensa T11 fora do teste int
   assert.equal((await approve()).data.error.code, "t11_pending", "sem validação ar_email_automatic");
   assert.equal(languageForCountry("BR").language, "pt-BR");
 });
+
+test("Migração 0042: classifica só o rótulo exato gerado pela rota de canais; rótulo livre com 'site' fica sem tipo", async (t) => {
+  const { readFileSync } = await import("node:fs");
+  const ctx = setup();
+  t.after(ctx.close);
+  const db = ctx.DB.raw;
+  db.exec("UPDATE contacts SET source_kind=NULL");
+  const co = (await ctx.api("/api/companies", "POST", { legalName: "Empresa Migração Ltda.", countryCode: "BR", registrationId: "11222333000181", registrationIdType: "CNPJ", sourceLabel: "teste" })).data.id;
+  const add = (id, kind, label, url) => db.prepare("INSERT INTO contacts(id,tenant_id,company_id,source_label,source_url,created_by,prospect_role,contact_kind) VALUES (?,?,?,?,?,'system-admin','other',?)").run(id, "eag-internal", co, label, url, kind);
+  add("m1", "company_channel", "Canal geral publicado no site da empresa (site) — verificado em 2026-10-08", "https://cimilho.com.br/");
+  add("m2", "company_channel", "Canal geral publicado em diretório (diretório) — verificado em 2026-10-08", "https://www.kompass.com/x");
+  add("m3", "company_channel", "E-mail de Compras publicado no site da indústria", "https://x.example/");
+  add("m4", "company_channel", "Canal geral publicado no site da empresa (site) — verificado em 2026-10-08", null);
+  add("m5", "person", "Canal geral publicado no site da empresa (site) — verificado em 2026-10-08", "https://y.example/");
+  const sql = readFileSync(new URL("../migrations/0042_tipo_fonte_canal.sql", import.meta.url), "utf8");
+  assert.doesNotMatch(sql.replace(/--.*$/gm, ""), /\bLIKE\b/i, "D1 recusa LIKE com padrão longo");
+  for (const stmt of sql.split(";").map((s) => s.replace(/^\s*--.*$/gm, "").trim()).filter((s) => /^UPDATE/i.test(s))) db.exec(stmt);
+  const kind = (id) => db.prepare("SELECT source_kind k FROM contacts WHERE id=?").get(id).k;
+  assert.deepEqual(["m1", "m2", "m3", "m4", "m5"].map(kind), ["company_site", "directory", null, null, null]);
+});
