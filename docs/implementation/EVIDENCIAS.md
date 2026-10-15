@@ -2439,3 +2439,41 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - nenhuma ficha internacional gerada;
   - T11 pendente, nada enviado;
   - ponte não alterada.
+
+## Publicação dos idiomas da identificação e migração 0042 (2026-10-14/15, autorizada por Rogério)
+
+- **Commit publicado:** `75c3d1255da98a85686f15d50cb4e0d8e5d79a9f`.
+  - Inclui, desde o código em produção (`f34a14c`): idiomas da identificação, rodapé pelo tipo de fonte, descadastro em espanhol, página trilíngue, migração 0042 e testes.
+  - Não inclui nenhum arquivo da ponte, nenhum texto de reunião e nenhuma alteração do painel.
+- **Antes:**
+  - Worker vigente `22ec08e9-9a4d-4abb-ae9c-c98ae83db56b`;
+  - Time Travel `00000800-00000740-00005105-e64033e22ac1dd6b67cfccc9081a9f98` (02:04 UTC de 15/10);
+  - backup privado `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0042-20261014\eag_compass.sql`: 30.876.835 bytes, SHA-256 `d36512526a9420a21d7955adbff04340d62608870565bd672c170f64f6601259`, acesso só de `ROGERIONOTE\Roger`.
+- **Pendências:** só a `0042_tipo_fonte_canal.sql`.
+- **Primeira tentativa de aplicação (02:06 UTC) recusada pelo D1:** "LIKE or GLOB pattern too complex".
+  - Nada foi aplicado: a 0042 continuou pendente, a coluna não existia e o estado ficou igual.
+  - Correção no commit `75c3d12`: a mesma regra (só o rótulo exato gerado pela rota de canais), comparando o início do rótulo sem `LIKE`, e um teste novo que roda os comandos da migração contra rótulos reais e livres.
+  - Antes de reaplicar, o filtro foi rodado como consulta só de leitura em produção: os 6 canais previstos como site.
+- **Migração aplicada** (02:09 UTC, 4 comandos):
+  - os 6 canais gerais classificados `company_site`, cada URL de fonte registrada no domínio da própria empresa: cimilho.com.br, reidomilho.com.br, saomartinho.com.br, 24grad.net, amori.coffee, blackandyum.de;
+  - 0 pessoas classificadas;
+  - "No migrations to apply" depois.
+- **Publicação:** `npm run deploy` (02:12 UTC), com o predeploy completo: `check` **472 + 2 + 32**, 0 falhas (envios só com transportes simulados, sem mensagem externa), e `validate-deploy` ok.
+  - Worker **`abdabdc2-85af-437f-8f2a-98f51cc05ea4`**.
+  - **Reversão do código:** `wrangler rollback 22ec08e9-9a4d-4abb-ae9c-c98ae83db56b`. Esse código é compatível com a 0042: a suíte do código em produção com a 0042 passou com 461 + 2 + 32.
+  - Nunca `64808403`. Banco: Time Travel e backup só para desastre.
+- **Conferido em produção depois:**
+  - **Fichas brasileiras:** Cimilho, São Martinho e Rei do Milho na v4 (`id-pt-1.4.0`), nenhuma v5, 0 aprovações, `in_approval`. A API devolve as duas saudações, sem marcador.
+  - **Fichas alemãs:** 3 na v2 (`id-de-1.1.0`), sem alteração.
+  - **Página de descadastro:** link inválido de conferência → 404 com as três frases (português, espanhol, inglês). Nenhum token real usado; supressões continuam 3.
+  - **Modelos em espanhol e inglês:** 0 parâmetros `ident_templates_approved` (rascunhos).
+  - **T11:** `pending`, histórico vazio.
+  - **Canais e campanhas:** canais `planned`; campanhas 2 `draft` + 1 `ended`.
+  - **Cópia:** `{"enabled":false}`.
+  - **Envios:** `send_outbox` 28, nenhum pendente, último de 21:12 UTC de 14/10; foto igual à de antes.
+  - **Ponte** (não alterada): leituras bem-sucedidas às 02:10:24, 02:11:41 e 02:12:53 UTC.
+- **Pendências preservadas:** L1 e L4 (Spec §6.0.1).
+- **Não feito:** fichas internacionais, mudança nas fichas alemãs, aprovação de modelos ou fichas, validação T11, envio.
+- **Regra D1, só a lista, nada excluído:** com a 0042 aplicada e conferida, fica elegível `d1-remoto-antes-0041-20261014\eag_compass.sql` (30.725.811 bytes, SHA-256 `9bc71f3f5956226327240a8b64ad6b8072ba310edf69fd55fd320748e5c702a5`).
+  - Fica o backup vigente `d1-remoto-antes-0042-20261014`.
+  - As cópias da ponte e os segredos estão fora da regra.
