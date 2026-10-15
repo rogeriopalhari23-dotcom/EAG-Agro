@@ -2600,3 +2600,19 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - base desconhecida; contatos e supressões não confirmados; busca de alcance limitado; sem extensão a outras empresas, contas ou canais; supressões válidas e oposição futura aplicada antes de novo contato.
   - Não é recuperação nem importação.
 - **Continua:** T11 não registrada, Cloudflare pendente, fichas sem aprovação, envios não liberados.
+
+## Descoberta e qualificação, rodada de 15/10/2026 (milho GMO, Indiara, 300 km; sem contato)
+
+- **Candidatas:** 11 sem qualificação aprofundada (10 no pedido mais 1 excluída), em `descoberta-milho-indiara/QUALIFICACAO-RODADA-2026-10-15.md`.
+- **Fontes:**
+  - Receita via `publica.cnpj.ws` (3 consultas por minuto; a BrasilAPI respondeu 500 e não foi usada);
+  - sites próprios;
+  - imprensa com data;
+  - diretórios marcados como indício.
+- **Melhor evidência de compra:** **Usina Rio Verde (DECAL)**, 02.043.917/0001-07, 129,2 km (centroide).
+  - O site próprio diz "Compramos milho de agricultores da região"; capacidade de 1.000 t de milho por dia [JornalCana, 11/12/2025]; WhatsApp comercial publicado.
+  - GMO não confirmado. Recuperação judicial de 2015, com situação atual não verificada.
+- **Compra comprovada, mas com restrição:** Milhão Ingredients é não transgênica desde 2006, com certificações [TheAgriBiz, 15/02/2024]; não recomendada para GMO.
+- **Mantidas em descoberta, com evidência insuficiente:** 8 candidatas (LF, Camaru, Casa do Milho, Extrafort, Multigrãos, Rações 2 Irmãos, Ração da Fazenda, Rações Garantido).
+- **Excluída:** Rações Ipê, suspensa na Receita.
+- **Não feito:** contato, Snov, e-mails deduzidos, aceite, cadastro, fichas, T11, canais ou campanhas.
