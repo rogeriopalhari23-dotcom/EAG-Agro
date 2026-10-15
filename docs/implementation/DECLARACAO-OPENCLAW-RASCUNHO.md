@@ -68,3 +68,40 @@ O desconhecimento **não** é tratado como ausência de contatos ou de supressõ
 - **(a) Caixa de e-mail que o OpenClaw usava.** O executor enviava por SMTP próprio, com relatório padrão para `rogeriopalhari@eagagro.com`. Uma busca só de leitura nas pastas Enviados e Entrada dessa caixa, até 24/09/2026, pelos domínios `cimilho.com.br`, `reidomilho.com.br` e `saomartinho.com.br` e por respostas de descadastro, respondem os itens 2 e 3 **para essa caixa**. Exige autorização de Rogério; a ponte já tem acesso de leitura a ela.
 - **(b) Painel da Hostinger.** Ver se a VPS `2.24.78.149` (`srv1644560`) aparece em alguma conta Hostinger de Rogério e se há backup ou snapshot anterior a 24/09/2026. Isso responde o item 1. Se aparecer, conferir a impressão `SHA256:zA4NvA5n8KMmxOVbyKdsgYdRn1I4LQjFREnM6y/1JX8` no terminal do navegador antes de qualquer leitura. Só Rogério pode entrar no painel.
 - Se (b) mostrar que a VPS não está em conta de Rogério, a situação da base fica desconhecida de forma definitiva para ele. Registrar a exceção mesmo assim, com essa incerteza declarada, seria decisão de Rogério, não presumida.
+
+## 6. Busca só de leitura na caixa `rogeriopalhari@eagagro.com` (autorizada por Rogério; feita em 15/10/2026)
+
+- **Método:**
+  - IMAP com cada pasta aberta em modo somente leitura (`EXAMINE`, `readOnly: true` confirmado em todas);
+  - lidos só envelopes e datas, sem corpo e sem marcar mensagens;
+  - senha decifrada só na memória do processo, nunca exibida.
+- **Período buscado:** até 24/09/2026, inclusive (troca da VPS observada em 24/09).
+- **Critérios:**
+  - mensagens de, para ou com cópia a `cimilho.com.br`, `reidomilho.com.br` e `saomartinho.com.br`;
+  - os nomes "Cimilho", "Rei do Milho" e "São Martinho" no assunto ou no texto;
+  - termos de descadastro (descadastr…, unsubscribe, opt-out, "sair da lista", "não quero/desejo receber", "parar de receber" etc.).
+- **Alcance da caixa** (data da mensagem mais antiga existente):
+  - Entrada desde 30/11/2025 (135 mensagens);
+  - Enviados desde 30/01/2026 (77);
+  - Lixeira desde 14/09/2026 (154);
+  - Spam desde 30/09/2026 (8);
+  - Rascunhos vazia.
+
+**Resultado:**
+- **Item 2, contatos com as três empresas:** nenhuma mensagem de, para ou com cópia aos três domínios. Nenhuma menção aos três nomes no assunto ou no texto.
+- **Item 3, pedidos de descadastro ou de não contato:** nenhum pedido vindo de empresa prospectada. As ocorrências de "unsubscribe" e "opt-out" são rodapés de mensagens recebidas de serviços (LinkedIn, Apollo, HubSpot).
+- **Achado sem relação com as três empresas:** 6 mensagens enviadas de `eagagro.com` em 09/05/2026 (20:29–20:46 UTC), guardadas na Entrada, para empresas do exterior: `s.alamgroupbd.com`, `cofco.com`, `isecindia.com`, `dhampur.com`, `dcmsr.com` e `sugarlabinta.com`.
+  - Têm rodapé com "unsubscribe", o que é compatível com prospecção.
+  - A origem (OpenClaw, outra ferramenta ou envio manual) **não** foi identificada. Os corpos não foram lidos.
+  - Não são do piloto brasileiro; ficam registradas para quando houver prospecção nesses países.
+
+**Limites (o que esta busca NÃO prova):**
+- Mensagens apagadas e já eliminadas da Lixeira, e Enviados anteriores a 30/01/2026, não existem mais na caixa e não foram vistos.
+- Se o OpenClaw usou outra conta de SMTP (`SMTP_FROM` do servidor não lido), outra caixa ou outro canal (LinkedIn, WhatsApp, telefone), isso não aparece aqui.
+- O item 1 (base no servidor) continua desconhecido. Só o painel da Hostinger responde.
+
+**Situação para a opção B:**
+- Itens 2 e 3 têm agora um **fato verificado com alcance limitado**: na caixa `rogeriopalhari@eagagro.com`, nos períodos acima, nenhum contato com as três empresas e nenhum pedido de descadastro de prospect.
+- O item 1 continua **desconhecido**.
+- A declaração B pressupõe "base não recuperável", e esse fato não está estabelecido. Registrar a exceção com o item 1 desconhecido e o alcance limitado dos itens 2 e 3 é decisão de Rogério.
+- Alternativa: verificar o painel da Hostinger antes.

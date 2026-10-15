@@ -2577,3 +2577,12 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **`incident_register`:** concluída no escopo do procedimento aprovado: procedimento, estrutura fora do Git, entrada 1 (classificação pendente de avaliação), cópia `eagc-ri-20261015T0307Z.7z` verificada (local e Drive idênticos, privada) e local da senha.
 - **Evidências T11:** 4 de 5. Falta `transfer_mechanism` (Cloudflare, aguardando resposta). A declaração do OpenClaw continua pendente.
 - Alteração só documental; a suíte não foi rodada. Validação T11 não registrada.
+
+## OpenClaw: busca só de leitura na caixa de e-mail (2026-10-15, autorizada por Rogério)
+
+- Pastas Entrada, Enviados, Lixeira, Spam e Rascunhos abertas em modo somente leitura; só envelopes e datas.
+- Até 24/09/2026: nenhum contato com `cimilho.com.br`, `reidomilho.com.br` ou `saomartinho.com.br`, nem menção aos nomes; nenhum pedido de descadastro de prospect.
+- Alcance: Entrada desde 30/11/2025, Enviados desde 30/01/2026, Lixeira desde 14/09/2026.
+- Achado: 6 envios de `eagagro.com` a empresas do exterior em 09/05/2026, com origem não identificada e sem relação com o piloto brasileiro.
+- Detalhe e limites em `DECLARACAO-OPENCLAW-RASCUNHO.md` §6. O item 1 (base no servidor) continua desconhecido.
+- A declaração B continua sem registro na Spec. Nenhum envio liberado; validação T11 não registrada.
