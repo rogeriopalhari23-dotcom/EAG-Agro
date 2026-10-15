@@ -1,6 +1,6 @@
-# Declaração do OpenClaw B: rascunho com fatos comprovados (2026-10-15)
+# Declaração do OpenClaw e exceção operacional com incertezas conhecidas (2026-10-15)
 
-**Situação:** rascunho. Não é declaração de Rogério e não entra na Spec antes de ele completar e confirmar.
+**Situação (15/10/2026):** os três itens da declaração da opção B ficaram sem resposta confirmada (§5). Rogério autorizou, em vez dela, uma **exceção operacional com incertezas conhecidas**, só para as três empresas do piloto (§7), registrada na Spec. Os §§1–3 ficam como histórico do rascunho.
 
 **Para quê:** R21.8 e R25.2 pedem importar as supressões do executor antigo (OpenClaw) ou registrar uma exceção datada. Rogério escolheu a opção B (exceção datada) em 09/10/2026.
 
@@ -69,39 +69,69 @@ O desconhecimento **não** é tratado como ausência de contatos ou de supressõ
 - **(b) Painel da Hostinger.** Ver se a VPS `2.24.78.149` (`srv1644560`) aparece em alguma conta Hostinger de Rogério e se há backup ou snapshot anterior a 24/09/2026. Isso responde o item 1. Se aparecer, conferir a impressão `SHA256:zA4NvA5n8KMmxOVbyKdsgYdRn1I4LQjFREnM6y/1JX8` no terminal do navegador antes de qualquer leitura. Só Rogério pode entrar no painel.
 - Se (b) mostrar que a VPS não está em conta de Rogério, a situação da base fica desconhecida de forma definitiva para ele. Registrar a exceção mesmo assim, com essa incerteza declarada, seria decisão de Rogério, não presumida.
 
-## 6. Busca só de leitura na caixa `rogeriopalhari@eagagro.com` (autorizada por Rogério; feita em 15/10/2026)
+## 6. Busca só de leitura na caixa `rogeriopalhari@eagagro.com` (autorizada por Rogério; feita em 15/10/2026; descrição corrigida em 15/10)
 
-- **Método:**
-  - IMAP com cada pasta aberta em modo somente leitura (`EXAMINE`, `readOnly: true` confirmado em todas);
-  - lidos só envelopes e datas, sem corpo e sem marcar mensagens;
-  - senha decifrada só na memória do processo, nunca exibida.
-- **Período buscado:** até 24/09/2026, inclusive (troca da VPS observada em 24/09).
-- **Critérios:**
-  - mensagens de, para ou com cópia a `cimilho.com.br`, `reidomilho.com.br` e `saomartinho.com.br`;
-  - os nomes "Cimilho", "Rei do Milho" e "São Martinho" no assunto ou no texto;
-  - termos de descadastro (descadastr…, unsubscribe, opt-out, "sair da lista", "não quero/desejo receber", "parar de receber" etc.).
-- **Alcance da caixa** (data da mensagem mais antiga existente):
+**Método, como foi feito de fato:**
+- Conexão IMAP. Cada pasta foi aberta em modo somente leitura (`EXAMINE`, `readOnly: true` confirmado nas 5 pastas); nenhuma mensagem foi marcada nem alterada.
+- **A busca por conteúdo foi feita pelo servidor de e-mail** (comando IMAP `SEARCH`), com critérios de remetente, destinatário, cópia, assunto e texto (`BODY`). O servidor examina o conteúdo e devolve só os identificadores das mensagens que atendem ao critério.
+- **Das mensagens devolvidas, Claude leu só o envelope e a data:** domínios do remetente e dos destinatários. **Nenhum corpo foi baixado ou lido.**
+- Senha da caixa decifrada só na memória do processo, nunca exibida.
+- **Período:** mensagens com data até 24/09/2026.
+- **Termos buscados no assunto e no texto:**
+  - nomes: "cimilho", "rei do milho", "sao martinho", "são martinho";
+  - descadastro: "descadastr", "unsubscribe", "opt-out", "optout", "sair da lista", "remover da lista", "remova meu", "receber mais", "nao/não quero receber", "nao/não desejo receber", "parar de receber".
+- **Domínios buscados no remetente, destinatário e cópia:** `cimilho.com.br`, `reidomilho.com.br`, `saomartinho.com.br`.
+- **Alcance da caixa** (data da mensagem mais antiga existente em cada pasta):
   - Entrada desde 30/11/2025 (135 mensagens);
   - Enviados desde 30/01/2026 (77);
   - Lixeira desde 14/09/2026 (154);
   - Spam desde 30/09/2026 (8);
   - Rascunhos vazia.
 
-**Resultado:**
-- **Item 2, contatos com as três empresas:** nenhuma mensagem de, para ou com cópia aos três domínios. Nenhuma menção aos três nomes no assunto ou no texto.
-- **Item 3, pedidos de descadastro ou de não contato:** nenhum pedido vindo de empresa prospectada. As ocorrências de "unsubscribe" e "opt-out" são rodapés de mensagens recebidas de serviços (LinkedIn, Apollo, HubSpot).
-- **Achado sem relação com as três empresas:** 6 mensagens enviadas de `eagagro.com` em 09/05/2026 (20:29–20:46 UTC), guardadas na Entrada, para empresas do exterior: `s.alamgroupbd.com`, `cofco.com`, `isecindia.com`, `dhampur.com`, `dcmsr.com` e `sugarlabinta.com`.
-  - Têm rodapé com "unsubscribe", o que é compatível com prospecção.
-  - A origem (OpenClaw, outra ferramenta ou envio manual) **não** foi identificada. Os corpos não foram lidos.
-  - Não são do piloto brasileiro; ficam registradas para quando houver prospecção nesses países.
+**Resultado, só o que os dados sustentam:**
+- **Domínios das três empresas:** a busca do servidor não devolveu nenhuma mensagem de, para ou com cópia a esses domínios.
+- **Nomes das três empresas:** a busca do servidor não devolveu nenhuma mensagem com esses nomes no assunto ou no texto.
+- **Termos de descadastro:** a busca devolveu 80 mensagens (contagem refeita em 15/10).
+  - Pelo envelope, os remetentes são `linkedin.com` (62), `em.linkedin.com` (3), `mail.apollo.io` (6) e `hubspotstarter.hs-send.com` (3), todas recebidas por `eagagro.com`, além de 6 mensagens de `eagagro.com` para domínios do exterior.
+  - Nenhuma mensagem devolvida tem como remetente um domínio de empresa prospectada.
+  - **Não foi verificado** em que parte do texto o termo aparece (rodapé, pedido ou outro), porque os corpos não foram lidos.
+- **6 mensagens de `eagagro.com` em 09/05/2026** (20:29–20:46 UTC), guardadas na Entrada, para `s.alamgroupbd.com`, `cofco.com`, `isecindia.com`, `dhampur.com`, `dcmsr.com` e `sugarlabinta.com`:
+  - contêm o termo "unsubscribe" segundo a busca do servidor;
+  - **conteúdo, finalidade e origem** (OpenClaw, outra ferramenta ou envio manual) **não verificados**;
+  - sem relação com as três empresas do piloto brasileiro.
 
 **Limites (o que esta busca NÃO prova):**
-- Mensagens apagadas e já eliminadas da Lixeira, e Enviados anteriores a 30/01/2026, não existem mais na caixa e não foram vistos.
-- Se o OpenClaw usou outra conta de SMTP (`SMTP_FROM` do servidor não lido), outra caixa ou outro canal (LinkedIn, WhatsApp, telefone), isso não aparece aqui.
-- O item 1 (base no servidor) continua desconhecido. Só o painel da Hostinger responde.
+- Ausência de contato ou de oposição: a busca depende dos termos e domínios escolhidos.
+  - Um pedido escrito de outra forma ("remove me", "não enviar mais" etc.), um texto em anexo ou um conteúdo codificado que o servidor não examina não seriam encontrados.
+  - Um contato com endereço de outro domínio da mesma empresa também não seria.
+- Mensagens apagadas e eliminadas da Lixeira, Enviados anteriores a 30/01/2026 e Entrada anterior a 30/11/2025 não existem mais na caixa.
+- Envios por outra conta de SMTP (o `SMTP_FROM` do servidor do OpenClaw não foi lido), outra caixa ou outro canal (LinkedIn, WhatsApp, telefone) não aparecem aqui.
+- A situação da base antiga no servidor (item 1) continua desconhecida.
 
-**Situação para a opção B:**
-- Itens 2 e 3 têm agora um **fato verificado com alcance limitado**: na caixa `rogeriopalhari@eagagro.com`, nos períodos acima, nenhum contato com as três empresas e nenhum pedido de descadastro de prospect.
-- O item 1 continua **desconhecido**.
-- A declaração B pressupõe "base não recuperável", e esse fato não está estabelecido. Registrar a exceção com o item 1 desconhecido e o alcance limitado dos itens 2 e 3 é decisão de Rogério.
-- Alternativa: verificar o painel da Hostinger antes.
+## 7. Exceção operacional com incertezas conhecidas (autorizada por Rogério em 15/10/2026)
+
+**Natureza:** exceção operacional à importação da base antiga do OpenClaw (R21.8, R25.2). **Não é recuperação nem importação concluída.**
+
+**Alcance, exclusivamente:**
+- Cimilho (CNPJ 19.980.044/0001-53);
+- Rei do Milho, fábrica de Inhumas (CNPJ 05.574.242/0001-02);
+- São Martinho, Usina Boa Vista (CNPJ 51.466.860/0062-78).
+
+Não se estende a outras empresas, contas ou canais.
+
+**Incertezas registradas expressamente:**
+1. A situação da base antiga do OpenClaw **permanece desconhecida**. Não se afirma que ela seja irrecuperável.
+2. Rogério **não sabe confirmar** contatos anteriores com essas empresas nem supressões ou oposições anteriores (respostas de 14/10/2026, horário de Cuiabá).
+3. A busca na caixa corporativa (§6) **tem alcance limitado** e **não comprova** ausência absoluta de contatos ou de oposição.
+
+**Regras que continuam valendo:**
+- Todas as supressões existentes no Compass permanecem válidas.
+- Qualquer oposição ou pedido de não contato identificado depois, por qualquer fonte (base antiga recuperada, resposta, informação de Rogério), **é aplicado no Compass antes de qualquer novo contato** com a empresa ou o contato atingido.
+- Se a base antiga for recuperada, a importação das supressões volta a ser exigida (R21.8, R25.2) para todas as empresas, inclusive estas três.
+
+**O que esta exceção não faz:**
+- não registra validação T11;
+- não aprova fichas;
+- não libera canais, campanhas ou envios.
+
+A comprovação da Cloudflare (`transfer_mechanism`) continua pendente.

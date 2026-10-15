@@ -2586,3 +2586,17 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - Achado: 6 envios de `eagagro.com` a empresas do exterior em 09/05/2026, com origem não identificada e sem relação com o piloto brasileiro.
 - Detalhe e limites em `DECLARACAO-OPENCLAW-RASCUNHO.md` §6. O item 1 (base no servidor) continua desconhecido.
 - A declaração B continua sem registro na Spec. Nenhum envio liberado; validação T11 não registrada.
+
+## OpenClaw: correção da descrição da busca e exceção operacional (2026-10-15)
+
+- **Correção da entrada anterior "OpenClaw: busca só de leitura na caixa de e-mail":**
+  - a busca por assunto e texto foi feita **pelo servidor de e-mail** (IMAP `SEARCH`); Claude leu só envelopes e datas;
+  - por isso **não** foi verificado se "unsubscribe" estava em rodapé, nem a finalidade das 6 mensagens de 09/05/2026;
+  - "nenhum pedido de descadastro de prospect" vale só como "a busca pelos termos listados não devolveu mensagem de domínio de empresa prospectada";
+  - contagem refeita: 80 mensagens com termos de descadastro (não 84).
+  - Descrição completa e limites em `DECLARACAO-OPENCLAW-RASCUNHO.md` §6.
+- **Exceção operacional com incertezas conhecidas**, autorizada por Rogério em 15/10/2026, só para Cimilho, Rei do Milho de Inhumas e São Martinho Boa Vista:
+  - registrada na Spec (tabela de decisões e notas em R21.8 e R25.2) e na declaração §7;
+  - base desconhecida; contatos e supressões não confirmados; busca de alcance limitado; sem extensão a outras empresas, contas ou canais; supressões válidas e oposição futura aplicada antes de novo contato.
+  - Não é recuperação nem importação.
+- **Continua:** T11 não registrada, Cloudflare pendente, fichas sem aprovação, envios não liberados.
