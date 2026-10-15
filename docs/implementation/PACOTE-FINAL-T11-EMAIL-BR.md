@@ -216,3 +216,17 @@ Obrigado.
 - montar as 5 evidências.
 
 O registro da validação T11 continua sendo ato do Administrador, com autorização expressa. A D-L9 só é decidida depois da resposta da Cloudflare.
+
+## 7. Atualização de 2026-10-15 (tarde)
+
+- **Cloudflare:** **envio informado por Rogério em 15/10/2026, aguardando resposta.** O mecanismo do art. 33 **não** é considerado comprovado (L9 pendente; D-L9 depois da resposta).
+- **Incidentes:**
+  - procedimento final para aprovação em `REGISTRO-INCIDENTES-PROCEDIMENTO.md`;
+  - rascunho do modelo fora do Git (`C:\Users\Roger\eag-compass-registros\incidentes\RASCUNHO-REGISTRO-INCIDENTES.md`, acesso só de `ROGERIONOTE\Roger`), com a indisponibilidade de 09/10 em avaliação, fatos e incertezas separados, sem classificação.
+- **OpenClaw:** rascunho da declaração com os fatos comprovados e os pendentes em `DECLARACAO-OPENCLAW-RASCUNHO.md`.
+  - Correção: "reinstalada em 24/09" não é fato comprovado; 24/09 é a data em que a troca de chaves foi observada.
+- **Evidências:** índice em `t11-evidencias/INDICE.md`.
+  - Prontas, com SHA-256: `decisions`, `legal_basis` e `erasure_test`.
+  - Incompletas: `transfer_mechanism` e `incident_register`.
+  - Validação T11 **não registrada**.
+- **Horário da cópia:** corrigido no commit `e60b328` (migração 0043, ponte 0.2.1), não publicado.
