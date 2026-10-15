@@ -181,3 +181,38 @@ Obrigado.
 4. Reimportar as listas de sanções se o primeiro envio for depois de 24/10/2026 (validade de 720 h).
 5. Investigar o consumo de leituras da fila da lista mensal internacional (`trade_list_jobs`, cerca de 1.240 linhas por consulta, repetindo em 14/10): risco de custo, não de envio.
 6. Registrar no CRM da EAG as 3 empresas antes do primeiro contato (obrigação contratual, feita por você no sistema da EAG, fora do Compass).
+
+## 6. Atualização de 2026-10-15 (retomada só das três pendências da T11)
+
+**Estado:**
+- Worker `abdabdc2`.
+- As 3 fichas brasileiras na **versão 4** (`id-pt-1.4.0`, Bom dia/Boa tarde), sem aprovação.
+- 0 validações T11; canais `planned`; campanhas inativas; cópia desligada; nenhum envio novo.
+- Decisões já aprovadas (lista do topo) não são reabertas.
+
+| Pendência | Conferido em 15/10 | Situação |
+| --- | --- | --- |
+| Cloudflare (art. 33, L9, evidência `transfer_mechanism`) | Gmail de `rogeriopalhari23@gmail.com` (só leitura): nenhuma mensagem enviada a `privacyquestions@`/`dpo@cloudflare.com` e nenhuma resposta; só e-mails de marketing da Cloudflare chegam a esse endereço, o que indica que ele é o dono da conta. A mensagem do §1 continua válida | **Não enviada.** Aguarda o envio por Rogério, depois a resposta |
+| Registro de incidentes (evidência `incident_register`) | `C:\Users\Roger\eag-compass-registros\` existe só com `contrato\`; não há pasta `incidentes\` | **Aguarda as escolhas de Rogério** (§2). Nada criado |
+| Declaração do OpenClaw B (exceção a R21.8/R25.2) | Nenhuma declaração registrada desde 09/10 | **Aguarda os fatos de Rogério** (§3) |
+
+**Respostas que faltam de Rogério:**
+1. **Cloudflare:** enviar a mensagem do §1 do e-mail dono da conta. Rogério envia direto, ou autoriza um rascunho no Gmail dele para revisar e enviar ele mesmo. Rascunho não é envio.
+2. **Incidentes:**
+   - aprovar o procedimento do §2;
+   - escolher a cópia cifrada A, B, C ou A + B;
+   - dizer onde fica a senha (só o local, nunca a senha);
+   - dizer como classificar a indisponibilidade de 09/10: incidente de disponibilidade ou evento avaliado e não confirmado.
+3. **OpenClaw:** completar a declaração do §3:
+   - data;
+   - se a base é recuperável;
+   - quais empresas do piloto foram contatadas pelo OpenClaw (ou nenhuma);
+   - supressões conhecidas (ou nenhuma).
+
+**Depois das respostas (sem nova decisão):**
+- criar a pasta, o modelo e o índice de incidentes;
+- registrar a declaração na Spec;
+- guardar a resposta da Cloudflare com SHA-256;
+- montar as 5 evidências.
+
+O registro da validação T11 continua sendo ato do Administrador, com autorização expressa. A D-L9 só é decidida depois da resposta da Cloudflare.
