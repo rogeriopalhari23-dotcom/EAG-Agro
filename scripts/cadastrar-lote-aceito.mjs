@@ -5,6 +5,9 @@
 //   Local (npm run dev): node scripts/cadastrar-lote-aceito.mjs <arquivo.json> --base http://127.0.0.1:8787 --apply
 //   Produção: CF_ACCESS_TOKEN=$(cloudflared access token -app=https://<compass>) \
 //             node --use-system-ca scripts/cadastrar-lote-aceito.mjs <arquivo.json> --base https://<compass> --apply
+//   --triagem: depois de criar cada empresa, roda a triagem de sanções pelo fluxo existente (POST /screening).
+//   O produto vem do arquivo ("produto"); não há padrão (fluxo geral de rodadas, 2026-10-15). Lotes gerados por
+//   scripts/rodada.mjs trazem "rastreio" por empresa; o campo é só registro local.
 import { readFileSync } from "node:fs";
 
 const args = process.argv.slice(2);
@@ -32,11 +35,13 @@ async function call(method, path, body) {
 
 const catalog = await call("GET", "/api/catalog");
 const forced = args.includes("--product") ? args[args.indexOf("--product") + 1] : null;
-const variant = lote.produto ?? "Milho GMO";
+const variant = lote.produto;
+if (!variant) throw new Error('Informe "produto" no arquivo do lote (variante do catálogo); não há produto padrão.');
 const options = (catalog.json.products ?? []).filter((p) => String(p.variant_name ?? "").trim().toLowerCase() === variant.toLowerCase());
-const milho = !apply ? { id: "simulado-milho" } : forced ? { id: forced } : options.length === 1 ? options[0] : null;
-if (!milho) throw new Error(`Produto milho: ${options.length} opções no catálogo (${options.map((p) => `${p.id} ${p.variant_name}`).join("; ")}). Escolha com --product <id>.`);
-console.log(`Produto: ${milho.id} (${variant})`);
+const produto = !apply ? { id: "simulado-produto" } : forced ? { id: forced } : options.length === 1 ? options[0] : null;
+if (!produto) throw new Error(`Produto "${variant}": ${options.length} opções no catálogo (${options.map((p) => `${p.id} ${p.variant_name}`).join("; ")}). Escolha com --product <id>.`);
+console.log(`Produto: ${produto.id} (${variant})`);
+const triagem = args.includes("--triagem");
 
 for (const e of lote.empresas) {
   const c = await call("POST", "/api/companies", e.company);
@@ -49,21 +54,25 @@ for (const e of lote.empresas) {
     console.log(`${e.chave}: falhou ao cadastrar (${c.status})`, c.json);
     continue;
   }
-  for (const ev of e.evidence) {
-    const r = await call("POST", `/api/companies/${id}/evidence`, { ...ev, productId: milho.id });
+  if (triagem) {
+    const r = await call("POST", `/api/companies/${id}/screening`, {});
+    console.log(`${e.chave}: triagem ${r.status} — ocorrências ${r.json.matches ?? "?"}, bloqueio ${r.json.block ?? "?"}, revisão ${r.json.review ?? "?"}`);
+  }
+  for (const ev of e.evidence ?? []) {
+    const r = await call("POST", `/api/companies/${id}/evidence`, { ...ev, productId: produto.id });
     console.log(`${e.chave}: evidência ${r.status}${r.status >= 400 ? ` ${r.json.error?.code}: ${r.json.error?.message}` : ""}`);
   }
-  for (const ch of e.channels) {
+  for (const ch of e.channels ?? []) {
     const r = await call("POST", `/api/companies/${id}/channels`, ch);
     console.log(`${e.chave}: canal ${r.status}`);
   }
-  for (const p of e.people) {
+  for (const p of e.people ?? []) {
     const r = await call("POST", `/api/companies/${id}/people`, p);
     console.log(`${e.chave}: pessoa ${r.status}${r.status === 409 ? " (já registrada)" : r.status >= 400 ? ` ${r.json.error?.code}: ${r.json.error?.message}` : ""}`);
   }
   // Perfil comprador "possível" (não confirma compra) e a ligação de nível 0 com o roteiro da unidade (próxima ação).
   if (e.profile) {
-    const r = await call("POST", `/api/companies/${id}/profiles`, { ...e.profile, productId: milho.id });
+    const r = await call("POST", `/api/companies/${id}/profiles`, { ...e.profile, productId: produto.id });
     console.log(`${e.chave}: perfil ${r.status}`);
   }
   if (e.level0) {

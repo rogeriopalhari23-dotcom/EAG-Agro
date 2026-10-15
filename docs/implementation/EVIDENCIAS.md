@@ -2652,3 +2652,14 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Estado geral sem mudança:** T11 0, canais `planned`, campanhas 2 `draft` + 1 `ended`, fichas e envios inalterados.
 - Rialma e Caçu continuam em descoberta.
 - Detalhe em `descoberta-milho-indiara/LISTA-CURTA-CONSOLIDADA-2026-10-15.md` §5.
+
+## Fluxo geral de rodadas de descoberta e qualificação (15/10/2026, sem publicar)
+
+- **O que mudou:** descoberta e qualificação viraram um fluxo reutilizável: `src/rodada/` (biblioteca) e `scripts/rodada.mjs` (validar, executar, lote). Milho GMO, Indiara e 300 km agora são só a configuração `rodadas/exemplos/milho-gmo-indiara-300km.json`.
+- **Perto do limite:** o corte fixo de 270 km foi trocado por uma faixa derivada do raio configurado.
+- **Novos exemplos:** soja (Rio Verde, 150 km), sorgo (Uberlândia, 300 mi) e café verde (Hamburgo, 200 km, sem fonte cadastral). Todos passam na validação.
+- **`scripts/cadastrar-lote-aceito.mjs`:** sem produto padrão (o lote precisa declarar `produto`) e nova opção `--triagem`.
+- **Testes:** `tests/rodada-fluxo.test.mjs`, 12 testes. Suíte completa: 484 + 2 + 37, 0 falhas.
+- **Bug corrigido:** na reexecução, um estabelecimento que só estava no estado anterior perdia nome e município.
+- **Não feito:** nada publicado, nenhuma migração aplicada, nenhum registro real alterado, nenhum contato, crédito ou Snov. T11, fichas, canais e campanhas sem mudança.
+- Lacunas e uso em `rodadas/FLUXO-RODADAS.md`.

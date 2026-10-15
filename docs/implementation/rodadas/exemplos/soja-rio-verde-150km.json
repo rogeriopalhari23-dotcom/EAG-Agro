@@ -1,0 +1,13 @@
+{
+  "id": "soja-rio-verde-150km",
+  "description": "Exemplo: soja em grão (sem variedade), origem Rio Verde/GO, raio menor, margem absoluta de 15 km.",
+  "commodity": { "code": "soy", "label": "soja", "spec": { "form": "grão" }, "segments": { "crusher": { "label": "esmagadora" }, "feed_mill": { "label": "fábrica de ração" } } },
+  "buyer": { "roles": ["processor", "final_consumer"], "uses": ["esmagamento", "ração"] },
+  "origin": { "country": "BR", "region": "GO", "municipality": "Rio Verde" },
+  "radius": { "value": 150, "unit": "km" },
+  "nearLimit": { "distance": 15 },
+  "priorities": { "size": ["medium", "small"], "segments": ["crusher", "feed_mill"] },
+  "sources": [{ "id": "br-cnpj-ws", "kind": "registry", "countries": ["BR"], "rateLimitPerMinute": 3 }],
+  "locale": { "language": "pt-BR", "timezone": "America/Sao_Paulo" },
+  "compliance": { "scope": "br_email_automatic" }
+}

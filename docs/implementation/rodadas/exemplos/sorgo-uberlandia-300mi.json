@@ -1,0 +1,12 @@
+{
+  "id": "sorgo-uberlandia-300mi",
+  "description": "Exemplo: sorgo, origem Uberlândia/MG, raio em milhas (300 mi ≈ 482,8 km).",
+  "commodity": { "code": "sorghum", "label": "sorgo", "segments": { "feed_mill": { "label": "fábrica de ração" }, "ethanol": { "label": "etanol de grãos" } } },
+  "buyer": { "roles": ["final_consumer", "processor"] },
+  "origin": { "country": "BR", "region": "MG", "municipality": "Uberlândia" },
+  "radius": { "value": 300, "unit": "mi" },
+  "nearLimit": { "fraction": 0.05 },
+  "sources": [{ "id": "br-cnpj-ws", "kind": "registry", "countries": ["BR"], "rateLimitPerMinute": 3 }],
+  "locale": { "language": "pt-BR", "timezone": "America/Sao_Paulo" },
+  "compliance": { "scope": "br_email_automatic" }
+}

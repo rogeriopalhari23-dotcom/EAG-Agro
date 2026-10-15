@@ -1,0 +1,12 @@
+{
+  "id": "cafe-verde-hamburgo-200km",
+  "description": "Exemplo internacional: café verde (SH 090111), origem Hamburgo por coordenada, 200 km. Sem fonte cadastral configurada para DE: a consulta vira pendência explícita.",
+  "commodity": { "code": "coffee", "label": "green coffee", "spec": { "hs6": "090111", "form": "green" }, "segments": { "roaster": { "label": "torrefação" } } },
+  "buyer": { "roles": ["processor"], "uses": ["torrefação"] },
+  "origin": { "country": "DE", "lat": 53.5511, "lon": 9.9937, "label": "Hamburgo (coordenada)" },
+  "radius": { "value": 200, "unit": "km" },
+  "nearLimit": { "fraction": 0.1 },
+  "sources": [],
+  "locale": { "language": "en", "timezone": "Europe/Berlin" },
+  "compliance": { "scope": "de_email_automatic" }
+}
