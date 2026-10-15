@@ -2543,3 +2543,15 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Drive do conector (`rogeriopalhari23@gmail.com`, confirmado pela listagem de arquivos próprios): nenhum `.7z` (MIME `application/x-7z-compressed`), nenhum título com `eagc` e nenhum arquivo próprio criado desde 15/10.
 - **Conclusão:** a cópia, o relatório e a integridade **não foram confirmados**. Hipóteses a esclarecer com Rogério: script rodado em outro computador ou usuário do Windows, envio para outra conta Google ou nome de arquivo diferente.
 - A evidência `incident_register` continua incompleta. O local da senha continua pendente.
+
+## Cópia cifrada: segunda conferência (2026-10-15)
+
+- **Informado por Rogério:** `.7z` e relatório copiados para `C:\Users\Roger\eag-compass-registros\copia-cifrada\`.
+- **Verificado por Claude (só leitura), sem resultado:**
+  - computador `ROGERIONOTE`: a pasta não existe (`Test-Path` = False);
+  - a pasta `eag-compass-registros` contém só `contrato`, `incidentes` e o script;
+  - nenhum `.7z` modificado nas últimas 48 h no disco C: (o único disco);
+  - nenhum `verificacao*.txt` recente;
+  - Drive de `rogeriopalhari23@gmail.com`: nenhum `.7z`, nenhum título com `eagc` ou `verificacao`.
+- **Nada verificado:** relatório, SHA-256 e correspondência com o Drive. A evidência `incident_register` continua incompleta; o local da senha continua pendente.
+- **Hipótese principal:** os arquivos estão em outro computador ou em outra conta Google; o Compass e o Claude rodam em `ROGERIONOTE`.
