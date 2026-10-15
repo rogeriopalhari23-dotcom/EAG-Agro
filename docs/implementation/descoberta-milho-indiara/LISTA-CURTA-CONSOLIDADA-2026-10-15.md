@@ -62,3 +62,29 @@ Pesquisa encerrada nessas lacunas. Só reabrir com **fonte nova** (por exemplo, 
   - consumidoras finais antes de revendedores e traders;
   - evidência de uso e de compra antes de canal;
   - médias primeiro, sem tratar "Demais" como prova de porte médio.
+
+## 5. Aceite e cadastro da Araguaia/BAIA (15/10/2026)
+
+- **Aceite de Rogério:** Araguaia S.A., fábrica BAIA, Abadiânia/GO, para cadastro e qualificação, **sem autorização de contato**.
+- **Conferência antes de cadastrar:** nenhuma empresa no Compass com o CNPJ 03.306.578/0055-51, com a raiz 03.306.578 ou com "Araguaia" no nome.
+- **Cadastro em produção** (`scripts/cadastrar-lote-aceito.mjs`, arquivo `cadastro-araguaia-baia-aceito.json`):
+  - empresa `4dbff19c-7dc3-4534-94ae-a4a5f28aa2c1`, situação `discovered`;
+  - 2 evidências pendentes de validação:
+    - documento da empresa, com uso de milho em produto próprio;
+    - registro MAPA GO0013919;
+  - perfil `possible_final_consumer`, com ICP pendente de porte;
+  - produto Milho GMO (`product-03`).
+  - Compra de terceiros e aceitação de GMO registradas como **não confirmadas**.
+  - Distância de 173,8 km registrada como **estimativa entre centroides municipais**.
+  - Central de Atendimento e formulário registrados como **canais gerais de atendimento, não de compras**.
+- **Sem:** canal de e-mail, pessoa, tarefa de ligação (piloto só por e-mail) ou ficha.
+  - A preparação da ficha fica pendente até haver endereço apropriado publicado.
+  - O formulário não é usado para iniciar contato.
+- **Triagem de sanções (fluxo existente):**
+  - execução `a2d2898d-f9de-48a8-943e-f998ad8c1263` em 15/10/2026, 04:10:36 UTC: **0 ocorrências** (nenhum bloqueio, nenhuma revisão);
+  - versões usadas:
+    - OFAC SDN `00e702fc…` (11.857 registros, baixada em 24/09/2026, 19:17 UTC);
+    - CGU CEIS `279f05dc…` (20260924_CEIS, 14.503);
+    - CGU CNEP `9b743870…` (20260924_CNEP, 1.783).
+  - **Validade:** 720 h a partir do download das listas, até cerca de 24/10/2026, 19:17 UTC. Depois disso, é preciso reimportar as listas e refazer a triagem antes de qualquer envio.
+- **Rialma e Caçu:** continuam em descoberta. Rialma até conciliar o CNPJ do confinamento; Caçu até comprovar operação atual com milho. Não repetir as pesquisas sem fonte nova.

@@ -2641,3 +2641,14 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Distâncias:** recalculadas por haversine entre centroides IBGE; conferem com a base. Nenhuma usa a coordenada da unidade.
 - **Comigo:** continua candidata; o porte não exclui.
 - **Não feito:** aceite, cadastro, contato, Snov, fichas, T11, canais ou campanhas.
+
+## Araguaia/BAIA aceita e cadastrada (15/10/2026, sem contato)
+
+- **Aceite de Rogério** para cadastro e qualificação, sem contato.
+- **Cadastro:** empresa `4dbff19c-7dc3-4534-94ae-a4a5f28aa2c1` (CNPJ 03.306.578/0055-51), com 2 evidências e perfil "possível consumidora final" (ICP pendente de porte).
+- **Registrado como não confirmado:** compra de terceiros e aceitação de GMO. Distância registrada como estimativa entre centroides; canais registrados como de atendimento, não de compras.
+- **Triagem de sanções:** 0 ocorrências (execução `a2d2898d…`, 15/10/2026). Listas de 24/09/2026, válidas até cerca de 24/10/2026, 19:17 UTC.
+- **Não criados:** canal, pessoa, tarefa de ligação ou ficha. A ficha fica pendente por falta de endereço apropriado publicado.
+- **Estado geral sem mudança:** T11 0, canais `planned`, campanhas 2 `draft` + 1 `ended`, fichas e envios inalterados.
+- Rialma e Caçu continuam em descoberta.
+- Detalhe em `descoberta-milho-indiara/LISTA-CURTA-CONSOLIDADA-2026-10-15.md` §5.

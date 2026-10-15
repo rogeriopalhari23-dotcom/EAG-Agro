@@ -1,0 +1,46 @@
+{
+  "aceite": "Rogério, 15/10/2026: Araguaia S.A., fábrica BAIA Nutrição Animal (Abadiânia/GO), aceita para cadastro e qualificação, SEM autorização de contato. Uso de milho comprovado em fonte própria; compra de milho de terceiros e aceitação de milho GMO NÃO confirmadas. Sem endereço apropriado publicado: preparação da ficha pendente. Sem tarefa de ligação (piloto só por e-mail).",
+  "produto": "Milho GMO",
+  "empresas": [
+    {
+      "chave": "araguaia-baia-abadiania",
+      "company": {
+        "legalName": "ARAGUAIA S.A.",
+        "tradeName": "Araguaia — fábrica BAIA Nutrição Animal, Abadiânia",
+        "countryCode": "BR",
+        "registrationId": "03306578005551",
+        "registrationIdType": "CNPJ",
+        "sourceLabel": "Descoberta milho GMO Indiara/GO 300 km — unidade pela Receita (consulta de 15/10/2026 via publica.cnpj.ws): filial ativa, CNAE principal 1066-0/00 fabricação de alimentos para animais, Rodovia GO-474, km 12, Zona Rural, Abadiânia/GO; registro MAPA SIPEAGRO GO0013919 no mesmo CNPJ (04/10/2026). Distância 173,8 km ESTIMADA em linha reta (haversine) entre o centroide de Indiara (IBGE, -17,1852; -49,9682) e o centroide do município de Abadiânia; não usa coordenada da unidade; não é percurso rodoviário. Aceite de Rogério em 15/10/2026 para cadastro e qualificação, sem contato.",
+        "sourceUrl": "https://www.compre.araguaia.com.br/pages/nossa-historia"
+      },
+      "evidence": [
+        {
+          "category": "business",
+          "evidenceType": "company_document",
+          "market": "national",
+          "supports": ["consumes_as_input"],
+          "reference": "Fonte própria da Araguaia: (1) página 'Nossa história' — 'Inaugurada a planta industrial BAIA Nutrição Animal com capacidade para 12.000 toneladas/ano em Abadiânia em GO' (2021); (2) produto 'BAIA 24 U Max Leite' na loja própria — ração 'composto por matéria-prima de alto padrão, sem substitutivos de farelos, utilizando apenas milho e farelo de soja' (produto esgotado no dia da consulta). Comprova uso de milho em produto da unidade. NÃO comprova compra de milho de terceiros nem aceitação de milho GMO (ambas não confirmadas). Canais publicados no site oficial (Central de Atendimento (62) 4020-5044 e formulário 'Fale Conosco') são canais gerais de atendimento a clientes, NÃO canais de compras; nenhum canal de suprimentos ou compra de grãos publicado (araguaia.com.br/contato, 15/10/2026).",
+          "sourceUrl": "https://www.compre.araguaia.com.br/products/nutricao-animal-araguaia-baia-racao-leite-24-u",
+          "consultedAt": "2026-10-15",
+          "validationStatus": "pending"
+        },
+        {
+          "category": "business",
+          "evidenceType": "public_nominal_record",
+          "market": "national",
+          "supports": [],
+          "reference": "Registro MAPA SIPEAGRO GO0013919 (ativo, 04/10/2026) no CNPJ 03.306.578/0055-51, Abadiânia/GO, atividades aditivo, ingrediente, núcleo, ração e suplemento; Receita: filial ativa, CNAE principal 1066-0/00 (consulta de 15/10/2026). Registro e CNAE indicam a atividade; não provam compra de milho.",
+          "sourceUrl": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+          "consultedAt": "2026-10-15",
+          "validationStatus": "pending"
+        }
+      ],
+      "channels": [],
+      "people": [],
+      "profile": {
+        "profileClass": "possible_final_consumer",
+        "basis": "Fábrica de ração BAIA (Araguaia S.A.) em Abadiânia/GO, 173,8 km estimados entre centroides municipais: uso de milho em produto próprio ('apenas milho e farelo de soja'), fábrica de 12 mil t/ano desde 2021. Compra de milho de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; responsável e canal de compras não identificados. A empresa também é distribuidora de insumos, mas a unidade avaliada é a fábrica."
+      }
+    }
+  ]
+}
