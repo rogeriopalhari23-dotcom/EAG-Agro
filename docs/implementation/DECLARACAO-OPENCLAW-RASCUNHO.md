@@ -40,3 +40,14 @@
 
 - Entra na Spec como exceção datada a R21.8/R25.2.
 - As supressões informadas são cadastradas no Compass antes do primeiro envio.
+
+## 4. Resposta recebida de Rogério (data informada: 14/10/2026, horário de Cuiabá)
+
+- **Data da declaração:** 14/10/2026, horário de Cuiabá (UTC−4). **Registrada.**
+- **Itens 1, 2 e 3:** recebidos com as opções ainda entre colchetes, sem nenhuma escolhida:
+  - acesso ao painel ou a backups: [sim / não / não sei];
+  - situação da base: [integral / parcial / recuperação não tentada / não recuperável / desconhecida];
+  - contatos anteriores: [listar / nenhuma / não sei afirmar];
+  - pedidos de descadastro ou de não contato: [listar / nenhum conhecido / não sei afirmar].
+- **Registro:** os três itens continuam **sem resposta**. Nada foi registrado como "nenhuma", "nenhum" ou "não recuperável", e a ausência de escolha não é tratada como ausência de contatos ou de supressões.
+- **Situação da declaração:** **incompleta.** A exceção a R21.8/R25.2 não entra na Spec, e as supressões do OpenClaw continuam como pendência antes de qualquer envio.
