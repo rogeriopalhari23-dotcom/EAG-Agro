@@ -51,3 +51,20 @@
   - pedidos de descadastro ou de não contato: [listar / nenhum conhecido / não sei afirmar].
 - **Registro:** os três itens continuam **sem resposta**. Nada foi registrado como "nenhuma", "nenhum" ou "não recuperável", e a ausência de escolha não é tratada como ausência de contatos ou de supressões.
 - **Situação da declaração:** **incompleta.** A exceção a R21.8/R25.2 não entra na Spec, e as supressões do OpenClaw continuam como pendência antes de qualquer envio.
+
+## 5. Respostas de Rogério (14/10/2026, horário de Cuiabá)
+
+1. **Acesso ao painel da VPS ou a backups:** não sei. **Situação da base:** desconhecida.
+2. **Contatos anteriores com Cimilho, Rei do Milho (Inhumas) ou São Martinho (Usina Boa Vista):** não sei afirmar.
+3. **Pedidos anteriores de descadastro ou de não contato:** não sei afirmar.
+
+O desconhecimento **não** é tratado como ausência de contatos ou de supressões.
+
+**Conferência local feita depois (Claude, 15/10, só leitura):** `~/.openclaw/claw3d/task-manager/tasks.json` tem 128 tarefas, de 10/05 a 28/06/2026, sem canal preenchido. Nenhuma ocorrência de Cimilho, Rei do Milho ou São Martinho, nem de descadastro, "unsubscribe" ou "não contatar". Isso cobre só esse arquivo e **não** prova ausência de contato: o que rodou na VPS não foi lido.
+
+**Conclusão:** as respostas **não atendem** à declaração da opção B, que pressupõe saber se a base é recuperável e quais contatos e supressões existem. A exceção a R21.8/R25.2 continua sem registro, e as supressões do OpenClaw continuam como pendência antes de qualquer envio.
+
+**Verificações concretas que resolveriam:**
+- **(a) Caixa de e-mail que o OpenClaw usava.** O executor enviava por SMTP próprio, com relatório padrão para `rogeriopalhari@eagagro.com`. Uma busca só de leitura nas pastas Enviados e Entrada dessa caixa, até 24/09/2026, pelos domínios `cimilho.com.br`, `reidomilho.com.br` e `saomartinho.com.br` e por respostas de descadastro, respondem os itens 2 e 3 **para essa caixa**. Exige autorização de Rogério; a ponte já tem acesso de leitura a ela.
+- **(b) Painel da Hostinger.** Ver se a VPS `2.24.78.149` (`srv1644560`) aparece em alguma conta Hostinger de Rogério e se há backup ou snapshot anterior a 24/09/2026. Isso responde o item 1. Se aparecer, conferir a impressão `SHA256:zA4NvA5n8KMmxOVbyKdsgYdRn1I4LQjFREnM6y/1JX8` no terminal do navegador antes de qualquer leitura. Só Rogério pode entrar no painel.
+- Se (b) mostrar que a VPS não está em conta de Rogério, a situação da base fica desconhecida de forma definitiva para ele. Registrar a exceção mesmo assim, com essa incerteza declarada, seria decisão de Rogério, não presumida.
