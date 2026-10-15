@@ -7,7 +7,7 @@ const MAX_BODY = 2048;
 
 function html(title, body, status = 200) {
   const page = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title>
-<style>body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#07140c;color:#eef3ee}main{max-width:32rem;margin:10vh auto;padding:0 16px}h1{font-size:1.4rem}button{min-height:44px;padding:0 20px;border:0;background:#f9d428;color:#002f09;font-weight:700;cursor:pointer}p.en{color:#a9b8ab;font-size:.9rem}</style></head><body><main>${body}</main></body></html>`;
+<style>body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#07140c;color:#eef3ee}main{max-width:32rem;margin:10vh auto;padding:0 16px}h1{font-size:1.4rem}button{min-height:44px;padding:0 20px;border:0;background:#f9d428;color:#002f09;font-weight:700;cursor:pointer}p.en,p.es{color:#a9b8ab;font-size:.9rem}</style></head><body><main>${body}</main></body></html>`;
   return new Response(page, {
     status,
     headers: {
@@ -21,7 +21,7 @@ function html(title, body, status = 200) {
   });
 }
 const notFound = () =>
-  html("Link inválido", "<h1>Link inválido ou expirado.</h1><p class=\"en\">Invalid or expired link.</p>", 404);
+  html("Link inválido", "<h1>Link inválido ou expirado.</h1><p class=\"es\">Enlace inválido o vencido.</p><p class=\"en\">Invalid or expired link.</p>", 404);
 
 // Resolve o destinatário do token: tenant, contato e hash do e-mail (sem decifrar dado pessoal).
 async function resolve(env, token) {
@@ -39,18 +39,18 @@ export async function handleUnsubscribe(request, env, token) {
   if (!["GET", "HEAD", "POST"].includes(request.method)) return new Response(null, { status: 405, headers: { allow: "GET, POST" } });
   if (env.UNSUB_LIMITER) {
     const { success } = await env.UNSUB_LIMITER.limit({ key: `u:${String(token).slice(0, 64)}` });
-    if (!success) return html("Muitas tentativas", "<h1>Muitas tentativas. Tente de novo em um minuto.</h1><p class=\"en\">Too many attempts. Please try again in a minute.</p>", 429);
+    if (!success) return html("Muitas tentativas", "<h1>Muitas tentativas. Tente de novo em um minuto.</h1><p class=\"es\">Demasiados intentos. Inténtelo de nuevo en un minuto.</p><p class=\"en\">Too many attempts. Please try again in a minute.</p>", 429);
   }
   const target = await resolve(env, token);
   if (!target) return notFound();
   if (request.method !== "POST")
     return html(
       "Descadastro",
-      `<h1>Não quer mais receber mensagens da EAG Agro?</h1><form method="post"><input type="hidden" name="List-Unsubscribe" value="One-Click"><button type="submit">Confirmar descadastro · Unsubscribe</button></form><p class="en">Don't want to receive messages from EAG Agro? Confirm above.</p>`,
+      `<h1>Não quer mais receber mensagens da EAG Agro?</h1><form method="post"><input type="hidden" name="List-Unsubscribe" value="One-Click"><button type="submit">Confirmar descadastro · Confirmar baja · Unsubscribe</button></form><p class="es">¿No desea recibir más mensajes de EAG Agro? Confirme arriba.</p><p class="en">Don't want to receive messages from EAG Agro? Confirm above.</p>`,
     );
   // POST do botão ou one-click do provedor (RFC 8058: form-urlencoded ou multipart; sem cookie).
   const len = Number(request.headers.get("content-length") || 0);
-  if (len > MAX_BODY) return html("Pedido inválido", "<h1>Pedido inválido.</h1><p class=\"en\">Invalid request.</p>", 413);
+  if (len > MAX_BODY) return html("Pedido inválido", "<h1>Pedido inválido.</h1><p class=\"es\">Solicitud inválida.</p><p class=\"en\">Invalid request.</p>", 413);
   const at = new Date().toISOString();
   await env.DB.batch([
     env.DB.prepare(
@@ -67,5 +67,5 @@ export async function handleUnsubscribe(request, env, token) {
       "UPDATE tasks SET status='cancelled',suspended_reason='descadastro' WHERE tenant_id=? AND status='open' AND contact_id IN (SELECT id FROM contacts WHERE tenant_id=? AND email_hash=?)",
     ).bind(target.tenant_id, target.tenant_id, target.email_hash),
   ]);
-  return html("Descadastro feito", "<h1>Pronto. Você não receberá mais mensagens.</h1><p class=\"en\">Done. You will not receive further messages.</p>");
+  return html("Descadastro feito", "<h1>Pronto. Você não receberá mais mensagens.</h1><p class=\"es\">Listo. No recibirá más mensajes.</p><p class=\"en\">Done. You will not receive further messages.</p>");
 }

@@ -73,7 +73,7 @@ test("Geração: o E-mail 1 tem a variante 'Bom dia' que só troca a saudação;
   t.after(ctx.close);
   const w = await world(ctx);
   const f = await w.view();
-  assert.equal(f.version.templates, "id-pt-1.4.0");
+  assert.equal(f.version.templates, "id-pt-1.5.0");
   assert.equal(f.version.reviewOk, true, JSON.stringify(f.version.findings.filter((x) => !x.ok)));
   const [e1, e2] = f.messages.sort((a, b) => a.step - b.step);
   assert.equal(e1.body.split("\n")[0], "Boa tarde, tudo bem?");

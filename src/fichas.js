@@ -10,7 +10,8 @@ import { isSuppressed } from "./operations.js";
 import { canHaveFicha, contactTargetFlag } from "./profiles.js";
 import { generateSequence, commodityDisplay, SKILL_SHA256, TEMPLATES_VERSION, GENERATOR_VERSION } from "./templates/prospeccao-vendas.js";
 import { reviewSequence, reviewIdentification } from "./review.js";
-import { generateIdentification, commodityDisplayDe, companyDisplayName, morningVariant, IDENT_VERSION } from "./templates/identificacao.js";
+import { generateIdentification, commodityDisplayDe, commodityDisplayEs, companyDisplayName, morningVariant, IDENT_VERSION, IDENT_DRAFT_LANGUAGES } from "./templates/identificacao.js";
+import { languageForCountry } from "./language.js";
 import { unsubUrl } from "./unsub-token.js";
 import { erasuresConsistent } from "./erasure.js";
 import { complianceStatus } from "./scores.js";
@@ -81,6 +82,8 @@ async function context(env, actor, companyId, campaignId, contactIds, opts = {})
     recipients.push({
       contactId: ct.id, role: ct.prospect_role, kind: ct.contact_kind, fullName, jobTitle, sourceLabel: ct.source_label, linkedin: !!linkedin,
       relationshipNote: ct.relationship_note, emailHash: ct.email_hash, timezone: ct.timezone || null,
+      // A-ID11: tipo e URL da fonte cadastrados decidem a frase de origem do rodapé (nunca o rótulo livre).
+      sourceKind: ct.source_kind ?? null, sourceUrl: ct.source_url ?? null,
     });
   }
   if (purpose === "meeting" && !recipients.some((r) => r.role !== "influencer")) fail(422, "decision_maker_required", "A ficha precisa de um decisor (PV8).");
@@ -94,10 +97,26 @@ async function context(env, actor, companyId, campaignId, contactIds, opts = {})
   const others = (
     await s(env, "SELECT DISTINCT group_name,variant_name,commodity FROM products WHERE tenant_id=? AND commodity<>?", actor.tenant_id, p.commodity).all()
   ).results.map(c.language === "en" ? commodityDisplayEn : commodityDisplay).filter(Boolean);
-  // Idioma: o da campanha; a ficha de identificação pode usar o idioma do país (alemão), com modelo aprovado por Rogério.
-  const language = purpose === "identify_buyer" && opts.language ? oneOf(opts.language, ["pt-BR", "en", "de"], "idioma") : c.language;
+  // Idioma (R28.20, 2026-10-14): a ficha de identificação usa o idioma do país da empresa cadastrada (origem do país:
+  // regra vigente até a decisão L4, pendente). Nunca nome ou domínio; sem idioma definido (L1 pendente), nada é gerado.
+  // Ficha de reunião continua com o idioma da campanha (fora deste escopo).
+  let language = c.language;
+  let languageBasis = null;
+  if (purpose === "identify_buyer") {
+    const rule = languageForCountry(company.country_code);
+    if (!rule.language)
+      fail(422, rule.reason === "l1_pending" ? "language_pending_l1" : "language_country_missing", rule.reason === "l1_pending"
+        ? `País ${company.country_code}: idioma pendente da decisão L1 (casos geográficos da América Latina). Nenhuma ficha é gerada até a decisão.`
+        : "Empresa sem país cadastrado: o idioma da ficha não pode ser definido.");
+    if (opts.language && opts.language !== rule.language)
+      fail(422, "language_by_country", `O idioma da ficha vem do país da empresa (${company.country_code} → ${rule.language}); não é escolhido à mão.`);
+    language = rule.language;
+    languageBasis = { country: company.country_code, source: "empresa cadastrada (L4 pendente)", rule: "R28.20" };
+  }
   const translationApproved = params[`templates_en_approved:${TEMPLATES_EN_VERSION}`]?.enabled === true;
-  return { campaign: c, product: p, company, profile, gate, timezone, recipients, declarations, declarationIds: decl.map((d) => d.id), others: [...new Set(others)], language, translationApproved, purpose };
+  // A-ID10: modelos de identificação em espanhol e inglês só valem com a aprovação expressa de Rogério (parâmetro).
+  const identTemplatesApproved = params[`ident_templates_approved:${IDENT_VERSION[language]}`]?.enabled === true;
+  return { campaign: c, product: p, company, profile, gate, timezone, recipients, declarations, declarationIds: decl.map((d) => d.id), others: [...new Set(others)], language, languageBasis, translationApproved, identTemplatesApproved, purpose };
 }
 
 // Monta a versão: gera, revisa, cifra e calcula os hashes. Edições manuais substituem textos antes da revisão.
@@ -108,7 +127,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   // Idioma da campanha (PV12, R28.15): inglês pelo modelo traduzido; português para o nacional e países lusófonos.
   const en = ctx.language === "en";
   const ident = ctx.purpose === "identify_buyer";
-  const commodity = ctx.language === "de" ? commodityDisplayDe(ctx.product) : en ? commodityDisplayEn(ctx.product) : commodityDisplay(ctx.product);
+  const commodity = ctx.language === "de" ? commodityDisplayDe(ctx.product) : ctx.language === "es" ? commodityDisplayEs(ctx.product) : en ? commodityDisplayEn(ctx.product) : commodityDisplay(ctx.product);
   if (!commodity) fail(422, "commodity_name_missing", `Commodity sem nome cadastrado nos modelos (${ctx.language}).`);
   const templatesVersion = ident ? IDENT_VERSION[ctx.language] : en ? TEMPLATES_EN_VERSION : TEMPLATES_VERSION;
   const gapNote = ctx.campaign.market === "international" ? GAP_NOTE : null;
@@ -130,6 +149,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
     market: ctx.campaign.market, commodity, otherCommodities: ctx.others, declarations: ctx.declarations, companyName: companyDisplayName(ctx.company),
     recipients: ctx.recipients, postalAddress: env.EAG_POSTAL_ADDRESS, postalAddressConfirmed: postalAddressConfirmed(env), unsubUrl: (id) => urls.get(id),
     language: ctx.language, languageGapNote: gapNote, translationApproved: ctx.translationApproved, templatesVersion,
+    identTemplateDraft: ident && IDENT_DRAFT_LANGUAGES.has(ctx.language) && !ctx.identTemplatesApproved,
   };
   let review = reviewer(msgs, reviewCtx);
   if (msgs.some((m) => m.am)) {
@@ -142,7 +162,7 @@ async function buildVersion(env, actor, fichaId, versionNo, ctx, edits = []) {
   const snapshot = JSON.stringify({
     companyId: ctx.company.id, campaignId: ctx.campaign.id, campaignVersion: ctx.campaign.version,
     productId: ctx.product.id, commodity: ctx.product.commodity, profileId: ctx.profile?.id ?? null,
-    icpStatus: ctx.profile?.icp_status ?? null, fichaNote: [ctx.gate.note, gapNote].filter(Boolean).join(" ") || null, timezone: ctx.timezone, language: ctx.language, purpose: ctx.purpose,
+    icpStatus: ctx.profile?.icp_status ?? null, fichaNote: [ctx.gate.note, gapNote].filter(Boolean).join(" ") || null, timezone: ctx.timezone, language: ctx.language, languageBasis: ctx.languageBasis, purpose: ctx.purpose,
     declarationIds: ctx.declarationIds,
     recipients: ctx.recipients.map((r) => ({ contactId: r.contactId, role: r.role, emailHash: r.emailHash, timezone: r.timezone, targetFlag: contactTargetFlag(r.jobTitle, r.relationshipNote) })),
     skill: SKILL_SHA256, templates: templatesVersion, generator: GENERATOR_VERSION, edits: edits.length,

@@ -12,13 +12,17 @@ const sig = { senderName: "Rogério Palhari", postalAddress: "Rua Exemplo, 100 �
 const UNSUB = "https://compass.exemplo/u/x";
 const LINE_SITE = `Encontrei este endereço no site da empresa. Pedidos sobre dados pessoais: ${DATA_REQUESTS_EMAIL}.`;
 const LINE_ONLY = `Pedidos sobre dados pessoais: ${DATA_REQUESTS_EMAIL}.`;
+// A-ID11 (2026-10-14): a origem vem do TIPO de fonte cadastrado (sourceKind) e da URL registrada, não do rótulo.
+// Nos testes, o atalho do rótulo só escolhe o cadastro: "diretório" → directory com URL; "site" → company_site; "" → sem tipo.
+const source = (label) => (/diretório/.test(label) ? { sourceKind: "directory", sourceUrl: "https://www.kompass.com/br/moinho" } : /site/.test(label) ? { sourceKind: "company_site", sourceUrl: "https://moinho.com.br/contato" } : {});
 const gen = (sourceLabel, language = "pt-BR", commodity = "milho") =>
-  generateIdentification({ language, commodity, recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel }], sig, unsub: () => UNSUB, company: "Moinho Teste" });
+  generateIdentification({ language, commodity, recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel, ...source(sourceLabel) }], sig, unsub: () => UNSUB, company: "Moinho Teste" });
 const review = (msgs, sourceLabel) =>
-  reviewIdentification(msgs, { market: "national", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel }], postalAddress: sig.postalAddress, postalAddressConfirmed: true, unsubUrl: () => UNSUB, language: "pt-BR" });
+  reviewIdentification(msgs, { market: "national", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel, ...source(sourceLabel) }], postalAddress: sig.postalAddress, postalAddressConfirmed: true, unsubUrl: () => UNSUB, language: "pt-BR" });
+const LINE_DIR = `Encontrei este endereço no diretório de empresas kompass.com. Pedidos sobre dados pessoais: ${DATA_REQUESTS_EMAIL}.`;
 
 test("E2-b (mantido no pt 1.3.0): com fonte no site, a linha completa fica no rodapé antes da saída, nos dois passos e no HTML", () => {
-  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.4.0");
+  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.5.0");
   assert.equal(DATA_REQUESTS_EMAIL, "rogeriopalhari@hotmail.com", "O2 decidido em 08/10/2026");
   const msgs = gen("Canal geral publicado no site da empresa (site) — verificado em 2026-10-08");
   assert.equal(msgs.length, 2);
@@ -37,13 +41,22 @@ test("E2-b (mantido no pt 1.3.0): com fonte no site, a linha completa fica no ro
   assert.doesNotMatch(msgs.map((m) => m.body).join("\n"), /GMO|transg|preço|disponib|condiç/i);
 });
 
-test("E2-b: fonte que não é o site não afirma origem (PV4) — entra só o canal do titular", () => {
-  const msgs = gen("Canal geral publicado em diretório (diretório) — verificado em 2026-10-08");
-  for (const m of msgs) {
-    assert.ok(m.body.split("\n").includes(LINE_ONLY), `passo ${m.step} com o canal do titular`);
+test("A-ID11: diretório diz só o domínio da URL registrada; sem tipo cadastrado não afirma origem — entra só o canal do titular", () => {
+  const dir = gen("Canal geral publicado em diretório (diretório) — verificado em 2026-10-08");
+  for (const m of dir) {
+    assert.ok(m.body.split("\n").includes(LINE_DIR), `passo ${m.step} com a origem no diretório`);
     assert.doesNotMatch(m.body, /no site da empresa/);
   }
-  assert.equal(review(msgs, "Canal geral publicado em diretório (diretório)").ok, true);
+  assert.equal(review(dir, "Canal geral publicado em diretório (diretório)").ok, true);
+  // Rótulo livre com a palavra "site", mas sem tipo cadastrado: nenhuma origem é afirmada.
+  const loose = generateIdentification({ language: "pt-BR", commodity: "milho", recipients: [{ contactId: "c1", kind: "company_channel", sourceLabel: "achado no site de buscas" }], sig, unsub: () => UNSUB, company: "Moinho Teste" });
+  for (const m of loose) {
+    assert.ok(m.body.split("\n").includes(LINE_ONLY), "sem tipo: só o canal do titular");
+    assert.doesNotMatch(m.body, /Encontrei este endereço/);
+  }
+  // Diretório sem URL registrada válida: também sem origem.
+  const noUrl = generateIdentification({ language: "pt-BR", commodity: "milho", recipients: [{ contactId: "c1", kind: "company_channel", sourceKind: "directory", sourceUrl: "não é url" }], sig, unsub: () => UNSUB, company: "Moinho Teste" });
+  assert.ok(noUrl[0].body.split("\n").includes(LINE_ONLY));
 });
 
 test("E2-b: revisor barra e-mail sem o canal do titular e origem 'site' com fonte de diretório", () => {
@@ -56,12 +69,13 @@ test("E2-b: revisor barra e-mail sem o canal do titular e origem 'site' com font
   assert.equal(r2.findings.find((x) => x.id === "TRANSP").ok, false, "afirma site sem fonte no site");
 });
 
-test("E2-b: alemão e inglês não mudam (decisão só para o português)", () => {
-  for (const [lang, c] of [["de", "Rohkaffee"], ["en", "corn"]]) {
-    for (const m of gen("site", lang, c)) assert.ok(!m.body.includes(DATA_REQUESTS_EMAIL), `${lang} sem a linha`);
-  }
+test("E2-b: alemão não muda; espanhol e inglês (rascunhos A-ID10) trazem a linha no próprio idioma", () => {
+  for (const m of gen("site", "de", "Rohkaffee")) assert.ok(!m.body.includes(DATA_REQUESTS_EMAIL), "de sem a linha");
   assert.equal(IDENT_VERSION.de, "id-de-1.1.0");
-  assert.equal(IDENT_VERSION.en, "id-en-1.0.0");
+  assert.equal(IDENT_VERSION.en, "id-en-2.0.0");
+  assert.equal(IDENT_VERSION.es, "id-es-1.0.0");
+  for (const m of gen("site", "es", "maíz")) assert.ok(m.body.includes(`Encontré esta dirección en el sitio web de su empresa. Para solicitudes sobre datos personales: ${DATA_REQUESTS_EMAIL}.`));
+  for (const m of gen("site", "en", "corn")) assert.ok(m.body.includes(`I found this address on your company's website. For requests about personal data: ${DATA_REQUESTS_EMAIL}.`));
 });
 
 test("E2-b: nova versão da ficha usa o modelo novo, fica aguardando revisão e preserva a versão anterior", async (t) => {
@@ -93,7 +107,7 @@ test("E2-b: nova versão da ficha usa o modelo novo, fica aguardando revisão e 
   const f = (await api(`/api/fichas/${c.data.id}`)).data;
   assert.equal(f.ficha.status, "in_approval", "aguardando revisão; nada aprovado");
   assert.equal(f.version.no, 2);
-  assert.equal(f.version.templates, "id-pt-1.4.0");
+  assert.equal(f.version.templates, "id-pt-1.5.0");
   assert.ok(f.messages.every((m) => m.body.includes(LINE_SITE)), "texto novo nos dois passos");
   const old = DB.raw.prepare("SELECT snapshot_sha256,templates_version,superseded_at FROM ficha_versions WHERE id=?").get(v1.id);
   assert.equal(old.snapshot_sha256, v1.snapshot_sha256, "versão anterior intacta");

@@ -423,9 +423,10 @@ export async function addChannel(request, env, actor, rid, companyId) {
     companyLock(env, actor, c),
     s(
       env,
-      "INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,job_title_encrypted,email_encrypted,phone_encrypted,linkedin_url_encrypted,source_label,source_url,created_by,prospect_role,email_hash,email_validation,timezone,contact_kind) VALUES (?,?,?,?,NULL,?,?,NULL,?,?,?,'other',?,'pending',?,'company_channel')",
+      // source_kind (0042): tipo da fonte gravado como dado estruturado; o rodapé da ficha usa só ele (nunca o rótulo).
+      "INSERT INTO contacts(id,tenant_id,company_id,full_name_encrypted,job_title_encrypted,email_encrypted,phone_encrypted,linkedin_url_encrypted,source_label,source_url,created_by,prospect_role,email_hash,email_validation,timezone,contact_kind,source_kind) VALUES (?,?,?,?,NULL,?,?,NULL,?,?,?,'other',?,'pending',?,'company_channel',?)",
       id, actor.tenant_id, c.id, await encryptPii(str(i.label ?? "Canal geral da empresa", "rótulo", 120), env), await encryptPii(email, env), await encryptPii(str(i.phone, "telefone", 50, true), env),
-      `${label} (${kind === "company_site" ? "site" : "diretório"}) — verificado em ${now().slice(0, 10)}`, sourceUrl, actor.id, hash, timezone,
+      `${label} (${kind === "company_site" ? "site" : "diretório"}) — verificado em ${now().slice(0, 10)}`, sourceUrl, actor.id, hash, timezone, kind,
     ),
     auditStatement(env, actor, rid, "contact.channel_added", "contact", id, { companyId: c.id, suppressed }),
   ]);

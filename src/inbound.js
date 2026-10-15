@@ -8,7 +8,8 @@ import { parseMessage, header, addressOf, messageIds } from "./mime.js";
 import { imapClient } from "./adapters/imap.js";
 
 // Alemão (fichas de identificação, 2026-09-30): o rodapé pede „abmelden“ — suprime como "sair".
-const UNSUB_RE = /^\s*(?:please,?\s+|por favor,?\s+|bitte,?\s+)?(sair|descadastr\w*|remover|remova[- ]me|me (tire|remova)|unsubscribe|remove me|stop|opt[ -]?out|take me off|abmelden|abbestellen|austragen)\b/im;
+// Espanhol (fichas de identificação, 2026-10-14): o rodapé pede "baja" — suprime como "sair".
+const UNSUB_RE = /^\s*(?:please,?\s+|por favor,?\s+|bitte,?\s+)?(sair|descadastr\w*|remover|remova[- ]me|me (tire|remova)|unsubscribe|remove me|stop|opt[ -]?out|take me off|abmelden|abbestellen|austragen|baja|darme de baja|dar(me)? de baja|cancelar (la |mi )?suscripci[oó]n|desuscrib\w*)(?![\p{L}\p{N}])/imu;
 const PRICE_RE = /pre[çc]o|tabela|cota[çc][ãa]o|apresenta[çc][ãa]o|proposta|price|pricing|quote|quotation|catalog|proposal|presentation|preis|angebot/i;
 const AUTO_SUBJECT = /^(resposta autom[áa]tica|automatic reply|auto[- ]?reply|out of office|aus[êe]ncia|f[ée]rias|ooo\b|abwesenheit|automatische antwort)/i;
 const PROVIDER_ALERT = /suspens|bloque|limit|spam|abuse|abuso|blacklist|violation|viola[çc][ãa]o/i;

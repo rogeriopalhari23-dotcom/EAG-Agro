@@ -2396,3 +2396,46 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - textos em espanhol e inglês para revisão em `TEXTOS-ES-EN-PARA-REVISAO.md`;
   - L2 e L3 registradas como decididas (inglês), com as fichas alemãs inalteradas;
   - L1 e L4 só com propostas.
+
+## Idiomas da ficha de identificação: espanhol, inglês, saudação, rodapé e descadastro (2026-10-14, autorizada por Rogério; não publicado)
+
+- **Escopo:** só a ficha de identificação. Textos de reunião fora. L1 e L4 continuam **pendentes**, sem registro como aprovadas.
+- **Idioma pelo país** (`src/language.js`, R28.20):
+  - BR → português;
+  - os 18 países de língua oficial espanhola da América Latina → espanhol;
+  - demais → inglês, incluindo Portugal, os lusófonos fora da América Latina e a Alemanha (L2 e L3);
+  - casos geográficos de dúvida da L1 → sem idioma (`language_pending_l1`): a ficha não é gerada.
+  - Origem do país: a empresa cadastrada (regra vigente até a L4) e registrada no retrato da versão (`languageBasis`).
+  - Escolha manual divergente → `language_by_country`. Nome e domínio nunca contam.
+  - Fichas alemãs existentes: nova versão recusada (`language_by_country`) até nova instrução; nada alterado.
+- **Modelos** (`id-es-1.0.0`, `id-en-2.0.0`, `id-pt-1.5.0`):
+  - textos de `TEXTOS-ES-EN-PARA-REVISAO.md` (commit `dc73a29`);
+  - espanhol e inglês são **rascunhos**: sem o parâmetro `ident_templates_approved:<versão>` (aprovação expressa de Rogério), o revisor reprova (achado `MODELO`) e a aprovação é recusada.
+  - O texto português com fonte no site não muda.
+- **Saudação por horário nos três idiomas:**
+  - variante da manhã gerada, revisada e aprovada junto (Bom dia/Boa tarde, Buenos días/Buenas tardes, Good morning/Good afternoon);
+  - escolhida no envio pelo horário local do destinatário (0041);
+  - a cópia interna reproduz a saudação enviada.
+- **Rodapé pelo tipo de fonte cadastrado** (`contacts.source_kind`, migração **0042**, não aplicada):
+  - site da empresa → frase do site;
+  - diretório → "diretório de empresas <domínio da URL registrada>";
+  - sem tipo ou sem URL → nenhuma origem;
+  - o rótulo livre não é mais lido.
+  - A 0042 converte só o rótulo exato gerado pela rota de canais a partir do tipo escolhido. Em produção são 6 canais, todos com o rótulo de site: as fichas brasileiras manteriam a frase do site em versões futuras.
+- **Descadastro:**
+  - "baja", "darme de baja", "dar de baja", "cancelar suscripción" e "desuscribirme" suprimem; frase comum com "baja" no meio não suprime;
+  - página `/u/*` em português, espanhol e inglês, com o mesmo funcionamento.
+- **Revisor por idioma** (pt, es, en):
+  - saudação sem nome no canal geral; marcador `{{…}}` sobrando; empresa citada; GMO;
+  - PV7 (preço, volume, condição) e PV10 (desculpas) em espanhol;
+  - rodapé igual ao calculado do cadastro (TRANSP).
+- **Testes:**
+  - novo `tests/idioma-identificacao.test.mjs` (10);
+  - transparência, saudação e descadastro atualizados.
+  - `npm run check`: **471 + 2 + 32**, 0 falhas; `validate-deploy` ok.
+  - **Compatibilidade:** o Worker em produção (`12040b1`, versão `22ec08e9`) com a 0042 acrescentada passou a suíte inteira (461 + 2 + 32).
+- **Produção sem mudança:**
+  - fichas brasileiras na v4 (`id-pt-1.4.0`), sem aprovação;
+  - nenhuma ficha internacional gerada;
+  - T11 pendente, nada enviado;
+  - ponte não alterada.

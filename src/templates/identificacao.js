@@ -22,20 +22,34 @@
 //  A-ID8 (2026-10-14, pedido de Rogério, versão pt 1.4.0) Saudação pelo horário: o E-mail 1 que começa com "Boa tarde"
 //        ganha na geração a variante "Bom dia" (só a saudação muda). As duas são revisadas e aprovadas juntas; no envio,
 //        antes das 12:00 no fuso do destinatário sai "Bom dia", a partir das 12:00 sai "Boa tarde" (src/sending.js).
-//  A-ID9 (2026-10-14, decisão de Rogério; Spec R28.20 e R28.21) Idioma pelo país do destinatário: Brasil, português;
-//        demais países da América Latina, espanhol; fora da América Latina, inglês. Nunca deduzido de nome ou domínio.
-//        Vale para a sequência inteira (assunto, apresentação, acompanhamento, transparência, descadastro); nomes
-//        próprios, marcas e endereços não se traduzem. A saudação por horário acompanha o idioma (Bom dia/Boa tarde,
-//        Buenos días/Buenas tardes, Good morning/Good afternoon). Ainda não aplicado ao código: só o português está
-//        conforme; espanhol não existe, inglês sem saudação por horário nem transparência, alemão fora da regra
-//        (implementation/IDIOMA-POR-PAIS.md). Sem modelo aprovado no idioma exigido, a ficha não deve ser gerada.
-export const IDENT_VERSION = { "pt-BR": "id-pt-1.4.0", en: "id-en-1.0.0", de: "id-de-1.1.0" };
-// Hora local a partir da qual a saudação é "Boa tarde" (antes dela, "Bom dia").
+//  A-ID9 (2026-10-14, decisão de Rogério; Spec R28.20 e R28.21) Idioma pelo país do destinatário (src/language.js):
+//        Brasil, português; demais países da América Latina, espanhol; fora da América Latina, inglês. Nunca deduzido de
+//        nome ou domínio. Vale para a sequência inteira (assunto, apresentação, acompanhamento, transparência,
+//        descadastro); nomes próprios, marcas e endereços não se traduzem. Só a ficha de identificação; reunião fora.
+//  A-ID10 (2026-10-14) Espanhol (id-es-1.0.0) e inglês (id-en-2.0.0): textos revisados por Rogério (TEXTOS-ES-EN-PARA-
+//        REVISAO.md, commit dc73a29), redação própria de cada idioma. RASCUNHOS até a aprovação expressa de Rogério
+//        (parâmetro ident_templates_approved:<versão>): sem ela o revisor reprova e a ficha não é aprovável.
+//  A-ID11 (2026-10-14) Origem do endereço no rodapé pelo TIPO de fonte cadastrado (contacts.source_kind, 0042), nunca pela
+//        palavra "site" num rótulo livre: site da empresa → frase do site; diretório → "diretório de empresas <domínio>"
+//        só com o domínio da URL registrada; sem tipo ou sem URL → nenhuma frase de origem. Português 1.5.0 (o texto das
+//        fichas com fonte no site não muda).
+export const IDENT_VERSION = { "pt-BR": "id-pt-1.5.0", es: "id-es-1.0.0", en: "id-en-2.0.0", de: "id-de-1.1.0" };
+// Modelos que só valem depois da aprovação expressa de Rogério (A-ID10).
+export const IDENT_DRAFT_LANGUAGES = new Set(["es", "en"]);
+// Hora local a partir da qual a saudação é a da tarde (antes dela, a da manhã).
 export const AFTERNOON_FROM = "12:00";
-// Variante "Bom dia" de um texto que começa com "Boa tarde" (texto e HTML; só a primeira ocorrência, a saudação).
+// Saudação da tarde → da manhã, por idioma (R28.21).
+const GREETINGS = [
+  ["Boa tarde", "Bom dia"],
+  ["Buenas tardes", "Buenos días"],
+  ["Good afternoon", "Good morning"],
+];
+// Variante da manhã de um texto que começa com a saudação da tarde (texto e HTML; só a primeira ocorrência, a saudação).
 export function morningVariant(m) {
-  if (!/^Boa tarde\b/.test(m.body || "")) return null;
-  return { body: m.body.replace(/^Boa tarde/, "Bom dia"), html: m.html ? m.html.replace("Boa tarde", "Bom dia") : null };
+  const g = GREETINGS.find(([pm]) => (m.body || "").startsWith(pm) && /^[\s,:]/.test((m.body || "").slice(pm.length)));
+  if (!g) return null;
+  const [pm, am] = g;
+  return { body: am + m.body.slice(pm.length), html: m.html ? m.html.replace(pm, am) : null };
 }
 
 import { emailParts } from "./assinatura.js";
@@ -43,13 +57,35 @@ import { DATA_REQUESTS_EMAIL } from "../privacy-contact.js";
 const COMPANY = "EAG Agro";
 // Rodapé separado da assinatura: endereço físico (R19.13) e forma de saída (R21.7).
 const footer = (s, unsubLine, privacyLine) => (privacyLine ? [s.postalAddress, privacyLine, unsubLine] : [s.postalAddress, unsubLine]);
-const fromSite = (sourceLabel) => /\bsite\b|website/i.test(sourceLabel || "");
 // Termo de mercado da commodity em alemão (sem entrada → a ficha em alemão não é gerada).
 const COMMODITY_DE = { coffee: "Rohkaffee", sugar: "Zucker", soy: "Sojabohnen", corn: "Mais", soy_meal: "Sojaschrot", soy_oil: "Sojaöl", ethanol: "Ethanol" };
 export const commodityDisplayDe = (product) => COMMODITY_DE[product.commodity] ?? null;
+// Termo de compras da commodity em espanhol (sem entrada → a ficha em espanhol não é gerada).
+const COMMODITY_ES = { coffee: "café verde", sugar: "azúcar", soy: "soja", corn: "maíz", soy_meal: "harina de soja", soy_oil: "aceite de soja", ethanol: "etanol" };
+export const commodityDisplayEs = (product) => COMMODITY_ES[product.commodity] ?? null;
 // Nome da empresa no texto: nome fantasia cadastrado sem o rótulo interno da unidade ("Rei do Milho — fábrica, Inhumas"
 // → "Rei do Milho"); sem nome fantasia, a razão social.
 export const companyDisplayName = (c) => String(c?.trade_name || c?.legal_name || "").split(" — ")[0].trim();
+
+// Domínio da URL registrada como fonte (sem "www."); sem URL http(s) válida → null.
+export function sourceDomain(url) {
+  try {
+    const u = new URL(String(url ?? ""));
+    if (!/^https?:$/.test(u.protocol) || !u.hostname.includes(".")) return null;
+    return u.hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+// Origem do endereço a partir do cadastro: { kind: "company_site" } | { kind: "directory", domain } | null.
+export function sourceOrigin(r) {
+  if (r?.sourceKind === "company_site") return { kind: "company_site" };
+  if (r?.sourceKind === "directory") {
+    const domain = sourceDomain(r.sourceUrl);
+    return domain ? { kind: "directory", domain } : null;
+  }
+  return null;
+}
 
 const TEXT = {
   "pt-BR": {
@@ -62,19 +98,54 @@ const TEXT = {
     ],
     e2: (c) => ["Olá,", `Retomo brevemente minha mensagem anterior. Poderia indicar com quem devo falar sobre a compra de ${c}?`, `Se a empresa não compra ${c}, uma breve confirmação já ajuda.`, "Obrigado."],
     unsub: (u) => `Para não receber mais mensagens, responda "sair" ou use este link: ${u}`,
-    privacy: (site) => `${site ? "Encontrei este endereço no site da empresa. " : ""}Pedidos sobre dados pessoais: ${DATA_REQUESTS_EMAIL}.`,
+    origin: { company_site: () => "Encontrei este endereço no site da empresa.", directory: (d) => `Encontrei este endereço no diretório de empresas ${d}.` },
+    data: `Pedidos sobre dados pessoais: ${DATA_REQUESTS_EMAIL}.`,
   },
+  // Espanhol (A-ID10): texto revisado por Rogério em 2026-10-14; rascunho até aprovação expressa.
+  es: {
+    subject: (c) => `Contacto de compras de ${c}`,
+    e1: (c, s, x) => [
+      x.name ? `Buenas tardes, ${x.name}:` : "Buenas tardes:",
+      `Mi nombre es Rogerio Palhari. Soy franquiciado de ${COMPANY} y trabajo en la originación de commodities agrícolas en Brasil.`,
+      `Estoy buscando a la persona responsable de las compras de ${c} en ${x.company}, para presentarme y conocer cómo se abastecen de este insumo.`,
+      "¿Podría indicarme quién está a cargo de esa área y cuál es la mejor vía de contacto?",
+      "Muchas gracias.",
+    ],
+    e2: (c, x) => [
+      "Hola:",
+      `Retomo mi correo anterior sobre las compras de ${c} de ${x.company}.`,
+      "¿Podría indicarme qué persona o departamento se encarga de estas compras, o facilitarme el correo del área correspondiente?",
+      `Si su empresa no compra ${c}, le agradecería que me lo indicara para actualizar mis registros.`,
+      "Muchas gracias.",
+    ],
+    unsub: (u) => `Para dejar de recibir estos mensajes, responda "baja" o use este enlace: ${u}`,
+    origin: { company_site: () => "Encontré esta dirección en el sitio web de su empresa.", directory: (d) => `Encontré esta dirección en el directorio de empresas ${d}.` },
+    data: `Para solicitudes sobre datos personales: ${DATA_REQUESTS_EMAIL}.`,
+  },
+  // Inglês (A-ID10): texto revisado por Rogério em 2026-10-14; rascunho até aprovação expressa.
   en: {
-    subject: (c) => `${c.charAt(0).toUpperCase()}${c.slice(1)} supplier`,
-    hello: "Hi, I hope you're well.",
-    found: "I found your contact on your website and took the liberty of sending you a quick message.",
-    who: (c) => `I'm with ${COMPANY}; we trade agricultural commodities, and I would like to speak with the person responsible for purchasing ${c} at your company.`,
-    ask: "Could you tell me who is responsible for this area and the best professional channel to reach them?",
-    follow: (c) => `Did you get a chance to see the message I sent a few days ago? I only need to know who is responsible for purchasing ${c} and the best channel to reach them.`,
+    subject: (c) => `${c.charAt(0).toUpperCase()}${c.slice(1)} purchasing contact`,
+    e1: (c, s, x) => [
+      x.name ? `Good afternoon ${x.name},` : "Good afternoon,",
+      `My name is Rogerio Palhari. I am an ${COMPANY} franchisee working in agricultural commodity origination in Brazil.`,
+      `I am trying to reach the person responsible for ${c} procurement at ${x.company}, to introduce myself and learn how your team sources ${c}.`,
+      `Could you let me know who handles ${c} purchasing and the best way to contact them?`,
+      "Thank you,",
+    ],
+    e2: (c, x) => [
+      "Hello,",
+      `I’m following up on my previous email about ${c} procurement at ${x.company}.`,
+      "Could you direct me to the person or department responsible, or share the appropriate purchasing email address?",
+      `If your company does not purchase ${c}, please let me know so I can update my records.`,
+      "Thank you,",
+    ],
     unsub: (u) => `To stop receiving these messages, reply "unsubscribe" or use this link: ${u}`,
+    origin: { company_site: () => "I found this address on your company's website.", directory: (d) => `I found this address in the business directory ${d}.` },
+    data: `For requests about personal data: ${DATA_REQUESTS_EMAIL}.`,
   },
   de: {
-    // Texto de Rogério para Rohkaffee; o substantivo composto vale para café verde.
+    // Texto de Rogério para Rohkaffee; o substantivo composto vale para café verde. Pela R28.20 a Alemanha passa a usar
+    // inglês (L3, 2026-10-14): este modelo só serve às fichas alemãs já existentes, mantidas sem alteração.
     subject: (c) => `Zuständige Person für den ${c}-Einkauf`,
     e1: (c, s) => ["Guten Tag,", `mein Name ist ${s.senderName}, ich bin bei ${COMPANY} in Brasilien tätig. Wir vermitteln Agrarrohstoffe, darunter brasilianischen ${c}.`, `Wer ist in Ihrem Unternehmen für den Einkauf von ${c} zuständig? Könnten Sie meine Nachricht bitte an die zuständige Person weiterleiten oder mir eine geeignete geschäftliche Kontaktadresse nennen?`, "Vielen Dank für Ihre Unterstützung."],
     e2: (c) => ["Guten Tag,", `ich komme kurz auf meine vorherige Nachricht zurück. Könnten Sie mir bitte mitteilen, an wen ich mich bezüglich des Einkaufs von ${c} wenden kann?`, `Falls Ihr Unternehmen keinen ${c} einkauft, genügt ein kurzer Hinweis.`, "Vielen Dank."],
@@ -82,22 +153,33 @@ const TEXT = {
   },
 };
 
-// recipients: canais gerais da empresa [{ contactId, sourceLabel }]. Mesma saída de generateSequence (passos e dias).
-// company: nome de exibição da empresa (obrigatório em português, para o "na <empresa>" do E-mail 1).
+// Linha de transparência do rodapé (E2-b e A-ID11): origem só pelo tipo de fonte cadastrado; sempre o canal do titular.
+export function privacyLine(language, r) {
+  const t = TEXT[language];
+  if (!t?.data) return null;
+  const o = sourceOrigin(r);
+  const origin = o ? t.origin[o.kind](o.domain) : null;
+  return origin ? `${origin} ${t.data}` : t.data;
+}
+// Frases de origem do idioma (para o revisor conferir que nenhuma aparece sem a fonte cadastrada).
+export const ORIGIN_START = { "pt-BR": "Encontrei este endereço", es: "Encontré esta dirección", en: "I found this address" };
+
+// recipients: canais gerais da empresa [{ contactId, kind, sourceKind, sourceUrl }]. Mesma saída de generateSequence.
+// company: nome de exibição da empresa (obrigatório em português, espanhol e inglês: o E-mail 1 cita a empresa).
 // recipients[].confirmedName: só para destinatário pessoa com nome confirmado; canal geral nunca recebe nome.
 export function generateIdentification({ language = "pt-BR", commodity, recipients, sig, unsub, company }) {
   const t = TEXT[language];
   if (!t) throw new Error(`Idioma sem modelo de identificação: ${language}`);
-  if (language === "pt-BR" && !(typeof company === "string" && company.trim())) throw new Error("Nome da empresa obrigatório no E-mail 1 em português.");
+  if (language !== "de" && !(typeof company === "string" && company.trim())) throw new Error(`Nome da empresa obrigatório no E-mail 1 (${language === "pt-BR" ? "português" : language}).`);
   const out = [];
   for (const r of recipients) {
-    // Versão 1.1.0 (pt/de): parágrafos separados por linha em branco; versão 1.0.0 (en): linhas simples.
     const name = r.kind !== "company_channel" && typeof r.confirmedName === "string" && r.confirmedName.trim() ? r.confirmedName.trim() : null;
     // Nome terminado em ponto ("Ltda.") não gera ponto duplo no fim da frase.
-    const e1 = t.e1 ? t.e1(commodity, sig, { name, company: company?.trim().replace(/\.+$/, "") }).join("\n\n") : [t.hello, ...(/\bsite\b|website/i.test(r.sourceLabel || "") ? [t.found] : []), t.who(commodity), t.ask].join("\n");
-    const e2 = t.e2 ? t.e2(commodity).join("\n\n") : [t.hello, t.follow(commodity)].join("\n");
+    const x = { name, company: company?.trim().replace(/\.+$/, "") };
+    const e1 = t.e1(commodity, sig, x).join("\n\n");
+    const e2 = t.e2(commodity, x).join("\n\n");
     // Texto: corpo, assinatura oficial (uma vez) e rodapé separado; HTML com a assinatura original, quando importada.
-    const foot = footer(sig, t.unsub(unsub(r.contactId)), t.privacy?.(fromSite(r.sourceLabel)));
+    const foot = footer(sig, t.unsub(unsub(r.contactId)), privacyLine(language, r));
     // Mesmo assunto no acompanhamento: o envio não encadeia como resposta real (sem In-Reply-To/References).
     out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 1, day: 0, subject: t.subject(commodity), ...emailParts(e1, foot), objective: "identificar o responsável pela compra e o canal profissional" });
     out.push({ contactId: r.contactId, role: "company_channel", channel: "email", kind: "auto_email", step: 2, day: 4, subject: t.subject(commodity), ...emailParts(e2, foot), objective: "obter a indicação do responsável ou a confirmação de que não compra" });

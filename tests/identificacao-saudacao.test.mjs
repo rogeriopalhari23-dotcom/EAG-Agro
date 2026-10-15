@@ -7,7 +7,7 @@ import { reviewIdentification } from "../src/review.js";
 
 const sig = { senderName: "Rogério Palhari", postalAddress: "Rua Exemplo, 100 — Sertãozinho/SP" };
 const UNSUB = "https://compass.exemplo/u/x";
-const CH = { contactId: "c1", kind: "company_channel", sourceLabel: "Canal geral publicado no site da empresa (site)" };
+const CH = { contactId: "c1", kind: "company_channel", sourceLabel: "Canal geral publicado no site da empresa (site)", sourceKind: "company_site", sourceUrl: "https://cimilho.com.br/" };
 const gen = (recipients, company = "Cimilho") => generateIdentification({ language: "pt-BR", commodity: "milho", recipients, sig, unsub: () => UNSUB, company });
 const review = (msgs, recipients = [CH], companyName = "Cimilho") =>
   reviewIdentification(msgs, { market: "national", recipients, postalAddress: sig.postalAddress, postalAddressConfirmed: true, unsubUrl: () => UNSUB, language: "pt-BR", companyName });
@@ -23,7 +23,7 @@ const E1 = [
 ].join("\n");
 
 test("E-mail 1 (pt 1.3.0): texto de Rogério, canal geral sem nome, empresa citada; revisor sem violações", () => {
-  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.4.0");
+  assert.equal(IDENT_VERSION["pt-BR"], "id-pt-1.5.0");
   const msgs = gen([CH]);
   assert.ok(msgs[0].body.startsWith(E1 + "\n\n"), msgs[0].body.slice(0, 400));
   assert.equal(msgs[0].subject, "Responsável pela compra de milho");

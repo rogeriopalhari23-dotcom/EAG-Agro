@@ -4,6 +4,7 @@ import { ADDRESS_PENDING } from "./postal-address.js";
 import { DATA_REQUESTS_EMAIL } from "./privacy-contact.js";
 import { contactTargetFlag } from "./profiles.js";
 import { SIGNATURE, signatureText, LOGO_PLACEHOLDER } from "./templates/assinatura.js";
+import { privacyLine, ORIGIN_START } from "./templates/identificacao.js";
 
 // SIG (pedido de Rogério em 2026-09-30): assinatura oficial (fonte única) pronta — logo original resolvido, conferida por
 // Rogério — e presente uma única vez no texto e no HTML de cada e-mail. Sem isso nenhuma ficha é aprovável.
@@ -52,20 +53,42 @@ const LANG = {
     subject: /^Lieferant für [A-ZÄÖÜ][a-zäöüß]+( [a-zäöüß]+)*$/, subjectHint: "Lieferant für <Rohstoff>", optOut: /„abmelden“/,
   },
 };
+// Espanhol (2026-10-14, só ficha de identificação): mesmas proibições do PV7 e do PV10 no idioma.
+LANG.es = {
+  hello: /^(Hola|Buenos días|Buenas tardes)/, conversation: /(?!)/, minutes: /20 minutos/, linkedin: /LinkedIn/,
+  inTouch: /en contacto con .* por correo/i, breakText: /(?!)/,
+  forbidden: /\bUS\$|precio|cotizaci[oó]n|\blotes?\b|existencias|inventario|plazo de entrega|certifica|\bpagos?\b|competidor|proveedor actual/i,
+  apology: /disculp[ae] (la )?molestia|perd[oó]n por (la )?molestia|lamento molestar/i,
+  volume: /volumen disponible|buen volumen|volumen relevante/i,
+  subject: /(?!)/, subjectHint: "", optOut: /"baja"/,
+};
 // Pergunta da ficha de identificação: quem responde pela compra + canal profissional (A-ID1–A-ID3).
 const IDENT_ASK = {
   "pt-BR": /respons[aá]vel pela compra[\s\S]*(encaminhar|indicar)[\s\S]*(contato profissional|canal)/i,
-  en: /responsible for purchasing[\s\S]*who is responsible[\s\S]*channel/i,
+  es: /responsable de las compras de[\s\S]*indicarme[\s\S]*(v[ií]a de contacto|correo)/i,
+  en: /responsible for [a-z ]+ procurement[\s\S]*let me know who handles[\s\S]*(best way to contact|email)/i,
   de: /für den Einkauf von[\s\S]*zuständig[\s\S]*(weiterleiten|Kontaktadresse)/i,
+};
+// Saudação, nome da empresa e GMO por idioma na ficha de identificação (R28.21; A-ID7 a A-ID11).
+const IDENT_LANG = {
+  "pt-BR": { greeting: /^(Boa tarde|Bom dia)\b/, plain: (h) => `${h}, tudo bem?`, examples: ["Bom dia", "Boa tarde"], company: (n) => `na ${n}.`, gmo: /\bGMO\b|transg[eê]nic/i },
+  es: { greeting: /^(Buenas tardes|Buenos días)(?=[\s,:])/, plain: (h) => `${h}:`, examples: ["Buenos días", "Buenas tardes"], company: (n) => `en ${n},`, gmo: /\bGMO\b|\bOGM\b|transg[eé]nic|genéticamente modificad/i },
+  en: { greeting: /^(Good afternoon|Good morning)\b/, plain: (h) => `${h},`, examples: ["Good morning", "Good afternoon"], company: (n) => `at ${n},`, gmo: /\bGMO\b|genetically modified|non-GMO/i },
 };
 // Saudação do E-mail 1 da identificação: pt 1.3.0 (2026-10-14) "Boa tarde, tudo bem?" (com nome só se confirmado);
 // versões anteriores começavam com "Olá,". Desde 2026-10-14 (pt 1.4.0) há também a variante "Bom dia", escolhida no envio
 // pelo horário local do destinatário (antes das 12:00).
-const IDENT_HELLO = { "pt-BR": /^((Boa tarde|Bom dia)(, [^,\n]+)?, tudo bem\?|Olá)/ };
+const IDENT_HELLO = {
+  "pt-BR": /^((Boa tarde|Bom dia)(, [^,\n]+)?, tudo bem\?|Olá)/,
+  es: /^(Buenos días|Buenas tardes)(, [^:\n]+)?:/,
+  en: /^Good (morning|afternoon)( [^,\n]+)?,/,
+};
 // Assunto da ficha de identificação (PV9 aplicado a esta ficha, 2026-09-30): diz o objetivo do contato — encontrar o
 // responsável pela compra da commodity —, sem número nem título "criativo". Textos pt/de escritos por Rogério (id-*-1.1.0).
 const IDENT_SUBJECT = {
   "pt-BR": { re: /^Responsável pela compra de [a-zà-ú][a-zà-ú ]*$/, hint: "Responsável pela compra de [commodity]" },
+  es: { re: /^Contacto de compras de [a-záéíóúñü][a-záéíóúñü ]*$/, hint: "Contacto de compras de [commodity]" },
+  en: { re: /^[A-Z][a-z]+( [a-z]+)* purchasing contact$/, hint: "<Commodity> purchasing contact" },
   de: { re: /^Zuständige Person für den [A-ZÄÖÜ][a-zäöüß]+-Einkauf$/, hint: "Zuständige Person für den [Rohstoff]-Einkauf" },
 };
 
@@ -250,29 +273,39 @@ export function reviewIdentification(raw, ctx) {
     const ok = !!ctx.postalAddress && m.body.includes(ctx.postalAddress) && m.body.includes(ctx.unsubUrl(m.contactId)) && L.optOut.test(m.body);
     if (!ok) finding(f, "R19.13", false, `E-mail passo ${m.step} sem endereço físico ou forma de saída.`, { step: m.step, contactId: m.contactId });
   }
-  // E2-b (decisão de Rogério, 2026-10-09): em português, todo e-mail traz o canal do titular no rodapé; a origem do
-  // endereço ("site da empresa") só pode ser dita quando a fonte registrada do canal é o site (PV4).
-  if ((ctx.language || "pt-BR") === "pt-BR") {
-    const src = (m) => ctx.recipients.find((r) => r.contactId === m.contactId)?.sourceLabel || "";
-    const bad = raw.filter((m) => m.kind === "auto_email" && (!m.body.includes(DATA_REQUESTS_EMAIL) || (/no site da empresa/i.test(m.body) && !/\bsite\b|website/i.test(src(m)))));
-    // Texto de 2026-10-14 (pt 1.3.0): canal geral nunca recebe nome inventado; nenhum marcador {{…}} sobra; o E-mail 1
-    // cita a empresa pelo nome da ficha. Nada sobre GMO/transgênico (aceitação de GMO não comprovada).
+  // E2-b (decisão de Rogério, 2026-10-09) e A-ID11 (2026-10-14), em português, espanhol e inglês: todo e-mail traz no
+  // rodapé exatamente a linha de transparência calculada do cadastro (canal do titular e, só com fonte cadastrada, a
+  // origem do endereço: site da empresa ou diretório com o domínio da URL registrada). Nenhuma outra frase de origem.
+  const lang = ctx.language || "pt-BR";
+  const IL = IDENT_LANG[lang];
+  if (IL) {
+    const rec = (m) => ctx.recipients.find((r) => r.contactId === m.contactId);
+    const bad = raw.filter((m) => {
+      if (m.kind !== "auto_email") return false;
+      const expected = privacyLine(lang, rec(m));
+      const origins = m.body.split(ORIGIN_START[lang]).length - 1;
+      return !m.body.includes(DATA_REQUESTS_EMAIL) || !m.body.includes(expected) || origins !== (expected.startsWith(ORIGIN_START[lang]) ? 1 : 0);
+    });
+    // Canal geral nunca recebe nome inventado; nenhum marcador {{…}} sobra; o E-mail 1 cita a empresa pelo nome da ficha.
+    // Nada sobre GMO/transgênico (aceitação de GMO não comprovada).
     const step1 = raw.filter((m) => m.kind === "auto_email" && m.step === 1);
     const greet = step1.filter((m) => {
-      const r = ctx.recipients.find((x) => x.contactId === m.contactId);
       const first = m.body.split("\n")[0];
-      const hello = first.match(/^(Boa tarde|Bom dia)/)?.[1];
-      if (r?.kind === "company_channel" && hello) return first !== `${hello}, tudo bem?`;
+      const hello = first.match(IL.greeting)?.[1];
+      if (rec(m)?.kind === "company_channel" && hello) return first !== IL.plain(hello);
       return false;
     });
     const leftover = raw.filter((m) => m.kind === "auto_email" && /\{\{|\}\}/.test(`${m.subject ?? ""}\n${m.body}`));
-    const noCompany = ctx.companyName ? step1.filter((m) => /^(Boa tarde|Bom dia)/.test(m.body) && !m.body.includes(`na ${ctx.companyName.trim().replace(/\.+$/, "")}.`)) : [];
+    const name = ctx.companyName?.trim().replace(/\.+$/, "");
+    const noCompany = name ? step1.filter((m) => IL.greeting.test(m.body) && !m.body.includes(IL.company(name))) : [];
     finding(f, "SAUDACAO", !greet.length && !leftover.length && !noCompany.length,
-      greet.length ? "Canal geral recebeu saudação com nome: use \"Boa tarde, tudo bem?\" ou \"Bom dia, tudo bem?\"." : leftover.length ? "Marcador {{…}} não substituído no texto." : noCompany.length ? `E-mail 1 sem o nome da empresa (${ctx.companyName}).` : "Saudação sem nome inventado, marcadores substituídos e empresa citada.");
-    const gmo = raw.filter((m) => m.kind === "auto_email" && /\bGMO\b|transg[eê]nic/i.test(m.body));
+      greet.length ? `Canal geral recebeu saudação com nome: use "${IL.plain(IL.examples[0])}" ou "${IL.plain(IL.examples[1])}".` : leftover.length ? "Marcador {{…}} não substituído no texto." : noCompany.length ? `E-mail 1 sem o nome da empresa (${ctx.companyName}).` : "Saudação sem nome inventado, marcadores substituídos e empresa citada.");
+    const gmo = raw.filter((m) => m.kind === "auto_email" && IL.gmo.test(m.body));
     finding(f, "AFIRMACAO", !gmo.length, gmo.length ? `Passo ${gmo.map((m) => m.step).join(", ")} fala de GMO/transgênico: aceitação não comprovada.` : "Sem afirmação sobre GMO ou transgênico.");
-    finding(f, "TRANSP", !bad.length, bad.length ? `Passo ${bad.map((m) => m.step).join(", ")}: sem o canal do titular no rodapé, ou origem do endereço diferente da fonte registrada.` : "Origem do endereço e canal do titular no rodapé (E2-b).");
+    finding(f, "TRANSP", !bad.length, bad.length ? `Passo ${bad.map((m) => m.step).join(", ")}: rodapé diferente do calculado pelo cadastro (canal do titular ausente ou origem do endereço sem a fonte cadastrada).` : "Origem do endereço (só com fonte cadastrada) e canal do titular no rodapé.");
   }
+  // A-ID10: modelo de identificação em espanhol ou inglês ainda não aprovado expressamente por Rogério → não aprovável.
+  if (ctx.identTemplateDraft) finding(f, "MODELO", false, `Modelo de identificação em ${lang === "es" ? "espanhol" : "inglês"} (${ctx.templatesVersion}) ainda é rascunho: aguarda a aprovação expressa de Rogério.`);
   if (ctx.postalAddress && ctx.postalAddressConfirmed !== true) finding(f, "R19.13", false, ADDRESS_PENDING);
   if (!f.some((x) => x.id === "R19.13")) finding(f, "R19.13", !!ctx.postalAddress, ctx.postalAddress ? "Endereço físico confirmado por Rogério e saída em todos os e-mails." : "Endereço físico da EAG não configurado.");
   return { ok: f.every((x) => x.ok), findings: f };

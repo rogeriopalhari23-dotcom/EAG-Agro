@@ -49,6 +49,10 @@ check("P2-T12: GET só mostra a confirmação e não suprime (robô de seguranç
   assert.equal(res.status, 200);
   const page = await res.text();
   assert.match(page, /Confirmar descadastro/);
+  // Três idiomas na mesma página (2026-10-14): português, espanhol e inglês; o funcionamento não muda.
+  assert.match(page, /Confirmar baja/);
+  assert.match(page, /¿No desea recibir más mensajes de EAG Agro\?/);
+  assert.match(page, /Unsubscribe/);
   assert.ok(!page.includes("valeverde") && !page.includes("Maria"));
   assert.match(res.headers.get("content-security-policy"), /default-src 'none'/);
   assert.equal(suppressed(ctx.DB), 0);
@@ -58,6 +62,8 @@ check("P2-T12: POST de um clique (RFC 8058) suprime sem login, cancela passos fu
   const r = await ready(ctx);
   const res = await call(ctx.env, r.token, "POST", "List-Unsubscribe=One-Click", { "content-type": "application/x-www-form-urlencoded" });
   assert.equal(res.status, 200);
+  const done = await res.text();
+  for (const s of ["Pronto. Você não receberá mais mensagens.", "Listo. No recibirá más mensajes.", "Done. You will not receive further messages."]) assert.ok(done.includes(s), s);
   assert.equal(suppressed(ctx.DB), 1);
   const st = ctx.DB.raw.prepare("SELECT DISTINCT status,block_reason FROM send_outbox").all();
   assert.deepEqual(st.map((z) => ({ ...z })), [{ status: "cancelled", block_reason: "unsubscribed" }]);
