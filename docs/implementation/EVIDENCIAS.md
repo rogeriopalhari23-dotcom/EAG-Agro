@@ -2533,3 +2533,13 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - **Cópia real, verificação, envio ao Drive e local da senha: pendentes de Rogério.**
 - **OpenClaw:** as três respostas continuam pendentes; nada registrado como "nenhuma" nem como "base irrecuperável".
 - **Não feito:** validação T11, publicação, aprovação de fichas, envio.
+
+## Cópia cifrada do registro de incidentes: conferência (2026-10-15)
+
+- **Informado por Rogério:** script rodado, cópia verificada e arquivo cifrado enviado ao Google Drive.
+- **Verificado por Claude (só leitura), sem resultado:**
+  - `C:\Users\Roger\eag-compass-registros\copia-cifrada\` não existe;
+  - busca recursiva em `C:\Users\Roger` por `eagc-ri-*.7z` e `verificacao-*.txt`: nada;
+  - Drive do conector (`rogeriopalhari23@gmail.com`, confirmado pela listagem de arquivos próprios): nenhum `.7z` (MIME `application/x-7z-compressed`), nenhum título com `eagc` e nenhum arquivo próprio criado desde 15/10.
+- **Conclusão:** a cópia, o relatório e a integridade **não foram confirmados**. Hipóteses a esclarecer com Rogério: script rodado em outro computador ou usuário do Windows, envio para outra conta Google ou nome de arquivo diferente.
+- A evidência `incident_register` continua incompleta. O local da senha continua pendente.

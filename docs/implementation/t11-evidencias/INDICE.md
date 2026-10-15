@@ -22,9 +22,9 @@
 | Estrutura local | **Criada** fora do Git, acesso só de `ROGERIONOTE\Roger`: `REGISTRO-INCIDENTES.md` (modelo e entrada 1) e `INDICE-SHA256.txt` |
 | Entrada 1 (D1, 09/10) | **Registrada** com fatos, impacto observado e lacunas. Classificação **pendente de avaliação**, sem afirmar perda, vazamento nem ausência de impacto |
 | Ferramenta da cópia | 7-Zip 26.04 instalado (pacote oficial, hash do instalador conferido pelo winget). Mecanismo testado só com dados e senha fictícios: `7zAES`, nomes ocultos sem a senha, recuperação idêntica |
-| Cópia cifrada real | **Pendente de Rogério:** rodar `gerar-copia-cifrada.ps1` e digitar a senha no 7-Zip. O script cria a cópia, testa a abertura e a recuperação e compara os SHA-256 |
-| Cópia verificada | **Pendente:** só depois do resultado "CÓPIA VERIFICADA" no log gerado pelo script |
-| Cópia no Google Drive | **Pendente de Rogério:** envio pelo navegador |
+| Cópia cifrada real | **Informada por Rogério em 15/10** (script rodado e cópia verificada). **Não verificada por Claude:** a pasta `C:UsersRogereag-compass-registroscopia-cifrada` não existe, e nenhum `eagc-ri-*.7z` nem `verificacao-*.txt` foi encontrado em `C:UsersRoger` (busca recursiva, 15/10) |
+| Cópia verificada | **Não confirmada:** o relatório de verificação não foi localizado neste computador |
+| Cópia no Google Drive | **Informada por Rogério em 15/10. Não localizada** no Drive de `rogeriopalhari23@gmail.com` (conector, só leitura, 15/10): nenhum `.7z`, nenhum título com `eagc` e nenhum arquivo próprio criado desde 15/10. Comparação de integridade não feita |
 | Local da senha | **Pendente de Rogério:** informar só o local |
 
 A evidência fica completa quando as quatro pendências estiverem cumpridas. A entrada 1 continuar pendente de avaliação não impede que a evidência fique completa: o registro existe e está guardado conforme o procedimento.
