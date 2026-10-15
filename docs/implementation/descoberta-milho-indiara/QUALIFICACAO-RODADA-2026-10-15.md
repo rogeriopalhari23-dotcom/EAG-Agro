@@ -56,7 +56,7 @@
 | **Ração da Fazenda**, Cristianópolis/GO | 04.018.126/0001-44, matriz, Av. Nilza Risso, s/n (ativa, EPP) | 134,0 | Fabricação de ração (CNAE) | Nenhum | Nenhum | Tudo, salvo cadastro |
 | **Rações Garantido (Yabagata)**, Trindade/GO | 21.196.572/0001-68, matriz, Rua 1022, Setor Laguna Parque (ativa, ME) | 75,5 | Fabricação de ração (CNAE) | Nenhum | Nenhum | Endereço em bairro residencial (local da fábrica); uso de milho |
 
-## 3. Excluída nesta rodada
+## 3. Registrada com situação suspensa (fora da qualificação ativa; ver também a rodada B, §3)
 
 - **Rações Ipê (Salto Industrial Comércio de Rações e Grãos)**, Orizona/GO, 49.182.853/0001-80: situação **Suspensa** na Receita desde 07/07/2026.
   - O site próprio exige login do Google e não pôde ser lido.

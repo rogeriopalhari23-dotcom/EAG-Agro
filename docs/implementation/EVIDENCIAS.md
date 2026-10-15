@@ -2616,3 +2616,15 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Mantidas em descoberta, com evidência insuficiente:** 8 candidatas (LF, Camaru, Casa do Milho, Extrafort, Multigrãos, Rações 2 Irmãos, Ração da Fazenda, Rações Garantido).
 - **Excluída:** Rações Ipê, suspensa na Receita.
 - **Não feito:** contato, Snov, e-mails deduzidos, aceite, cadastro, fichas, T11, canais ou campanhas.
+
+## Descoberta e qualificação, rodada B de 15/10/2026 (consumidoras de milho; sem contato)
+
+- **Detalhe:** `descoberta-milho-indiara/QUALIFICACAO-RODADA-2026-10-15-B.md`.
+- **Avanço concreto em 3 candidatas:**
+  - **Usina Caçu** (07.996.345/0001-96, 60,7 km): planta de milho FLEX 360 de 1.200 t/dia instalada; operação atual do milho não comprovada;
+  - **Araguaia S.A., fábrica BAIA** (03.306.578/0055-51, 173,8 km): ração própria "apenas milho e farelo de soja"; fábrica de 12 mil t/ano;
+  - **Rialma Agropecuária, confinamento** (raiz 09.097.534, unidade a conciliar, 224,4 km): 30 mil cabeças; milho moído e silagem na dieta [TCC IF Goiano, 2025].
+- **Compra de terceiros:** nenhuma comprovada nesta rodada. A melhor continua sendo a Usina Rio Verde, da rodada anterior.
+- **Verificadas sem avanço:** SuperFrango, Fazenda Tropical, Denusa, Nova Gália, Goiás Bioenergia, Comigo.
+- **Rações Ipê:** registro mantido com a situação "Suspensa" (Receita, 15/10/2026), sem presumir encerramento.
+- **Não feito:** contato, Snov, aceite, cadastro, fichas, T11, canais ou campanhas.
