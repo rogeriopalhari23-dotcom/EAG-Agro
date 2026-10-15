@@ -2477,3 +2477,17 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Regra D1, só a lista, nada excluído:** com a 0042 aplicada e conferida, fica elegível `d1-remoto-antes-0041-20261014\eag_compass.sql` (30.725.811 bytes, SHA-256 `9bc71f3f5956226327240a8b64ad6b8072ba310edf69fd55fd320748e5c702a5`).
   - Fica o backup vigente `d1-remoto-antes-0042-20261014`.
   - As cópias da ponte e os segredos estão fora da regra.
+
+## Limpeza D1 do backup anterior à 0041 (2026-10-14, autorizada por Rogério)
+
+- **Autorização:** exclusivamente `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0041-20261014\eag_compass.sql`.
+- **Conferência antes de excluir:**
+  - caminho completo igual;
+  - 30.725.811 bytes;
+  - SHA-256 `9bc71f3f5956226327240a8b64ad6b8072ba310edf69fd55fd320748e5c702a5`, igual ao registro.
+- **Execução:** arquivo excluído e pasta vazia removida. Nenhuma divergência.
+- **Preservados:** `d1-remoto-antes-0042-20261014`, `ponte-antes-0.2.0-20261014` (4 arquivos), `ponte-config-antes-prazo-20261006` (1 arquivo) e `segredos-producao-2026-09-24.txt`.
+- **Backup vigente conferido depois:**
+  - 30.876.835 bytes, SHA-256 `d36512526a9420a21d7955adbff04340d62608870565bd672c170f64f6601259` (igual ao registro);
+  - carregado num banco só em memória: `integrity_check` ok, 0 violações de chave estrangeira, 87 tabelas, última migração `0041`, 13 fichas, 29 versões, 28 envios.
+- Alteração só documental; a suíte não foi rodada.
