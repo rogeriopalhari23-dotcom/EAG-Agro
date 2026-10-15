@@ -1,7 +1,7 @@
 # Lista curta consolidada para o aceite de Rogério (15/10/2026): milho GMO, Indiara/GO, 300 km
 
 **Situação:**
-- Nenhuma candidata aceita, cadastrada ou contatada.
+- Araguaia/BAIA aceita e cadastrada em 15/10/2026, sem autorização de contato (§5). As demais não foram aceitas nem cadastradas. Nenhuma foi contatada.
 - Snov não usado; nenhum e-mail deduzido.
 - Fichas, T11, canais e campanhas sem alteração.
 
