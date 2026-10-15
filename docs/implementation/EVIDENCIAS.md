@@ -2515,3 +2515,21 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - 3 fichas brasileiras na v4, 0 aprovações;
   - relação para o CRM da EAG entregue no relatório (razão social, nome fantasia, CNPJ, unidade e município, das fontes do lote aceito);
   - Snov não usado.
+
+## Registro de incidentes: procedimento aprovado e estrutura criada (2026-10-15)
+
+- **Decisão de Rogério:** procedimento aprovado, opção A (cópia cifrada no Google Drive dele).
+- **Estrutura** (fora do Git, acesso só de `ROGERIONOTE\Roger`):
+  - `C:\Users\Roger\eag-compass-registros\incidentes\REGISTRO-INCIDENTES.md`: modelo e entrada 1;
+  - `INDICE-SHA256.txt`: linha 1, SHA-256 `4363ebd9…791b`;
+  - o rascunho anterior foi substituído.
+- **Entrada 1** (indisponibilidade do D1 em 09/10): fatos comprovados, impacto observado e lacunas. As lacunas são: início exato, integridade sem conferência independente, logs de acesso não revisados, leitura da caixa no período não conferida e número de titulares.
+  - **Classificação pendente de avaliação.** Nenhuma afirmação de perda, vazamento ou ausência de impacto.
+- **Cópia cifrada:**
+  - 7-Zip 26.04 instalado pelo winget, com o hash do instalador verificado;
+  - script `C:\Users\Roger\eag-compass-registros\gerar-copia-cifrada.ps1`: 7z, AES-256, `-mhe=on`;
+  - a senha é pedida pelo próprio 7-Zip; o script testa a abertura, recupera numa pasta temporária, compara os SHA-256 e grava só o resultado;
+  - mecanismo conferido com dados e senha fictícios (`7zAES`, nomes ocultos, recuperação idêntica).
+  - **Cópia real, verificação, envio ao Drive e local da senha: pendentes de Rogério.**
+- **OpenClaw:** as três respostas continuam pendentes; nada registrado como "nenhuma" nem como "base irrecuperável".
+- **Não feito:** validação T11, publicação, aprovação de fichas, envio.
