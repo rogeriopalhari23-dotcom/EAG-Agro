@@ -2570,3 +2570,10 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Pendente:** local da senha (Rogério). Evidência `incident_register` incompleta só por isso.
 - **Continuam pendentes:** Cloudflare (aguardando resposta) e declaração do OpenClaw.
 - **Não feito:** validação T11, aprovação de fichas, liberação de envios.
+
+## Evidência `incident_register` concluída (2026-10-15)
+
+- **Local da senha, informado por Rogério:** gerenciador de senhas pessoal, separado do arquivo cifrado no Drive. Só o local foi registrado; nem a senha nem o acesso ao gerenciador foram pedidos.
+- **`incident_register`:** concluída no escopo do procedimento aprovado: procedimento, estrutura fora do Git, entrada 1 (classificação pendente de avaliação), cópia `eagc-ri-20261015T0307Z.7z` verificada (local e Drive idênticos, privada) e local da senha.
+- **Evidências T11:** 4 de 5. Falta `transfer_mechanism` (Cloudflare, aguardando resposta). A declaração do OpenClaw continua pendente.
+- Alteração só documental; a suíte não foi rodada. Validação T11 não registrada.

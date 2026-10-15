@@ -65,7 +65,8 @@
 1. **Local da cópia cifrada:** **A, escolhida.** 7-Zip, formato 7z, AES-256, cabeçalho cifrado (`-mhe=on`, nomes dos arquivos cifrados), enviado por Rogério ao Google Drive dele pelo navegador.
    - A senha é digitada por Rogério no próprio 7-Zip e nunca aparece em chat, comando, log ou documento.
    - Script: `C:\Users\Roger\eag-compass-registros\gerar-copia-cifrada.ps1`, fora do Git. Ele cria a cópia, testa a abertura, recupera numa pasta temporária, compara os SHA-256 com os originais e grava só o resultado.
-2. **Onde a senha fica guardada:** **pendente.** Só o local, nunca a senha.
+2. **Onde a senha fica guardada:** gerenciador de senhas pessoal de Rogério, separado do arquivo cifrado no Drive (informado em 15/10/2026). Só o local é registrado.
+3. **Primeira cópia:** `eagc-ri-20261015T0307Z.7z` (registro versão 1), verificada localmente e no Drive em 15/10/2026 (ver `EVIDENCIAS.md`).
 
 **Estrutura criada em 15/10** (fora do Git, acesso só de `ROGERIONOTE\Roger`): `REGISTRO-INCIDENTES.md` (modelo e entrada 1) e `INDICE-SHA256.txt` (primeira linha). O rascunho anterior foi substituído.
 
