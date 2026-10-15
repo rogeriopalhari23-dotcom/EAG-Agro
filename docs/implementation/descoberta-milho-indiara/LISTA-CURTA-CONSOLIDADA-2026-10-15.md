@@ -1,0 +1,64 @@
+# Lista curta consolidada para o aceite de Rogério (15/10/2026): milho GMO, Indiara/GO, 300 km
+
+**Situação:**
+- Nenhuma candidata aceita, cadastrada ou contatada.
+- Snov não usado; nenhum e-mail deduzido.
+- Fichas, T11, canais e campanhas sem alteração.
+
+**Fontes de origem:**
+- `QUALIFICACAO-RODADA-2026-10-15.md` (Usina Rio Verde, Milhão);
+- `QUALIFICACAO-RODADA-2026-10-15-B.md` (Caçu, BAIA/Araguaia, Rialma);
+- aprofundamento do mesmo dia (§3).
+
+## 1. Distâncias: como foram calculadas
+
+- **Método:** linha reta (haversine, raio terrestre de 6.371 km) do **centroide de Indiara** (IBGE 5209952: −17,1852; −49,9682) ao **centroide do município** da unidade (`municipios-300km.csv`).
+- **Recalculadas e conferidas em 15/10/2026:** Vicentinópolis 60,7; Rio Verde 129,2; Abadiânia 173,8; Luziânia 224,4 km.
+- **Nenhuma distância desta lista usa coordenada da unidade.** O endereço real pode estar mais perto ou mais longe que o centroide; Luziânia, por exemplo, tem território extenso.
+- Todas ficam abaixo de 270 km, o limite a partir do qual a base marca "conferir distância".
+
+## 2. Lista curta
+
+### 2.1 Compra de milho de terceiros comprovada (fonte própria) e uso comprovado
+
+| Unidade | CNPJ | km (centroide) | Uso de milho | Compra de terceiros | Canal publicado | GMO | Pendências |
+|---|---|---|---|---|---|---|---|
+| **Usina Rio Verde (DECAL)**, Rio Verde/GO, etanol | 02.043.917/0001-07, matriz, ativa | 129,2 | Etanol de milho, 1.000 t/dia [JornalCana, 11/12/2025]; DDG e WDG [site próprio] | "Compramos milho de agricultores da região" [site próprio, 15/10/2026] | WhatsApp comercial (64) 99293-5898 [site próprio] | Sem restrição encontrada; aceitação **não** confirmada | Recuperação judicial de 2015, situação atual não verificada; responsável de compras |
+
+**Fora da lista para GMO:** Milhão Ingredients compra de produtores parceiros, mas é indústria não transgênica desde 2006, com certificações [TheAgriBiz, 15/02/2024].
+
+### 2.2 Uso de milho comprovado; compra de terceiros **não** comprovada
+
+| Unidade | CNPJ | km (centroide) | Uso de milho | Compra de terceiros | Canal publicado | GMO | Pendências |
+|---|---|---|---|---|---|---|---|
+| **Araguaia S.A., fábrica BAIA Nutrição Animal**, Abadiânia/GO, ração | 03.306.578/0055-51, filial, ativa, CNAE ração, GO-474 km 12; registro MAPA no mesmo CNPJ | 173,8 | Ração "BAIA 24 U Max Leite … utilizando apenas milho e farelo de soja" [loja própria, 15/10/2026]; fábrica de 12.000 t/ano desde 2021 [site próprio] | Não encontrada | **Nenhum canal de suprimentos ou compra de grãos publicado.** O site oficial (`araguaia.com.br/contato`, 15/10/2026) só traz a Central de Atendimento a clientes, (62) 4020-5044 (pedidos, boletos, notas fiscais), e um formulário "Fale Conosco". A loja on-line é de vendas | Sem restrição encontrada; aceitação **não** confirmada | Compra de milho e de quem; canal de suprimentos (**depende de contato**) |
+| **Rialma Agropecuária, confinamento**, Luziânia/GO, bovinos | **A conciliar:** raiz 09.097.534 (Rialma Agropecuária Ltda.), filiais ativas 0003-14 (BR-040, estrada ao Povoado dos Americanos) e 0004-03 (Fazenda Buenos Aires, rodovia municipal a 16 km de Luziânia), ambas com CNAE principal cultivo de arroz | 224,4 | Confinamento com capacidade estática de 30 mil cabeças, em expansão para 40 mil; milho moído entre os principais ingredientes e silagem de milho [TCC IF Goiano, estágio de 11/2024 a 05/2025, depositado em 15/08/2025] | Não encontrada | **Canal corporativo geral do grupo** (site oficial `gruporialma.com.br`, rodapé, 15/10/2026): `contato@gruporialma.com.br`, (61) 3298-8800, SIA Trecho 17, Guará, Brasília/DF. É do Grupo Rialma (Rialma S/A), não específico do confinamento nem de compras | Sem restrição encontrada; aceitação **não** confirmada | CNPJ da unidade (**depende de contato**); compra de milho grão |
+
+**Sobre a Rialma:**
+- O site do grupo diz: fazendas "distribuídas pelos estados de Goiás e Tocantins", com "produção de 60 mil cabeças de boi por ano".
+- Nenhuma fonte verificável liga o confinamento a uma das duas filiais.
+- Um resumo de busca atribuiu o confinamento à Fazenda Buenos Aires, mas só repetia o endereço cadastral da filial 0004-03, sem fonte para o vínculo. **Não foi adotado.**
+
+### 2.3 Instalação para milho comprovada; uso atual **não** comprovado
+
+| Unidade | CNPJ | km (centroide) | O que está comprovado | Pendências |
+|---|---|---|---|---|
+| **Usina Caçu**, Vicentinópolis/GO, etanol | 07.996.345/0001-96, matriz, ativa | 60,7 | Flex de cana e milho, certificada no RenovaBio [Copersucar, 31/03/2020]; módulo de milho FLEX 360 de 1.200 t/dia [Piracicaba Engenharia, sem data] | Moagem de milho na safra atual; compra de terceiros; canal oficial |
+
+## 3. Aprofundamento de 15/10/2026: encerrado
+
+| Lacuna | O que foi consultado | Resultado | Depende de contato futuro |
+|---|---|---|---|
+| Araguaia: canal de suprimentos ou compra de grãos | Site oficial (`/contato`); busca por fornecedores, compras e suprimentos; página de vagas (Gupy) | Só canais de clientes; nenhum canal de fornecedores ou de compra de grãos | Sim: quem compra o milho da fábrica BAIA e por qual canal |
+| Rialma: CNPJ da unidade do confinamento | Receita (2 filiais em Luziânia); TCC IF Goiano; site oficial do grupo; busca por "Confinamento Rialma" com endereço | O endereço do confinamento não aparece em fonte verificável | Sim: qual CNPJ opera o confinamento |
+| Rialma: canal corporativo oficial | Site oficial do grupo | `contato@gruporialma.com.br` e (61) 3298-8800, canal geral do grupo | Indicação do responsável de compras de milho |
+
+Pesquisa encerrada nessas lacunas. Só reabrir com **fonte nova** (por exemplo, licença ambiental do confinamento com o CNPJ, ou anúncio de compra de grãos da Araguaia).
+
+## 4. Prioridades e porte
+
+- O porte grande, isoladamente, **não** exclui candidatas. A **Comigo** (fábrica de rações em Rio Verde, cooperativa que origina e armazena milho) continua candidata na base. Ela não foi aprofundada nesta rodada por falta de fonte nova conferida, não por porte.
+- As prioridades definidas continuam:
+  - consumidoras finais antes de revendedores e traders;
+  - evidência de uso e de compra antes de canal;
+  - médias primeiro, sem tratar "Demais" como prova de porte médio.

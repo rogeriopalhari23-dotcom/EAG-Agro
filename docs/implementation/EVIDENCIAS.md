@@ -2628,3 +2628,16 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Verificadas sem avanço:** SuperFrango, Fazenda Tropical, Denusa, Nova Gália, Goiás Bioenergia, Comigo.
 - **Rações Ipê:** registro mantido com a situação "Suspensa" (Receita, 15/10/2026), sem presumir encerramento.
 - **Não feito:** contato, Snov, aceite, cadastro, fichas, T11, canais ou campanhas.
+
+## Lista curta consolidada e aprofundamento de BAIA e Rialma (15/10/2026, sem contato)
+
+- **Consolidada em** `descoberta-milho-indiara/LISTA-CURTA-CONSOLIDADA-2026-10-15.md`:
+  - compra de terceiros comprovada: Usina Rio Verde;
+  - uso comprovado, sem compra comprovada: BAIA/Araguaia e Rialma;
+  - instalação para milho com uso atual não comprovado: Caçu;
+  - fora para GMO: Milhão, com restrição não transgênica.
+- **Araguaia/BAIA:** o site oficial só tem canais de clientes; nenhum canal de suprimentos ou de compra de grãos. Depende de contato.
+- **Rialma:** o CNPJ da unidade do confinamento não foi conciliado (2 filiais ativas em Luziânia; nenhuma fonte liga o confinamento a uma delas). Canal corporativo geral do grupo: `contato@gruporialma.com.br`, (61) 3298-8800 (site oficial). Depende de contato.
+- **Distâncias:** recalculadas por haversine entre centroides IBGE; conferem com a base. Nenhuma usa a coordenada da unidade.
+- **Comigo:** continua candidata; o porte não exclui.
+- **Não feito:** aceite, cadastro, contato, Snov, fichas, T11, canais ou campanhas.
