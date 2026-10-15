@@ -135,7 +135,11 @@ export async function handleBridge(request, env, path, rid) {
         auditStatement(env, actor, rid, "bridge.hash_mismatch", "send_outbox", outboxId, {}),
       ]);
     }
-    const r = await settleFromBridge(env, tenant, outboxId, token, { kind: input.outcome, detail }, at);
+    // Horário do aceite SMTP informado pela ponte (0043): ISO válido, não no futuro (tolerância de 5 min de relógio) e não
+    // mais antigo que 30 dias. Fora disso, ou ausente (ponte antiga, aceite só comprovado nos enviados), fica nulo.
+    const smtpMs = input.outcome === "accepted" && typeof input.smtpAt === "string" ? Date.parse(input.smtpAt) : NaN;
+    const smtpAt = Number.isFinite(smtpMs) && smtpMs <= Date.parse(at) + 5 * 60000 && smtpMs >= Date.parse(at) - 30 * 86400000 ? new Date(smtpMs).toISOString() : null;
+    const r = await settleFromBridge(env, tenant, outboxId, token, { kind: input.outcome, detail, smtpAt }, at);
     await auditStatement(env, actor, rid, "bridge.result", "send_outbox", outboxId, { outcome: input.outcome, status: r.status, recovered: !!r.recovered }).run();
     if (r.status !== 200) fail(r.status, r.code, "Resultado não aplicado.", { current: r.current ?? null });
     return response(r);

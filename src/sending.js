@@ -287,7 +287,7 @@ export async function settleFromBridge(env, tenant, outboxId, token, result, at,
   if (row.status === done && !(row.status === "indeterminate" && row.block_reason === "lease_expired")) return { status: 200, outcome: result.kind, idempotent: true };
   if (row.status === "indeterminate" && row.block_reason === "lease_expired" && result.kind === "accepted") {
     await env.DB.batch([
-      s(env, "UPDATE send_outbox SET status='accepted',accepted_at=?,resolved_by='bridge',resolved_reason=?,updated_at=? WHERE id=? AND status='indeterminate' AND lease_token=?", at, result.detail ?? "aceito pelo SMTP (informado pela ponte)", at, row.id, token),
+      s(env, "UPDATE send_outbox SET status='accepted',accepted_at=?,smtp_accepted_at=?,resolved_by='bridge',resolved_reason=?,updated_at=? WHERE id=? AND status='indeterminate' AND lease_token=?", at, result.smtpAt ?? null, result.detail ?? "aceito pelo SMTP (informado pela ponte)", at, row.id, token),
       log(env, row.id, "accepted_after_lease_expired", result.detail ?? null, token),
       ...(await copyOnAccept(env, row, at)),
       s(env, "UPDATE sender_state SET day=?,sent_today=?,ramp_started_on=COALESCE(ramp_started_on,?) WHERE tenant_id=? AND sender=?", senderDay, sentToday + 1, senderDay, tenant, sender),
@@ -320,7 +320,8 @@ async function settle(env, row, token, result, at, sentToday, senderDay, interva
         ]
       : [];
     return env.DB.batch([
-      s(env, `UPDATE send_outbox SET status='accepted',accepted_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE ${fence}`, at, at, row.id, token),
+      // accepted_at: registro no Compass; smtp_accepted_at: aceite SMTP informado pela ponte (0043), quando houver.
+      s(env, `UPDATE send_outbox SET status='accepted',accepted_at=?,smtp_accepted_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE ${fence}`, at, result.smtpAt ?? null, at, row.id, token),
       ...shift,
       log(env, row.id, "accepted", null, token),
       ...(await copyOnAccept(env, row, at)),

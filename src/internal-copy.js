@@ -45,7 +45,13 @@ export async function buildCopy(env, outbox, copy) {
   if (!msg) return null;
   const link = await unsubUrl(env, msg.versionId, outbox.contact_id);
   const to = await decryptPii((await s(env, "SELECT email_encrypted FROM contacts WHERE id=?", outbox.contact_id).first())?.email_encrypted, env);
-  const intro = `Cópia interna (contrato de franquia) do e-mail enviado em ${String(outbox.accepted_at).slice(0, 16).replace("T", " ")} UTC a ${to ?? "[destinatário excluído]"} — passo ${outbox.step_no}. O link de descadastro do destinatário foi omitido.`;
+  // Horários distintos (0043): aceite SMTP informado pela ponte e registro desse aceite no Compass. Sem o aceite SMTP,
+  // a cópia diz que só há o horário do registro, sem apresentá-lo como horário do envio.
+  const hhmmss = (iso) => String(iso).slice(0, 19).replace("T", " ");
+  const when = outbox.smtp_accepted_at
+    ? `aceito pelo servidor de envio em ${hhmmss(outbox.smtp_accepted_at)} UTC (aceite registrado no Compass em ${hhmmss(outbox.accepted_at)} UTC)`
+    : `com aceite registrado no Compass em ${hhmmss(outbox.accepted_at)} UTC (horário do aceite pelo servidor de envio não informado pela ponte)`;
+  const intro = `Cópia interna (contrato de franquia) do e-mail ${when} a ${to ?? "[destinatário excluído]"} — passo ${outbox.step_no}. O link de descadastro do destinatário foi omitido.`;
   const text = `${intro}\n\n${replaceAll(msg.body, link, UNSUB_PLACEHOLDER)}`;
   const html = msg.html ? `<p>${intro.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>${replaceAll(msg.html, link, UNSUB_PLACEHOLDER)}` : null;
   // Garantia: nenhum vestígio do link do prospect na cópia.

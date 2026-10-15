@@ -24,7 +24,8 @@ export async function recover({ compass, imap, journal, log }) {
     } else if (j.outcome === "not_sent") {
       report = { outcome: "indeterminate", evidence: j.smtp_text || "não enviado" };
     } else {
-      report = { outcome: j.outcome, sentSha256: j.sha256, smtp: { code: j.smtp_code, text: j.smtp_text } };
+      // Queda depois do SMTP: o horário do aceite é o gravado no diário naquele momento, não o da recuperação.
+      report = { outcome: j.outcome, sentSha256: j.sha256, smtp: { code: j.smtp_code, text: j.smtp_text }, ...(j.outcome === "accepted" && j.smtp_at ? { smtpAt: j.smtp_at } : {}) };
     }
     try {
       await compass.call("/api/bridge/result", { ...m, ...report });
@@ -98,7 +99,8 @@ export async function sendOne({ compass, smtp, imap, journal, log, fault, copyAl
   }
   if (journal.alreadyAccepted(m.outboxId)) {
     journal.notSent(m, "passo já aceito pelo SMTP em lease anterior");
-    await compass.call("/api/bridge/result", { outboxId: m.outboxId, leaseToken: m.leaseToken, outcome: "accepted", sentSha256: m.sha256, evidence: "já aceito antes (diário da ponte)" });
+    const smtpAt = journal.acceptedAt(m.outboxId);
+    await compass.call("/api/bridge/result", { outboxId: m.outboxId, leaseToken: m.leaseToken, outcome: "accepted", sentSha256: m.sha256, evidence: "já aceito antes (diário da ponte)", ...(smtpAt ? { smtpAt } : {}) });
     journal.reported(m);
     return { sent: false, reason: "already_accepted" };
   }
@@ -112,11 +114,13 @@ export async function sendOne({ compass, smtp, imap, journal, log, fault, copyAl
   fault?.("before_smtp");
   journal.smtpStarted(m);
   const r = await smtp.send(raw, envelope);
-  journal.smtpDone(m, r);
+  // Instante da resposta do SMTP, gravado no diário antes de qualquer chamada de rede (sobrevive a queda).
+  const smtpAt = new Date().toISOString();
+  journal.smtpDone(m, r, smtpAt);
   if (r.kind === "accepted") fault?.("after_smtp");
   log("smtp_result", { outboxId: m.outboxId, kind: r.kind, code: r.code ?? null });
   if (r.kind === "accepted") await imap.appendSent(raw).catch((e) => log("append_sent_failed", { code: e.code ?? null }));
-  await compass.call("/api/bridge/result", { outboxId: m.outboxId, leaseToken: m.leaseToken, outcome: r.kind, sentSha256: m.sha256, smtp: { code: r.code, text: r.text } });
+  await compass.call("/api/bridge/result", { outboxId: m.outboxId, leaseToken: m.leaseToken, outcome: r.kind, sentSha256: m.sha256, smtp: { code: r.code, text: r.text }, ...(r.kind === "accepted" ? { smtpAt } : {}) });
   journal.reported(m);
   return { sent: r.kind === "accepted", reason: r.kind, stop: r.stop ?? null };
 }

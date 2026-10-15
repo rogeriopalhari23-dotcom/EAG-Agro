@@ -11,7 +11,7 @@ import { smtpClient, imapClient } from "./mail.js";
 import { openJournal } from "./journal.js";
 import { runCycle } from "./cycle.js";
 
-const VERSION = "eag-mail-bridge/0.2.0"; // 0.2.0 (2026-10-14): cópia interna D5-a, diário de cópias, aceitação parcial indeterminada
+const VERSION = "eag-mail-bridge/0.2.1"; // 0.2.0 (2026-10-14): cópia interna D5-a, diário de cópias, aceitação parcial indeterminada; 0.2.1 (2026-10-15): horário do aceite SMTP no diário e no resultado
 const env = process.env;
 function secret(name) {
   if (env.CREDENTIALS_DIRECTORY) {

@@ -15,18 +15,22 @@ export function openJournal(path) {
       outbox_id TEXT NOT NULL, lease_token INTEGER NOT NULL, message_id TEXT NOT NULL,
       state TEXT NOT NULL, outcome TEXT, smtp_code INTEGER, smtp_text TEXT, updated_at TEXT NOT NULL,
       PRIMARY KEY (outbox_id, lease_token));`);
+  // smtp_at (0.2.1): instante em que o SMTP respondeu ao passo; diários antigos ganham a coluna sem perder registros.
+  if (!db.prepare("PRAGMA table_info(sends)").all().some((c) => c.name === "smtp_at")) db.exec("ALTER TABLE sends ADD COLUMN smtp_at TEXT");
   const redact = (t) => (t ?? "").slice(0, 160).replace(/[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]+\.[a-z]{2,}/gi, "[endereço]");
   const at = () => new Date().toISOString();
   const q = (sql) => db.prepare(sql);
   return {
     claimed: (m) => q("INSERT OR IGNORE INTO sends(outbox_id,lease_token,message_id,sha256,state,updated_at) VALUES (?,?,?,?,'claimed',?)").run(m.outboxId, m.leaseToken, m.messageId, m.sha256, at()),
     smtpStarted: (m) => q("UPDATE sends SET state='smtp_started',updated_at=? WHERE outbox_id=? AND lease_token=? AND state='claimed'").run(at(), m.outboxId, m.leaseToken),
-    smtpDone: (m, r) => q("UPDATE sends SET state='smtp_done',outcome=?,smtp_code=?,smtp_text=?,updated_at=? WHERE outbox_id=? AND lease_token=?").run(r.kind, r.code ?? null, (r.text ?? "").slice(0, 160).replace(/[^\s<>"'(),;:[\]]+@[^\s<>"'(),;:[\]]+\.[a-z]{2,}/gi, "[endereço]"), at(), m.outboxId, m.leaseToken),
+    smtpDone: (m, r, smtpAt = at()) => q("UPDATE sends SET state='smtp_done',outcome=?,smtp_code=?,smtp_text=?,smtp_at=?,updated_at=? WHERE outbox_id=? AND lease_token=?").run(r.kind, r.code ?? null, redact(r.text), smtpAt, at(), m.outboxId, m.leaseToken),
     notSent: (m, why) => q("UPDATE sends SET state='smtp_done',outcome='not_sent',smtp_text=?,updated_at=? WHERE outbox_id=? AND lease_token=?").run(why, at(), m.outboxId, m.leaseToken),
     reported: (m) => q("UPDATE sends SET state='reported',updated_at=? WHERE outbox_id=? AND lease_token=?").run(at(), m.outboxId, m.leaseToken),
     pending: () => q("SELECT * FROM sends WHERE state IN ('claimed','smtp_started','smtp_done') ORDER BY updated_at").all(),
     // Mesmo passo já aceito pelo SMTP (com qualquer lease): nunca enviar de novo.
     alreadyAccepted: (outboxId) => !!q("SELECT 1 FROM sends WHERE outbox_id=? AND outcome='accepted' LIMIT 1").get(outboxId),
+    // Instante do aceite SMTP original do passo (qualquer lease), para informar de novo sem reenviar.
+    acceptedAt: (outboxId) => q("SELECT smtp_at FROM sends WHERE outbox_id=? AND outcome='accepted' ORDER BY updated_at LIMIT 1").get(outboxId)?.smtp_at ?? null,
     copy: {
       claimed: (c) => q("INSERT OR IGNORE INTO copies(outbox_id,lease_token,message_id,state,updated_at) VALUES (?,?,?,'claimed',?)").run(c.outboxId, c.leaseToken, c.messageId, at()),
       smtpStarted: (c) => q("UPDATE copies SET state='smtp_started',updated_at=? WHERE outbox_id=? AND lease_token=? AND state='claimed'").run(at(), c.outboxId, c.leaseToken),

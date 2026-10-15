@@ -11,7 +11,7 @@ import { setup } from "../../tests/helpers/db.mjs";
 import { compassClient } from "../src/compass.js";
 import { openJournal } from "../src/journal.js";
 import { smtpClient } from "../src/mail.js";
-import { runCycle, readReplies, recoverCopies, sendCopyOne } from "../src/cycle.js";
+import { runCycle, readReplies, recover, recoverCopies, sendCopyOne } from "../src/cycle.js";
 
 const KEY = Buffer.alloc(32, 9).toString("base64");
 const INTERNAL = "rogeriopalhari23@gmail.com";
@@ -373,4 +373,112 @@ test("Cópia: parâmetro só do Administrador, com motivo, endereço válido e r
   DB.raw.exec("INSERT INTO users(id,tenant_id,email,display_name,role) VALUES ('manager','eag-internal','gestor@example.test','Gestor','commercial_manager')");
   env.LOCAL_USER_EMAIL = "gestor@example.test";
   assert.equal((await put({ enabled: false })).status, 403, "gestor não altera a cópia");
+});
+
+// Horário do aceite SMTP (0043, ponte 0.2.1): o aceite do servidor e o registro do aceite no Compass são instantes
+// distintos; a cópia diz os dois, e nunca apresenta o registro como horário do envio.
+const outbox1 = (DB) => ({ ...DB.raw.prepare("SELECT * FROM send_outbox WHERE step_no=1").get() });
+const intro = (raw) => qp(raw).split(/\r?\n\r?\n/).find((p) => p.includes("Cópia interna (contrato de franquia)"));
+const hms = (iso) => iso.slice(0, 19).replace("T", " ");
+
+test("Horário: aceite normal grava o instante do SMTP informado pela ponte; a cópia mostra aceite e registro, com o texto que saiu", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  const d = deps(ctx);
+  assert.equal((await runCycle(d)).sent, true);
+  const o = outbox1(ctx.DB);
+  assert.ok(o.smtp_accepted_at, "aceite SMTP gravado");
+  assert.ok(o.smtp_accepted_at <= o.accepted_at, "aceite SMTP não depois do registro");
+  const [p, c] = d.smtp.raws;
+  const text = intro(c.raw);
+  assert.ok(text.includes(`aceito pelo servidor de envio em ${hms(o.smtp_accepted_at)} UTC`), text);
+  assert.ok(text.includes(`aceite registrado no Compass em ${hms(o.accepted_at)} UTC`), text);
+  // Corpo da cópia = texto que saiu ao destinatário (saudação incluída).
+  const firstLine = qp(p.raw).split(/\r?\n\r?\n/).find((x) => /^(Olá|Bom dia|Boa tarde|Buenos|Buenas|Good|Hi)/.test(x.trim()));
+  assert.ok(firstLine && qp(c.raw).includes(firstLine.trim().split(/\r?\n/)[0]), "saudação enviada reproduzida na cópia");
+});
+
+test("Horário: queda depois do SMTP e antes de avisar — a recuperação informa o instante original do SMTP, sem reenviar", async (t) => {
+  const t0 = Date.now();
+  t.mock.timers.enable({ apis: ["Date"], now: t0 });
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  const d = deps(ctx);
+  const real = d.compass;
+  let dropped = false;
+  const flaky = { call: (p, b) => (p === "/api/bridge/result" && !dropped ? ((dropped = true), Promise.reject(Object.assign(new Error("rede caiu"), { code: "ECONNRESET" }))) : real.call(p, b)) };
+  await runCycle({ ...d, compass: flaky }).catch(() => {});
+  const smtpAt = new Date(Date.now()).toISOString();
+  assert.equal(outbox1(ctx.DB).status, "leased", "Compass ainda não sabe do aceite");
+  t.mock.timers.setTime(t0 + 95_000); // a ponte volta 95 s depois
+  await runCycle(d);
+  const o = outbox1(ctx.DB);
+  assert.equal(o.status, "accepted");
+  assert.equal(prospectSends(d.smtp), 1, "nenhum reenvio ao prospect");
+  assert.ok(Date.parse(o.accepted_at) - Date.parse(o.smtp_accepted_at) >= 90_000, `registro (${o.accepted_at}) depois do aceite SMTP (${o.smtp_accepted_at})`);
+  assert.ok(Math.abs(Date.parse(o.smtp_accepted_at) - Date.parse(smtpAt)) < 2000, "instante original do SMTP, não o da recuperação");
+  const c = d.smtp.raws.find((x) => x.envelope.to[0] === COPY);
+  assert.ok(c, "cópia sai depois do aceite registrado");
+  assert.ok(intro(c.raw).includes(`aceito pelo servidor de envio em ${hms(o.smtp_accepted_at)} UTC (aceite registrado no Compass em ${hms(o.accepted_at)} UTC)`));
+  assert.equal(d.smtp.raws.filter((x) => x.envelope.to[0] === COPY).length, 1, "uma única cópia");
+});
+
+test("Horário: ponte antiga (sem smtpAt) ou aceite só comprovado nos enviados — sem horário SMTP, a cópia diz só o registro", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  const d = deps(ctx);
+  const real = d.compass;
+  const old = { call: (p, b) => real.call(p, p === "/api/bridge/result" ? { ...b, smtpAt: undefined } : b) };
+  await runCycle({ ...d, compass: old });
+  const o = outbox1(ctx.DB);
+  assert.equal(o.status, "accepted");
+  assert.equal(o.smtp_accepted_at, null);
+  const c = d.smtp.raws.find((x) => x.envelope.to[0] === COPY);
+  const text = intro(c.raw);
+  assert.ok(text.includes(`com aceite registrado no Compass em ${hms(o.accepted_at)} UTC (horário do aceite pelo servidor de envio não informado pela ponte)`), text);
+  assert.doesNotMatch(text, /enviado em/);
+});
+
+test("Horário: queda durante o SMTP, mensagem achada nos enviados — aceite fechado sem horário SMTP inventado", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  // SMTP cai no meio: a mensagem pode ter saído, mas a ponte não recebeu resposta (diário fica em smtp_started).
+  const raws = [];
+  const dying = { raws, async send(raw) { raws.push(raw.toString()); throw Object.assign(new Error("conexão caiu durante o SMTP"), { code: "ECONNRESET" }); } };
+  const d = deps(ctx, { smtp: dying });
+  await runCycle(d).catch(() => {});
+  assert.equal(outbox1(ctx.DB).status, "leased");
+  // A caixa guardou a mensagem nos enviados: a recuperação fecha como aceita, sem horário SMTP (não foi observado).
+  d.imap.sent.push(raws[0]);
+  await recover(d);
+  const o = outbox1(ctx.DB);
+  assert.equal(o.status, "accepted");
+  assert.equal(o.smtp_accepted_at, null, "horário do SMTP desconhecido não é inventado");
+  assert.equal(raws.length, 1, "nenhum reenvio");
+});
+
+test("Horário: smtpAt no futuro ou inválido é ignorado; diário antigo ganha a coluna sem perder registros", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  await ready(ctx);
+  const d = deps(ctx);
+  const real = d.compass;
+  const future = { call: (p, b) => real.call(p, p === "/api/bridge/result" && b.outcome === "accepted" ? { ...b, smtpAt: new Date(Date.now() + 3600_000).toISOString() } : b) };
+  await runCycle({ ...d, compass: future });
+  assert.equal(outbox1(ctx.DB).status, "accepted");
+  assert.equal(outbox1(ctx.DB).smtp_accepted_at, null, "horário no futuro não é aceito");
+  // Diário da versão 0.2.0 (sem smtp_at): abre, ganha a coluna e mantém a linha.
+  const { DatabaseSync } = await import("node:sqlite");
+  const path = join(mkdtempSync(join(tmpdir(), "ponte-diario-antigo-")), "journal.sqlite");
+  const old = new DatabaseSync(path);
+  old.exec("CREATE TABLE sends (outbox_id TEXT NOT NULL, lease_token INTEGER NOT NULL, message_id TEXT NOT NULL, sha256 TEXT NOT NULL, state TEXT NOT NULL, outcome TEXT, smtp_code INTEGER, smtp_text TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (outbox_id, lease_token)); INSERT INTO sends VALUES ('o1',1,'<m@x>','h','reported','accepted',250,'OK','2026-10-14T21:13:19Z');");
+  old.close();
+  const j = openJournal(path);
+  assert.equal(j.alreadyAccepted("o1"), true, "registro antigo preservado");
+  assert.equal(j.acceptedAt("o1"), null, "sem horário SMTP no diário antigo");
+  j.close();
 });
