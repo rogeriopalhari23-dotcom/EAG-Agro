@@ -2950,3 +2950,46 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - tela conferida no Chrome sem interface (`tests/ui-rodadas.mjs`);
   - suíte completa: **500 + 2 + 37**, 0 falhas.
 - **Não feito:** publicação, contato, alteração de T11, canais, campanhas ou fichas.
+
+## Publicação da consolidação das rodadas, validade das triagens, contagem por 429 e campo "Pesquisa pública" (2026-10-16, autorizada por Rogério)
+
+- **Conjunto publicado** (de `f05ab0a` para `896ef25`). Arquivos de código: `src/rodada/{batch,closure,config,report,acceptance}.js`, `src/rodada/sources/import.js`, `src/rounds.js`, `public/app.js`.
+  - `a469203`: contagem das consultas adiadas por HTTP 429.
+  - `b952e7d`: fechamento por estabelecimento, triagens com validade, fase da pesquisa pública e comando `consolidar`.
+  - `896ef25`: ajustes antes da publicação (abaixo).
+  - `2c17afe` só traz script local e documentos.
+  - **Nenhuma migração**: produção já estava sem pendências ("No migrations to apply"). Ponte não alterada (0.2.0).
+- **Ajustes antes da publicação** (`896ef25`):
+  - **COMPROP e Aurilândia não têm incompatibilidade real.** Cooperativa pode ter atividade principal de armazenagem ou atacado (Receita) e fábrica de ração registrada no MAPA. A regra deixou de chamar isso de conflito e mostra "papel comercial a confirmar: atividades distintas nas fontes (cadastro oficial: …; registro: fabricante)". O conflito real da SIAP (evidência do cadastro `conflicting`) continua como conflito.
+  - **Papel comercial × atividade industrial.** A atividade industrial registrada em fonte comprovante (registro oficial ou fonte própria dizendo "fabricante") entra como **verificada**. O **papel comercial** (consome, revende, armazena ou origina) fica desconhecido até haver prova e vai para contato futuro.
+  - **Pesquisa pública encerrada não é qualificação comercial completa.** O fechamento mostra as duas coisas separadas, e o painel diz que encerrar a pesquisa "não conclui a qualificação nem promove a empresa".
+  - **"Sem suporte" com ciência não dispensa verificação.** A ciência só autoriza executar a rodada. Aceitar, incluir ou cadastrar exige consulta cadastral concluída, e sem ela a decisão é recusada com o motivo. Teste novo: rodada da Alemanha sem fonte cadastral, com ciência registrada, não aceita, não inclui e não cadastra nada.
+- **Testes:** `rodada-fechamento` (6); tela conferida no Chrome sem interface (`ui-rodadas`, com espera da renderização); suíte completa **501 + 2 + 37**, 0 falhas.
+- **Antes:**
+  - Worker vigente `4d7cfa4c-5511-4b3c-82e0-2e2cf5dec7d0`;
+  - Time Travel `00000814-0000012a-00005106-ea40b70d29add305c09a189297755e93`;
+  - retrato do estado.
+  - Sem migração, não houve backup novo; o vigente continua `d1-remoto-antes-0043-0044-20261016`.
+- **Publicação:** `npm run deploy` (16:33 UTC), com o predeploy completo: 501 + 2 + 37 e `validate-deploy` ok.
+  - Worker **`aefbf8b7-5c99-439c-8da2-356cf258b79f`**.
+  - **Reversão:** `wrangler rollback 4d7cfa4c-5511-4b3c-82e0-2e2cf5dec7d0`. Mesmo esquema; o código anterior ignora os campos novos (`closure`, `lookup`, `research`). Nunca `64808403`. Time Travel e backup só para desastre.
+- **Encerramento da pesquisa pública da Rodada 1**, pelo mecanismo previsto: campo "Pesquisa pública: Encerrada" no formulário da rodada, no painel de produção.
+  - Configuração revisão 1 → 2, e só `research.publicPhase` mudou (o resto é idêntico).
+  - Ciência da revisão 2 registrada pelo botão da tela.
+  - Reexecução com 0 consultas externas: 10 cadastros reaproveitados, 0 adiadas, 0 falhas, 0 alterados.
+  - Nenhuma empresa promovida: as 10 seguem em "Descoberta". Nenhuma pendência eliminada: 73 pendências de contato futuro.
+- **Conferido no painel de produção:**
+  - Início e Tarefas sem aviso de erro; nenhum erro na página;
+  - linha "Pesquisa pública: encerrada. Qualificação comercial incompleta em 10 de 10…";
+  - linha das consultas: 0 feitas, 10 reaproveitadas, 0 adiadas (limite interno ou HTTP 429), 0 com falha;
+  - **10 triagens** "completed, 0 ocorrência(s); válida até 24/10/2026" (19:17 UTC);
+  - fechamento nas 10;
+  - pela API: atividade industrial verificada nas 10; operação comprovada na Campo; conflito só na SIAP; "atividades distintas nas fontes" na COMPROP e na Aurilândia; conferência do limite pendente em Herlan e Pérola.
+- **Preservação** (retratos antes e depois):
+  - conteúdo idêntico (SHA-256) em empresas, evidências, perfis, contatos, fichas, versões, aprovações, envios, cópias, supressões, canais, campanhas, tarefas, T11 e parâmetros;
+  - só mudaram `audit_log` (+3: configuração, ciência e execução) e `bridge_nonces` (rotação normal);
+  - os 10 cadastros e a ausência de decisões da rodada se mantêm (0 antes e 0 depois).
+- **Estado mantido:** T11 com 0 validações; canais `planned`; campanhas 2 `draft` + 1 `ended`; cópia `{"enabled":false}`; `send_outbox` 28, o último de 14/10, nenhum envio novo.
+- **Ponte:** leitura bem-sucedida às 16:38:24 UTC, depois da publicação.
+- **Relatório e exportação de produção:** `rodadas/rodada-1-milho-indiara-100km/relatorio.md` e `exportacao.json`, gerados pelo painel. Eles trazem as cinco seções do fechamento. O `relatorio-consolidado.md` anterior fica como a versão gerada localmente antes da publicação.
+- **Caminho no painel:** menu lateral → **Rodadas** → "Rodada 1 — milho GMO, Indiara/GO, 100 km (16/10/2026)" → Abrir → Resultados. A linha da fase e a das consultas ficam no topo; em cada estabelecimento estão "Fechamento: pesquisa pública encerrada · qualificação comercial incompleta" e a linha da triagem com validade.

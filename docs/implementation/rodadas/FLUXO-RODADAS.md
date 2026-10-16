@@ -176,13 +176,20 @@ Onde o fechamento aparece:
   - `scripts/qualificar-lote.mjs`: qualificação assistida de empresas já cadastradas, pelas rotas existentes, sem duplicar;
   - `node scripts/rodada.mjs consolidar <id> --d1 <banco> --remote [--encerrar] --saida <pasta>`: fechamento de uma rodada já executada, só lendo o banco, sem consultar fontes.
 
-### Situação atual
+### Situação atual (publicado em 16/10/2026, Worker `aefbf8b7`)
 
-| Funciona pelo painel em produção (Worker `4d7cfa4c`) | No repositório, aguarda publicação | Exige pesquisa assistida ou fonte externa |
-|---|---|---|
-| Criar e configurar a rodada, área IBGE, limitações e ciência | Fechamento por estabelecimento e triagem com validade no painel | Prova de uso e de compra de terceiros (fonte própria, documento oficial ou contato) |
-| Importação (SIPEAGRO, CSV/JSON) e pesquisa assistida | Contagem das consultas adiadas por HTTP 429 (`a469203`) | Responsável e canal de compras |
-| Consulta à Receita com limite entre execuções, conciliação, reexecução sem duplicar | Campo "Pesquisa pública" (aberta/encerrada) no formulário | Localização exata da unidade sem coordenada (ex.: ruas fora do OSM) |
-| Revisão, decisão em lote com histórico, cadastro em descoberta com triagem | Conflitos do cadastro (`conflicting`) dentro da rodada | Porte quando a Receita não informa |
-| Exportação e relatório (sem as seções de fechamento) | — | OpenStreetMap: falhou (502) na rodada real; disponibilidade não comprovada |
-| — | — | **Países fora do Brasil:** sem conjunto de municípios, fonte cadastral nem regra de identificador integrados. **Não há suporte completo**; a tela mostra "Sem suporte" e exige ciência |
+| Funciona pelo painel em produção | Exige pesquisa assistida ou fonte externa |
+|---|---|
+| Criar e configurar a rodada, área IBGE, limitações e ciência | Prova de uso e de compra de terceiros (fonte própria, documento oficial ou contato) |
+| Importação (SIPEAGRO, CSV/JSON) e pesquisa assistida | Papel comercial (consome, revende, armazena, origina), responsável e canal de compras |
+| Consulta à Receita com limite entre execuções; contagem de adiadas por limite interno ou HTTP 429 | Localização exata da unidade sem coordenada (ex.: ruas fora do OSM) |
+| Conciliação, reexecução sem duplicar, revisão, decisão em lote com histórico | Porte quando a Receita não informa |
+| Cadastro em descoberta com triagem; aceitar, incluir ou cadastrar exige consulta cadastral concluída | OpenStreetMap: falhou (502) na rodada real; disponibilidade não comprovada |
+| Fechamento por estabelecimento (verificado, conflitos, desconhecidos, contato futuro); triagens com validade; campo "Pesquisa pública" | **Países fora do Brasil:** sem conjunto de municípios, fonte cadastral nem regra de identificador integrados. **Não há suporte completo.** A tela mostra "Sem suporte" e exige ciência, e a ciência **não dispensa** fonte, identificador nem verificação: sem consulta cadastral, nada é aceito nem cadastrado pela rodada |
+| Exportação e relatório com as seções do fechamento | — |
+
+Regras de leitura do fechamento:
+
+- Atividades diferentes no cadastro oficial e no registro de atividade (ex.: armazenagem na CNAE e fabricante no MAPA) **não são conflito**: aparecem como "papel comercial a confirmar".
+- A atividade industrial registrada conta como verificada; o papel comercial é outra pergunta.
+- Encerrar a pesquisa pública não conclui a qualificação comercial nem muda a etapa da empresa.

@@ -2,8 +2,8 @@
  "round": {
   "id": "dee25927-b941-48aa-a74f-7bc78a278fea",
   "name": "Rodada 1 — milho GMO, Indiara/GO, 100 km (16/10/2026)",
-  "revision": 1,
-  "exportedAt": "2026-10-16T01:22:07.256Z"
+  "revision": 2,
+  "exportedAt": "2026-10-16T16:40:01.328Z"
  },
  "config": {
   "id": "milho-gmo-indiara-100km-r1",
@@ -169,6 +169,9 @@
   "compliance": {
    "scope": "br_email_automatic",
    "sanctionsMaxAgeHours": 720
+  },
+  "research": {
+   "publicPhase": "closed"
   }
  },
  "preflight": {
@@ -365,7 +368,116 @@
    ],
    "conciliatedFrom": [
     "BR:nome:cooperativa mista dos produtores rurais de pontalina|pontalina|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Pontalina/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/17802890000239"
+      ],
+      "at": "2026-10-16T00:42:14.626Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar: atividades distintas nas fontes (cadastro oficial: armazenagem, 5211-7/01 Armazéns gerais - emissão de warrant; registro: fabricante)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "size",
+      "text": "Porte",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 59.7 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar: atividades distintas nas fontes (cadastro oficial: armazenagem, 5211-7/01 Armazéns gerais - emissão de warrant; registro: fabricante)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "size",
+      "text": "Porte"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 59.7 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:09276439000205",
@@ -484,7 +596,107 @@
    ],
    "conciliatedFrom": [
     "BR:nome:p s produtos agropecuarios ltda|abadia de goias|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Abadia de Goiás/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/09276439000205"
+      ],
+      "at": "2026-10-16T00:42:14.626Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 70.6 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 70.6 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:21196572000168",
@@ -597,7 +809,107 @@
    ],
    "conciliatedFrom": [
     "BR:nome:yabagata nutricao animal ltda|trindade|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Trindade/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/21196572000168"
+      ],
+      "at": "2026-10-16T00:42:14.626Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 75.5 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 75.5 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:54478827000134",
@@ -724,7 +1036,107 @@
    ],
    "conciliatedFrom": [
     "BR:nome:rural cria industria e comercio de racoes ltda|trindade|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Trindade/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/54478827000134"
+      ],
+      "at": "2026-10-16T00:46:21.220Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 75.5 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 75.5 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:11595239000178",
@@ -836,7 +1248,107 @@
    ],
    "conciliatedFrom": [
     "BR:nome:vf industria e comercio de racoes ltda me|hidrolandia|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Hidrolândia/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/11595239000178"
+      ],
+      "at": "2026-10-16T00:46:21.220Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 77 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 77 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:01225945000174",
@@ -962,7 +1474,116 @@
    ],
    "conciliatedFrom": [
     "BR:nome:cooperativa agropecuaria de aurilandia|aurilandia|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Aurilândia/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/01225945000174"
+      ],
+      "at": "2026-10-16T00:46:21.220Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar: atividades distintas nas fontes (cadastro oficial: comércio, 4692-3/00 Comércio atacadista de mercadorias em geral, com predominância de insumos agropecuários; registro: fabricante)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "size",
+      "text": "Porte",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 80.5 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar: atividades distintas nas fontes (cadastro oficial: comércio, 4692-3/00 Comércio atacadista de mercadorias em geral, com predominância de insumos agropecuários; registro: fabricante)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "size",
+      "text": "Porte"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 80.5 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:05621758000160",
@@ -1097,7 +1718,114 @@
    ],
    "conciliatedFrom": [
     "BR:nome:campo racoes ltda|acreuna|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Acreúna/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/05621758000160"
+      ],
+      "at": "2026-10-16T00:37:29.636Z"
+     },
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "sources": [
+       "https://camponutricao.com.br/nossasunidades"
+      ]
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "size",
+      "text": "Porte",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 48.2 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "size",
+      "text": "Porte"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 48.2 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:43177285000143",
@@ -1222,7 +1950,124 @@
    ],
    "conciliatedFrom": [
     "BR:nome:siap racoes nutricao animal e vegetal ltda|acreuna|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Acreúna/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/43177285000143"
+      ],
+      "at": "2026-10-16T00:37:29.636Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [
+     {
+      "field": "registered_evidence",
+      "text": "Evidência do cadastro marcada como conflitante: CONFLITO PRESERVADO. Site do grupo SIAP (siap.com.br, 16/10/2026): 'comércio e distribuição de insumos agrícolas', 'armazenamento e transporte de produtos', 'armazém localizado na cidade de Acreúna-GO possui capacidade para 76 mil toneladas de grãos', unidade Av. São Felipe 495. ",
+      "sources": [
+       "https://siap.com.br/"
+      ]
+     }
+    ],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "size",
+      "text": "Porte",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 48.2 km (ESTIMADA: centroide do município))",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "size",
+      "text": "Porte"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 48.2 km (ESTIMADA: centroide do município))"
+     }
+    ]
+   }
   },
   {
    "key": "BR:50478250000100",
@@ -1340,7 +2185,107 @@
    ],
    "conciliatedFrom": [
     "BR:nome:industria e comercio de racoes herlan ltda|caturai|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Caturaí/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/50478250000100"
+      ],
+      "at": "2026-10-16T00:49:03.065Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 91 km (ESTIMADA: centroide do município)); conferência do limite pendente",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 91 km (ESTIMADA: centroide do município)); conferência do limite pendente"
+     }
+    ]
+   }
   },
   {
    "key": "BR:41809266000167",
@@ -1454,7 +2399,107 @@
    ],
    "conciliatedFrom": [
     "BR:nome:racoes perola eireli|adelandia|GO"
-   ]
+   ],
+   "lookup": {
+    "status": "cached",
+    "source": "br-cnpj-ws"
+   },
+   "closure": {
+    "publicResearch": "closed",
+    "commercialQualification": "incomplete",
+    "commercialMissing": [
+     "commodity_use",
+     "purchase",
+     "variety_acceptance",
+     "commercial_role",
+     "purchasing_channel"
+    ],
+    "verified": [
+     {
+      "field": "registry",
+      "text": "Cadastro oficial consultado: situação Ativa, Adelândia/GO",
+      "sources": [
+       "https://publica.cnpj.ws/cnpj/41809266000167"
+      ],
+      "at": "2026-10-16T00:49:03.065Z"
+     },
+     {
+      "field": "industrial_activity",
+      "text": "Atividade industrial registrada (fabricante)",
+      "sources": [
+       "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file"
+      ]
+     }
+    ],
+    "conflicts": [],
+    "unknown": [
+     {
+      "field": "operation",
+      "text": "Operação atual",
+      "level": "indication"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho",
+      "level": "indication"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros",
+      "level": "none"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO",
+      "level": "none"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)",
+      "level": "none"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras",
+      "level": "none"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 93.6 km (ESTIMADA: centroide do município)); conferência do limite pendente",
+      "level": "indication"
+     }
+    ],
+    "contact": [
+     {
+      "field": "operation",
+      "text": "Operação atual"
+     },
+     {
+      "field": "commodity_use",
+      "text": "Uso de milho"
+     },
+     {
+      "field": "purchase",
+      "text": "Compra de terceiros"
+     },
+     {
+      "field": "variety_acceptance",
+      "text": "Aceitação de GMO"
+     },
+     {
+      "field": "commercial_role",
+      "text": "Papel comercial a confirmar (consome, revende, armazena ou origina)"
+     },
+     {
+      "field": "purchasing_channel",
+      "text": "Responsável e canal de compras"
+     },
+     {
+      "field": "unit_location",
+      "text": "Localização da unidade (distância 93.6 km (ESTIMADA: centroide do município)); conferência do limite pendente"
+     }
+    ]
+   }
   }
  ],
  "decisions": [],
@@ -1801,5 +2846,117 @@
     }
    }
   }
- ]
+ ],
+ "screenings": {
+  "BR:01225945000174": {
+   "companyId": "0c80efda-5256-4dac-a178-cdf0971bac64",
+   "runId": "7b204956-7907-4e59-8ca6-7a1744033d16",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:25.529Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:05621758000160": {
+   "companyId": "bc68d221-0ec5-492b-9dbb-e2b711d1b92e",
+   "runId": "ee0e47a6-6bed-4ad7-9e88-dbee312541b0",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:27.019Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:09276439000205": {
+   "companyId": "34f3f6eb-449e-452a-b884-aedabfacdbac",
+   "runId": "d0d1d09c-02e7-48ec-9d9e-32015efdafaf",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:19.304Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:11595239000178": {
+   "companyId": "b3fb678b-36a7-4cda-a4ad-a702b7e188a6",
+   "runId": "34cee6be-10e0-4bd2-b756-659252a92c36",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:23.970Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:17802890000239": {
+   "companyId": "f46c0e88-c590-4cdc-bc45-351d8bb6ce8b",
+   "runId": "b5c391d5-75d1-4ba9-ad21-7a1e3de71090",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:17.802Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:21196572000168": {
+   "companyId": "697a7287-97e0-4297-9e5b-191cc61f64a8",
+   "runId": "14fef13d-7f7b-41a0-980e-ca853aa459cc",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:20.918Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:41809266000167": {
+   "companyId": "6c404026-b73d-4230-91a9-74348ded33a5",
+   "runId": "3a04e97e-075d-4ccf-b1f4-51a61869ce8c",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:31.467Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:43177285000143": {
+   "companyId": "e41f2793-1b8a-4095-86a6-03990b563bb4",
+   "runId": "8e2fe544-c456-43dd-a06c-6180c2e086d5",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:28.487Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:50478250000100": {
+   "companyId": "9bb408cd-2c45-4ce8-9cfa-4cb643db24de",
+   "runId": "2fc48cda-8f98-4330-b89e-ebd37d824a83",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:29.976Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  },
+  "BR:54478827000134": {
+   "companyId": "fd3bb583-be70-4644-9187-e7d8d4146469",
+   "runId": "537c2fe0-2e7f-43ca-9ae1-af14a8d08647",
+   "status": "completed",
+   "completedAt": "2026-10-16T00:52:22.391Z",
+   "matches": 0,
+   "lists": 3,
+   "oldestListDownloadedAt": "2026-09-24T19:17:25.117Z",
+   "validUntil": "2026-10-24T19:17:25.117Z",
+   "valid": true
+  }
+ }
 }
