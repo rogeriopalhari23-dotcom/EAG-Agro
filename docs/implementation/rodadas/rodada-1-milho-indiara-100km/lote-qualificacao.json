@@ -1,0 +1,82 @@
+{
+  "descricao": "Qualificação assistida das 10 empresas da Rodada 1 (16/10/2026). Fontes públicas gratuitas; nenhum contato. Atividade cadastrada, uso de milho e compra de terceiros ficam separados; conflitos preservados com as fontes.",
+  "produto": "product-03",
+  "rodada": "dee25927-b941-48aa-a74f-7bc78a278fea",
+  "empresas": [
+    {
+      "cnpj": "05.621.758/0001-60",
+      "assistidas": [
+        { "name": "Campo Rações Ltda (Campo Nutrição Animal)", "sourceUrl": "https://camponutricao.com.br/nossasunidades", "evidence": { "kind": "operation", "strength": "own_source", "quote": "Acreúna (GO): fábrica de produção, 'estrutura moderna e totalmente automatizada' para fabricação de suplementos nutricionais (site próprio, 16/10/2026)." } },
+        { "name": "Campo Rações Ltda (Campo Nutrição Animal)", "sourceUrl": "https://camponutricao.com.br/corte/", "evidence": { "kind": "activity_code", "strength": "own_source", "quote": "Linha Corte: sais minerais, proteinados e núcleos; núcleo Prepara Arremate DG 'para dietas com inclusão de subprodutos do milho' (produto para o pecuarista; não prova que a fábrica compra ou consome milho)." } }
+      ],
+      "evidencias": [
+        { "category": "business", "evidenceType": "company_document", "market": "national", "supports": [], "reference": "Fonte própria (camponutricao.com.br/nossasunidades, consultada em 16/10/2026): 'Acreúna (GO) — fábrica de produção, estrutura moderna e totalmente automatizada para fabricação de suplementos nutricionais'; escritório administrativo e comercial em Aparecida de Goiânia; centro experimental na Fazenda São Joaquim (Jandaia). Quem somos: 'mais de 250 colaboradores diretos e indiretos'. Linha Corte (/corte/): sais minerais, proteinados e núcleos; o núcleo Prepara Arremate DG é 'para dietas com inclusão de subprodutos do milho' (uso pelo pecuarista). Comprova operação atual da fábrica. NÃO comprova uso de milho como insumo da fábrica nem compra de milho de terceiros. Nenhuma restrição a GMO encontrada; aceitação de GMO não confirmada.", "sourceUrl": "https://camponutricao.com.br/nossasunidades", "consultedAt": "2026-10-16", "validationStatus": "pending" }
+      ],
+      "basicos": { "website": "https://camponutricao.com.br/", "activityText": "Fábrica de suplementos para bovinos de corte e leite (sais minerais, proteinados, núcleos) em Acreúna/GO; escritório em Aparecida de Goiânia.", "activitySource": "Site próprio camponutricao.com.br (quem-somos, nossasunidades, corte), consultado em 16/10/2026" },
+      "perfil": { "profileClass": "possible_final_consumer", "basis": "Rodada 1 (16/10/2026). Papel: fabricante de suplementos para bovinos (fonte própria). Operação atual: comprovada (site próprio: fábrica automatizada em Acreúna). Uso de milho: não comprovado (o site cita só núcleo para dietas com subprodutos do milho, de uso do pecuarista). Compra de terceiros: sem evidência. GMO: nenhuma restrição encontrada; aceitação não confirmada. Porte: não comprovável ('mais de 250 colaboradores diretos e indiretos' mistura vínculos). Canal: telefone (62)/(64) 3645-4300 e formulários de contato no site; nenhum e-mail publicado; nenhum canal de compras. Pendente de contato futuro: uso e compra de milho, responsável por compras." }
+    },
+    {
+      "cnpj": "43.177.285/0001-43",
+      "assistidas": [
+        { "name": "SIAP Rações, Nutrição Animal e Vegetal Ltda", "sourceUrl": "https://siap.com.br/", "evidence": { "kind": "activity_code", "strength": "own_source", "quote": "Site do grupo SIAP: comércio e distribuição de insumos, consultoria, armazenamento e transporte; armazém em Acreúna com capacidade para 76 mil toneladas de grãos (Av. São Felipe 495). A entidade do site pode ser outra empresa do grupo (há SIAP Agricultura e Pecuária, CNPJ 13.822.441): não atribuído a esta unidade sem prova." } }
+      ],
+      "evidencias": [
+        { "category": "business", "evidenceType": "company_document", "market": "national", "supports": [], "reference": "CONFLITO PRESERVADO. Site do grupo SIAP (siap.com.br, 16/10/2026): 'comércio e distribuição de insumos agrícolas', 'armazenamento e transporte de produtos', 'armazém localizado na cidade de Acreúna-GO possui capacidade para 76 mil toneladas de grãos', unidade Av. São Felipe 495. Este CNPJ (SIAP Rações, Nutrição Animal e Vegetal, aberto em 2021, Av. São Felipe S/N, Acreúna) é fabricante de alimentos para animais na Receita e no MAPA (GO0017779). Não há prova de que o armazém e o comércio de insumos sejam desta pessoa jurídica (existe SIAP Agricultura e Pecuária, CNPJ 13.822.441). Não comprova uso nem compra de milho por esta unidade.", "sourceUrl": "https://siap.com.br/", "consultedAt": "2026-10-16", "validationStatus": "conflicting" }
+      ],
+      "perfil": { "profileClass": "unconfirmed", "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração pela Receita (1066-0/00) e pelo MAPA; o grupo SIAP declara comércio de insumos e armazém de 76 mil t de grãos (possível armazenadora/revendedora), mas sem prova de que seja esta pessoa jurídica: conflito mantido, papel indefinido. Uso de milho: não comprovado. Compra de terceiros: sem evidência (armazém de grãos sugere originação, não comprovada). GMO: nada encontrado. Porte: não informado pela Receita. Canal: telefone (64) 3645-1199 no site do grupo; nenhum e-mail publicado. Pendente de contato futuro: relação com o grupo e papel no milho." }
+    },
+    {
+      "cnpj": "17.802.890/0002-39",
+      "assistidas": [
+        { "name": "Cooperativa Mista dos Produtores Rurais de Pontalina (COMPROP)", "sourceUrl": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-mista-dos-produtores-rurais-de-pontalina-comprop/", "evidence": { "kind": "activity_code", "strength": "directory", "quote": "OCB-GO: COMPROP, ramo agropecuário, situação REGULAR; e-mail financeiro.comprop@hotmail.com; sem produtos ou serviços listados." } }
+      ],
+      "canais": [
+        { "email": "financeiro.comprop@hotmail.com", "sourceUrl": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-mista-dos-produtores-rurais-de-pontalina-comprop/", "sourceKind": "directory", "label": "Canal no diretório OCB-GO; finalidade: financeiro (não é canal de compras)" }
+      ],
+      "perfil": { "profileClass": "unconfirmed", "basis": "Rodada 1 (16/10/2026). Papel indefinido: filial com atividade principal 5211-7/01 armazéns gerais (Receita) e registro de fabricante de ração no MAPA (GO0008702); sem fonte própria. Operação: cooperativa REGULAR na OCB-GO (indício). Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: não informado. Canal: financeiro.comprop@hotmail.com (diretório OCB-GO, finalidade financeiro) e telefone (64) 3471-1135. Pendente de contato futuro: se a filial fabrica ração com milho ou só armazena." }
+    },
+    {
+      "cnpj": "09.276.439/0002-05",
+      "assistidas": [
+        { "name": "P&S Produtos Agropecuários Ltda (Nutripec)", "sourceUrl": "https://www.econodata.com.br/consulta-empresa/09276439000116-p-s-produtos-agropecuarios-ltda", "evidence": { "kind": "activity_code", "strength": "directory", "quote": "Matriz 09.276.439/0001-16 (Av. Comercial, Jardim Oriente, Abadia de Goiás): comércio atacadista de insumos agropecuários; filial 0002-05 (Fazenda Quati, zona rural): fabricação de alimentos para animais (Nutripec Nutrição Animal)." } }
+      ],
+      "porte": { "sizeBand": "small", "basis": "estimated", "source": "Receita Federal: porte EPP (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo" },
+      "perfil": { "profileClass": "possible_final_consumer", "basis": "Rodada 1 (16/10/2026). Papel misto: a unidade (filial, Fazenda Quati) é fabricante de alimentos para animais (Receita e MAPA GO0010286); a matriz é comércio atacadista de insumos (revenda), pelo diretório Econodata. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: EPP na Receita (estimado). Canal: telefone (62) 3503-1455 e Instagram @nutripecabadia (não lido); nenhum e-mail publicado encontrado. Pendente de contato futuro: uso de milho na fábrica." }
+    },
+    {
+      "cnpj": "21.196.572/0001-68",
+      "porte": { "sizeBand": "micro", "basis": "estimated", "source": "Receita Federal: porte ME (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo" },
+      "perfil": { "profileClass": "possible_final_consumer", "basis": "Rodada 1 (16/10/2026). Papel: fabricante de alimentos para animais (Receita 1066-0/00, MAPA GO0012351), nome fantasia Rações Garantido. Existe empresa de nome parecido (Agropecuária Yabagata, CNPJ 07.834.024, varejo veterinário, Econodata): possível ligação não comprovada. Sem site ou fonte própria encontrada: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: ME na Receita (estimado). Canal: nenhum publicado encontrado. Pendente de contato futuro." }
+    },
+    {
+      "cnpj": "54.478.827/0001-34",
+      "porte": { "sizeBand": "small", "basis": "estimated", "source": "Receita Federal: porte EPP (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo" },
+      "perfil": { "profileClass": "possible_final_consumer", "basis": "Rodada 1 (16/10/2026). Papel: fabricante de alimentos para animais (Receita 1066-0/00, aberta em 2024; MAPA GO0022799), Rações Rural Cria. Sem site ou fonte própria encontrada: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: EPP na Receita (estimado). Canal: nenhum publicado encontrado. Pendente de contato futuro." }
+    },
+    {
+      "cnpj": "11.595.239/0001-78",
+      "porte": { "sizeBand": "micro", "basis": "estimated", "source": "Receita Federal: porte ME (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo" },
+      "perfil": { "profileClass": "possible_final_consumer", "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração (Receita 1066-0/00, MAPA GO0014010). Localização: endereço da Receita no distrito de Nova Fátima, município de Hidrolândia; Nova Fátima é distrito de Hidrolândia (OpenStreetMap, relação 6664233, ~75 km da origem). Isso explica o registro do MAPA em 'Nova Fátima' (divergência de nome, mesma localidade). Sem site ou fonte própria: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: ME na Receita (estimado). Canal: o telefone em diretório ((62) 3333-3333) parece genérico e não foi registrado. Pendente de contato futuro." }
+    },
+    {
+      "cnpj": "01.225.945/0001-74",
+      "assistidas": [
+        { "name": "Cooperativa Agropecuária de Aurilândia", "sourceUrl": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-agropecuaria-de-aurilandia/", "evidence": { "kind": "activity_code", "strength": "directory", "quote": "OCB-GO: Cooperativa Agropecuária de Aurilândia, ramo agropecuário, situação REGULAR; e-mail coop_capal@hotmail.com; sem produtos ou serviços listados." } }
+      ],
+      "canais": [
+        { "email": "coop_capal@hotmail.com", "sourceUrl": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-agropecuaria-de-aurilandia/", "sourceKind": "directory", "label": "Canal no diretório OCB-GO; finalidade: contato geral da cooperativa" }
+      ],
+      "perfil": { "profileClass": "unconfirmed", "basis": "Rodada 1 (16/10/2026). Papel indefinido: atividade principal 4692-3/00 comércio atacadista (Receita) e registro de fabricante de ração no MAPA (GO0014729); sem fonte própria. Operação: cooperativa REGULAR na OCB-GO (indício). Atenção: 'Capal' do e-mail é sigla local; a Capal Cooperativa Agroindustrial (capal.coop.br) é do Paraná, e a fábrica de rações dela não foi atribuída a esta cooperativa. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: não informado. Canal: coop_capal@hotmail.com (OCB-GO, contato geral); telefones divergentes entre fontes ((64) 3684-1225 na OCB-GO; (62) 3684-1131 em outra fonte). Pendente de contato futuro." }
+    },
+    {
+      "cnpj": "50.478.250/0001-00",
+      "porte": { "sizeBand": "small", "basis": "estimated", "source": "Receita Federal: porte EPP (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo" },
+      "perfil": { "profileClass": "possible_final_consumer", "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração (Receita 1066-0/00, aberta em 2023; MAPA GO0022594), Herlan Nutrição Animal. Localização: endereço urbano em Caturaí (Rua Geraldo Domingos de Araújo, Residencial Luiz Moreira de Melo); a rua não está no OpenStreetMap; a sede municipal fica a ~96,4 km da origem (Nominatim, 16/10/2026). Indica que está dentro do raio, por margem pequena, sem coordenada da unidade: conferência do limite PENDENTE. Sem site ou fonte própria: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: EPP na Receita (estimado). Canal: telefone (62) 9293-1475 em diretório (não registrado como canal). Pendente de contato futuro." }
+    },
+    {
+      "cnpj": "41.809.266/0001-67",
+      "porte": { "sizeBand": "micro", "basis": "estimated", "source": "Receita Federal: porte ME (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo" },
+      "perfil": { "profileClass": "possible_final_consumer", "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração (Receita 1066-0/00, aberta em 2021; MAPA GO0013994). Localização: endereço urbano em Adelândia (Rua Benedito Romão 500, Jardim Planalto); a rua não está no OpenStreetMap; a sede municipal fica a ~88,2 km da origem (Nominatim, 16/10/2026). Indica que está dentro do raio, sem coordenada da unidade: conferência do limite PENDENTE. Sem site ou fonte própria: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: ME na Receita (estimado). Canal: nenhum publicado encontrado. Pendente de contato futuro." }
+    }
+  ]
+}

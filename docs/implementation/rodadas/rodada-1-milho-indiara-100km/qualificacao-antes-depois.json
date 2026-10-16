@@ -1,0 +1,616 @@
+{
+ "antes": {
+  "05.621.758/0001-60": {
+   "id": "bc68d221-0ec5-492b-9dbb-e2b711d1b92e",
+   "legalName": "CAMPO RACOES LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0010090, CNPJ 05.621.758/0001-60, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0010090 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 48.2 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "43.177.285/0001-43": {
+   "id": "e41f2793-1b8a-4095-86a6-03990b563bb4",
+   "legalName": "SIAP RACOES, NUTRICAO ANIMAL E VEGETAL LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0017779, CNPJ 43.177.285/0001-43, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0017779 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 48.2 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "17.802.890/0002-39": {
+   "id": "f46c0e88-c590-4cdc-bc45-351d8bb6ce8b",
+   "legalName": "COOPERATIVA MISTA DOS PRODUTORES RURAIS DE PONTALINA - COMPROP",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0008702, CNPJ 17.802.890/0002-39, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0008702 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 59.7 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "09.276.439/0002-05": {
+   "id": "34f3f6eb-449e-452a-b884-aedabfacdbac",
+   "legalName": "P & S PRODUTOS AGROPECUARIOS LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0010286, CNPJ 09.276.439/0002-05, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0010286 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 70.6 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "21.196.572/0001-68": {
+   "id": "697a7287-97e0-4297-9e5b-191cc61f64a8",
+   "legalName": "YABAGATA NUTRICAO ANIMAL LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0012351, CNPJ 21.196.572/0001-68, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0012351 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 75.5 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "54.478.827/0001-34": {
+   "id": "fd3bb583-be70-4644-9187-e7d8d4146469",
+   "legalName": "RURAL CRIA INDUSTRIA E COMERCIO DE RACAO LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0022799, CNPJ 54.478.827/0001-34, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0022799 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 75.5 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "11.595.239/0001-78": {
+   "id": "b3fb678b-36a7-4cda-a4ad-a702b7e188a6",
+   "legalName": "VF INDUSTRIA E COMERCIO DE RACOES LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0014010, CNPJ 11.595.239/0001-78, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0014010 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 77 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "01.225.945/0001-74": {
+   "id": "0c80efda-5256-4dac-a178-cdf0971bac64",
+   "legalName": "COOPERATIVA AGROPECUARIA DE AURILANDIA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0014729, CNPJ 01.225.945/0001-74, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0014729 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 80.5 km (ESTIMADA: centroide do município). Pendências: Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "50.478.250/0001-00": {
+   "id": "9bb408cd-2c45-4ce8-9cfa-4cb643db24de",
+   "legalName": "INDUSTRIA E COMERCIO DE RACOES HERLAN LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0022594, CNPJ 50.478.250/0001-00, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0022594 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 91 km (ESTIMADA: centroide do município). Pendências: Perto do limite do raio pelo centroide: conferir a localização da unidade.; Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  },
+  "41.809.266/0001-67": {
+   "id": "6c404026-b73d-4230-91a9-74348ded33a5",
+   "legalName": "RACOES PEROLA LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0013994, CNPJ 41.809.266/0001-67, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0013994 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 1,
+     "basis": "Rodada milho-gmo-indiara-100km-r1: discovery; compra de terceiros NÃO confirmada; aceitação de GMO NÃO confirmada; distância 93.6 km (ESTIMADA: centroide do município). Pendências: Perto do limite do raio pelo centroide: conferir a localização da unidade.; Canal de compras publicado não encontrado.; Operação atual não comprovada em fonte própria ou oficial.; Uso de milho não comprovado.; Compra de terceiros não comprovada.; Aceitação da variedade GMO não confirmada."
+    }
+   ]
+  }
+ },
+ "depois": {
+  "05.621.758/0001-60": {
+   "id": "bc68d221-0ec5-492b-9dbb-e2b711d1b92e",
+   "legalName": "CAMPO RACOES LTDA",
+   "pipeline": "discovered",
+   "website": "https://camponutricao.com.br/",
+   "activity": "Fábrica de suplementos para bovinos de corte e leite (sais minerais, proteinados, núcleos) em Acreúna/GO; escritório em Aparecida de Goiânia.",
+   "size": null,
+   "evidence": [
+    {
+     "type": "company_document",
+     "status": "pending",
+     "url": "https://camponutricao.com.br/nossasunidades",
+     "supports": [],
+     "reference": "Fonte própria (camponutricao.com.br/nossasunidades, consultada em 16/10/2026): 'Acreúna (GO) — fábrica de produção, estrutura moderna e totalmente automatizada "
+    },
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0010090, CNPJ 05.621.758/0001-60, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0010090 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "pending_size",
+     "revision": 2,
+     "basis": "Rodada 1 (16/10/2026). Papel: fabricante de suplementos para bovinos (fonte própria). Operação atual: comprovada (site próprio: fábrica automatizada em Acreúna). Uso de milho: não comprovado (o site cita só núcleo para dietas com subprodutos do milho, de uso do pecuarista). Compra de terceiros: sem evidência. GMO: nenhuma restrição encontrada; aceitação não confirmada. Porte: não comprovável ('mais de 250 colaboradores diretos e indiretos' mistura vínculos). Canal: telefone (62)/(64) 3645-4300 e formulários de contato no site; nenhum e-mail publicado; nenhum canal de compras. Pendente de contato futuro: uso e compra de milho, responsável por compras."
+    }
+   ]
+  },
+  "43.177.285/0001-43": {
+   "id": "e41f2793-1b8a-4095-86a6-03990b563bb4",
+   "legalName": "SIAP RACOES, NUTRICAO ANIMAL E VEGETAL LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "company_document",
+     "status": "conflicting",
+     "url": "https://siap.com.br/",
+     "supports": [],
+     "reference": "CONFLITO PRESERVADO. Site do grupo SIAP (siap.com.br, 16/10/2026): 'comércio e distribuição de insumos agrícolas', 'armazenamento e transporte de produtos', 'ar"
+    },
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0017779, CNPJ 43.177.285/0001-43, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0017779 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "unconfirmed",
+     "icp": "pending_size",
+     "revision": 2,
+     "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração pela Receita (1066-0/00) e pelo MAPA; o grupo SIAP declara comércio de insumos e armazém de 76 mil t de grãos (possível armazenadora/revendedora), mas sem prova de que seja esta pessoa jurídica: conflito mantido, papel indefinido. Uso de milho: não comprovado. Compra de terceiros: sem evidência (armazém de grãos sugere originação, não comprovada). GMO: nada encontrado. Porte: não informado pela Receita. Canal: telefone (64) 3645-1199 no site do grupo; nenhum e-mail publicado. Pendente de contato futuro: relação com o grupo e papel no milho."
+    }
+   ]
+  },
+  "17.802.890/0002-39": {
+   "id": "f46c0e88-c590-4cdc-bc45-351d8bb6ce8b",
+   "legalName": "COOPERATIVA MISTA DOS PRODUTORES RURAIS DE PONTALINA - COMPROP",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0008702, CNPJ 17.802.890/0002-39, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0008702 (Ativ"
+    }
+   ],
+   "channels": [
+    {
+     "email": "financeiro.comprop@hotmail.com",
+     "label": "Canal no diretório OCB-GO; finalidade: financeiro (não é canal de compras)",
+     "source": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-mista-dos-produtores-rurais-de-pontalina-comprop/"
+    }
+   ],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "unconfirmed",
+     "icp": "pending_size",
+     "revision": 2,
+     "basis": "Rodada 1 (16/10/2026). Papel indefinido: filial com atividade principal 5211-7/01 armazéns gerais (Receita) e registro de fabricante de ração no MAPA (GO0008702); sem fonte própria. Operação: cooperativa REGULAR na OCB-GO (indício). Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: não informado. Canal: financeiro.comprop@hotmail.com (diretório OCB-GO, finalidade financeiro) e telefone (64) 3471-1135. Pendente de contato futuro: se a filial fabrica ração com milho ou só armazena."
+    }
+   ]
+  },
+  "09.276.439/0002-05": {
+   "id": "34f3f6eb-449e-452a-b884-aedabfacdbac",
+   "legalName": "P & S PRODUTOS AGROPECUARIOS LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": {
+    "band": "small",
+    "basis": "estimated",
+    "source": "Receita Federal: porte EPP (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo"
+   },
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0010286, CNPJ 09.276.439/0002-05, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0010286 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "in_icp",
+     "revision": 3,
+     "basis": "Rodada 1 (16/10/2026). Papel misto: a unidade (filial, Fazenda Quati) é fabricante de alimentos para animais (Receita e MAPA GO0010286); a matriz é comércio atacadista de insumos (revenda), pelo diretório Econodata. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: EPP na Receita (estimado). Canal: telefone (62) 3503-1455 e Instagram @nutripecabadia (não lido); nenhum e-mail publicado encontrado. Pendente de contato futuro: uso de milho na fábrica."
+    }
+   ]
+  },
+  "21.196.572/0001-68": {
+   "id": "697a7287-97e0-4297-9e5b-191cc61f64a8",
+   "legalName": "YABAGATA NUTRICAO ANIMAL LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": {
+    "band": "micro",
+    "basis": "estimated",
+    "source": "Receita Federal: porte ME (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo"
+   },
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0012351, CNPJ 21.196.572/0001-68, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0012351 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "out_small",
+     "revision": 3,
+     "basis": "Rodada 1 (16/10/2026). Papel: fabricante de alimentos para animais (Receita 1066-0/00, MAPA GO0012351), nome fantasia Rações Garantido. Existe empresa de nome parecido (Agropecuária Yabagata, CNPJ 07.834.024, varejo veterinário, Econodata): possível ligação não comprovada. Sem site ou fonte própria encontrada: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: ME na Receita (estimado). Canal: nenhum publicado encontrado. Pendente de contato futuro."
+    }
+   ]
+  },
+  "54.478.827/0001-34": {
+   "id": "fd3bb583-be70-4644-9187-e7d8d4146469",
+   "legalName": "RURAL CRIA INDUSTRIA E COMERCIO DE RACAO LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": {
+    "band": "small",
+    "basis": "estimated",
+    "source": "Receita Federal: porte EPP (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo"
+   },
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0022799, CNPJ 54.478.827/0001-34, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0022799 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "in_icp",
+     "revision": 3,
+     "basis": "Rodada 1 (16/10/2026). Papel: fabricante de alimentos para animais (Receita 1066-0/00, aberta em 2024; MAPA GO0022799), Rações Rural Cria. Sem site ou fonte própria encontrada: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: EPP na Receita (estimado). Canal: nenhum publicado encontrado. Pendente de contato futuro."
+    }
+   ]
+  },
+  "11.595.239/0001-78": {
+   "id": "b3fb678b-36a7-4cda-a4ad-a702b7e188a6",
+   "legalName": "VF INDUSTRIA E COMERCIO DE RACOES LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": {
+    "band": "micro",
+    "basis": "estimated",
+    "source": "Receita Federal: porte ME (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo"
+   },
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0014010, CNPJ 11.595.239/0001-78, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0014010 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "out_small",
+     "revision": 3,
+     "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração (Receita 1066-0/00, MAPA GO0014010). Localização: endereço da Receita no distrito de Nova Fátima, município de Hidrolândia; Nova Fátima é distrito de Hidrolândia (OpenStreetMap, relação 6664233, ~75 km da origem). Isso explica o registro do MAPA em 'Nova Fátima' (divergência de nome, mesma localidade). Sem site ou fonte própria: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: ME na Receita (estimado). Canal: o telefone em diretório ((62) 3333-3333) parece genérico e não foi registrado. Pendente de contato futuro."
+    }
+   ]
+  },
+  "01.225.945/0001-74": {
+   "id": "0c80efda-5256-4dac-a178-cdf0971bac64",
+   "legalName": "COOPERATIVA AGROPECUARIA DE AURILANDIA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": null,
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0014729, CNPJ 01.225.945/0001-74, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0014729 (Ativ"
+    }
+   ],
+   "channels": [
+    {
+     "email": "coop_capal@hotmail.com",
+     "label": "Canal no diretório OCB-GO; finalidade: contato geral da cooperativa",
+     "source": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-agropecuaria-de-aurilandia/"
+    }
+   ],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "unconfirmed",
+     "icp": "pending_size",
+     "revision": 2,
+     "basis": "Rodada 1 (16/10/2026). Papel indefinido: atividade principal 4692-3/00 comércio atacadista (Receita) e registro de fabricante de ração no MAPA (GO0014729); sem fonte própria. Operação: cooperativa REGULAR na OCB-GO (indício). Atenção: 'Capal' do e-mail é sigla local; a Capal Cooperativa Agroindustrial (capal.coop.br) é do Paraná, e a fábrica de rações dela não foi atribuída a esta cooperativa. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: não informado. Canal: coop_capal@hotmail.com (OCB-GO, contato geral); telefones divergentes entre fontes ((64) 3684-1225 na OCB-GO; (62) 3684-1131 em outra fonte). Pendente de contato futuro."
+    }
+   ]
+  },
+  "50.478.250/0001-00": {
+   "id": "9bb408cd-2c45-4ce8-9cfa-4cb643db24de",
+   "legalName": "INDUSTRIA E COMERCIO DE RACOES HERLAN LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": {
+    "band": "small",
+    "basis": "estimated",
+    "source": "Receita Federal: porte EPP (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo"
+   },
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0022594, CNPJ 50.478.250/0001-00, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0022594 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "in_icp",
+     "revision": 3,
+     "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração (Receita 1066-0/00, aberta em 2023; MAPA GO0022594), Herlan Nutrição Animal. Localização: endereço urbano em Caturaí (Rua Geraldo Domingos de Araújo, Residencial Luiz Moreira de Melo); a rua não está no OpenStreetMap; a sede municipal fica a ~96,4 km da origem (Nominatim, 16/10/2026). Indica que está dentro do raio, por margem pequena, sem coordenada da unidade: conferência do limite PENDENTE. Sem site ou fonte própria: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: EPP na Receita (estimado). Canal: telefone (62) 9293-1475 em diretório (não registrado como canal). Pendente de contato futuro."
+    }
+   ]
+  },
+  "41.809.266/0001-67": {
+   "id": "6c404026-b73d-4230-91a9-74348ded33a5",
+   "legalName": "RACOES PEROLA LTDA",
+   "pipeline": "discovered",
+   "website": null,
+   "activity": null,
+   "size": {
+    "band": "micro",
+    "basis": "estimated",
+    "source": "Receita Federal: porte ME (publica.cnpj.ws, 16/10/2026); classificação por faturamento, sem efetivo"
+   },
+   "evidence": [
+    {
+     "type": "public_nominal_record",
+     "status": "pending",
+     "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+     "supports": [],
+     "reference": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0013994, CNPJ 41.809.266/0001-67, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0013994 (Ativ"
+    }
+   ],
+   "channels": [],
+   "people": 0,
+   "profiles": [
+    {
+     "product": "product-03",
+     "class": "possible_final_consumer",
+     "icp": "out_small",
+     "revision": 3,
+     "basis": "Rodada 1 (16/10/2026). Papel: fabricante de ração (Receita 1066-0/00, aberta em 2021; MAPA GO0013994). Localização: endereço urbano em Adelândia (Rua Benedito Romão 500, Jardim Planalto); a rua não está no OpenStreetMap; a sede municipal fica a ~88,2 km da origem (Nominatim, 16/10/2026). Indica que está dentro do raio, sem coordenada da unidade: conferência do limite PENDENTE. Sem site ou fonte própria: pesquisa pública esgotada. Uso de milho: não comprovado. Compra de terceiros: sem evidência. GMO: nada encontrado. Porte: ME na Receita (estimado). Canal: nenhum publicado encontrado. Pendente de contato futuro."
+    }
+   ]
+  }
+ }
+}

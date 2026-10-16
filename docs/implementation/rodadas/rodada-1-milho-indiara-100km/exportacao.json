@@ -3,7 +3,7 @@
   "id": "dee25927-b941-48aa-a74f-7bc78a278fea",
   "name": "Rodada 1 — milho GMO, Indiara/GO, 100 km (16/10/2026)",
   "revision": 1,
-  "exportedAt": "2026-10-16T00:56:07.412Z"
+  "exportedAt": "2026-10-16T01:22:07.256Z"
  },
  "config": {
   "id": "milho-gmo-indiara-100km-r1",
@@ -244,7 +244,8 @@
    "country": "BR",
    "registrationId": "17802890000239",
    "names": [
-    "COOPERATIVA MISTA DOS PRODUTORES RURAIS DE PONTALINA"
+    "COOPERATIVA MISTA DOS PRODUTORES RURAIS DE PONTALINA",
+    "Cooperativa Mista dos Produtores Rurais de Pontalina (COMPROP)"
    ],
    "municipality": "Pontalina",
    "registry": {
@@ -309,6 +310,13 @@
        "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
        "quote": "SIPEAGRO GO0008702 (Ativo): FABRICANTE SUPLEMENTO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO",
        "date": "2026-10-16T00:37:10.968Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "directory",
+       "url": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-mista-dos-produtores-rurais-de-pontalina-comprop/",
+       "quote": "OCB-GO: COMPROP, ramo agropecuário, situação REGULAR; e-mail financeiro.comprop@hotmail.com; sem produtos ou serviços listados.",
+       "date": "2026-10-16T01:19:11.831Z"
       }
      ]
     },
@@ -343,7 +351,7 @@
    "checks": [],
    "siblings": [],
    "sizeHint": "unknown",
-   "segment": "feed_mill",
+   "segment": null,
    "pending": [
     "Canal de compras publicado não encontrado.",
     "Operação atual não comprovada em fonte própria ou oficial.",
@@ -352,7 +360,8 @@
     "Aceitação da variedade GMO não confirmada."
    ],
    "intake": [
-    "import"
+    "import",
+    "assisted"
    ],
    "conciliatedFrom": [
     "BR:nome:cooperativa mista dos produtores rurais de pontalina|pontalina|GO"
@@ -364,7 +373,8 @@
    "country": "BR",
    "registrationId": "09276439000205",
    "names": [
-    "P&S PRODUTOS AGROPECUÁRIOS LTDA"
+    "P&S PRODUTOS AGROPECUÁRIOS LTDA",
+    "P&S Produtos Agropecuários Ltda (Nutripec)"
    ],
    "municipality": "Abadia de Goiás",
    "registry": {
@@ -419,6 +429,13 @@
        "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
        "quote": "SIPEAGRO GO0010286 (Ativo): FABRICANTE NÚCLEO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO; FABRICANTE RAÇÃO",
        "date": "2026-10-16T00:37:10.968Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "directory",
+       "url": "https://www.econodata.com.br/consulta-empresa/09276439000116-p-s-produtos-agropecuarios-ltda",
+       "quote": "Matriz 09.276.439/0001-16 (Av. Comercial, Jardim Oriente, Abadia de Goiás): comércio atacadista de insumos agropecuários; filial 0002-05 (Fazenda Quati, zona rural): fabricação de alimentos para animais (Nutripec Nutrição Animal).",
+       "date": "2026-10-16T01:19:18.388Z"
       }
      ]
     },
@@ -453,7 +470,7 @@
    "checks": [],
    "siblings": [],
    "sizeHint": "small",
-   "segment": "feed_mill",
+   "segment": null,
    "pending": [
     "Canal de compras publicado não encontrado.",
     "Operação atual não comprovada em fonte própria ou oficial.",
@@ -462,7 +479,8 @@
     "Aceitação da variedade GMO não confirmada."
    ],
    "intake": [
-    "import"
+    "import",
+    "assisted"
    ],
    "conciliatedFrom": [
     "BR:nome:p s produtos agropecuarios ltda|abadia de goias|GO"
@@ -826,7 +844,8 @@
    "country": "BR",
    "registrationId": "01225945000174",
    "names": [
-    "COOPERATIVA AGROPECUARIA DE AURILANDIA"
+    "COOPERATIVA AGROPECUARIA DE AURILANDIA",
+    "Cooperativa Agropecuária de Aurilândia"
    ],
    "municipality": "Aurilândia",
    "registry": {
@@ -888,6 +907,13 @@
        "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
        "quote": "SIPEAGRO GO0014729 (Ativo): FABRICANTE NÚCLEO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO",
        "date": "2026-10-16T00:37:10.968Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "directory",
+       "url": "https://www.goiascooperativo.coop.br/cooperativa/cooperativa-agropecuaria-de-aurilandia/",
+       "quote": "OCB-GO: Cooperativa Agropecuária de Aurilândia, ramo agropecuário, situação REGULAR; e-mail coop_capal@hotmail.com; sem produtos ou serviços listados.",
+       "date": "2026-10-16T01:19:50.882Z"
       }
      ]
     },
@@ -922,7 +948,7 @@
    "checks": [],
    "siblings": [],
    "sizeHint": "unknown",
-   "segment": "feed_mill",
+   "segment": null,
    "pending": [
     "Canal de compras publicado não encontrado.",
     "Operação atual não comprovada em fonte própria ou oficial.",
@@ -931,7 +957,8 @@
     "Aceitação da variedade GMO não confirmada."
    ],
    "intake": [
-    "import"
+    "import",
+    "assisted"
    ],
    "conciliatedFrom": [
     "BR:nome:cooperativa agropecuaria de aurilandia|aurilandia|GO"
@@ -943,7 +970,8 @@
    "country": "BR",
    "registrationId": "05621758000160",
    "names": [
-    "CAMPO RACOES LTDA"
+    "CAMPO RACOES LTDA",
+    "Campo Rações Ltda (Campo Nutrição Animal)"
    ],
    "municipality": "Acreúna",
    "registry": {
@@ -989,12 +1017,14 @@
    },
    "assessment": {
     "operation": {
-     "status": "indication",
+     "status": "proved",
      "sources": [
       {
        "kind": "operation",
-       "strength": "official_record",
-       "quote": "cadastro: Ativa"
+       "strength": "own_source",
+       "url": "https://camponutricao.com.br/nossasunidades",
+       "quote": "Acreúna (GO): fábrica de produção, 'estrutura moderna e totalmente automatizada' para fabricação de suplementos nutricionais (site próprio, 16/10/2026).",
+       "date": "2026-10-16T01:18:54.449Z"
       }
      ]
     },
@@ -1014,6 +1044,13 @@
        "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
        "quote": "SIPEAGRO GO0010090 (Ativo): FABRICANTE CONCENTRADO; FABRICANTE NÚCLEO; FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO",
        "date": "2026-10-16T00:37:10.968Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "own_source",
+       "url": "https://camponutricao.com.br/corte/",
+       "quote": "Linha Corte: sais minerais, proteinados e núcleos; núcleo Prepara Arremate DG 'para dietas com inclusão de subprodutos do milho' (produto para o pecuarista; não prova que a fábrica compra ou consome milho).",
+       "date": "2026-10-16T01:18:55.773Z"
       }
      ]
     },
@@ -1037,7 +1074,6 @@
     "channels": [],
     "pending": [
      "Canal de compras publicado não encontrado.",
-     "Operação atual não comprovada em fonte própria ou oficial.",
      "Uso de milho não comprovado.",
      "Compra de terceiros não comprovada.",
      "Aceitação da variedade GMO não confirmada."
@@ -1048,16 +1084,16 @@
    "checks": [],
    "siblings": [],
    "sizeHint": "unknown",
-   "segment": "feed_mill",
+   "segment": null,
    "pending": [
     "Canal de compras publicado não encontrado.",
-    "Operação atual não comprovada em fonte própria ou oficial.",
     "Uso de milho não comprovado.",
     "Compra de terceiros não comprovada.",
     "Aceitação da variedade GMO não confirmada."
    ],
    "intake": [
-    "import"
+    "import",
+    "assisted"
    ],
    "conciliatedFrom": [
     "BR:nome:campo racoes ltda|acreuna|GO"
@@ -1069,7 +1105,8 @@
    "country": "BR",
    "registrationId": "43177285000143",
    "names": [
-    "SIAP RACOES, NUTRICAO ANIMAL E VEGETAL LTDA"
+    "SIAP RACOES, NUTRICAO ANIMAL E VEGETAL LTDA",
+    "SIAP Rações, Nutrição Animal e Vegetal Ltda"
    ],
    "municipality": "Acreúna",
    "registry": {
@@ -1130,6 +1167,13 @@
        "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
        "quote": "SIPEAGRO GO0017779 (Ativo): FABRICANTE NÚCLEO; FABRICANTE RAÇÃO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO",
        "date": "2026-10-16T00:37:10.968Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "own_source",
+       "url": "https://siap.com.br/",
+       "quote": "Site do grupo SIAP: comércio e distribuição de insumos, consultoria, armazenamento e transporte; armazém em Acreúna com capacidade para 76 mil toneladas de grãos (Av. São Felipe 495). A entidade do site pode ser outra empresa do grupo (há SIAP Agricultura e Pecuária, CNPJ 13.822.441): não atribuído a esta unidade sem prova.",
+       "date": "2026-10-16T01:19:03.996Z"
       }
      ]
     },
@@ -1164,7 +1208,7 @@
    "checks": [],
    "siblings": [],
    "sizeHint": "unknown",
-   "segment": "feed_mill",
+   "segment": null,
    "pending": [
     "Canal de compras publicado não encontrado.",
     "Operação atual não comprovada em fonte própria ou oficial.",
@@ -1173,7 +1217,8 @@
     "Aceitação da variedade GMO não confirmada."
    ],
    "intake": [
-    "import"
+    "import",
+    "assisted"
    ],
    "conciliatedFrom": [
     "BR:nome:siap racoes nutricao animal e vegetal ltda|acreuna|GO"

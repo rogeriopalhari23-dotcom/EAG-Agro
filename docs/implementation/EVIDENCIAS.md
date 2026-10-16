@@ -2860,3 +2860,63 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - canal de compras de todas;
   - porte não informado pela Receita em 4 delas;
   - OpenStreetMap a testar de novo pelo navegador em outro horário.
+
+## Rodada 1: contagem das consultas adiadas e qualificação assistida das 10 empresas (2026-10-16 UTC)
+
+- **Contagem das consultas adiadas** (commit `a469203`, **não publicado**; produção continua com o Worker `4d7cfa4c`).
+  - Cada estabelecimento passa a ter a situação estruturada da consulta (`lookup`): `fetched`, `cached`, `deferred`, `failed`, `not_found`, `unavailable` ou `not_applicable`.
+  - Contam como `deferred`: o limite interno, o **HTTP 429** e as consultas bloqueadas depois de um 429. Erro de servidor (500) é `failed`.
+  - O resumo da execução (`deferred` e `lookups`) é calculado dessas situações, não do texto das pendências.
+  - Teste novo no Worker: o caso real de produção (1 ok, 429, 3 bloqueadas) dá resumo igual aos estabelecimentos (`deferred` = 4, `failed` = 0). O teste de lote também foi atualizado.
+  - Suíte: 495 + 2 + 37, 0 falhas.
+- **Qualificação assistida.** Script genérico novo, `scripts/qualificar-lote.mjs`, que vale para qualquer commodity, origem ou rodada.
+  - Simulação por padrão. Localiza a empresa pelo CNPJ e usa só as rotas existentes: evidência, canal, site e atividade, porte e perfil.
+  - Põe as mesmas fontes na rodada como pesquisa assistida e não duplica evidência, canal, porte nem perfil.
+  - Entrada: `rodadas/rodada-1-milho-indiara-100km/lote-qualificacao.json`, com fontes, conflitos e pendências.
+- **Achados por empresa** (fontes públicas gratuitas, sem contato; atividade, uso de milho e compra de terceiros separados):
+
+| Empresa | Operação atual | Uso de milho | Compra de terceiros | Papel | Canal publicado (finalidade) | GMO | Porte |
+|---|---|---|---|---|---|---|---|
+| Campo Rações | **comprovada** (site próprio: fábrica automatizada em Acreúna) | não comprovado (o site só cita núcleo "para dietas com inclusão de subprodutos do milho", de uso do pecuarista) | sem evidência | fabricante de suplementos para bovinos | telefone e formulários no site; sem e-mail | nada encontrado | não comprovável ("mais de 250 colaboradores diretos e indiretos") |
+| SIAP Rações | indício | não comprovado | sem evidência | **conflito**: fabricante (Receita/MAPA) × grupo SIAP com comércio de insumos e armazém de 76 mil t (siap.com.br), possivelmente outra pessoa jurídica (CNPJ 13.822.441) | telefone no site do grupo | nada | não informado |
+| COMPROP (Pontalina) | indício (OCB-GO: REGULAR) | não comprovado | sem evidência | indefinido: armazéns gerais (Receita) × fabricante (MAPA) | financeiro.comprop@hotmail.com (OCB-GO; **financeiro**, não compras) | nada | não informado |
+| P&S / Nutripec | indício | não comprovado | sem evidência | misto: filial fabricante; matriz em atacado de insumos (Econodata) | telefone em diretório | nada | EPP (estimado) |
+| Yabagata (Rações Garantido) | indício | não comprovado | sem evidência | fabricante; possível ligação com Agropecuária Yabagata (outro CNPJ, varejo veterinário), não comprovada | nenhum | nada | ME (estimado) |
+| Rural Cria | indício | não comprovado | sem evidência | fabricante | nenhum | nada | EPP (estimado) |
+| VF Rações | indício | não comprovado | sem evidência | fabricante | telefone genérico em diretório, não registrado | nada | ME (estimado) |
+| Coop. de Aurilândia | indício (OCB-GO: REGULAR) | não comprovado | sem evidência | indefinido: atacado (Receita) × fabricante (MAPA) | coop_capal@hotmail.com (OCB-GO; contato geral) | nada | não informado |
+| Herlan | indício | não comprovado | sem evidência | fabricante | telefone em diretório, não registrado | nada | EPP (estimado) |
+| Rações Pérola | indício | não comprovado | sem evidência | fabricante | nenhum | nada | ME (estimado) |
+
+  - O porte vem da Receita (ME → micro, EPP → pequena), com base "estimada" por ser classificação por faturamento, sem efetivo.
+  - Porte desconhecido não eliminou ninguém. O status `out_small` é o nome antigo de "micro — candidata" (regra de 30/09). Ficaram 4 `in_icp`, 3 `out_small` e 3 `pending_size`.
+  - Conflitos preservados com as fontes, sem escolher versão:
+    - SIAP: evidência gravada como `conflicting`;
+    - Aurilândia: a "Capal" do Paraná (capal.coop.br) **não** foi atribuída à cooperativa de Aurilândia, cujo e-mail usa a sigla local CAPAL. Os telefones divergem entre fontes;
+    - P&S: matriz e filial com papéis diferentes.
+- **Localização de Herlan e Pérola** (Nominatim/OpenStreetMap, 5 consultas, todas HTTP 200):
+  - as ruas dos dois endereços urbanos não estão no OSM, então não há coordenada da unidade;
+  - as sedes municipais ficam a ~96,4 km (Caturaí) e ~88,2 km (Adelândia) da origem, o que indica que as duas estão dentro do raio;
+  - sem a coordenada da unidade, **a conferência do limite continua pendente** nas duas.
+  - VF: Nova Fátima é **distrito de Hidrolândia** (OSM, relação 6664233, ~75 km). Isso explica o registro do SIPEAGRO em "Nova Fátima": a divergência anterior fica conciliada.
+- **OpenStreetMap (descoberta):** não houve nova tentativa. A falha anterior (502) continua registrada e não foi tratada como ausência de empresas.
+- **Triagens de sanções:** as 10 previstas foram concluídas às 00:52 UTC, com **0 ocorrências** (listas de 24/09/2026, válidas até cerca de 24/10). Não foram repetidas.
+- **Aplicação em produção:**
+  - 1ª passada: rodada +6 pesquisas assistidas; Campo +1 evidência (`company_document`, operação) e site/atividade; SIAP +1 evidência (`conflicting`); COMPROP e Aurilândia +1 canal cada (`company_channel`, fonte diretório); 6 portes; 4 perfis.
+  - Os outros 6 perfis foram recusados (`edit_conflict`): gravar o porte atualiza a revisão do perfil, e o script usava a revisão lida antes. O script foi corrigido para reler a revisão; na 2ª passada entraram só esses 6 perfis, e o resto foi reconhecido como já registrado.
+  - Rodada reexecutada às 01:22 UTC **sem consultas** (dados da Receita reaproveitados): 5 estabelecimentos alterados, todos ainda em "Descoberta". Campo tem agora **operação comprovada** por fonte própria; uso e compra seguem sem prova.
+- **Comparação antes/depois:** `rodadas/rodada-1-milho-indiara-100km/qualificacao-antes-depois.json` (cadastro, empresa por empresa), `exportacao.json` e `relatorio.md` (rodada).
+- **Estado preservado:**
+  - o retrato global de antes do lote falhou por erro transitório de autenticação do wrangler; a comparação usou o retrato logo depois do cadastro, que é a última linha de base válida;
+  - mudaram só empresas, perfis e evidências das 10, 2 canais, 6 candidatas da rodada e `audit_log`;
+  - as 27 empresas, 12 evidências, 26 perfis e 16 linhas de `contacts` anteriores estão idênticas linha a linha;
+  - nenhuma pessoa (os 2 canais são `company_channel` de diretório);
+  - fichas, versões, aprovações, tarefas, envios, cópias, supressões, canais de envio, campanhas, T11 e parâmetros: idênticos;
+  - ponte lendo (01:23:40 UTC).
+- **Pública esgotada, contato futuro necessário:**
+  - uso de milho e compra de terceiros nas 10;
+  - responsável e canal de compras nas 10;
+  - papel das duas cooperativas e da SIAP;
+  - localização exata de Herlan e Pérola;
+  - porte de Campo, SIAP, COMPROP e Aurilândia.
+- **Não feito:** contato, Snov, fichas, T11, canais de envio, campanhas e publicação.
