@@ -5,6 +5,7 @@ import { validateRoundConfig } from "./config.js";
 import { municipalityIndex, resolveOrigin, distanceFor } from "./distance.js";
 import { mergeCandidates, conciliate, groupByRoot } from "./establishment.js";
 import { assess } from "./qualify.js";
+import { closureFor } from "./closure.js";
 
 // Limite de taxa por fonte (consultas por minuto), com relógio e espera injetáveis.
 export function rateLimiter(perMinute, { now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
@@ -105,6 +106,7 @@ export async function runRound({ config: raw, municipalities, candidates, fetche
       municipality: munName ?? null, registry, distance: d, assessment: a, status: c.status, reasons: c.reasons, checks: c.checks,
       siblings, sizeHint: est.hints?.size ?? registry?.size ?? "unknown", segment: est.hints?.segment ?? null, pending,
       intake: [...new Set(est.sources.map((x) => x.mode).filter(Boolean))], conciliatedFrom: est.conciliatedFrom ?? [], lookup,
+      closure: closureFor({ est, assessment: a, registry, distance: d, config, lookup }),
     };
     const fp = fingerprint({ input: est, registry: registry && { ...registry, fetchedAt: undefined }, status: result.status, pending });
     counters[!old ? "created" : old.fingerprint === fp ? "unchanged" : "updated"]++;

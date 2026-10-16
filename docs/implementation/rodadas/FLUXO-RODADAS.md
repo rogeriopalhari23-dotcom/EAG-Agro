@@ -151,3 +151,38 @@ Há também um teste de tela opcional, fora do `npm run check`: `node tests/ui-r
 - importar arquivo e registrar uma candidata por pesquisa assistida;
 - executar, decidir em lote e cadastrar;
 - largura de celular sem rolagem horizontal e ausência de erro de JavaScript.
+
+## Fechamento da pesquisa (16/10/2026; no repositório, ainda não publicado)
+
+Para cada estabelecimento, `src/rodada/closure.js` monta o fechamento a partir das evidências, do cadastro oficial e da distância. As regras são gerais, sem nada por empresa:
+
+- **Verificado:** só o que tem prova aceita pela configuração, e a consulta cadastral feita.
+- **Conflitos de fonte:**
+  - evidência marcada como conflitante na pesquisa assistida (`evidence.conflict`);
+  - evidência do cadastro do Compass com validação `conflicting`;
+  - papel divergente entre a atividade principal do cadastro oficial e o registro de fabricante. Por enquanto essa regra existe só para a CNAE do Brasil; em outros países nenhum conflito é inventado.
+- **Desconhecido:** cada campo aparece **uma vez**, com o nível atual (indício ou sem evidência). Os campos são operação, uso da commodity, compra de terceiros, aceitação da variedade, papel, responsável e canal de compras, porte e localização da unidade. Perto do limite, a localização leva a marca "conferência do limite pendente".
+- **Contato futuro:**
+  - com a pesquisa pública aberta, só o que fonte pública normalmente não responde: compra de terceiros, aceitação da variedade, responsável e canal de compras;
+  - encerrada a fase (`research.publicPhase: "closed"`, escolhida no formulário da rodada), todos os desconhecidos.
+  - Nenhum pedido de confirmação campo a campo.
+- **Triagens de sanções** das empresas cadastradas pela rodada: situação, ocorrências, número de listas e **validade** pela regra do Compass. A validade é o download mais antigo das listas usadas mais `sanctions_max_age_hours`.
+
+Onde o fechamento aparece:
+
+- **Painel:** em cada resultado da rodada ("Fechamento da pesquisa" e linha da triagem com validade).
+- **Exportação e relatório:** seções "Verificações concluídas", "Conflitos de fonte", "Dados desconhecidos", "Pendências para contato futuro" e "Triagens de sanções".
+- **Comandos novos:**
+  - `scripts/qualificar-lote.mjs`: qualificação assistida de empresas já cadastradas, pelas rotas existentes, sem duplicar;
+  - `node scripts/rodada.mjs consolidar <id> --d1 <banco> --remote [--encerrar] --saida <pasta>`: fechamento de uma rodada já executada, só lendo o banco, sem consultar fontes.
+
+### Situação atual
+
+| Funciona pelo painel em produção (Worker `4d7cfa4c`) | No repositório, aguarda publicação | Exige pesquisa assistida ou fonte externa |
+|---|---|---|
+| Criar e configurar a rodada, área IBGE, limitações e ciência | Fechamento por estabelecimento e triagem com validade no painel | Prova de uso e de compra de terceiros (fonte própria, documento oficial ou contato) |
+| Importação (SIPEAGRO, CSV/JSON) e pesquisa assistida | Contagem das consultas adiadas por HTTP 429 (`a469203`) | Responsável e canal de compras |
+| Consulta à Receita com limite entre execuções, conciliação, reexecução sem duplicar | Campo "Pesquisa pública" (aberta/encerrada) no formulário | Localização exata da unidade sem coordenada (ex.: ruas fora do OSM) |
+| Revisão, decisão em lote com histórico, cadastro em descoberta com triagem | Conflitos do cadastro (`conflicting`) dentro da rodada | Porte quando a Receita não informa |
+| Exportação e relatório (sem as seções de fechamento) | — | OpenStreetMap: falhou (502) na rodada real; disponibilidade não comprovada |
+| — | — | **Países fora do Brasil:** sem conjunto de municípios, fonte cadastral nem regra de identificador integrados. **Não há suporte completo**; a tela mostra "Sem suporte" e exige ciência |

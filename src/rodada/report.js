@@ -28,6 +28,32 @@ export function renderReport(run, { title } = {}) {
   if (!review.length) lines.push("Nenhuma.");
   for (const r of review)
     lines.push(`- **${cell(r.names[0])}** (${cell(r.registrationId ?? "sem identificador")}): ${[...(r.status === "exception" ? r.reasons : []), ...(r.checks ?? []).map((c) => `conferir: ${c}`)].join("; ")}`);
+  // Fechamento por estabelecimento (src/rodada/closure.js): verificado × conflito × desconhecido × contato futuro.
+  const withClosure = results.filter((r) => r.closure);
+  if (withClosure.length) {
+    const phase = withClosure[0].closure.publicResearch === "closed" ? "encerrada" : "aberta";
+    const name = (r) => `**${cell(r.names[0])}** (${cell(r.registrationId ?? "sem identificador")})`;
+    const join = (list) => list.map((x) => cell(x.text)).join("; ");
+    lines.push("", "## Verificações concluídas", "");
+    for (const r of withClosure) lines.push(`- ${name(r)}: ${join(r.closure.verified) || "nenhuma"}`);
+    lines.push("", "## Conflitos de fonte", "");
+    const conf = withClosure.filter((r) => r.closure.conflicts.length);
+    if (!conf.length) lines.push("Nenhum.");
+    for (const r of conf) lines.push(`- ${name(r)}: ${r.closure.conflicts.map((x) => `${cell(x.text)}${x.sources.length ? ` [${x.sources.join(", ")}]` : ""}`).join("; ")}`);
+    lines.push("", "## Dados desconhecidos", "");
+    for (const r of withClosure) lines.push(`- ${name(r)}: ${r.closure.unknown.map((x) => `${cell(x.text)} (${st(x.level)})`).join("; ") || "nenhum"}`);
+    lines.push("", `## Pendências para contato futuro (pesquisa pública ${phase})`, "");
+    for (const r of withClosure) lines.push(`- ${name(r)}: ${join(r.closure.contact) || "nenhuma"}`);
+  }
+  const scr = run.screenings ?? {};
+  if (Object.keys(scr).length) {
+    lines.push("", "## Triagens de sanções", "");
+    for (const r of results) {
+      const x = scr[r.key];
+      if (!x) continue;
+      lines.push(`- **${cell(r.names[0])}**: ${x.status}${x.completedAt ? ` em ${x.completedAt.slice(0, 16).replace("T", " ")} UTC` : ""}; ocorrências ${x.matches}; ${x.lists} listas; válida até ${x.validUntil ? `${x.validUntil.slice(0, 16).replace("T", " ")} UTC` : "não calculado"}${x.valid ? "" : " (VENCIDA ou incompleta: refazer antes de avançar)"}`);
+    }
+  }
   lines.push("", "## Estabelecimentos", "");
   lines.push("| Situação | Estabelecimento | Identificador | Município | Distância | Operação | Uso | Compra de terceiros | Papel | Restrição | Canais | Pendências |");
   lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|");

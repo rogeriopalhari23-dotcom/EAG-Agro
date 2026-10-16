@@ -38,7 +38,7 @@ test("Configuração: piloto e exemplos válidos; perto do limite deriva do raio
   assert.equal(bad.ok, false);
   assert.ok(bad.errors.length >= 7, bad.errors.join(" | "));
   // Nenhum valor do piloto no código da rodada.
-  for (const f of ["rodada/config", "rodada/distance", "rodada/establishment", "rodada/qualify", "rodada/batch", "rodada/report", "rodada/acceptance", "rodada/municipalities", "rodada/area", "rodada/sources/catalog", "rodada/sources/osm", "rodada/sources/sipeagro", "rodada/sources/import", "rounds"]) {
+  for (const f of ["rodada/config", "rodada/distance", "rodada/establishment", "rodada/qualify", "rodada/batch", "rodada/report", "rodada/acceptance", "rodada/municipalities", "rodada/area", "rodada/sources/catalog", "rodada/sources/osm", "rodada/sources/sipeagro", "rodada/sources/import", "rodada/closure", "rounds"]) {
     const src = readFileSync(new URL(`../src/${f}.js`, import.meta.url), "utf8");
     assert.doesNotMatch(src, /indiara|milho|\b270\b|\b300\b|goi[aá]s/i, `src/${f}.js sem valores do piloto`);
   }

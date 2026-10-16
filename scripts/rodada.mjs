@@ -14,6 +14,8 @@
 //   Formatos antigos (adaptação explícita; o arquivo original nunca é reescrito):
 //   node scripts/rodada.mjs adaptar-candidatas <candidatas.csv antigo> --saida <novo.json>
 //   node scripts/rodada.mjs adaptar-lote <lote antigo.json> --produto "<variante>" --saida <novo.json> [--por "<quem>"]
+//   Fechamento de rodada já executada no Compass (só leitura do banco):
+//   node scripts/rodada.mjs consolidar <id da rodada> --d1 <banco> [--remote] [--encerrar] --saida <pasta>
 import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { validateRoundConfig } from "../src/rodada/config.js";
@@ -32,7 +34,7 @@ import { adaptLegacyCandidatesCsv, adaptLegacyBatch } from "../src/rodada/legacy
 
 const [cmd, ...rest] = process.argv.slice(2);
 const opt = (n) => (rest.includes(n) ? rest[rest.indexOf(n) + 1] : null);
-const VALUED = new Set(["--municipios", "--estado", "--saida", "--modo", "--produto", "--decisoes", "--por", "--importar", "--sipeagro"]);
+const VALUED = new Set(["--municipios", "--estado", "--saida", "--modo", "--produto", "--decisoes", "--por", "--importar", "--sipeagro", "--d1"]);
 const pos = rest.filter((a, i) => !a.startsWith("--") && !VALUED.has(rest[i - 1]));
 const json = (f) => JSON.parse(readFileSync(f, "utf8").replace(/^﻿/, ""));
 const root = resolve(import.meta.dirname, "..");
@@ -139,7 +141,51 @@ if (cmd === "validar") {
   const batch = adaptLegacyBatch(json(pos[0]), { produto: opt("--produto"), file: pos[0], adaptedAt: new Date().toISOString(), adaptedBy: opt("--por") });
   writeFileSync(out, JSON.stringify(batch, null, 1));
   console.log(`Lote adaptado em ${out}: ${batch.empresas.length} empresas. ${batch.adaptacao.notes.join(" ")} Original intocado: ${pos[0]}.`);
+} else if (cmd === "consolidar") {
+  // Fechamento de uma rodada já executada no Compass, SÓ LEITURA do banco (wrangler d1 execute): candidatas, estado salvo e
+  // triagens. Recalcula localmente, sem consultar fontes (o cadastro salvo é reaproveitado), e grava relatório e JSON.
+  //   node scripts/rodada.mjs consolidar <id da rodada> --d1 <banco> [--remote] [--encerrar] --saida <pasta>
+  //   --encerrar: considera a fase de pesquisa pública encerrada (desconhecidos → contato futuro) só neste relatório.
+  const { execFileSync } = await import("node:child_process");
+  const db = opt("--d1");
+  if (!db) throw new Error("Informe --d1 <banco>.");
+  const q = (sql) => {
+    const out = execFileSync(process.execPath, [join(root, "node_modules/wrangler/bin/wrangler.js"), "d1", "execute", db, ...(rest.includes("--remote") ? ["--remote"] : ["--local"]), "--json", "--command", sql], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 });
+    return JSON.parse(out.slice(out.search(/^[\[{]/m)))[0].results;
+  };
+  const id = pos[0];
+  if (!/^[0-9a-f-]{36}$/.test(id ?? "")) throw new Error("Informe o id da rodada.");
+  const round = q(`SELECT name,config_json FROM discovery_rounds WHERE id='${id}'`)[0];
+  if (!round) throw new Error("Rodada não encontrada.");
+  const config = JSON.parse(round.config_json);
+  if (rest.includes("--encerrar")) config.research = { ...(config.research ?? {}), publicPhase: "closed" };
+  const v = validateRoundConfig(config);
+  if (!v.ok) throw new Error(v.errors.join("; "));
+  const candidates = q(`SELECT payload_json FROM round_candidates WHERE round_id='${id}' ORDER BY created_at, rowid`).map((r) => JSON.parse(r.payload_json));
+  const state = { establishments: Object.fromEntries(q(`SELECT est_key,state_json FROM round_establishments WHERE round_id='${id}'`).map((r) => [r.est_key, JSON.parse(r.state_json)])) };
+  const maxAge = JSON.parse(q("SELECT value_json FROM parameters WHERE parameter_key='sanctions_max_age_hours' AND scope_key='global' ORDER BY effective_from DESC LIMIT 1")[0]?.value_json ?? "null");
+  const screenings = {};
+  for (const r of q(`SELECT rr.est_key, sr.status, sr.completed_at, sr.source_versions_json, (SELECT COUNT(*) FROM screening_matches m WHERE m.screening_run_id=sr.id) matches FROM round_registrations rr JOIN screening_runs sr ON sr.id=(SELECT x.id FROM screening_runs x WHERE x.company_id=rr.company_id ORDER BY x.initiated_at DESC, x.rowid DESC LIMIT 1) WHERE rr.round_id='${id}'`)) {
+    const versions = Object.values(JSON.parse(r.source_versions_json || "{}"));
+    const dl = versions.length ? q(`SELECT MIN(downloaded_at) oldest FROM sanction_list_versions WHERE id IN (${versions.map((x) => `'${String(x).replace(/'/g, "")}'`).join(",")})`)[0]?.oldest : null;
+    const validUntil = dl && typeof maxAge === "number" ? new Date(Date.parse(dl) + maxAge * 3600000).toISOString() : null;
+    screenings[r.est_key] = { status: r.status, completedAt: r.completed_at, matches: r.matches, lists: versions.length, oldestListDownloadedAt: dl, validUntil, valid: !!validUntil && Date.parse(validUntil) > Date.now() && r.status === "completed" };
+  }
+  // Conflitos registrados no cadastro (evidência "conflicting") das empresas cadastradas pela rodada.
+  const regConf = {};
+  for (const r of q(`SELECT rr.est_key, e.reference, e.source_url FROM round_registrations rr JOIN evidence e ON e.company_id=rr.company_id AND e.validation_status='conflicting' WHERE rr.round_id='${id}'`))
+    (regConf[r.est_key] ??= []).push({ field: "registered_evidence", text: `Evidência do cadastro marcada como conflitante: ${String(r.reference).slice(0, 300)}`, sources: r.source_url ? [r.source_url] : [] });
+  const { list: municipalities } = loadMunicipalities(v.config);
+  // Sem fontes: o cadastro salvo no estado é reaproveitado (nenhuma consulta externa).
+  const run = await runRound({ config, municipalities, candidates, fetchers: {}, state, now: new Date().toISOString() });
+  if (!run.ok) throw new Error(run.errors.join("; "));
+  for (const r of run.results) if (regConf[r.key]) r.closure.conflicts.push(...regConf[r.key]);
+  const out = opt("--saida") ?? ".";
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "relatorio-consolidado.md"), renderReport({ ...run, screenings }, { title: `${round.name} — fechamento da pesquisa pública` }));
+  writeFileSync(join(out, "fechamento.json"), JSON.stringify({ round: { id, name: round.name }, publicResearch: config.research?.publicPhase ?? "open", generatedAt: new Date().toISOString(), lookups: run.lookups, establishments: run.results.map((r) => ({ key: r.key, name: r.names[0], registrationId: r.registrationId, status: r.status, distance: r.distance.label, checks: r.checks, closure: r.closure, screening: screenings[r.key] ?? null })) }, null, 1));
+  console.log(`Fechamento de ${round.name}: ${run.results.length} estabelecimentos; consultas ${JSON.stringify(run.lookups)}; triagens ${Object.keys(screenings).length}. Gravado em ${out}.`);
 } else {
-  console.log("Comandos: validar | area | executar | lote | adaptar-candidatas | adaptar-lote (ver o cabeçalho deste arquivo).");
+  console.log("Comandos: validar | area | executar | lote | adaptar-candidatas | adaptar-lote | consolidar (ver o cabeçalho deste arquivo).");
   process.exit(1);
 }

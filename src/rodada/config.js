@@ -59,6 +59,8 @@ export function validateRoundConfig(cfg) {
   const comp = cfg.compliance ?? {};
   if (!str(comp.scope)) e.push("compliance.scope obrigatório (ex.: br_email_automatic).");
   if (comp.sanctionsMaxAgeHours != null && !(isNum(comp.sanctionsMaxAgeHours) && comp.sanctionsMaxAgeHours > 0)) e.push("compliance.sanctionsMaxAgeHours inválido.");
+  // Fase da pesquisa pública da rodada: encerrada, os desconhecidos viram pendência de contato futuro (sem pedido campo a campo).
+  if (cfg.research?.publicPhase != null && !["open", "closed"].includes(cfg.research.publicPhase)) e.push("research.publicPhase: use open ou closed.");
   if (e.length) return { ok: false, errors: e, config: null };
   const factor = UNITS[unit];
   const radiusKm = r.value * factor;

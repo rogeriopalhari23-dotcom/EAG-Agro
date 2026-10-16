@@ -4027,6 +4027,7 @@ function roundConfigForm(initial, roundName, onSubmit, label) {
     language: input("Idioma", "language", "text", c.locale?.language ?? "pt-BR"),
     timezone: input("Fuso", "timezone", "text", c.locale?.timezone ?? "America/Sao_Paulo"),
     scope: input("Escopo de compliance", "scope", "text", c.compliance?.scope ?? ""),
+    research: select("Pesquisa pública", "researchPhase", [["open", "Aberta"], ["closed", "Encerrada: desconhecidos viram pendência de contato futuro"]], c.research?.publicPhase ?? "open"),
   };
   const advanced = input(
     "Segmentos (com regras de descoberta), fontes, prioridades e perfil do comprador (JSON)",
@@ -4042,6 +4043,7 @@ function roundConfigForm(initial, roundName, onSubmit, label) {
       { group: "Origem", hint: "No Brasil, qualquer município do IBGE (nome + UF, ou o código). Fora do Brasil, informe a coordenada.", fields: [f.country, f.region, f.municipality, f.code7, f.lat, f.lon] },
       { group: "Raio e proximidade do limite", hint: "A faixa perto do limite pede conferência da localização; não exclui ninguém.", fields: [f.radius, f.unit, f.nearKind, f.nearValue] },
       { group: "Idioma, fuso e compliance", fields: [f.language, f.timezone, f.scope] },
+      { group: "Fase da pesquisa", hint: "Encerrada: nenhuma confirmação campo a campo; o que segue desconhecido vai para contato futuro.", fields: [f.research] },
       { group: "Avançado", collapsed: true, fields: [advanced] },
     ],
     async (v) => {
@@ -4071,6 +4073,7 @@ function roundConfigForm(initial, roundName, onSubmit, label) {
         nearLimit: v.nearKind === "fraction" ? { fraction: num(v.nearValue) / 100 } : { distance: num(v.nearValue) },
         locale: { language: v.language.trim(), timezone: v.timezone.trim() },
         compliance: { ...(c.compliance ?? {}), scope: v.scope.trim() },
+        research: { ...(c.research ?? {}), publicPhase: v.researchPhase },
       };
       await onSubmit(v.name.trim(), config);
     },
@@ -4326,11 +4329,22 @@ async function showRound(id) {
           x.checks?.length ? `Conferir: ${x.checks.join("; ")}` : null,
           x.decision ? `Decisão: ${DECISION_LABEL[x.decision.decision]} por ${x.decision.decided_by} em ${fmtDate(x.decision.decided_at)}${x.decision.note ? ` (${x.decision.note})` : ""}` : null,
           x.registration ? `Cadastro: ${x.registration.outcome} (${x.registration.mode}) em ${fmtDate(x.registration.registered_at)}` : null,
+          x.screening ? `Triagem de sanções: ${x.screening.status}, ${x.screening.matches} ocorrência(s); válida até ${x.screening.validUntil ? fmtDate(x.screening.validUntil) : "não calculado"}${x.screening.valid ? "" : " (vencida ou incompleta)"}` : null,
+          x.closure?.conflicts.length ? `Conflitos de fonte: ${x.closure.conflicts.length}` : null,
+          x.closure?.contact.length ? `Para contato futuro: ${x.closure.contact.length} item(ns)` : null,
         ].filter(Boolean);
+        const cl = x.closure;
+        const list = (title, items, fmt) => details(`${title} (${items.length})`, items.length ? el("ul", {}, ...items.map((i) => text("li", fmt(i)))) : text("p", "Nenhum.", "muted"));
+        const closureBox = cl
+          ? details(
+              `Fechamento da pesquisa (pública ${cl.publicResearch === "closed" ? "encerrada" : "aberta"})`,
+              el("div", {}, list("Verificado", cl.verified, (i) => i.text), list("Conflitos de fonte", cl.conflicts, (i) => `${i.text}${i.sources.length ? ` — ${i.sources.join(", ")}` : ""}`), list("Desconhecido", cl.unknown, (i) => `${i.text} (${PROOF_LABEL[i.level] ?? i.level})`), list("Para contato futuro", cl.contact, (i) => i.text)),
+            )
+          : null;
         return el(
           "div",
           { class: "row" },
-          el("div", { class: "round-lines" }, el("label", { class: "round-pick" }, writable() ? box : null, text("strong", x.names.join(" / "))), ...info.map((l) => text("small", l)), details("Pendências", el("ul", {}, ...x.pending.map((p) => text("li", p))))),
+          el("div", { class: "round-lines" }, el("label", { class: "round-pick" }, writable() ? box : null, text("strong", x.names.join(" / "))), ...info.map((l) => text("small", l)), closureBox, details("Pendências", el("ul", {}, ...x.pending.map((p) => text("li", p))))),
           tag(stLabel, stCls),
           x.checks?.length ? tag("conferir", "warn") : null,
         );

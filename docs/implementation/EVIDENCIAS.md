@@ -2920,3 +2920,33 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - localização exata de Herlan e Pérola;
   - porte de Campo, SIAP, COMPROP e Aurilândia.
 - **Não feito:** contato, Snov, fichas, T11, canais de envio, campanhas e publicação.
+
+## Rodada 1: pesquisa pública encerrada e fechamento consolidado (2026-10-16 UTC; nada publicado)
+
+- **Pesquisa pública da Rodada 1 encerrada.** Nenhuma busca foi repetida: o fechamento usa só o que já estava registrado.
+- **Fechamento geral por estabelecimento** (`src/rodada/closure.js`, regras gerais; detalhes em `rodadas/FLUXO-RODADAS.md`, seção "Fechamento da pesquisa"):
+  - mostra verificado, conflitos de fonte, dados desconhecidos, contato futuro e triagem com validade;
+  - aparece no painel (resultado da rodada), na exportação e no relatório;
+  - nas próximas rodadas, os desconhecidos vão para uma lista única, sem confirmação campo a campo. Com a fase pública encerrada (campo novo no formulário da rodada), viram pendência de contato futuro.
+- **Relatório consolidado da Rodada 1:** `rodadas/rodada-1-milho-indiara-100km/relatorio-consolidado.md` e `fechamento.json`.
+  - Gerado por `rodada.mjs consolidar ... --encerrar`, que **só lê** o banco de produção: 0 consultas externas, os 10 cadastros salvos reaproveitados.
+  - A produção não foi alterada: a configuração da rodada no Compass continua com a fase aberta, e o encerramento vale só para este relatório até a publicação.
+  - **Verificado:** cadastro oficial ativo nas 10 (Receita, 16/10/2026); operação atual da Campo (fonte própria).
+  - **Conflitos:**
+    - SIAP: evidência do cadastro marcada como conflitante (grupo SIAP × esta pessoa jurídica);
+    - COMPROP: armazenagem na CNAE × fabricante no MAPA;
+    - Aurilândia: comércio atacadista na CNAE × fabricante no MAPA.
+  - **Desconhecidos e contato futuro, nas 10:**
+    - uso de milho, compra de terceiros, aceitação de GMO, papel, responsável e canal de compras, localização exata;
+    - operação atual em 9;
+    - porte em 4.
+    - Herlan e Pérola com "conferência do limite pendente".
+  - **Triagens:** 10 concluídas às 00:52 UTC, 0 ocorrências, 3 listas cada, **válidas até 24/10/2026 19:17 UTC**. A validade segue a regra do Compass: download mais antigo mais `sanctions_max_age_hours`, 720 h.
+- **Contagem das consultas adiadas por 429:** commit `a469203`, só no repositório e **não publicada**. Testes e resultado na seção anterior ("Rodada 1: contagem das consultas adiadas e qualificação assistida").
+- **Ressalva preservada da comparação antes/depois do enriquecimento:** a linha de base global foi a **última fotografia válida depois do cadastro** (`estado-pos-cadastro-r1`). A fotografia imediatamente anterior ao enriquecimento falhou por erro transitório de autenticação do wrangler. A comparação empresa por empresa (`qualificacao-antes-depois.json`) foi tirada imediatamente antes.
+- **Testes:**
+  - novo `tests/rodada-fechamento.test.mjs` (5), com o Worker cobrindo triagem, validade, conflito `conflicting` e relatório;
+  - guarda contra valores do piloto estendida a `closure.js`;
+  - tela conferida no Chrome sem interface (`tests/ui-rodadas.mjs`);
+  - suíte completa: **500 + 2 + 37**, 0 falhas.
+- **Não feito:** publicação, contato, alteração de T11, canais, campanhas ou fichas.

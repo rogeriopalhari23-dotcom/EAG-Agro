@@ -6,7 +6,7 @@
 // Nada aqui faz contato, aprova ficha, libera envio ou consome serviço pago. A triagem de sanções continua no Compass:
 // o cadastro em descoberta pode vir antes dela; os avanços que exigem triagem continuam bloqueados pelo próprio Compass.
 import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES } from "./http.js";
-import { statement as s, commit, auditStatement, now, product } from "./store.js";
+import { statement as s, commit, auditStatement, now, product, parameters } from "./store.js";
 import { normalizeName } from "./geo.js";
 import { validateRoundConfig } from "./rodada/config.js";
 import { municipalityIndex, resolveOrigin } from "./rodada/distance.js";
@@ -24,6 +24,7 @@ import { renderReport } from "./rodada/report.js";
 const WORKER_FETCHERS = { "br-cnpj-ws": (fetchImpl) => brCnpjWs({ fetchImpl }) };
 const BROWSER_SOURCES = ["osm-overpass"];
 const CHUNK = 40;
+const REF_MAX = 280; // trecho da referência exibido no fechamento
 
 async function sha256(text) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -73,6 +74,31 @@ function validated(raw) {
 }
 const preflightFor = (config) =>
   preflight(config, { geography: config.origin.country === "BR" ? "national_official" : "none", implemented: [...Object.keys(WORKER_FETCHERS), ...BROWSER_SOURCES] });
+
+// Triagens de sanções das empresas cadastradas pela rodada (só leitura): última execução por empresa, ocorrências,
+// versões das listas usadas e validade pela mesma regra do Compass (sanctions_max_age_hours sobre o download de cada lista).
+async function screeningsFor(env, actor, id) {
+  const maxAge = (await parameters(env, actor.tenant_id))["sanctions_max_age_hours:global"];
+  const rows = (await s(env, "SELECT rr.est_key, rr.company_id, sr.id run_id, sr.status, sr.completed_at, sr.source_versions_json, (SELECT COUNT(*) FROM screening_matches m WHERE m.screening_run_id=sr.id) matches FROM round_registrations rr JOIN screening_runs sr ON sr.id=(SELECT x.id FROM screening_runs x WHERE x.tenant_id=? AND x.company_id=rr.company_id ORDER BY x.initiated_at DESC, x.rowid DESC LIMIT 1) WHERE rr.round_id=?", actor.tenant_id, id).all()).results;
+  const out = {};
+  for (const r of rows) {
+    const versions = Object.values(JSON.parse(r.source_versions_json || "{}"));
+    const dl = versions.length ? (await s(env, `SELECT MIN(downloaded_at) oldest FROM sanction_list_versions WHERE id IN (${versions.map(() => "?").join(",")})`, ...versions).first())?.oldest : null;
+    const validUntil = dl && typeof maxAge === "number" ? new Date(Date.parse(dl) + maxAge * 3600000).toISOString() : null;
+    out[r.est_key] = { companyId: r.company_id, runId: r.run_id, status: r.status, completedAt: r.completed_at, matches: r.matches, lists: versions.length, oldestListDownloadedAt: dl, validUntil, valid: !!validUntil && Date.parse(validUntil) > Date.now() && r.status === "completed" };
+  }
+  return out;
+}
+
+// Conflitos registrados no cadastro do Compass (evidência com validação "conflicting") das empresas cadastradas pela
+// rodada: entram no fechamento como conflito de fonte, para o painel e o relatório mostrarem o mesmo que o cadastro.
+async function registeredConflicts(env, actor, id) {
+  const rows = (await s(env, "SELECT rr.est_key, e.reference, e.source_url FROM round_registrations rr JOIN evidence e ON e.tenant_id=? AND e.company_id=rr.company_id AND e.validation_status='conflicting' WHERE rr.round_id=?", actor.tenant_id, id).all()).results;
+  const out = {};
+  for (const r of rows) (out[r.est_key] ??= []).push({ field: "registered_evidence", text: `Evidência do cadastro marcada como conflitante: ${String(r.reference).slice(0, REF_MAX)}`, sources: r.source_url ? [r.source_url] : [] });
+  return out;
+}
+const withConflicts = (res, extra) => (res.closure && extra?.length ? { ...res, closure: { ...res.closure, conflicts: [...res.closure.conflicts, ...extra] } } : res);
 
 export async function listRounds(env, actor) {
   const rows = (await s(env, "SELECT id,name,status,config_json,config_revision,last_run_at,last_run_json,updated_at FROM discovery_rounds WHERE tenant_id=? ORDER BY updated_at DESC LIMIT 100", actor.tenant_id).all()).results;
@@ -137,12 +163,14 @@ export async function getRound(env, actor, id) {
   const regs = (await s(env, "SELECT est_key,company_id,mode,outcome,registered_at FROM round_registrations WHERE round_id=?", id).all()).results;
   const cands = (await s(env, "SELECT intake,source_id,COUNT(*) n FROM round_candidates WHERE round_id=? GROUP BY intake,source_id", id).all()).results;
   const dec = new Map(decisions.map((d) => [d.est_key, d])), reg = new Map(regs.map((x) => [x.est_key, x]));
+  const scr = regs.length ? await screeningsFor(env, actor, id) : {};
+  const regConf = regs.length ? await registeredConflicts(env, actor, id) : {};
   return {
     id: r.id, name: r.name, status: r.status, revision: r.config_revision, config: r.config, normalized: v.ok ? { radiusKm: v.config.radius.km, nearLimit: v.config.nearLimit } : null,
     preflight: parse(r.preflight_json), acknowledged: r.preflight_ack_revision === r.config_revision ? { by: r.preflight_ack_by, at: r.preflight_ack_at } : null,
     lastRunAt: r.last_run_at, lastRun: parse(r.last_run_json), candidates: cands,
     sources: Object.fromEntries(Object.entries(SOURCE_CATALOG).map(([k, x]) => [k, { label: x.label, mode: x.mode, cost: x.cost, countries: x.countries }])),
-    results: ests.map((e) => ({ ...JSON.parse(e.result_json), needsReview: Boolean(e.needs_review), decision: dec.get(e.est_key) ?? null, registration: reg.get(e.est_key) ?? null })),
+    results: ests.map((e) => ({ ...withConflicts(JSON.parse(e.result_json), regConf[e.est_key]), needsReview: Boolean(e.needs_review), decision: dec.get(e.est_key) ?? null, registration: reg.get(e.est_key) ?? null, screening: scr[e.est_key] ?? null })),
   };
 }
 
@@ -375,5 +403,8 @@ export async function exportRound(env, actor, id) {
   const registrations = (await s(env, "SELECT * FROM round_registrations WHERE round_id=?", id).all()).results.map((x) => ({ ...x, detail_json: undefined, detail: parse(x.detail_json) }));
   const origin = await originFor(env, config);
   const counters = parse(r.last_run_json)?.counters ?? { created: 0, updated: 0, unchanged: 0 };
-  return { round: { id: r.id, name: r.name, revision: r.config_revision, exportedAt: now() }, config: r.config, preflight: parse(r.preflight_json), results, decisions, registrations, report: renderReport({ config, origin, results, counters }, { title: r.name }) };
+  const screenings = registrations.length ? await screeningsFor(env, actor, id) : {};
+  const regConf = registrations.length ? await registeredConflicts(env, actor, id) : {};
+  for (let k = 0; k < results.length; k++) results[k] = withConflicts(results[k], regConf[results[k].key]);
+  return { round: { id: r.id, name: r.name, revision: r.config_revision, exportedAt: now() }, config: r.config, preflight: parse(r.preflight_json), results, decisions, registrations, screenings, report: renderReport({ config, origin, results, counters, screenings }, { title: r.name }) };
 }

@@ -83,7 +83,7 @@ export function assistedCandidate(input, { country, consultedAt, by }) {
     country: input.country ?? country, name: input.name, registrationId: input.registrationId || null, municipality: input.municipality || null, region: input.region?.toUpperCase() || null,
     hints: { segment: input.segment || null },
     sources: [{ id: "assisted", mode: "assisted", ref: input.sourceUrl, url: input.sourceUrl, consultedAt, by }],
-    evidence: input.evidence?.kind ? [{ kind: input.evidence.kind, strength: input.evidence.strength ?? "search_summary", url: input.sourceUrl, quote: input.evidence.quote ?? null, date: consultedAt }] : [],
+    evidence: input.evidence?.kind ? [{ kind: input.evidence.kind, strength: input.evidence.strength ?? "search_summary", url: input.sourceUrl, quote: input.evidence.quote ?? null, date: consultedAt, ...(input.evidence.conflict === true ? { conflict: true } : {}) }] : [],
   };
   return { candidate: c, errors };
 }
