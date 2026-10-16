@@ -2686,3 +2686,43 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Suíte completa: 494 + 2 + 37, 0 falhas. O teste workerd aplica a migração 0044.
 - **Não feito:** migração 0044 aplicada em produção, publicação, uso de serviço pago, chamada real a fontes externas (os testes usam respostas simuladas), contato, ou alteração de registros reais do piloto.
 - Matriz completa (operacional, parcial, dependência externa) em `rodadas/FLUXO-RODADAS.md`.
+
+## Publicação das rodadas com as migrações 0043 e 0044 (2026-10-16 UTC, autorizada por Rogério)
+
+- **Commit publicado:** `f05ab0a83cbbc191d2ea55b2d48a95a5ea401b03` (opção 1).
+  - Inclui, desde o código em produção (`75c3d12`):
+    - correção do horário da cópia: `e60b328`, migração 0043, no Worker (`src/sending.js`, `src/bridge.js`, `src/internal-copy.js`);
+    - fluxo geral de rodadas: `006b208` e `f05ab0a`, com migração 0044, `src/rodada/`, `src/rounds.js`, rotas `/api/rounds` e tela Rodadas;
+    - o restante é documentação.
+  - A ponte em produção continua **0.2.0**. A 0.2.1 do mesmo commit não foi instalada; sem ela, `smtp_accepted_at` fica nulo.
+  - Com `smtp_accepted_at` nulo, a cópia diz "com aceite registrado no Compass em … (horário do aceite pelo servidor de envio não informado pela ponte)". Ela nunca apresenta o horário do registro como horário comprovado do aceite SMTP (teste em `bridge/test/copia-interna.test.mjs`).
+- **Pendências antes da aplicação** (`wrangler d1 migrations list --remote`): 0043 e 0044. A 0043 foi informada antes de aplicar e autorizada.
+- **Pontos de restauração (antes):**
+  - Worker vigente `abdabdc2-85af-437f-8f2a-98f51cc05ea4`;
+  - Time Travel `0000080a-0000033b-00005106-60508ce163e7d541fbcd2e2766b1a287` (00:08 UTC);
+  - backup privado `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0043-0044-20261016\eag_compass.sql`: 31.077.312 bytes, SHA-256 `9010e2b1e83f59190b3a9e9faa3e2d6d88e6de29d46a98569ffd731862e14a08`, acesso só de `ROGERIONOTE\Roger`;
+  - backup carregado num banco só em memória: `integrity_check` ok, 0 violações de chave estrangeira, 84 tabelas, última migração 0042, 27 empresas, 13 fichas, 29 versões, 28 envios.
+- **Compatibilidade:**
+  - o código em produção (`75c3d12`) com a 0043 e a 0044 acrescentadas passou a própria suíte: 472 + 2, 0 falhas (a suíte da ponte não roda nesse pacote);
+  - a 0043 só acrescenta uma coluna que aceita nulo; a 0044 só cria tabelas novas.
+- **Reversão:**
+  - **código:** `wrangler rollback abdabdc2-85af-437f-8f2a-98f51cc05ea4`, compatível com o esquema novo (suíte acima). As tabelas novas ficam sem uso e a coluna nova fica nula. Nunca `64808403`.
+  - **banco:** Time Travel e backup só para desastre, nunca para reverter código.
+- **Migrações aplicadas** (00:09 UTC; 0043 com 2 comandos, 0044 com 12):
+  - "No migrations to apply" depois;
+  - esquema conferido: `send_outbox.smtp_accepted_at`, as 6 tabelas (`discovery_rounds`, `round_candidates`, `round_establishments`, `round_decisions`, `round_registrations`, `round_source_calls`) e os 5 índices.
+- **Publicação:** `npm run deploy` (00:12 UTC), com o predeploy completo: `check` **494 + 2 + 37**, 0 falhas, e `validate-deploy` ok.
+  - Worker **`4d7cfa4c-5511-4b3c-82e0-2e2cf5dec7d0`**.
+- **Conferido no banco depois** (retrato só de leitura, comparado com o de antes):
+  - conteúdo idêntico (SHA-256) em empresas, fichas, versões, aprovações, envios, cópias, supressões, canais, campanhas, tarefas, validações T11, contatos, parâmetros, evidências, perfis e pessoas;
+  - contagens iguais, exceto `audit_log` (+1) e `bridge_nonces` (rotação normal da ponte);
+  - tabelas das rodadas vazias.
+- **Fichas brasileiras:** Cimilho `92203532`, São Martinho `3bba38e2` e Rei do Milho `5217599f` na v4, `in_approval`, 0 aprovações. As fichas alemãs continuam na v2, sem aprovação.
+- **T11:** 0 validações.
+- **Canais e campanhas:** email, linkedin e whatsapp `planned`; campanhas 2 `draft` + 1 `ended`.
+- **Cópia:** `{"enabled":false}` vigente.
+- **Envios:** `send_outbox` 28 (6 aceitos, 22 cancelados), o último de 21:12 UTC de 14/10. Nenhum envio novo.
+- **Ponte 0.2.0:** leituras bem-sucedidas às 00:11:13 UTC (antes da publicação, já com o esquema novo) e às 00:18:56 UTC (depois da publicação).
+- **Página pública de descadastro:** link inválido → 404.
+- **Conectores externos:** publica.cnpj.ws, Overpass e o arquivo do SIPEAGRO foram testados **só com respostas simuladas**. A disponibilidade real não foi comprovada nesta etapa.
+- **Não feito:** rodada real, cadastro de empresas, aprovação de fichas, validação T11, liberação de envio, atualização da ponte.
