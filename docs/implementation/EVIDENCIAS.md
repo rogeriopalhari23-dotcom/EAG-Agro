@@ -2726,3 +2726,53 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Página pública de descadastro:** link inválido → 404.
 - **Conectores externos:** publica.cnpj.ws, Overpass e o arquivo do SIPEAGRO foram testados **só com respostas simuladas**. A disponibilidade real não foi comprovada nesta etapa.
 - **Não feito:** rodada real, cadastro de empresas, aprovação de fichas, validação T11, liberação de envio, atualização da ponte.
+
+## Limpeza D1 do backup anterior à 0042 (2026-10-16, autorizada por Rogério)
+
+- **Autorização:** exclusivamente `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0042-20261014\eag_compass.sql`.
+- **Conferência antes de excluir:**
+  - 30.876.835 bytes;
+  - SHA-256 completo `d36512526a9420a21d7955adbff04340d62608870565bd672c170f64f6601259`, igual ao registro.
+- **Execução:** arquivo excluído e pasta vazia removida. Nenhuma divergência.
+- **Preservados:**
+  - `d1-remoto-antes-0043-0044-20261016\eag_compass.sql`: 31.077.312 bytes, SHA-256 `9010e2b1e83f59190b3a9e9faa3e2d6d88e6de29d46a98569ffd731862e14a08`, conferido depois;
+  - `ponte-antes-0.2.0-20261014`;
+  - `ponte-config-antes-prazo-20261006`;
+  - `segredos-producao-2026-09-24.txt`.
+
+## Primeira rodada real (milho GMO, Indiara/GO, 100 km): preparação e conectores reais (2026-10-16 UTC)
+
+- **Configuração:** `rodadas/rodada-1-milho-indiara-100km/config.json`.
+  - Raio de 100 km; faixa proporcional de 10% (90–100 km), que gera conferência.
+  - Fontes: Receita (publica.cnpj.ws), OpenStreetMap e SIPEAGRO. Casa dos Dados e Snov ficam fora.
+  - Área pelo IBGE: 63 municípios (28 inteiros, 35 parciais), só em GO.
+- **Conectores reais, gratuitos** (resultado real, distinto dos testes simulados):
+  - **SIPEAGRO, dados abertos do MAPA:** download feito (00:23 UTC), HTTP 200, 2.319.869 bytes, 18.003 linhas, `Last-Modified` 11/10/2026, SHA-256 `b168131883b04a59ddae0d5df80c61fddeadb8c780fd81061fc983b920964818`.
+    - Filtrado pela área: 101 estabelecimentos ativos com regra do segmento. Ficaram de fora 17.377 linhas fora da área, 41 inativas, 273 sem regra e 1 de pessoa física.
+    - O CNPJ vem mascarado nos dados abertos.
+  - **Lista oficial do MAPA em PDF** (`ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf`, gov.br): download feito, HTTP 200, 1.415.065 bytes, SHA-256 `fb21e78d2117241a8cd549ad5c5b396eadb4034a8fbfeadf34b32bd71aaee526` (igual à cópia de 06/10).
+    - Traz o CNPJ completo por registro: 40 dos 101 tiveram CNPJ compatível com a máscara.
+    - A coluna de município do PDF não é lida com segurança; o município da unidade fica para a Receita.
+  - **OpenStreetMap (Overpass):** HTTP 502 às 00:22 e às 00:26 UTC (2 tentativas, sem insistir). Nenhuma candidata por essa fonte. Registrado como falha real do serviço público.
+- **Seleção das 10 candidatas**, por critérios objetivos e sem completar com dados presumidos:
+  - critérios: CNPJ oficial casado por registro e máscara; centroide até 100 km; fabricante ativo; fora do Compass; fora de grandes grupos e de atacadistas;
+  - fora pelos critérios: Milhão (restrição não transgênica já registrada) e Fazendão, que diverge entre fontes (ativo nos dados abertos de 11/10, "SUSPENSO A PEDIDO" no PDF de 21/07);
+  - já no Compass e preservadas: Nutrir, Rural Forte, Sociagro, BRF Rio Verde e Rei do Milho;
+  - escolhidas:
+
+| Empresa | Município | CNPJ | Registro SIPEAGRO |
+|---|---|---|---|
+| Campo Rações | Acreúna | 05.621.758/0001-60 | GO0010090 |
+| SIAP Rações | Acreúna | 43.177.285/0001-43 | GO0017779 |
+| Cooperativa Mista dos Produtores Rurais de Pontalina | Pontalina | 17.802.890/0002-39 | GO0008702 |
+| P&S Produtos Agropecuários | Abadia de Goiás | 09.276.439/0002-05 | GO0010286 |
+| Yabagata | Trindade | 21.196.572/0001-68 | GO0012351 |
+| Rural Cria | Trindade | 54.478.827/0001-34 | GO0022799 |
+| VF Rações | Hidrolândia | 11.595.239/0001-78 | GO0014010 |
+| Cooperativa Agropecuária de Aurilândia | Aurilândia | 01.225.945/0001-74 | GO0014729 |
+| Rações Herlan | Caturaí, 91 km (conferência) | 50.478.250/0001-00 | GO0022594 |
+| Rações Pérola | Adelândia, 93,6 km (conferência) | 41.809.266/0001-67 | GO0013994 |
+
+  - Entradas em `candidatas-identificadas.csv` (importação) e `sipeagro-recorte-10.csv` (linhas oficiais das 10, para o importador do SIPEAGRO e a conciliação).
+  - Evidência por candidata: registro oficial do MAPA, que é **indício de atividade**; não prova uso de milho nem compra.
+- **Pendente:** conferência da tela e execução no painel. O login do Access (cloudflared) expirou e o novo login exige o navegador de Rogério. Nada foi gravado em produção nesta etapa.
