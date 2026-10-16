@@ -2,8 +2,9 @@
 // conflitos de fonte, dados desconhecidos e o que fica para contato futuro. Calculado só das evidências, do cadastro
 // e da distância — nenhuma regra por empresa e nenhum pedido de confirmação campo a campo.
 //   - verificado: comprovado por fonte que a configuração aceita como comprovante, ou consulta cadastral feita;
-//   - conflito: evidência marcada pela pessoa como conflitante (evidence.conflict) ou papel divergente entre o cadastro
-//     oficial e o registro de atividade (regra por país; hoje só a CNAE do Brasil);
+//   - conflito: evidência marcada pela pessoa como conflitante (evidence.conflict) ou restrição que conflita com a variedade.
+//     Atividades diferentes no cadastro oficial e no registro de atividade (ex.: comércio na CNAE e fabricante no MAPA)
+//     NÃO são conflito: podem coexistir; viram "papel comercial a confirmar" (regra de CNAE só para o Brasil);
 //   - desconhecido: campo sem prova (com o nível atual: indício ou sem evidência);
 //   - contato futuro: campos que fonte pública normalmente não responde (compra de terceiros, aceitação da variedade,
 //     responsável/canal de compras) e, quando a rodada encerra a fase de pesquisa pública
@@ -21,7 +22,7 @@ const ROLE_LABEL = { manufacturing: "indústria", trade: "comércio", storage: "
 const MANUFACTURING_TEXT = /fabric|indústria|industria|manufactur|produç/i;
 
 // Campos que só o próprio comprador costuma responder: vão para contato futuro mesmo com a pesquisa pública aberta.
-const CONTACT_BY_NATURE = new Set(["purchase", "variety_acceptance", "purchasing_channel"]);
+const CONTACT_BY_NATURE = new Set(["purchase", "variety_acceptance", "purchasing_channel", "commercial_role"]);
 
 export function closureFor({ est, assessment: a, registry, distance: d, config, lookup }) {
   const verified = [], conflicts = [], unknown = [];
@@ -35,8 +36,15 @@ export function closureFor({ est, assessment: a, registry, distance: d, config, 
   dim("commodity_use", `Uso de ${label}`, a.commodityUse);
   dim("purchase", "Compra de terceiros", a.purchase);
   if (config.commodity.variety) unknown.push({ field: "variety_acceptance", text: `Aceitação de ${config.commodity.variety}`, level: "none" });
-  if (["unknown", "possible_reseller"].includes(a.role)) unknown.push({ field: "role", text: "Papel (consumidora, fabricante, armazenadora ou revendedora)", level: a.role === "possible_reseller" ? "indication" : "none" });
-  else verified.push({ field: "role", text: `Papel: ${a.role}`, sources: [] });
+  // Atividade industrial registrada (fonte oficial ou própria que diz "fabricante") é fato verificado; o PAPEL COMERCIAL
+  // (consome a commodity, revende, armazena, origina) é outra pergunta e continua desconhecido até haver prova.
+  const industrial = (est.evidence ?? []).filter((e) => e.kind === "activity_code" && config.evidence.confirming.includes(e.strength) && MANUFACTURING_TEXT.test(e.quote ?? ""));
+  if (industrial.length) verified.push({ field: "industrial_activity", text: "Atividade industrial registrada (fabricante)", sources: src(industrial) });
+  const activities = est.country === "BR" && registry?.activity ? BR_ROLE(registry.activity) : null;
+  const distinct = industrial.length && activities && activities !== "manufacturing";
+  if (["unknown", "possible_reseller"].includes(a.role))
+    unknown.push({ field: "commercial_role", text: distinct ? `Papel comercial a confirmar: atividades distintas nas fontes (cadastro oficial: ${ROLE_LABEL[activities]}, ${registry.activity}; registro: fabricante)` : "Papel comercial a confirmar (consome, revende, armazena ou origina)", level: a.role === "possible_reseller" ? "indication" : "none" });
+  else verified.push({ field: "commercial_role", text: `Papel comercial: ${a.role}`, sources: [] });
   const purchasing = a.channels.filter((c) => c.type === "purchasing" && c.verified);
   if (purchasing.length) verified.push({ field: "purchasing_channel", text: "Canal de compras publicado", sources: purchasing.map((c) => c.source) });
   else unknown.push({ field: "purchasing_channel", text: "Responsável e canal de compras", level: a.channels.length ? "indication" : "none" });
@@ -48,15 +56,11 @@ export function closureFor({ est, assessment: a, registry, distance: d, config, 
 
   // Conflitos registrados pela pessoa na evidência (ex.: duas fontes que se contradizem).
   for (const e of est.evidence ?? []) if (e.conflict) conflicts.push({ field: e.kind, text: e.quote ?? "Conflito registrado na evidência", sources: e.url ? [e.url] : [] });
-  // Papel divergente entre o cadastro oficial e o registro de atividade (Brasil: CNAE principal × fabricante).
-  if (est.country === "BR" && registry?.activity) {
-    const role = BR_ROLE(registry.activity);
-    const saysManufacturing = (est.evidence ?? []).some((e) => e.kind === "activity_code" && MANUFACTURING_TEXT.test(e.quote ?? ""));
-    if (saysManufacturing && role && role !== "manufacturing")
-      conflicts.push({ field: "role", text: `Atividade principal no cadastro oficial é ${ROLE_LABEL[role]} (${registry.activity}), mas o registro de atividade indica fabricante`, sources: registry.url ? [registry.url] : [] });
-  }
-
   const closed = config.research?.publicPhase === "closed";
   const contact = unknown.filter((u) => closed || CONTACT_BY_NATURE.has(u.field)).map((u) => ({ field: u.field, text: u.text }));
-  return { publicResearch: closed ? "closed" : "open", verified, conflicts, unknown, contact };
+  // Encerrar a pesquisa pública NÃO conclui a qualificação comercial: ela só fica completa com uso, compra de terceiros,
+  // papel comercial e canal de compras comprovados (e a aceitação da variedade, quando configurada).
+  const COMMERCIAL = ["commodity_use", "purchase", "commercial_role", "purchasing_channel", "variety_acceptance"];
+  const missing = unknown.filter((u) => COMMERCIAL.includes(u.field)).map((u) => u.field);
+  return { publicResearch: closed ? "closed" : "open", commercialQualification: missing.length ? "incomplete" : "complete", commercialMissing: missing, verified, conflicts, unknown, contact };
 }

@@ -4337,7 +4337,7 @@ async function showRound(id) {
         const list = (title, items, fmt) => details(`${title} (${items.length})`, items.length ? el("ul", {}, ...items.map((i) => text("li", fmt(i)))) : text("p", "Nenhum.", "muted"));
         const closureBox = cl
           ? details(
-              `Fechamento da pesquisa (pública ${cl.publicResearch === "closed" ? "encerrada" : "aberta"})`,
+              `Fechamento: pesquisa pública ${cl.publicResearch === "closed" ? "encerrada" : "aberta"} · qualificação comercial ${cl.commercialQualification === "complete" ? "completa" : "incompleta"}`,
               el("div", {}, list("Verificado", cl.verified, (i) => i.text), list("Conflitos de fonte", cl.conflicts, (i) => `${i.text}${i.sources.length ? ` — ${i.sources.join(", ")}` : ""}`), list("Desconhecido", cl.unknown, (i) => `${i.text} (${PROOF_LABEL[i.level] ?? i.level})`), list("Para contato futuro", cl.contact, (i) => i.text)),
             )
           : null;
@@ -4353,8 +4353,16 @@ async function showRound(id) {
   };
   filter.control.addEventListener("change", render);
   render();
+  const withCl = results.filter((x) => x.closure);
+  const phaseLine = withCl.length
+    ? el("div", { class: "callout" }, text("p", `Pesquisa pública: ${withCl[0].closure.publicResearch === "closed" ? "encerrada" : "aberta"}. Qualificação comercial incompleta em ${withCl.filter((x) => x.closure.commercialQualification !== "complete").length} de ${withCl.length}: encerrar a pesquisa pública não conclui a qualificação nem promove a empresa. Pendências para contato futuro: ${withCl.reduce((n, x) => n + x.closure.contact.length, 0)}.`))
+    : null;
+  const lk = r.lastRun?.lookups;
+  const lookupLine = lk ? text("small", `Consultas cadastrais na última execução: ${lk.fetched} feitas, ${lk.cached} reaproveitadas, ${lk.deferred} adiadas (limite interno ou HTTP 429), ${lk.failed} com falha, ${lk.not_found} não encontradas, ${lk.unavailable} sem fonte, ${lk.not_applicable} sem identificador.`, "muted") : null;
   const resPanel = panel(
     "Resultados",
+    phaseLine,
+    lookupLine,
     text("small", r.lastRun ? `Última execução ${fmtDate(r.lastRunAt)}: ${r.lastRun.total} estabelecimentos, ${r.lastRun.exceptions} exceções, ${r.lastRun.review} para revisar.` : "Rodada ainda não executada.", "muted"),
     filter.node,
     listBody,

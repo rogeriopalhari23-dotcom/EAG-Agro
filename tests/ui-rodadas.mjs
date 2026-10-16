@@ -128,6 +128,7 @@ try {
 
   await click("Executar rodada");
   await until(`/Rodada executada: 3 estabelecimentos/.test(document.getElementById("notice").innerText)`, "execução");
+  await until(`/Ômega Grãos/.test(document.body.innerText) && /ESTIMADA/.test(document.body.innerText)`, "resultados renderizados");
   const afterRun = await js(`document.body.innerText`);
   assert.match(afterRun, /Ômega Grãos/, "exceção (CNPJ não encontrado) aparece para revisão");
   assert.match(afterRun, /ESTIMADA/);

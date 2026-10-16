@@ -34,6 +34,8 @@ export function buildRegistrationBatch(run, { mode, decisions = {}, decidedBy, d
   const { config } = run;
   const eligible = run.results.filter((r) => {
     if (r.provisional || r.status === "outside" || r.status === "separated") return false;
+    // Sem consulta cadastral concluída não há cadastro, em nenhum modo (a ciência das limitações não dispensa).
+    if (!r.registry) return false;
     if (mode === "discovery") return r.status !== "exception" || decisions[r.key] === "include";
     return decisions[r.key] === "accept";
   });

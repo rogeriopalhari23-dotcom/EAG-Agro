@@ -24,11 +24,12 @@ test("Fechamento: verificado só com prova; desconhecidos listados uma vez; cont
   assert.ok(r.verified.some((v) => v.field === "operation" && v.sources[0] === "https://x.example/fabrica"));
   assert.ok(r.verified.some((v) => v.field === "registry"));
   const unknownFields = r.unknown.map((u) => u.field);
-  for (const f of ["commodity_use", "purchase", "role", "purchasing_channel", "size", "unit_location"]) assert.ok(unknownFields.includes(f), f);
+  for (const f of ["commodity_use", "purchase", "commercial_role", "purchasing_channel", "size", "unit_location"]) assert.ok(unknownFields.includes(f), f);
   assert.equal(new Set(unknownFields).size, unknownFields.length, "cada campo desconhecido aparece uma vez");
   assert.equal(r.publicResearch, "open");
   // Com a pesquisa aberta, só vai para contato o que fonte pública normalmente não responde.
-  assert.deepEqual(r.contact.map((x) => x.field).sort(), ["purchase", "purchasing_channel"]);
+  assert.deepEqual(r.contact.map((x) => x.field).sort(), ["commercial_role", "purchase", "purchasing_channel"]);
+  assert.equal(r.commercialQualification, "incomplete");
   // Encerrada a fase pública, todos os desconhecidos viram contato futuro, sem pedido de confirmação campo a campo.
   const closed = close(est([]), cfg({ research: { publicPhase: "closed" } }));
   assert.equal(closed.publicResearch, "closed");
@@ -39,14 +40,18 @@ test("Fechamento: verificado só com prova; desconhecidos listados uma vez; cont
   assert.match(validateRoundConfig({ ...ex("soja-rio-verde-150km"), research: { publicPhase: "talvez" } }).errors.join(), /research\.publicPhase/);
 });
 
-test("Conflitos de fonte: marcados na evidência e papel divergente entre cadastro oficial (CNAE) e registro de fabricante", () => {
+test("Atividades distintas nas fontes não são conflito: atividade industrial verificada, papel comercial a confirmar", () => {
   const c = cfg();
   const fab = { kind: "activity_code", strength: "official_record", url: "https://registro.example", quote: "Registro: FABRICANTE RAÇÃO" };
   const trade = close(est([fab]), c, { status: "Ativa", municipality: "Rio Verde", region: "GO", activity: "4692-3/00 Comércio atacadista de mercadorias em geral", url: "https://cadastro.example/1" });
-  assert.ok(trade.conflicts.some((x) => x.field === "role" && /comércio \(4692-3\/00/.test(x.text)));
+  assert.equal(trade.conflicts.length, 0, "comércio na CNAE e fabricante no registro podem coexistir");
+  assert.ok(trade.verified.some((x) => x.field === "industrial_activity" && x.sources[0] === "https://registro.example"));
+  assert.match(trade.unknown.find((x) => x.field === "commercial_role").text, /Papel comercial a confirmar: atividades distintas nas fontes \(cadastro oficial: comércio, 4692-3\/00/);
   const storage = close(est([fab]), c, { status: "Ativa", activity: "5211-7/01 Armazéns gerais" });
-  assert.match(storage.conflicts[0].text, /armazenagem/);
-  assert.equal(close(est([fab]), c).conflicts.length, 0, "CNAE de indústria com registro de fabricante: sem conflito");
+  assert.match(storage.unknown.find((x) => x.field === "commercial_role").text, /armazenagem/);
+  assert.equal(close(est([fab]), c).unknown.find((x) => x.field === "commercial_role").text, "Papel comercial a confirmar (consome, revende, armazena ou origina)");
+  // Indício (diretório) não verifica atividade industrial.
+  assert.ok(!close(est([{ ...fab, strength: "directory" }]), c).verified.some((x) => x.field === "industrial_activity"));
   const marked = close(est([{ kind: "activity_code", strength: "own_source", url: "https://grupo.example", quote: "site do grupo: armazém de grãos; entidade pode ser outra", conflict: true }]), c);
   assert.ok(marked.conflicts.some((x) => x.sources[0] === "https://grupo.example"));
   // Fora do Brasil não há regra de CNAE: nenhum conflito inventado.
@@ -100,7 +105,9 @@ test("Painel/Worker: resultado e exportação trazem o fechamento e a triagem co
   assert.equal(reg.items[0].outcome, "created");
   const r = (await api(base)).data.results[0];
   assert.equal(r.closure.publicResearch, "closed");
-  assert.ok(r.closure.conflicts.some((x) => x.field === "role"), "atacado na Receita × fabricante no registro");
+  assert.equal(r.closure.conflicts.length, 0, "atacado na Receita × fabricante no registro: atividades distintas, não conflito");
+  assert.match(r.closure.unknown.find((x) => x.field === "commercial_role").text, /atividades distintas nas fontes/);
+  assert.equal(r.closure.commercialQualification, "incomplete", "pesquisa pública encerrada não conclui a qualificação comercial");
   assert.ok(r.closure.contact.length >= 4, "desconhecidos viram contato futuro de uma vez");
   assert.equal(r.screening.status, "completed");
   assert.equal(r.screening.matches, 0);
@@ -115,7 +122,30 @@ test("Painel/Worker: resultado e exportação trazem o fechamento e a triagem co
   const exp = (await api(`${base}/export`)).data;
   assert.match(exp.report, /Evidência do cadastro marcada como conflitante: Site do grupo/);
   assert.ok(exp.screenings[r.key]);
-  for (const h of ["## Conflitos de fonte", "## Pendências para contato futuro (pesquisa pública encerrada)", "## Triagens de sanções"]) assert.ok(exp.report.includes(h), h);
+  for (const h of ["## Conflitos de fonte", "## Dados desconhecidos", "## Pendências para contato futuro (pesquisa pública encerrada)", "## Triagens de sanções"]) assert.ok(exp.report.includes(h), h);
   // Nenhum contato, ficha ou tarefa criados pela rodada.
   for (const tbl of ["contacts", "fichas", "tasks"]) assert.equal(ctx.DB.raw.prepare(`SELECT COUNT(*) n FROM ${tbl}`).get().n, 0, tbl);
+});
+
+test("Ciência das limitações não dispensa verificação: sem consulta cadastral, nada é aceito, incluído ou cadastrado", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  const { api } = ctx;
+  const id = (await api("/api/rounds", "POST", { name: "DE sem fonte cadastral", config: ex("cafe-verde-hamburgo-200km") })).data.id;
+  const base = `/api/rounds/${id}`;
+  await api(`${base}/candidates`, "POST", { intake: "assisted", candidate: { name: "Rösterei Teste", registrationId: "HRB 1234", sourceUrl: "https://roestereiteste.example/impressum", evidence: { kind: "commodity_use", strength: "own_source", quote: "Rohkaffee" } } });
+  assert.equal((await api(`${base}/run`, "POST", {})).data.error.code, "preflight_not_acknowledged");
+  await api(`${base}/preflight-ack`, "POST", { revision: 1 });
+  const s = (await api(`${base}/run`, "POST", {})).data;
+  assert.equal(s.lookups.unavailable, 1, "sem fonte cadastral para DE");
+  const res = (await api(base)).data.results[0];
+  assert.equal(res.status, "exception");
+  assert.ok(res.closure.unknown.some((x) => x.field === "registry"));
+  for (const decision of ["accept", "include"]) {
+    const d = (await api(`${base}/decisions`, "POST", { decisions: [{ key: res.key, decision }] })).data;
+    assert.equal(d.outcomes[0].ok, false, decision);
+    assert.match(d.outcomes[0].reason, /verificação cadastral obrigatória ausente \(unavailable\): a ciência das limitações não dispensa/);
+  }
+  for (const mode of ["discovery", "accept"]) assert.equal((await api(`${base}/register`, "POST", { mode, productId: "product-05" })).data.items.length, 0, mode);
+  assert.equal(ctx.DB.raw.prepare("SELECT COUNT(*) n FROM companies").get().n, 0);
 });

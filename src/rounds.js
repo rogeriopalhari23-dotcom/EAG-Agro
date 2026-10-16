@@ -330,6 +330,11 @@ export async function decide(request, env, actor, rid, id) {
       continue;
     }
     if (decision === "include" && res.status !== "exception") { outcomes.push({ key, ok: false, reason: "incluir vale só para exceção; use aceitar" }); continue; }
+    // Ciência das limitações autoriza EXECUTAR a rodada; não dispensa fonte, identificador nem verificação obrigatória.
+    if (["accept", "include"].includes(decision) && !res.registry) {
+      outcomes.push({ key, ok: false, reason: `verificação cadastral obrigatória ausente${res.lookup?.status ? ` (${res.lookup.status})` : ""}: a ciência das limitações não dispensa; reexecute quando a fonte responder ou registre por outro fluxo com verificação` });
+      continue;
+    }
     const snapshot = { status: res.status, reasons: res.reasons, checks: res.checks, pending: res.pending, distance: res.distance?.label, assessment: { operation: res.assessment.operation, commodityUse: res.assessment.commodityUse, purchase: res.assessment.purchase, role: res.assessment.role, restriction: res.assessment.restriction }, intake: res.intake };
     const decId = crypto.randomUUID();
     stmts.push(s(env, "UPDATE round_decisions SET superseded_at=? WHERE round_id=? AND est_key=? AND superseded_at IS NULL", at, id, key));
