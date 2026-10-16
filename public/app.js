@@ -685,13 +685,14 @@ function writable() {
 function approver() {
   return ["admin", "commercial_manager"].includes(state.actor?.role);
 }
-async function api(path, method = "GET", body) {
+async function api(path, method = "GET", body, extraHeaders = {}) {
   const controller = new AbortController(),
     timer = setTimeout(() => controller.abort(), 20000);
   try {
     const r = await fetch(path, {
       method,
-      headers: body === undefined ? {} : { "content-type": "application/json" },
+      // Canal declarado: painel. O painel não declara executor: um botão pode ser acionado por pessoa ou automação.
+      headers: { "x-compass-channel": "panel", ...(body === undefined ? {} : { "content-type": "application/json" }), ...extraHeaders },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,
     });
@@ -4328,7 +4329,7 @@ async function showRound(id) {
           x.status === "exception" ? `Exceção: ${x.reasons.join("; ")}` : null,
           x.checks?.length ? `Conferir: ${x.checks.join("; ")}` : null,
           x.decision ? `Decisão: ${DECISION_LABEL[x.decision.decision]} por ${x.decision.decided_by} em ${fmtDate(x.decision.decided_at)}${x.decision.note ? ` (${x.decision.note})` : ""}` : null,
-          x.registration ? `Cadastro: ${x.registration.outcome} (${x.registration.mode}) em ${fmtDate(x.registration.registered_at)}` : null,
+          x.registration ? `Cadastro (${x.registration.outcome}): ${x.registration.label}${x.registration.decision ? ` — decisão ${DECISION_LABEL[x.registration.decision.value] ?? x.registration.decision.value} de ${x.registration.decision.decidedBy ?? "?"} em ${x.registration.decision.decidedAt ? fmtDate(x.registration.decision.decidedAt) : "?"}` : ""}. ${x.registration.operationText}` : null,
           x.screening ? `Triagem de sanções: ${x.screening.status}, ${x.screening.matches} ocorrência(s); válida até ${x.screening.validUntil ? fmtDate(x.screening.validUntil) : "não calculado"}${x.screening.valid ? "" : " (vencida ou incompleta)"}` : null,
           x.closure?.conflicts.length ? `Conflitos de fonte: ${x.closure.conflicts.length}` : null,
           x.closure?.contact.length ? `Para contato futuro: ${x.closure.contact.length} item(ns)` : null,
@@ -4388,18 +4389,20 @@ async function showRound(id) {
     const prod = productSelect("productId");
     const mode = select("Cadastro", "mode", [["discovery", "Descoberta (sem aprovação individual; sem exceções nem recusadas)"], ["accept", "Só as aceitas"]], "discovery");
     const screen = el("input", { type: "checkbox", name: "screening" });
+    const authRef = input("Referência da autorização (opcional)", "authorizationRef", "text", "", false);
     resPanel.append(
       el(
         "div",
         { class: "toolbar" },
         prod.node,
         mode.node,
+        authRef.node,
         el("label", {}, screen, " Rodar a triagem de sanções logo após o cadastro"),
         button("Cadastrar no Compass", async () => {
           // O servidor cadastra em partes; repete até não restar nenhuma.
           const out = { items: [], mode: mode.control.value };
           for (let round = 0; round < 100; round++) {
-            const part = await api(`${base}/register`, "POST", { mode: mode.control.value, productId: prod.control.value, screening: screen.checked });
+            const part = await api(`${base}/register`, "POST", { mode: mode.control.value, productId: prod.control.value, screening: screen.checked }, authRef.control.value.trim() ? { "x-compass-authorization-ref": encodeURIComponent(authRef.control.value.trim()) } : {});
             out.items.push(...part.items.filter((x) => x.outcome !== "skipped" || round === 0));
             notice(`Cadastrando… ${out.items.filter((x) => x.outcome === "created").length} criada(s) até agora.`);
             if (!part.remaining) break;
@@ -4419,7 +4422,19 @@ async function showRound(id) {
       button("Relatório (markdown)", async () => downloadFile(`relatorio-${r.config.id}.md`, (await api(`${base}/export`)).report, "text/markdown")),
     ),
   );
-  node.append(resPanel);
+  const notes = r.annotations ?? [];
+  const notePanel = panel(
+    "Anotações complementares",
+    text("small", "Registro novo, com a data em que foi gravado; não altera cadastros, decisões nem o histórico.", "muted"),
+    rows(notes, (n) => el("div", { class: "row" }, el("div", { class: "round-lines" }, text("strong", fmtDate(n.annotatedAt)), text("small", n.text), text("small", `Registrada por ${n.authenticatedIdentity} (identidade autenticada; não prova ação humana); canal ${n.operation?.channel ?? "não declarado"}; executor ${n.operation?.executor ?? "não declarado"}${n.refersTo?.requestIds?.length ? `; operações: ${n.refersTo.requestIds.join(", ")}` : ""}${n.authorization?.reference ? `; autorização citada: ${[n.authorization.reference, n.authorization.grantedBy, n.authorization.grantedAt].filter(Boolean).join(", ")}` : ""}`)))),
+  );
+  if (writable())
+    notePanel.append(details("Nova anotação", makeForm([input("Texto", "text", "textarea"), input("Operações referidas (ids de requisição, separados por vírgula)", "requestIds", "text", "", false), input("Autorização citada: referência", "authRef", "text", "", false), input("Autorização citada: responsável", "authBy", "text", "", false), input("Autorização citada: data", "authAt", "text", "", false)], async (v) => {
+      await api(`${base}/annotations`, "POST", { text: v.text, refersTo: { requestIds: v.requestIds ? v.requestIds.split(",").map((x) => x.trim()).filter(Boolean) : [] }, authorization: v.authRef || v.authBy || v.authAt ? { reference: v.authRef || null, grantedBy: v.authBy || null, grantedAt: v.authAt || null } : null });
+      notice("Anotação registrada.");
+      await showRound(id);
+    }, "Registrar anotação")));
+  node.append(resPanel, notePanel);
   if (writable() && r.status !== "closed")
     node.append(
       details(

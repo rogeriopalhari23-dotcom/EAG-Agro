@@ -3016,3 +3016,29 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - testes da publicação: 501 + 2 + 37, 0 falhas, e `validate-deploy` ok;
   - a rodada foi executada e cadastrada no Worker anterior, `4d7cfa4c`.
 - **Etapa da Rodada 1 encerrada.** As empresas seguem em "Descoberta"; as pendências de contato aguardam a liberação aplicável. Bloqueios mantidos: T11 pendente, canais `planned`, campanhas inativas, cópia desligada, nenhum envio. Sem suíte (alteração só documental).
+
+## Rastreabilidade geral das operações (2026-10-16; no repositório, não publicado)
+
+- **Implementado** (regra geral para painel, API e scripts; detalhes em `rodadas/FLUXO-RODADAS.md`, seção "Rastreabilidade das operações"):
+  - identidade autenticada (Access), canal de execução, executor e autorização ficam separados; canal, executor e autorização são **declarados** por quem chama, e o momento vem do servidor;
+  - sessão do Access e uso de botão **não** são apresentados como prova de ação humana; o painel declara só o canal;
+  - cadastro em descoberta: "cadastro sem decisão comercial individual", com a operação (data, identidade, canal, executor, autorização) e sem campos de decisão;
+  - aceite e inclusão de exceção: vínculo com a decisão real, separado da operação que cadastrou;
+  - anotações complementares: registro novo na auditoria, com a data do servidor; não reescrevem nada;
+  - scripts com canal `script` e opções de executor e autorização.
+- **Testes:**
+  - novo `tests/rodada-rastreabilidade.test.mjs` (4): procedência declarada; descoberta sem decisão; reexecução sem duplicar nem reescrever; aceite e inclusão ligados à decisão com histórico preservado; anotação com data real sem alterar cadastros nem criar decisões; cadastro antigo mostrado como gravado;
+  - testes antigos ajustados à regra nova: `rodadas-worker` (descoberta não liga decisão) e `rodada-fluxo` (aceite ou inclusão exigem quem decidiu; aceite sem nada aceito dá lote vazio);
+  - suíte completa: **505 + 2 + 37**, 0 falhas; tela conferida no Chrome sem interface (`ui-rodadas`).
+- **Rodada 1:**
+  - anotação complementar **preparada, não gravada**: `rodadas/rodada-1-milho-indiara-100km/anotacao-complementar.json`. Ela cita a requisição `a77a0236`, os 10 estabelecimentos, a execução por Claude (automação) com a sessão de Rogério e a autorização de 16/10/2026;
+  - será gravada só depois da publicação da rota, com a data real da gravação;
+  - os 10 cadastros não foram reescritos; nenhuma decisão foi criada; nenhuma pesquisa foi repetida; nenhuma empresa, ficha ou liberação foi alterada.
+- **Plano de publicação** (para autorizar):
+  1. conferir o conjunto de commits desde `896ef25`;
+  2. registrar o Worker vigente `aefbf8b7`, o marcador do Time Travel e um retrato do estado;
+  3. **sem migração**;
+  4. `npm run deploy` com o predeploy completo;
+  5. no painel, conferir que a Rodada 1 mostra "cadastro sem decisão comercial individual" e "canal e executor não registrados (cadastro anterior…)" nos 10, sem mudar dados (retratos iguais), e uma leitura da ponte;
+  6. com autorização, gravar a anotação (`rodada.mjs anotar … --executor "<quem grava>" --apply`) e conferir a data do servidor, os cadastros intactos e 0 decisões;
+  7. reversão: `wrangler rollback aefbf8b7-5c99-439c-8da2-356cf258b79f`. O código anterior ignora os campos novos; a anotação continua na auditoria, sem efeito sobre ele.

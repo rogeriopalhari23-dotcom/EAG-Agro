@@ -16,6 +16,8 @@
 //   node scripts/rodada.mjs adaptar-lote <lote antigo.json> --produto "<variante>" --saida <novo.json> [--por "<quem>"]
 //   Fechamento de rodada já executada no Compass (só leitura do banco):
 //   node scripts/rodada.mjs consolidar <id da rodada> --d1 <banco> [--remote] [--encerrar] --saida <pasta>
+//   Anotação complementar (registro novo, data do servidor; simulação sem --apply):
+//   node scripts/rodada.mjs anotar <id da rodada> <anotacao.json> --base https://<compass> [--executor "<quem>"] [--apply]
 import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { validateRoundConfig } from "../src/rodada/config.js";
@@ -34,7 +36,7 @@ import { adaptLegacyCandidatesCsv, adaptLegacyBatch } from "../src/rodada/legacy
 
 const [cmd, ...rest] = process.argv.slice(2);
 const opt = (n) => (rest.includes(n) ? rest[rest.indexOf(n) + 1] : null);
-const VALUED = new Set(["--municipios", "--estado", "--saida", "--modo", "--produto", "--decisoes", "--por", "--importar", "--sipeagro", "--d1"]);
+const VALUED = new Set(["--municipios", "--estado", "--saida", "--modo", "--produto", "--decisoes", "--por", "--importar", "--sipeagro", "--d1", "--base", "--executor", "--autorizacao-ref", "--autorizado-por", "--autorizado-em"]);
 const pos = rest.filter((a, i) => !a.startsWith("--") && !VALUED.has(rest[i - 1]));
 const json = (f) => JSON.parse(readFileSync(f, "utf8").replace(/^﻿/, ""));
 const root = resolve(import.meta.dirname, "..");
@@ -185,7 +187,28 @@ if (cmd === "validar") {
   writeFileSync(join(out, "relatorio-consolidado.md"), renderReport({ ...run, screenings }, { title: `${round.name} — fechamento da pesquisa pública` }));
   writeFileSync(join(out, "fechamento.json"), JSON.stringify({ round: { id, name: round.name }, publicResearch: config.research?.publicPhase ?? "open", generatedAt: new Date().toISOString(), lookups: run.lookups, establishments: run.results.map((r) => ({ key: r.key, name: r.names[0], registrationId: r.registrationId, status: r.status, distance: r.distance.label, checks: r.checks, closure: r.closure, screening: screenings[r.key] ?? null })) }, null, 1));
   console.log(`Fechamento de ${round.name}: ${run.results.length} estabelecimentos; consultas ${JSON.stringify(run.lookups)}; triagens ${Object.keys(screenings).length}. Gravado em ${out}.`);
+} else if (cmd === "anotar") {
+  // Anotação complementar de uma rodada (registro novo; data do servidor; não altera cadastros nem cria decisões).
+  //   node scripts/rodada.mjs anotar <id da rodada> <anotacao.json> --base https://<compass> [--executor "<quem>"] [--apply]
+  const { scriptProvenance } = await import("./lib/procedencia.mjs");
+  const id = pos[0], file = pos[1], base = opt("--base");
+  if (!/^[0-9a-f-]{36}$/.test(id ?? "") || !file) throw new Error("Informe o id da rodada e o arquivo da anotação.");
+  const { _uso, ...body } = json(file);
+  if (!rest.includes("--apply")) {
+    console.log(`[simulação] POST /api/rounds/${id}/annotations ${JSON.stringify(body).slice(0, 300)}…`);
+    console.log("Nada foi gravado. Use --base e --apply para gravar (a data será a do servidor).");
+  } else {
+    if (!base) throw new Error("Informe --base.");
+    const r = await fetch(new URL(`/api/rounds/${id}/annotations`, base), {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: new URL(base).origin, ...scriptProvenance(rest), ...(process.env.CF_ACCESS_TOKEN ? { cookie: `CF_Authorization=${process.env.CF_ACCESS_TOKEN}` } : {}) },
+      body: JSON.stringify(body),
+      redirect: "manual",
+    });
+    const out = (r.headers.get("content-type") || "").includes("json") ? await r.json() : {};
+    console.log(r.status === 201 ? `Anotação gravada em ${out.annotatedAt} (requisição ${out.requestId}).` : `Falhou (${r.status}): ${JSON.stringify(out.error ?? out)}`);
+  }
 } else {
-  console.log("Comandos: validar | area | executar | lote | adaptar-candidatas | adaptar-lote | consolidar (ver o cabeçalho deste arquivo).");
+  console.log("Comandos: validar | area | executar | lote | adaptar-candidatas | adaptar-lote | consolidar | anotar (ver o cabeçalho deste arquivo).");
   process.exit(1);
 }

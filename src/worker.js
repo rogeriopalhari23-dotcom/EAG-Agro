@@ -41,6 +41,7 @@ import * as people from "./people.js";
 import * as decisionReview from "./decision-review.js";
 import * as integrations from "./integrations.js";
 import * as rounds from "./rounds.js";
+import { readProvenance } from "./provenance.js";
 import { handleQueue } from "./queue.js";
 import { mapInfo, mapTiles } from "./map-tiles.js";
 import { geocodeUnitRoute } from "./geocoding.js";
@@ -66,6 +67,8 @@ async function route(request, env, rid) {
   // Ponte de e-mail: identidade própria (token de serviço do Access + assinatura HMAC), só nestas rotas.
   if (path.startsWith("/api/bridge/")) return handleBridge(request, env, path, rid);
   const actor = await getActor(request, env);
+  // Procedência declarada (canal, executor, autorização): registrada com a operação; nunca prova ação humana.
+  actor.provenance = readProvenance(request);
   assertSameOrigin(request);
   if (path === "/api/session" && method === "GET")
     return response({
@@ -196,7 +199,7 @@ async function route(request, env, rid) {
   // Rodadas de descoberta e qualificação (fluxo geral, configurado por rodada).
   if (path === "/api/rounds" && method === "GET") return response(await rounds.listRounds(env, actor));
   if (path === "/api/rounds" && method === "POST") return response(await rounds.createRound(request, env, actor, rid), 201);
-  const rnd = path.match(/^\/api\/rounds\/([0-9a-f-]{36})(?:\/(area|osm-query|preflight-ack|candidates|run|decisions|register|export))?$/);
+  const rnd = path.match(/^\/api\/rounds\/([0-9a-f-]{36})(?:\/(area|osm-query|preflight-ack|candidates|run|decisions|register|export|annotations))?$/);
   if (rnd) {
     const [, rid2, sub] = rnd;
     if (!sub && method === "GET") return response(await rounds.getRound(env, actor, rid2));
@@ -208,6 +211,7 @@ async function route(request, env, rid) {
     if (sub === "candidates" && method === "POST") return response(await rounds.addCandidates(request, env, actor, rid, rid2), 201);
     if (sub === "run" && method === "POST") return response(await rounds.executeRound(request, env, actor, rid, rid2));
     if (sub === "decisions" && method === "POST") return response(await rounds.decide(request, env, actor, rid, rid2), 201);
+    if (sub === "annotations" && method === "POST") return response(await rounds.annotateRound(request, env, actor, rid, rid2), 201);
     if (sub === "register" && method === "POST") {
       // Cadastro pelas rotas existentes, com a identidade e a origem desta requisição (mesmas regras do cadastro manual).
       const dispatch = async (p, m, body) => {

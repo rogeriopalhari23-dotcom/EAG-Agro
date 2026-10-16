@@ -263,12 +263,19 @@ test("Lote: descoberta sem aprovação individual (sem fora, separadas, provisó
   assert.equal(uso.evidence[0].evidenceType, "company_document");
   assert.deepEqual(uso.channels.map((c) => c.email), ["compras@uso.example"], "só e-mail publicado em fonte própria");
   assert.equal(disc.empresas.find((e) => e.company.tradeName === "Só cadastro").evidence.length, 0, "indício não vira evidência");
-  assert.throws(() => buildRegistrationBatch(run, { mode: "accept", productVariant: "Variante X", decisions: {} }), /quem decidiu/);
+  assert.equal(buildRegistrationBatch(run, { mode: "accept", productVariant: "Variante X", decisions: {} }).empresas.length, 0, "nada aceito, nada cadastrado");
+  assert.throws(() => buildRegistrationBatch(run, { mode: "accept", productVariant: "Variante X", decisions: { [run.results.find((r) => r.names[0] === "Uso").key]: "accept" } }), /quem decidiu/);
   const key = run.results.find((r) => r.names[0] === "Uso").key;
   const acc = buildRegistrationBatch(run, { mode: "accept", productVariant: "Variante X", decisions: { [key]: "accept" }, decidedBy: "Revisor", decidedAt: NOW });
   assert.equal(acc.empresas.length, 1);
-  assert.deepEqual({ by: acc.empresas[0].rastreio.decidedBy, at: acc.empresas[0].rastreio.decidedAt, round: acc.empresas[0].rastreio.roundId }, { by: "Revisor", at: NOW, round: PILOT.id });
+  assert.deepEqual({ by: acc.empresas[0].rastreio.decision.decidedBy, at: acc.empresas[0].rastreio.decision.decidedAt, round: acc.empresas[0].rastreio.roundId, basis: acc.empresas[0].rastreio.basis }, { by: "Revisor", at: NOW, round: PILOT.id, basis: "decision_accept" });
+  // Descoberta: nenhum rótulo de decisão inexistente.
+  assert.ok(disc.empresas.every((e) => e.rastreio.decision === null && e.rastreio.basis === "discovery_mode" && e.rastreio.label === "cadastro sem decisão comercial individual" && !("decidedBy" in e.rastreio)));
+  assert.match(disc.aceite, /cadastro sem decisão comercial individual/);
   // Exceção só entra na descoberta com decisão explícita do lote.
   const suspKey = run.results.find((r) => r.names[0] === "Suspensa").key;
-  assert.equal(buildRegistrationBatch(run, { mode: "discovery", productVariant: "X", decisions: { [suspKey]: "include" } }).empresas.length, 3);
+  assert.throws(() => buildRegistrationBatch(run, { mode: "discovery", productVariant: "X", decisions: { [suspKey]: "include" } }), /quem decidiu/, "inclusão é decisão: exige quem decidiu");
+  const inc = buildRegistrationBatch(run, { mode: "discovery", productVariant: "X", decisions: { [suspKey]: "include" }, decidedBy: "Revisor", decidedAt: NOW });
+  assert.equal(inc.empresas.length, 3);
+  assert.equal(inc.empresas.find((e) => e.chave === suspKey).rastreio.basis, "discovery_mode_with_inclusion");
 });

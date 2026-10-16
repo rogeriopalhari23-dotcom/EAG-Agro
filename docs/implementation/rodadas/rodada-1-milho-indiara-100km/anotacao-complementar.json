@@ -1,0 +1,17 @@
+{
+  "_uso": "Anotação complementar da Rodada 1, preparada em 16/10/2026 e AINDA NÃO GRAVADA. Gravar só depois da publicação da rota de anotações: node scripts/rodada.mjs anotar dee25927-b941-48aa-a74f-7bc78a278fea docs/implementation/rodadas/rodada-1-milho-indiara-100km/anotacao-complementar.json --base https://eag-compass-production.rogeriopalhari23.workers.dev --executor \"<quem grava>\" --apply. A data da anotação é a do servidor no momento da gravação; os 10 cadastros e o histórico não são alterados e nenhuma decisão é criada.",
+  "kind": "complement",
+  "text": "Complemento de rastreabilidade dos 10 cadastros desta rodada (registrado depois do fato, na data desta anotação). Os cadastros foram feitos em modo descoberta, por regra SEM decisão comercial individual; a rodada não tem decisões registradas. A operação de cadastro foi uma única chamada à rota da rodada (requisição a77a0236-8994-4cbb-b2e4-369d30931dae, 16/10/2026 00:52:16–00:52:31 UTC), executada por Claude (automação) com o script r1.mjs, usando a sessão do Cloudflare Access de Rogério Palhari; a identidade autenticada registrada (user-rogerio-palhari) não indica clique humano. A ciência das limitações (00:36:50 UTC) também foi registrada por automação do navegador. Os campos decidedBy e decidedAt do rastreio desses cadastros são o operador e o instante do lote, não uma decisão. A autorização da operação foi dada por Rogério na conversa de trabalho, registrada em docs/implementation/EVIDENCIAS.md.",
+  "refersTo": {
+    "requestIds": ["a77a0236-8994-4cbb-b2e4-369d30931dae"],
+    "estKeys": [
+      "BR:17802890000239", "BR:09276439000205", "BR:21196572000168", "BR:54478827000134", "BR:11595239000178",
+      "BR:01225945000174", "BR:05621758000160", "BR:43177285000143", "BR:50478250000100", "BR:41809266000167"
+    ]
+  },
+  "authorization": {
+    "reference": "Instruções de Rogério na conversa de trabalho: 'Autorizo concluir a conferência da tela e executar a primeira rodada real conforme o plano…' e 'Cadastre em descoberta somente as candidatas aptas, sem duplicidade, e faça a triagem de sanções' (docs/implementation/EVIDENCIAS.md, seções da primeira rodada real)",
+    "grantedBy": "Rogério Palhari",
+    "grantedAt": "2026-10-16"
+  }
+}

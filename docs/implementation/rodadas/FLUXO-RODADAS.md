@@ -193,3 +193,45 @@ Regras de leitura do fechamento:
 - Atividades diferentes no cadastro oficial e no registro de atividade (ex.: armazenagem na CNAE e fabricante no MAPA) **não são conflito**: aparecem como "papel comercial a confirmar".
 - A atividade industrial registrada conta como verificada; o papel comercial é outra pergunta.
 - Encerrar a pesquisa pública não conclui a qualificação comercial nem muda a etapa da empresa.
+
+## Rastreabilidade das operações (16/10/2026; no repositório, aguarda publicação)
+
+Regra geral (`src/provenance.js`), igual no painel, na API e nos scripts, para qualquer commodity ou localização.
+
+**Quatro informações separadas em cada operação:**
+
+| Informação | De onde vem | O que significa |
+|---|---|---|
+| Identidade autenticada | Access | Quem o Access autenticou. **Não prova ação humana**: automação pode usar a sessão de uma pessoa, e um botão pode ser acionado por automação do navegador |
+| Canal de execução | Declarado por quem chama (`x-compass-channel`) | Painel, script ou API; sem declaração, "não declarado" |
+| Executor | Declarado (`x-compass-executor`) | O painel nunca declara executor, porque não sabe se foi pessoa ou automação |
+| Autorização | Declarada: referência, responsável e data (`x-compass-authorization-ref/-by/-at`) | O Compass registra, não valida |
+
+O momento da operação vem do servidor.
+
+**Cadastro pela rodada:**
+
+- **Descoberta:**
+  - mostra "cadastro sem decisão comercial individual", com operador e data da operação;
+  - `decision_id` fica nulo, mesmo que exista uma decisão para a unidade, porque o cadastro não dependeu dela;
+  - o rastreio não tem campos de decisão.
+- **Aceite, e inclusão de exceção na descoberta:**
+  - o cadastro fica ligado à decisão real (id, quem e quando decidiu, lidos do registro da decisão);
+  - a operação de cadastro fica registrada à parte;
+  - uma decisão posterior substitui a anterior no histórico, sem desfazer o vínculo do cadastro feito.
+- **Decisão em lote:** guarda também a operação que a registrou (`recordedBy`).
+- **Cadastros antigos, de antes da regra:** são mostrados como gravados. "Canal e executor não registrados (cadastro anterior à regra de rastreabilidade)"; nenhum `decision: "discovery"` antigo vira decisão.
+
+**Anotações complementares:**
+
+- `POST /api/rounds/:id/annotations`, painel → "Anotações complementares" e comando `rodada.mjs anotar`;
+- são registro novo na auditoria (`round.annotated`), com a data do servidor, citando operações (ids de requisição), estabelecimentos e a autorização;
+- nunca reescrevem cadastros nem criam decisões.
+
+**Scripts** (`cadastrar-lote-aceito.mjs`, `qualificar-lote.mjs`, `rodada.mjs anotar`):
+
+- usam canal `script`;
+- aceitam `--executor`, `--autorizacao-ref`, `--autorizado-por` e `--autorizado-em`;
+- nada é deduzido da sessão.
+
+**Migração:** nenhuma. Tudo cabe em `round_registrations.detail_json`, `round_decisions.evidence_json` e `audit_log`.

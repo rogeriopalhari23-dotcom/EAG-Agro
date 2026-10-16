@@ -31,9 +31,15 @@ export function auditStatement(
     action,
     type,
     id,
-    JSON.stringify(metadata),
+    JSON.stringify(withProvenance(actor, metadata)),
     requestId,
   );
+}
+// Procedência declarada na requisição (src/provenance.js) acompanha a auditoria quando existe; sem cabeçalhos, nada muda.
+function withProvenance(actor, metadata) {
+  const p = actor?.provenance;
+  if (!p || (!p.channel && !p.executor && !p.authorization)) return metadata;
+  return { ...metadata, _operation: { channel: p.channel ?? "não declarado", executor: p.executor ?? null, authorization: p.authorization ?? null } };
 }
 export function companyLock(env, actor, c) {
   return statement(

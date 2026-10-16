@@ -1,7 +1,8 @@
 // Lote para o cadastro (scripts/cadastrar-lote-aceito.mjs), com rastreabilidade por empresa.
-//  - mode "discovery": novas candidatas entram como DESCOBERTA, sem aprovação comercial individual (fora do raio,
+//  - mode "discovery": novas candidatas entram como DESCOBERTA, sem decisão comercial individual (fora do raio,
 //    separadas e sem identificador ficam de fora; exceções só entram se a decisão em lote as incluir).
-//  - mode "accept": só as aceitas na decisão em lote, cada uma com quem decidiu, quando e o resultado avaliado.
+//  - mode "accept": só as aceitas na decisão em lote, ligadas à decisão registrada (id, quem e quando decidiu); a operação
+//    que cadastra (identidade autenticada, canal, executor e autorização declarados, momento) fica separada da decisão.
 // Nunca cria tarefa de ligação, ficha, contato com pessoa nem consome crédito. Indícios não viram evidência comprovada.
 
 const STRENGTH_TO_TYPE = { own_source: "company_document", official_record: "public_nominal_record" };
@@ -28,9 +29,8 @@ const notConfirmed = (r, config) => [
   r.distance.estimated ? `distância ${r.distance.label}` : null,
 ].filter(Boolean).join("; ");
 
-export function buildRegistrationBatch(run, { mode, decisions = {}, decidedBy, decidedAt, productVariant, profileClass = "possible_final_consumer" }) {
+export function buildRegistrationBatch(run, { mode, decisions = {}, decidedBy, decidedAt, productVariant, profileClass = "possible_final_consumer", decisionRecords = {}, operation = null }) {
   if (!productVariant) throw new Error("Informe a variante de produto do catálogo (sem padrão).");
-  if (mode === "accept" && !decidedBy) throw new Error("Aceite em lote exige quem decidiu.");
   const { config } = run;
   const eligible = run.results.filter((r) => {
     if (r.provisional || r.status === "outside" || r.status === "separated") return false;
@@ -39,9 +39,25 @@ export function buildRegistrationBatch(run, { mode, decisions = {}, decidedBy, d
     if (mode === "discovery") return r.status !== "exception" || decisions[r.key] === "include";
     return decisions[r.key] === "accept";
   });
+  // Cadastro que depende de decisão exige quem decidiu: pelo registro da decisão (rodada no Compass) ou informado
+  // (linha de comando). Sem nada a cadastrar, não há o que exigir.
+  const missing = eligible.filter((r) => (mode === "accept" || decisions[r.key] === "include") && !(decisionRecords[r.key]?.decidedBy ?? decidedBy));
+  if (missing.length) throw new Error(`Aceite em lote exige quem decidiu (${missing.map((r) => r.key).join(", ")}).`);
   const empresas = eligible.map((r) => {
     const reg = r.registry ?? {};
-    const trace = { roundId: config.id, key: r.key, status: r.status, mode, decision: mode === "accept" ? "accept" : "discovery", decidedBy: decidedBy ?? null, decidedAt: decidedAt ?? null, pending: r.pending };
+    // Rastreio: o cadastro em descoberta NÃO tem decisão comercial individual (basis "discovery_mode"); só o aceite e a
+    // inclusão de exceção dependem de decisão, e então o vínculo é com a decisão registrada (id, quem e quando decidiu).
+    // A operação (identidade autenticada, canal, executor, autorização e momento) fica separada da decisão.
+    const rec = decisionRecords[r.key] ?? null;
+    const byDecision = mode === "accept" || decisions[r.key] === "include";
+    const trace = {
+      roundId: config.id, key: r.key, status: r.status, mode,
+      basis: mode === "accept" ? "decision_accept" : byDecision ? "discovery_mode_with_inclusion" : "discovery_mode",
+      label: mode === "accept" ? "cadastro por aceite (decisão registrada)" : byDecision ? "cadastro em descoberta com inclusão de exceção (decisão registrada)" : "cadastro sem decisão comercial individual",
+      decision: byDecision ? { value: decisions[r.key], id: rec?.id ?? null, decidedBy: rec?.decidedBy ?? decidedBy ?? null, decidedAt: rec?.decidedAt ?? decidedAt ?? null } : null,
+      operation: operation ?? null,
+      pending: r.pending,
+    };
     return {
       chave: r.key,
       rastreio: trace,
@@ -51,7 +67,7 @@ export function buildRegistrationBatch(run, { mode, decisions = {}, decidedBy, d
         countryCode: r.country,
         registrationId: r.registrationId,
         registrationIdType: reg.idType ?? (r.country === "BR" ? "CNPJ" : "OTHER"),
-        sourceLabel: `Rodada ${config.id} (${mode === "accept" ? "aceite em lote" : "descoberta, sem aprovação comercial"}). ${notConfirmed(r, config)}.`,
+        sourceLabel: `Rodada ${config.id} (${trace.label}). ${notConfirmed(r, config)}.`,
         sourceUrl: r.assessment.commodityUse.sources.find((e) => e.url)?.url ?? reg.url ?? undefined,
       },
       evidence: evidenceFor(r, config),
@@ -61,7 +77,7 @@ export function buildRegistrationBatch(run, { mode, decisions = {}, decidedBy, d
     };
   });
   return {
-    aceite: mode === "accept" ? `Aceite em lote por ${decidedBy} em ${decidedAt} (rodada ${config.id}); sem autorização de contato.` : `Descoberta da rodada ${config.id}: cadastro sem aprovação comercial individual; sem contato.`,
+    aceite: mode === "accept" ? `Cadastro por aceite em lote (decisões registradas na rodada ${config.id}); sem autorização de contato.` : `Rodada ${config.id}: cadastro sem decisão comercial individual (modo descoberta); sem contato.`,
     produto: productVariant,
     empresas,
   };

@@ -54,6 +54,25 @@ export function renderReport(run, { title } = {}) {
       lines.push(`- **${cell(r.names[0])}**: ${x.status}${x.completedAt ? ` em ${x.completedAt.slice(0, 16).replace("T", " ")} UTC` : ""}; ocorrências ${x.matches}; ${x.lists} listas; válida até ${x.validUntil ? `${x.validUntil.slice(0, 16).replace("T", " ")} UTC` : "não calculado"}${x.valid ? "" : " (VENCIDA ou incompleta: refazer antes de avançar)"}`);
     }
   }
+  // Cadastros feitos pela rodada: base (descoberta sem decisão comercial individual × aceite com decisão) e operação.
+  const regs = run.registrations ?? [];
+  if (regs.length) {
+    lines.push("", "## Cadastros e rastreabilidade", "");
+    for (const g of regs) {
+      const r = results.find((x) => x.key === g.est_key);
+      const dec = g.decision ? `; decisão ${g.decision.value} ${g.decision.id ?? g.decisionId ?? "(id não registrado)"} por ${g.decision.decidedBy ?? "?"} em ${g.decision.decidedAt ?? "?"}` : "";
+      lines.push(`- **${cell(r?.names?.[0] ?? g.est_key)}** → empresa ${g.company_id ?? "—"} (${g.outcome}): ${cell(g.label)}${dec}. ${cell(g.operationText)}`);
+    }
+  }
+  const notes = run.annotations ?? [];
+  if (notes.length) {
+    lines.push("", "## Anotações complementares", "");
+    for (const n of notes) {
+      const refs = n.refersTo?.requestIds?.length ? ` [operações: ${n.refersTo.requestIds.join(", ")}]` : "";
+      const auth = n.authorization?.reference ? ` [autorização: ${cell([n.authorization.reference, n.authorization.grantedBy, n.authorization.grantedAt].filter(Boolean).join(", "))}]` : "";
+      lines.push(`- ${n.annotatedAt} (${cell(n.kind ?? "complemento")}; registrada por ${cell(n.authenticatedIdentity)}, canal ${cell(n.operation?.channel ?? "não declarado")}, executor ${cell(n.operation?.executor ?? "não declarado")}): ${cell(n.text)}${refs}${auth}`);
+    }
+  }
   lines.push("", "## Estabelecimentos", "");
   lines.push("| Situação | Estabelecimento | Identificador | Município | Distância | Operação | Uso | Compra de terceiros | Papel | Restrição | Canais | Pendências |");
   lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|");

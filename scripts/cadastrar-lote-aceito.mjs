@@ -5,13 +5,16 @@
 //   Local (npm run dev): node scripts/cadastrar-lote-aceito.mjs <arquivo.json> --base http://127.0.0.1:8787 --apply
 //   Produção: CF_ACCESS_TOKEN=$(cloudflared access token -app=https://<compass>) \
 //             node --use-system-ca scripts/cadastrar-lote-aceito.mjs <arquivo.json> --base https://<compass> --apply
+//   Procedência (registrada na auditoria; não prova ação humana): --executor, --autorizacao-ref, --autorizado-por,
+//   --autorizado-em; o canal é sempre "script".
 //   --triagem: depois de criar cada empresa, roda a triagem de sanções pelo fluxo existente (POST /screening).
 //   O produto vem do arquivo ("produto"); não há padrão (fluxo geral de rodadas, 2026-10-15). Lotes gerados por
 //   scripts/rodada.mjs trazem "rastreio" por empresa; o campo é só registro local.
 import { readFileSync } from "node:fs";
+import { scriptProvenance, PROVENANCE_FLAGS } from "./lib/procedencia.mjs";
 
 const args = process.argv.slice(2);
-const file = args.find((a) => !a.startsWith("--"));
+const file = args.find((a, i) => !a.startsWith("--") && !["--base", "--product", ...PROVENANCE_FLAGS].includes(args[i - 1]));
 const base = args.includes("--base") ? args[args.indexOf("--base") + 1] : null;
 const local = base && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(base);
 const apply = args.includes("--apply");
@@ -26,7 +29,7 @@ async function call(method, path, body) {
   if (!base || (!local && !process.env.CF_ACCESS_TOKEN)) throw new Error("Use --base e, fora do ambiente local, CF_ACCESS_TOKEN para aplicar.");
   const r = await fetch(new URL(path, base), {
     method,
-    headers: { "content-type": "application/json", origin: new URL(base).origin, ...(process.env.CF_ACCESS_TOKEN ? { cookie: `CF_Authorization=${process.env.CF_ACCESS_TOKEN}` } : {}) },
+    headers: { "content-type": "application/json", origin: new URL(base).origin, ...scriptProvenance(args), ...(process.env.CF_ACCESS_TOKEN ? { cookie: `CF_Authorization=${process.env.CF_ACCESS_TOKEN}` } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const json = await r.json().catch(() => ({}));

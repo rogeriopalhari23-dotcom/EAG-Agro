@@ -194,7 +194,11 @@ test("Rodada pelo painel: da configuração ao cadastro, com falhas parciais, re
   const alfaCo = (await api(`/api/companies/${reg.items.find((x) => x.key === key("Alfa")).companyId}`)).data;
   assert.equal(alfaCo.company?.registration_id ?? alfaCo.registration_id ?? "11111111000191", "11111111000191");
   const regRow = DB.raw.prepare("SELECT decision_id,registered_by,detail_json FROM round_registrations WHERE round_id=? AND est_key=?").get(id, key("Alfa"));
-  assert.ok(regRow.decision_id, "cadastro ligado à decisão que o autorizou");
+  // Cadastro em descoberta não depende de decisão: mesmo com aceite registrado antes, o vínculo fica nulo e o rastreio diz
+  // "sem decisão comercial individual" (o vínculo com decisão é testado no modo "aceitas", em rodada-rastreabilidade).
+  assert.equal(regRow.decision_id, null);
+  assert.equal(JSON.parse(regRow.detail_json).trace.basis, "discovery_mode");
+  assert.equal(JSON.parse(regRow.detail_json).trace.decision, null);
   assert.equal(JSON.parse(regRow.detail_json).evidence[0], 201, "evidência de fonte própria registrada");
   assert.equal(JSON.parse(regRow.detail_json).trace.mode, "discovery");
   const again2 = (await api(`${base}/register`, "POST", { mode: "discovery", productId: "product-01" })).data;

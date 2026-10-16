@@ -19,6 +19,7 @@ import { osmRoundQuery, osmToCandidates } from "./rodada/sources/osm.js";
 import { sipeagroToCandidates } from "./rodada/sources/sipeagro.js";
 import { importCandidates, assistedCandidate } from "./rodada/sources/import.js";
 import { renderReport } from "./rodada/report.js";
+import { operationRecord, describeOperation } from "./provenance.js";
 
 // Fontes automáticas que o Worker consegue executar (o OSM sai pelo navegador; ver sources/osm.js).
 const WORKER_FETCHERS = { "br-cnpj-ws": (fetchImpl) => brCnpjWs({ fetchImpl }) };
@@ -100,6 +101,45 @@ async function registeredConflicts(env, actor, id) {
 }
 const withConflicts = (res, extra) => (res.closure && extra?.length ? { ...res, closure: { ...res.closure, conflicts: [...res.closure.conflicts, ...extra] } } : res);
 
+// Cadastro feito pela rodada, com o rastreio legível: descoberta sem decisão comercial individual × aceite com decisão.
+// Cadastros antigos (antes desta regra) mostram só o que foi gravado; nada é inferido para trás.
+function registrationView(x) {
+  const detail = parse(x.detail_json, {});
+  const t = detail.trace ?? {};
+  const basis = t.basis ?? (x.mode === "accept" ? "decision_accept" : "discovery_mode");
+  const label = t.label ?? (basis === "decision_accept" ? "cadastro por aceite (decisão registrada)" : "cadastro sem decisão comercial individual");
+  return {
+    est_key: x.est_key, company_id: x.company_id, mode: x.mode, outcome: x.outcome, registered_at: x.registered_at, registered_by: x.registered_by,
+    basis, label, decisionId: x.decision_id ?? null, decision: t.decision && typeof t.decision === "object" ? t.decision : null,
+    operation: detail.operation ?? null,
+    operationText: detail.operation ? describeOperation(detail.operation) : `Operação em ${x.registered_at}; identidade autenticada: ${x.registered_by} (não prova ação humana); canal e executor não registrados (cadastro anterior à regra de rastreabilidade).`,
+  };
+}
+
+// Anotações complementares da rodada: registro novo, com a data real em que foi gravado; nunca reescrevem o que existe.
+async function annotationsOf(env, actor, id) {
+  const rows = (await s(env, "SELECT occurred_at, actor_id, request_id, new_value_json FROM audit_log WHERE tenant_id=? AND entity_type='discovery_round' AND entity_id=? AND action='round.annotated' ORDER BY occurred_at", actor.tenant_id, id).all()).results;
+  return rows.map((r) => ({ annotatedAt: r.occurred_at, authenticatedIdentity: r.actor_id, requestId: r.request_id, ...parse(r.new_value_json, {}) }));
+}
+
+export async function annotateRound(request, env, actor, rid, id) {
+  requireRole(actor, WRITE_ROLES);
+  await roundOf(env, actor, id);
+  const i = await bodyJson(request);
+  const text = str(i.text, "texto da anotação", 3000);
+  const refersTo = {
+    requestIds: Array.isArray(i.refersTo?.requestIds) ? i.refersTo.requestIds.slice(0, 20).map((x) => str(x, "requisição", 80)) : [],
+    estKeys: Array.isArray(i.refersTo?.estKeys) ? i.refersTo.estKeys.slice(0, 500).map((x) => str(x, "estabelecimento", 400)) : [],
+  };
+  // Autorização citada no corpo (o que a anotação documenta) e a operação desta anotação (cabeçalhos) ficam separadas.
+  const a = i.authorization ?? null;
+  const authorization = a ? { reference: str(a.reference, "referência da autorização", 400, true), grantedBy: str(a.grantedBy, "responsável pela autorização", 160, true), grantedAt: str(a.grantedAt, "data da autorização", 40, true) } : null;
+  const at = now();
+  const op = operationRecord(actor, at);
+  await commit(env, [auditStatement(env, actor, rid, "round.annotated", "discovery_round", id, { kind: str(i.kind, "tipo", 60, true) ?? "complement", text, refersTo, authorization, operation: op })]);
+  return { annotatedAt: at, requestId: rid, operation: op };
+}
+
 export async function listRounds(env, actor) {
   const rows = (await s(env, "SELECT id,name,status,config_json,config_revision,last_run_at,last_run_json,updated_at FROM discovery_rounds WHERE tenant_id=? ORDER BY updated_at DESC LIMIT 100", actor.tenant_id).all()).results;
   return {
@@ -160,7 +200,8 @@ export async function getRound(env, actor, id) {
   const v = validateRoundConfig(r.config);
   const ests = (await s(env, "SELECT est_key,status,needs_review,result_json FROM round_establishments WHERE round_id=? ORDER BY needs_review DESC, status", id).all()).results;
   const decisions = (await s(env, "SELECT id,est_key,decision,note,decided_by,decided_at FROM round_decisions WHERE round_id=? AND superseded_at IS NULL", id).all()).results;
-  const regs = (await s(env, "SELECT est_key,company_id,mode,outcome,registered_at FROM round_registrations WHERE round_id=?", id).all()).results;
+  const regs = (await s(env, "SELECT est_key,company_id,mode,outcome,decision_id,registered_by,registered_at,detail_json FROM round_registrations WHERE round_id=?", id).all()).results.map(registrationView);
+  const annotations = await annotationsOf(env, actor, id);
   const cands = (await s(env, "SELECT intake,source_id,COUNT(*) n FROM round_candidates WHERE round_id=? GROUP BY intake,source_id", id).all()).results;
   const dec = new Map(decisions.map((d) => [d.est_key, d])), reg = new Map(regs.map((x) => [x.est_key, x]));
   const scr = regs.length ? await screeningsFor(env, actor, id) : {};
@@ -170,6 +211,7 @@ export async function getRound(env, actor, id) {
     preflight: parse(r.preflight_json), acknowledged: r.preflight_ack_revision === r.config_revision ? { by: r.preflight_ack_by, at: r.preflight_ack_at } : null,
     lastRunAt: r.last_run_at, lastRun: parse(r.last_run_json), candidates: cands,
     sources: Object.fromEntries(Object.entries(SOURCE_CATALOG).map(([k, x]) => [k, { label: x.label, mode: x.mode, cost: x.cost, countries: x.countries }])),
+    annotations,
     results: ests.map((e) => ({ ...withConflicts(JSON.parse(e.result_json), regConf[e.est_key]), needsReview: Boolean(e.needs_review), decision: dec.get(e.est_key) ?? null, registration: reg.get(e.est_key) ?? null, screening: scr[e.est_key] ?? null })),
   };
 }
@@ -335,7 +377,7 @@ export async function decide(request, env, actor, rid, id) {
       outcomes.push({ key, ok: false, reason: `verificação cadastral obrigatória ausente${res.lookup?.status ? ` (${res.lookup.status})` : ""}: a ciência das limitações não dispensa; reexecute quando a fonte responder ou registre por outro fluxo com verificação` });
       continue;
     }
-    const snapshot = { status: res.status, reasons: res.reasons, checks: res.checks, pending: res.pending, distance: res.distance?.label, assessment: { operation: res.assessment.operation, commodityUse: res.assessment.commodityUse, purchase: res.assessment.purchase, role: res.assessment.role, restriction: res.assessment.restriction }, intake: res.intake };
+    const snapshot = { status: res.status, reasons: res.reasons, checks: res.checks, pending: res.pending, distance: res.distance?.label, assessment: { operation: res.assessment.operation, commodityUse: res.assessment.commodityUse, purchase: res.assessment.purchase, role: res.assessment.role, restriction: res.assessment.restriction }, intake: res.intake, recordedBy: operationRecord(actor, at) };
     const decId = crypto.randomUUID();
     stmts.push(s(env, "UPDATE round_decisions SET superseded_at=? WHERE round_id=? AND est_key=? AND superseded_at IS NULL", at, id, key));
     stmts.push(s(env, "INSERT INTO round_decisions(id,round_id,est_key,decision,note,evidence_json,decided_by,decided_at) VALUES (?,?,?,?,?,?,?,?)", decId, id, key, decision, str(d.note, "observação", 1000, true), JSON.stringify(snapshot), actor.id, at));
@@ -362,7 +404,9 @@ export async function registerFromRound(request, env, actor, rid, id, dispatch) 
   const blockedByDecision = new Set(decRows.filter((d) => ["reject", "defer"].includes(d.decision)).map((d) => d.est_key));
   const run = { config: validated(r.config), results: rows.filter((x) => !blockedByDecision.has(x.key)) };
   const decisions = Object.fromEntries(decRows.map((d) => [d.est_key, d.decision]));
-  const batch = buildRegistrationBatch(run, { mode, decisions, decidedBy: actor.id, decidedAt: now(), productVariant: p.variant_name ?? p.id });
+  const op = operationRecord(actor, now());
+  const decisionRecords = Object.fromEntries(decRows.map((d) => [d.est_key, { id: d.id, decidedBy: d.decided_by, decidedAt: d.decided_at }]));
+  const batch = buildRegistrationBatch(run, { mode, decisions, decisionRecords, operation: op, productVariant: p.variant_name ?? p.id });
   const only = Array.isArray(i.keys) ? new Set(i.keys) : null;
   // Em partes: cada cadastro usa várias operações no banco; o painel repete a chamada até não restar nada.
   const limit = Number.isInteger(i.limit) && i.limit > 0 && i.limit <= 50 ? i.limit : 25;
@@ -373,7 +417,8 @@ export async function registerFromRound(request, env, actor, rid, id, dispatch) 
     if (done.has(e.chave)) { out.push({ key: e.chave, outcome: "skipped", reason: "já cadastrada por esta rodada" }); continue; }
     if (processed >= limit) { remaining++; continue; }
     processed++;
-    const d = decByKey.get(e.chave);
+    // Vínculo com a decisão só quando o cadastro dependeu dela (aceite ou inclusão de exceção); senão, fica nulo.
+    const d = e.rastreio.decision ? decByKey.get(e.chave) : null;
     const c = await dispatch("/api/companies", "POST", e.company);
     let outcome, companyId = c.data?.id ?? null;
     const detail = {};
@@ -389,13 +434,14 @@ export async function registerFromRound(request, env, actor, rid, id, dispatch) 
       if (i.screening === true) detail.screening = (await dispatch(`/api/companies/${companyId}/screening`, "POST", {})).status;
     }
     detail.trace = e.rastreio;
+    detail.operation = op;
     await commit(env, [
       s(env, "INSERT INTO round_registrations(round_id,est_key,company_id,mode,decision_id,outcome,detail_json,registered_by,registered_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(round_id,est_key) DO UPDATE SET company_id=excluded.company_id,mode=excluded.mode,decision_id=excluded.decision_id,outcome=excluded.outcome,detail_json=excluded.detail_json,registered_by=excluded.registered_by,registered_at=excluded.registered_at",
         id, e.chave, companyId, mode, d?.id ?? null, outcome, JSON.stringify(detail), actor.id, now()),
     ]);
     out.push({ key: e.chave, outcome, companyId, ...(outcome === "failed" ? { error: detail.error } : {}) });
   }
-  await commit(env, [auditStatement(env, actor, rid, "round.registered", "discovery_round", id, { mode, productId: p.id, created: out.filter((x) => x.outcome === "created").length, existing: out.filter((x) => x.outcome === "already_exists").length, failed: out.filter((x) => x.outcome === "failed").length })]);
+  await commit(env, [auditStatement(env, actor, rid, "round.registered", "discovery_round", id, { mode, basis: mode === "accept" ? "decision_accept" : "discovery_mode", operation: op, productId: p.id, created: out.filter((x) => x.outcome === "created").length, existing: out.filter((x) => x.outcome === "already_exists").length, failed: out.filter((x) => x.outcome === "failed").length })]);
   return { mode, productId: p.id, items: out, remaining };
 }
 
@@ -405,11 +451,12 @@ export async function exportRound(env, actor, id) {
   const config = validated(r.config);
   const results = (await s(env, "SELECT result_json FROM round_establishments WHERE round_id=?", id).all()).results.map((x) => JSON.parse(x.result_json));
   const decisions = (await s(env, "SELECT * FROM round_decisions WHERE round_id=? ORDER BY decided_at", id).all()).results.map((d) => ({ ...d, evidence_json: undefined, snapshot: JSON.parse(d.evidence_json) }));
-  const registrations = (await s(env, "SELECT * FROM round_registrations WHERE round_id=?", id).all()).results.map((x) => ({ ...x, detail_json: undefined, detail: parse(x.detail_json) }));
+  const registrations = (await s(env, "SELECT * FROM round_registrations WHERE round_id=?", id).all()).results.map((x) => ({ ...x, detail_json: undefined, detail: parse(x.detail_json), view: registrationView(x) }));
+  const annotations = await annotationsOf(env, actor, id);
   const origin = await originFor(env, config);
   const counters = parse(r.last_run_json)?.counters ?? { created: 0, updated: 0, unchanged: 0 };
   const screenings = registrations.length ? await screeningsFor(env, actor, id) : {};
   const regConf = registrations.length ? await registeredConflicts(env, actor, id) : {};
   for (let k = 0; k < results.length; k++) results[k] = withConflicts(results[k], regConf[results[k].key]);
-  return { round: { id: r.id, name: r.name, revision: r.config_revision, exportedAt: now() }, config: r.config, preflight: parse(r.preflight_json), results, decisions, registrations, screenings, report: renderReport({ config, origin, results, counters, screenings }, { title: r.name }) };
+  return { round: { id: r.id, name: r.name, revision: r.config_revision, exportedAt: now() }, config: r.config, preflight: parse(r.preflight_json), results, decisions, registrations, screenings, annotations, report: renderReport({ config, origin, results, counters, screenings, registrations: registrations.map((x) => x.view), annotations }, { title: r.name }) };
 }

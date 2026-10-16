@@ -6,6 +6,8 @@
 //   - perfil comprador (classe e fundamento) → POST /profiles, com a revisão atual;
 //   - opcional: as mesmas evidências entram na rodada como pesquisa assistida (POST /api/rounds/:id/candidates),
 //     para o resultado da rodada refletir a qualificação na próxima execução.
+// Procedência (registrada na auditoria; não prova ação humana): --executor, --autorizacao-ref, --autorizado-por,
+// --autorizado-em; o canal é sempre "script".
 // Não cria pessoa, contato pessoal, ficha, tarefa ou envio. Não consome crédito. Simulação por padrão.
 //   node scripts/qualificar-lote.mjs <lote.json>                               (simulação; nada é gravado)
 //   CF_ACCESS_TOKEN=... node scripts/qualificar-lote.mjs <lote.json> --base https://<compass> --apply
@@ -20,9 +22,10 @@
 //     "porte": { "sizeBand", "source", "basis" },
 //     "perfil": { "profileClass", "basis" } } ] }
 import { readFileSync, writeFileSync } from "node:fs";
+import { scriptProvenance, PROVENANCE_FLAGS } from "./lib/procedencia.mjs";
 
 const args = process.argv.slice(2);
-const file = args.find((a) => !a.startsWith("--") && !["--base", "--foto"].includes(args[args.indexOf(a) - 1]));
+const file = args.find((a, i) => !a.startsWith("--") && !["--base", "--foto", ...PROVENANCE_FLAGS].includes(args[i - 1]));
 const base = args.includes("--base") ? args[args.indexOf("--base") + 1] : null;
 const apply = args.includes("--apply");
 const foto = args.includes("--foto") ? args[args.indexOf("--foto") + 1] : null;
@@ -35,7 +38,7 @@ async function http(method, path, body) {
   if (!base) throw new Error("Use --base para ler ou gravar.");
   const r = await fetch(new URL(path, base), {
     method,
-    headers: { "content-type": "application/json", origin: new URL(base).origin, ...(process.env.CF_ACCESS_TOKEN ? { cookie: `CF_Authorization=${process.env.CF_ACCESS_TOKEN}` } : {}) },
+    headers: { "content-type": "application/json", origin: new URL(base).origin, ...scriptProvenance(args), ...(process.env.CF_ACCESS_TOKEN ? { cookie: `CF_Authorization=${process.env.CF_ACCESS_TOKEN}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
     redirect: "manual",
   });
