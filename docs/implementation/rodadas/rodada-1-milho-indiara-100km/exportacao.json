@@ -1,0 +1,1760 @@
+{
+ "round": {
+  "id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+  "name": "Rodada 1 — milho GMO, Indiara/GO, 100 km (16/10/2026)",
+  "revision": 1,
+  "exportedAt": "2026-10-16T00:56:07.412Z"
+ },
+ "config": {
+  "id": "milho-gmo-indiara-100km-r1",
+  "description": "Primeira rodada real (16/10/2026): milho GMO, Indiara/GO, 100 km, faixa de 10%, até 10 candidatas; só fontes gratuitas; sem contato.",
+  "commodity": {
+   "code": "corn",
+   "label": "milho",
+   "variety": "GMO",
+   "spec": {
+    "form": "grão"
+   },
+   "nameHints": [
+    "MILHO",
+    "MILHAO",
+    "CORN",
+    "FUBA",
+    "CANJIC"
+   ],
+   "restrictionHints": [
+    "n[ãa]o[- ]?transg[eê]nic",
+    "non[- ]?gmo",
+    "livre de transg"
+   ],
+   "segments": {
+    "feed_mill": {
+     "label": "fábrica de ração",
+     "discovery": {
+      "osm": [
+       [
+        "industrial",
+        "feed"
+       ],
+       [
+        "product",
+        "~ração|racao|animal feed"
+       ]
+      ],
+      "sipeagro": {
+       "activity": [
+        "FABRICANTE"
+       ],
+       "classification": [
+        "RAÇÃO",
+        "CONCENTRADO",
+        "NÚCLEO",
+        "SUPLEMENTO",
+        "ALIMENTO"
+       ]
+      }
+     }
+    },
+    "cooperative_feed": {
+     "label": "cooperativa com fabricação própria"
+    },
+    "poultry_swine_integration": {
+     "label": "integração de aves e suínos",
+     "discovery": {
+      "osm": [
+       [
+        "industrial",
+        "slaughterhouse"
+       ]
+      ]
+     }
+    },
+    "feedlot": {
+     "label": "confinamento"
+    },
+    "ethanol": {
+     "label": "etanol de milho",
+     "discovery": {
+      "osm": [
+       [
+        "product",
+        "~etanol|ethanol"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  "buyer": {
+   "roles": [
+    "final_consumer",
+    "processor"
+   ],
+   "uses": [
+    "ração",
+    "etanol",
+    "moagem",
+    "confinamento"
+   ],
+   "separate": [
+    "reseller",
+    "trader"
+   ]
+  },
+  "origin": {
+   "country": "BR",
+   "region": "GO",
+   "municipality": "Indiara",
+   "municipalityCode": "5209952"
+  },
+  "radius": {
+   "value": 100,
+   "unit": "km",
+   "method": "haversine"
+  },
+  "nearLimit": {
+   "fraction": 0.1
+  },
+  "priorities": {
+   "size": [
+    "medium",
+    "small",
+    "unknown",
+    "large",
+    "micro"
+   ],
+   "segments": [
+    "feed_mill",
+    "cooperative_feed",
+    "poultry_swine_integration",
+    "feedlot",
+    "ethanol"
+   ]
+  },
+  "sources": [
+   {
+    "id": "br-cnpj-ws",
+    "kind": "registry",
+    "countries": [
+     "BR"
+    ],
+    "rateLimitPerMinute": 3,
+    "maxAgeDays": 30
+   },
+   {
+    "id": "osm-overpass",
+    "kind": "discovery",
+    "countries": [
+     "*"
+    ]
+   },
+   {
+    "id": "mapa-sipeagro",
+    "kind": "discovery",
+    "countries": [
+     "BR"
+    ]
+   }
+  ],
+  "evidence": {
+   "confirming": [
+    "own_source",
+    "official_record"
+   ]
+  },
+  "locale": {
+   "language": "pt-BR",
+   "timezone": "America/Sao_Paulo"
+  },
+  "compliance": {
+   "scope": "br_email_automatic",
+   "sanctionsMaxAgeHours": 720
+  }
+ },
+ "preflight": {
+  "overall": "partial",
+  "requiresAcknowledgement": true,
+  "items": [
+   {
+    "area": "geografia",
+    "level": "supported",
+    "message": "Conjunto nacional oficial de municípios para BR: área calculada pela origem e pelo raio."
+   },
+   {
+    "area": "proximidade do limite",
+    "level": "supported",
+    "message": "Critério proporcional: últimos 10% do raio (de 90 a 100 km); gera conferência, não exclusão."
+   },
+   {
+    "area": "identificador",
+    "level": "supported",
+    "message": "CNPJ: chave por unidade e raiz da empresa."
+   },
+   {
+    "area": "fonte br-cnpj-ws",
+    "level": "partial",
+    "message": "Receita Federal (publica.cnpj.ws) (consulta cadastral automática): situação cadastral, CNAE, porte, endereço e município da unidade pelo CNPJ. Limite: só consulta CNPJ já conhecido (não busca por nome); 3 consultas por minuto."
+   },
+   {
+    "area": "fonte osm-overpass",
+    "level": "partial",
+    "message": "OpenStreetMap (Overpass) (descoberta automática): estabelecimentos mapeados no raio, por etiquetas configuradas por segmento. Limite: cobertura irregular; raramente traz identificador cadastral (candidatas provisórias até conciliar); o servidor público recusa chamadas da Cloudflare, então no painel a consulta sai do navegador."
+   },
+   {
+    "area": "segmentos × osm-overpass",
+    "level": "partial",
+    "message": "Sem regra de descoberta em OpenStreetMap (Overpass) para: cooperative_feed, feedlot (esses segmentos ficam só com importação e pesquisa assistida)."
+   },
+   {
+    "area": "fonte mapa-sipeagro",
+    "level": "partial",
+    "message": "MAPA SIPEAGRO — estabelecimentos registrados (dados abertos) (importação): estabelecimentos com registro no MAPA (UF, município, registro, atividade, classificação). Limite: CNPJ mascarado no arquivo público (candidata provisória; a máscara ajuda a conciliar); registro indica atividade, não prova uso nem compra."
+   },
+   {
+    "area": "segmentos × mapa-sipeagro",
+    "level": "partial",
+    "message": "Sem regra de descoberta em MAPA SIPEAGRO — estabelecimentos registrados (dados abertos) para: cooperative_feed, poultry_swine_integration, feedlot, ethanol (esses segmentos ficam só com importação e pesquisa assistida)."
+   },
+   {
+    "area": "descoberta automática",
+    "level": "partial",
+    "message": "Automática por OpenStreetMap (Overpass); o resultado é indício e precisa de conciliação."
+   },
+   {
+    "area": "cadastro oficial",
+    "level": "supported",
+    "message": "Consulta cadastral por Receita Federal (publica.cnpj.ws)."
+   },
+   {
+    "area": "prova de uso e compra",
+    "level": "partial",
+    "message": "Só fonte própria ou registro oficial comprova; o resto é indício. A busca dessas provas é pesquisa assistida."
+   },
+   {
+    "area": "triagem de sanções",
+    "level": "partial",
+    "message": "Feita pelo Compass depois do cadastro em descoberta; avanços que exigem triagem continuam bloqueados até ela existir e estar válida."
+   }
+  ]
+ },
+ "results": [
+  {
+   "key": "BR:17802890000239",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "17802890000239",
+   "names": [
+    "COOPERATIVA MISTA DOS PRODUTORES RURAIS DE PONTALINA"
+   ],
+   "municipality": "Pontalina",
+   "registry": {
+    "legalName": "COOPERATIVA MISTA DOS PRODUTORES RURAIS DE PONTALINA - COMPROP",
+    "tradeName": null,
+    "status": "Ativa",
+    "statusDate": "2019-06-05",
+    "kind": "Filial",
+    "size": "unknown",
+    "activity": "5211-7/01 Armazéns gerais - emissão de warrant",
+    "secondary": [
+     "1066-0/00 Fabricação de alimentos para animais",
+     "4619-2/00 Representantes comerciais e agentes do comércio de mercadorias em geral não especializado",
+     "4622-2/00 Comércio atacadista de soja",
+     "4623-1/06 Comércio atacadista de sementes, flores, plantas e gramas",
+     "4623-1/99 Comércio atacadista de matérias-primas agrícolas não especificadas anteriormente",
+     "4930-2/01 Transporte rodoviário de carga, exceto produtos perigosos e mudanças, municipal",
+     "4930-2/02 Transporte rodoviário de carga, exceto produtos perigosos e mudanças, intermunicipal, interestadual e internacional",
+     "5211-7/99 Depósitos de mercadorias para terceiros, exceto armazéns gerais e guarda-móveis",
+     "7490-1/03 Serviços de agronomia e de consultoria às atividades agrícolas e pecuárias"
+    ],
+    "municipality": "Pontalina",
+    "region": "GO",
+    "address": "RODOVIA MUNICIPAL LOBO SN KM    01 ZONA RURAL",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/17802890000239",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:42:14.626Z"
+   },
+   "distance": {
+    "km": 59.7,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "confirmed",
+    "nearLimit": false,
+    "label": "59.7 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0008702, CNPJ 17.802.890/0002-39, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0008702 (Ativo): FABRICANTE SUPLEMENTO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0008702 (Ativo): FABRICANTE SUPLEMENTO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "unknown",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:cooperativa mista dos produtores rurais de pontalina|pontalina|GO"
+   ]
+  },
+  {
+   "key": "BR:09276439000205",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "09276439000205",
+   "names": [
+    "P&S PRODUTOS AGROPECUÁRIOS LTDA"
+   ],
+   "municipality": "Abadia de Goiás",
+   "registry": {
+    "legalName": "P & S PRODUTOS AGROPECUARIOS LTDA",
+    "tradeName": "NUTRIPEC NUTRICAO ANIMAL",
+    "status": "Ativa",
+    "statusDate": "2019-11-04",
+    "kind": "Filial",
+    "size": "small",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [],
+    "municipality": "Abadia de Goiás",
+    "region": "GO",
+    "address": "RUA ANTONIO ALVES DE QUEIROZ - FAZENDA QUATI S/N ZONA RURAL",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/09276439000205",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:42:14.626Z"
+   },
+   "distance": {
+    "km": 70.6,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "confirmed",
+    "nearLimit": false,
+    "label": "70.6 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0010286, CNPJ 09.276.439/0002-05, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0010286 (Ativo): FABRICANTE NÚCLEO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO; FABRICANTE RAÇÃO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0010286 (Ativo): FABRICANTE NÚCLEO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO; FABRICANTE RAÇÃO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "small",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:p s produtos agropecuarios ltda|abadia de goias|GO"
+   ]
+  },
+  {
+   "key": "BR:21196572000168",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "21196572000168",
+   "names": [
+    "YABAGATA NUTRICAO ANIMAL LTDA"
+   ],
+   "municipality": "Trindade",
+   "registry": {
+    "legalName": "YABAGATA NUTRICAO ANIMAL LTDA",
+    "tradeName": "RACOES GARANTIDO",
+    "status": "Ativa",
+    "statusDate": "2014-10-08",
+    "kind": "Matriz",
+    "size": "micro",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [
+     "4623-1/09 Comércio atacadista de alimentos para animais",
+     "4789-0/04 Comércio varejista de animais vivos e de artigos e alimentos para animais de estimação"
+    ],
+    "municipality": "Trindade",
+    "region": "GO",
+    "address": "RUA 1022 218 QUADRA24                  LOTE  14 SETOR LAGUNA PARQUE",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/21196572000168",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:42:14.626Z"
+   },
+   "distance": {
+    "km": 75.5,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "confirmed",
+    "nearLimit": false,
+    "label": "75.5 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0012351, CNPJ 21.196.572/0001-68, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0012351 (Ativo): FABRICANTE SUPLEMENTO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0012351 (Ativo): FABRICANTE SUPLEMENTO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "micro",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:yabagata nutricao animal ltda|trindade|GO"
+   ]
+  },
+  {
+   "key": "BR:54478827000134",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "54478827000134",
+   "names": [
+    "RURAL CRIA INDUSTRIA E COMERCIO DE RAÇÕES LTDA"
+   ],
+   "municipality": "Trindade",
+   "registry": {
+    "legalName": "RURAL CRIA INDUSTRIA E COMERCIO DE RACAO LTDA",
+    "tradeName": "RACOES RURAL CRIA",
+    "status": "Ativa",
+    "statusDate": "2024-03-26",
+    "kind": "Matriz",
+    "size": "small",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [
+     "0163-6/00 Atividades de pós-colheita",
+     "1064-3/00 Fabricação de farinha de milho e derivados, exceto óleos de milho",
+     "1069-4/00 Moagem e fabricação de produtos de origem vegetal não especificados anteriormente",
+     "4622-2/00 Comércio atacadista de soja",
+     "4623-1/03 Comércio atacadista de algodão",
+     "4623-1/08 Comércio atacadista de matérias-primas agrícolas com atividade de fracionamento e acondicionamento associada",
+     "4623-1/09 Comércio atacadista de alimentos para animais",
+     "4632-0/03 Comércio atacadista de cereais e leguminosas beneficiados, farinhas, amidos e féculas, com atividade de fracionamento e acondicionamento associada",
+     "4691-5/00 Comércio atacadista de mercadorias em geral, com predominância de produtos alimentícios",
+     "4729-6/99 Comércio varejista de produtos alimentícios em geral ou especializado em produtos alimentícios não especificados anteriormente",
+     "4930-2/01 Transporte rodoviário de carga, exceto produtos perigosos e mudanças, municipal",
+     "4930-2/02 Transporte rodoviário de carga, exceto produtos perigosos e mudanças, intermunicipal, interestadual e internacional",
+     "5211-7/01 Armazéns gerais - emissão de warrant",
+     "5211-7/99 Depósitos de mercadorias para terceiros, exceto armazéns gerais e guarda-móveis",
+     "7490-1/04 Atividades de intermediação e agenciamento de serviços e negócios em geral, exceto imobiliários",
+     "8292-0/00 Envasamento e empacotamento sob contrato"
+    ],
+    "municipality": "Trindade",
+    "region": "GO",
+    "address": "RUA 16 DE JULHO 1435 LOTE  01                  QUADRA03 VILA AUGUSTUS",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/54478827000134",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:46:21.220Z"
+   },
+   "distance": {
+    "km": 75.5,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "confirmed",
+    "nearLimit": false,
+    "label": "75.5 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0022799, CNPJ 54.478.827/0001-34, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0022799 (Ativo): FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO; FABRICANTE CONCENTRADO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0022799 (Ativo): FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO; FABRICANTE CONCENTRADO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "small",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:rural cria industria e comercio de racoes ltda|trindade|GO"
+   ]
+  },
+  {
+   "key": "BR:11595239000178",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "11595239000178",
+   "names": [
+    "VF INDUSTRIA E COMERCIO DE RACOES LTDA - ME"
+   ],
+   "municipality": "Hidrolândia",
+   "registry": {
+    "legalName": "VF INDUSTRIA E COMERCIO DE RACOES LTDA",
+    "tradeName": "VF INDUSTRIA E COMERCIO DE RACOES",
+    "status": "Ativa",
+    "statusDate": "2010-01-22",
+    "kind": "Matriz",
+    "size": "micro",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [
+     "4623-1/09 Comércio atacadista de alimentos para animais"
+    ],
+    "municipality": "Hidrolândia",
+    "region": "GO",
+    "address": "AVENIDA AVENIDA JUSTINO PEREIRA CARDOSO S/N QUADRA23                  LOTE  12 CENTRO NOVA FATIMA",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/11595239000178",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:46:21.220Z"
+   },
+   "distance": {
+    "km": 77,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "estimated",
+    "nearLimit": false,
+    "label": "77 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0014010, CNPJ 11.595.239/0001-78, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0014010 (Ativo): FABRICANTE RAÇÃO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0014010 (Ativo): FABRICANTE RAÇÃO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "micro",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:vf industria e comercio de racoes ltda me|hidrolandia|GO"
+   ]
+  },
+  {
+   "key": "BR:01225945000174",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "01225945000174",
+   "names": [
+    "COOPERATIVA AGROPECUARIA DE AURILANDIA"
+   ],
+   "municipality": "Aurilândia",
+   "registry": {
+    "legalName": "COOPERATIVA AGROPECUARIA DE AURILANDIA",
+    "tradeName": null,
+    "status": "Ativa",
+    "statusDate": "2004-12-24",
+    "kind": "Matriz",
+    "size": "unknown",
+    "activity": "4692-3/00 Comércio atacadista de mercadorias em geral, com predominância de insumos agropecuários",
+    "secondary": [
+     "1066-0/00 Fabricação de alimentos para animais",
+     "4623-1/06 Comércio atacadista de sementes, flores, plantas e gramas",
+     "4683-4/00 Comércio atacadista de defensivos agrícolas, adubos, fertilizantes e corretivos do solo",
+     "4711-3/02 Comércio varejista de mercadorias em geral, com predominância de produtos alimentícios - supermercados",
+     "4771-7/04 Comércio varejista de medicamentos veterinários",
+     "4784-9/00 Comércio varejista de gás liqüefeito de petróleo (GLP)"
+    ],
+    "municipality": "Aurilândia",
+    "region": "GO",
+    "address": "AVENIDA ANTUNES DE SANTANA 38 SETOR CENTRAL",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/01225945000174",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:46:21.220Z"
+   },
+   "distance": {
+    "km": 80.5,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "estimated",
+    "nearLimit": false,
+    "label": "80.5 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0014729, CNPJ 01.225.945/0001-74, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0014729 (Ativo): FABRICANTE NÚCLEO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0014729 (Ativo): FABRICANTE NÚCLEO; FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "unknown",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:cooperativa agropecuaria de aurilandia|aurilandia|GO"
+   ]
+  },
+  {
+   "key": "BR:05621758000160",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "05621758000160",
+   "names": [
+    "CAMPO RACOES LTDA"
+   ],
+   "municipality": "Acreúna",
+   "registry": {
+    "legalName": "CAMPO RACOES LTDA",
+    "tradeName": "CAMPO NUTRICAO ANIMAL",
+    "status": "Ativa",
+    "statusDate": "2005-11-03",
+    "kind": "Matriz",
+    "size": "unknown",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [
+     "0163-6/00 Atividades de pós-colheita",
+     "4611-7/00 Representantes comerciais e agentes do comércio de matérias-primas agrícolas e animais vivos",
+     "4618-4/99 Outros representantes comerciais e agentes do comércio especializado em produtos não especificados anteriormente",
+     "4619-2/00 Representantes comerciais e agentes do comércio de mercadorias em geral não especializado",
+     "4623-1/09 Comércio atacadista de alimentos para animais",
+     "4689-3/99 Comércio atacadista especializado em outros produtos intermediários não especificados anteriormente",
+     "4789-0/04 Comércio varejista de animais vivos e de artigos e alimentos para animais de estimação",
+     "4789-0/99 Comércio varejista de outros produtos não especificados anteriormente",
+     "4930-2/02 Transporte rodoviário de carga, exceto produtos perigosos e mudanças, intermunicipal, interestadual e internacional",
+     "5211-7/99 Depósitos de mercadorias para terceiros, exceto armazéns gerais e guarda-móveis",
+     "7210-0/00 Pesquisa e desenvolvimento experimental em ciências físicas e naturais",
+     "7490-1/03 Serviços de agronomia e de consultoria às atividades agrícolas e pecuárias",
+     "7739-0/99 Aluguel de outras máquinas e equipamentos comerciais e industriais não especificados anteriormente, sem operador",
+     "8650-0/02 Atividades de profissionais da nutrição",
+     "8650-0/07 Atividades de terapia de nutrição enteral e parenteral"
+    ],
+    "municipality": "Acreúna",
+    "region": "GO",
+    "address": "RUA MARIA MACHADO DE ALMEIDA 148 QUADRAAREA                LOTE  2-C AREAS DO CENTRO",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/05621758000160",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:37:29.636Z"
+   },
+   "distance": {
+    "km": 48.2,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "confirmed",
+    "nearLimit": false,
+    "label": "48.2 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0010090, CNPJ 05.621.758/0001-60, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0010090 (Ativo): FABRICANTE CONCENTRADO; FABRICANTE NÚCLEO; FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0010090 (Ativo): FABRICANTE CONCENTRADO; FABRICANTE NÚCLEO; FABRICANTE RAÇÃO; FABRICANTE SUPLEMENTO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "unknown",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:campo racoes ltda|acreuna|GO"
+   ]
+  },
+  {
+   "key": "BR:43177285000143",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "43177285000143",
+   "names": [
+    "SIAP RACOES, NUTRICAO ANIMAL E VEGETAL LTDA"
+   ],
+   "municipality": "Acreúna",
+   "registry": {
+    "legalName": "SIAP RACOES, NUTRICAO ANIMAL E VEGETAL LTDA",
+    "tradeName": "SIAP NUTRICAO",
+    "status": "Ativa",
+    "statusDate": "2021-08-18",
+    "kind": "Matriz",
+    "size": "unknown",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [
+     "1041-4/00 Fabricação de óleos vegetais em bruto, exceto óleo de milho",
+     "2093-2/00 Fabricação de aditivos de uso industrial",
+     "4622-2/00 Comércio atacadista de soja",
+     "4623-1/09 Comércio atacadista de alimentos para animais",
+     "4623-1/99 Comércio atacadista de matérias-primas agrícolas não especificadas anteriormente"
+    ],
+    "municipality": "Acreúna",
+    "region": "GO",
+    "address": "AVENIDA SAO FELIPE S/N QUADRAAREA                LOTE  26 AREAS DO PERIMETRO URBANO",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/43177285000143",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:37:29.636Z"
+   },
+   "distance": {
+    "km": 48.2,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "confirmed",
+    "nearLimit": false,
+    "label": "48.2 km (ESTIMADA: centroide do município)"
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0017779, CNPJ 43.177.285/0001-43, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0017779 (Ativo): FABRICANTE NÚCLEO; FABRICANTE RAÇÃO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0017779 (Ativo): FABRICANTE NÚCLEO; FABRICANTE RAÇÃO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [],
+   "siblings": [],
+   "sizeHint": "unknown",
+   "segment": "feed_mill",
+   "pending": [
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:siap racoes nutricao animal e vegetal ltda|acreuna|GO"
+   ]
+  },
+  {
+   "key": "BR:50478250000100",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "50478250000100",
+   "names": [
+    "INDUSTRIA E COMERCIO DE RAÇÕES HERLAN LTDA"
+   ],
+   "municipality": "Caturaí",
+   "registry": {
+    "legalName": "INDUSTRIA E COMERCIO DE RACOES HERLAN LTDA",
+    "tradeName": "HERLAN NUTRICAO ANIMAL",
+    "status": "Ativa",
+    "statusDate": "2023-04-27",
+    "kind": "Matriz",
+    "size": "small",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [
+     "4623-1/09 Comércio atacadista de alimentos para animais",
+     "4789-0/04 Comércio varejista de animais vivos e de artigos e alimentos para animais de estimação",
+     "4930-2/01 Transporte rodoviário de carga, exceto produtos perigosos e mudanças, municipal"
+    ],
+    "municipality": "Caturaí",
+    "region": "GO",
+    "address": "RUA GERALDO DOMINGOS DE ARAUJO SN QUADRA5                   LOTE  14/16 RESIDENCIAL LUIZ MOREIRA DE MELO",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/50478250000100",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:49:03.065Z"
+   },
+   "distance": {
+    "km": 91,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "estimated",
+    "nearLimit": true,
+    "label": "91 km (ESTIMADA: centroide do município)",
+    "pending": "Perto do limite do raio pelo centroide: conferir a localização da unidade."
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0022594, CNPJ 50.478.250/0001-00, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0022594 (Ativo): FABRICANTE RAÇÃO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0022594 (Ativo): FABRICANTE RAÇÃO; FABRICANTE CONCENTRADO; FABRICANTE SUPLEMENTO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [
+    "perto do limite do raio"
+   ],
+   "siblings": [],
+   "sizeHint": "small",
+   "segment": "feed_mill",
+   "pending": [
+    "Perto do limite do raio pelo centroide: conferir a localização da unidade.",
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:industria e comercio de racoes herlan ltda|caturai|GO"
+   ]
+  },
+  {
+   "key": "BR:41809266000167",
+   "provisional": false,
+   "country": "BR",
+   "registrationId": "41809266000167",
+   "names": [
+    "RACOES PEROLA EIRELI"
+   ],
+   "municipality": "Adelândia",
+   "registry": {
+    "legalName": "RACOES PEROLA LTDA",
+    "tradeName": "RACOES PEROLA",
+    "status": "Ativa",
+    "statusDate": "2021-05-04",
+    "kind": "Matriz",
+    "size": "micro",
+    "activity": "1066-0/00 Fabricação de alimentos para animais",
+    "secondary": [],
+    "municipality": "Adelândia",
+    "region": "GO",
+    "address": "RUA BENEDITO ROMAO 500 JARDIM PLANALTO",
+    "idType": "CNPJ",
+    "url": "https://publica.cnpj.ws/cnpj/41809266000167",
+    "source": "br-cnpj-ws",
+    "fetchedAt": "2026-10-16T00:49:03.065Z"
+   },
+   "distance": {
+    "km": 93.6,
+    "basis": "municipality_centroid",
+    "estimated": true,
+    "inside": "estimated",
+    "nearLimit": true,
+    "label": "93.6 km (ESTIMADA: centroide do município)",
+    "pending": "Perto do limite do raio pelo centroide: conferir a localização da unidade."
+   },
+   "assessment": {
+    "operation": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "operation",
+       "strength": "official_record",
+       "quote": "cadastro: Ativa"
+      }
+     ]
+    },
+    "commodityUse": {
+     "status": "indication",
+     "sources": [
+      {
+       "kind": "activity_code",
+       "strength": "official_record",
+       "url": "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/arquivos-alimentacao-animal/ListadeEstabelecimentosSIPEAGRO21.07.2026.pdf/@@download/file",
+       "quote": "Lista oficial MAPA SIPEAGRO (21/07/2026): registro GO0013994, CNPJ 41.809.266/0001-67, situação Ativo. Dados abertos MAPA (11/10/2026): SIPEAGRO GO0013994 (Ativo): FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO. Registro indica atividade; não prova uso de milho nem compra.",
+       "date": "2026-10-16T00:37:09.563Z"
+      },
+      {
+       "kind": "activity_code",
+       "strength": "activity_code",
+       "url": "https://dados.agricultura.gov.br/dataset/52a01565-72d6-410e-b21b-64035831a7be/resource/378b184b-67bd-48fa-9901-17bb7a0700fb/download/sipeagroalimentacaoanimal.csv",
+       "quote": "SIPEAGRO GO0013994 (Ativo): FABRICANTE CONCENTRADO; FABRICANTE RAÇÃO",
+       "date": "2026-10-16T00:37:10.968Z"
+      }
+     ]
+    },
+    "purchase": {
+     "status": "none",
+     "sources": []
+    },
+    "resale": {
+     "status": "none",
+     "sources": []
+    },
+    "trade": {
+     "status": "none",
+     "sources": []
+    },
+    "role": "unknown",
+    "restriction": {
+     "status": "none_found"
+    },
+    "varietyAcceptance": "not_confirmed",
+    "channels": [],
+    "pending": [
+     "Canal de compras publicado não encontrado.",
+     "Operação atual não comprovada em fonte própria ou oficial.",
+     "Uso de milho não comprovado.",
+     "Compra de terceiros não comprovada.",
+     "Aceitação da variedade GMO não confirmada."
+    ]
+   },
+   "status": "discovery",
+   "reasons": [],
+   "checks": [
+    "perto do limite do raio"
+   ],
+   "siblings": [],
+   "sizeHint": "micro",
+   "segment": "feed_mill",
+   "pending": [
+    "Perto do limite do raio pelo centroide: conferir a localização da unidade.",
+    "Canal de compras publicado não encontrado.",
+    "Operação atual não comprovada em fonte própria ou oficial.",
+    "Uso de milho não comprovado.",
+    "Compra de terceiros não comprovada.",
+    "Aceitação da variedade GMO não confirmada."
+   ],
+   "intake": [
+    "import"
+   ],
+   "conciliatedFrom": [
+    "BR:nome:racoes perola eireli|adelandia|GO"
+   ]
+  }
+ ],
+ "decisions": [],
+ "registrations": [
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:01225945000174",
+   "company_id": "0c80efda-5256-4dac-a178-cdf0971bac64",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:25.624Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:01225945000174",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:05621758000160",
+   "company_id": "bc68d221-0ec5-492b-9dbb-e2b711d1b92e",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:27.109Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:05621758000160",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:09276439000205",
+   "company_id": "34f3f6eb-449e-452a-b884-aedabfacdbac",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:19.403Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:09276439000205",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:11595239000178",
+   "company_id": "b3fb678b-36a7-4cda-a4ad-a702b7e188a6",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:24.070Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:11595239000178",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:17802890000239",
+   "company_id": "f46c0e88-c590-4cdc-bc45-351d8bb6ce8b",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:17.907Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:17802890000239",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:21196572000168",
+   "company_id": "697a7287-97e0-4297-9e5b-191cc61f64a8",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:21.009Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:21196572000168",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:41809266000167",
+   "company_id": "6c404026-b73d-4230-91a9-74348ded33a5",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:31.555Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:41809266000167",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Perto do limite do raio pelo centroide: conferir a localização da unidade.",
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:43177285000143",
+   "company_id": "e41f2793-1b8a-4095-86a6-03990b563bb4",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:28.578Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:43177285000143",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:50478250000100",
+   "company_id": "9bb408cd-2c45-4ce8-9cfa-4cb643db24de",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:30.073Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:50478250000100",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Perto do limite do raio pelo centroide: conferir a localização da unidade.",
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  },
+  {
+   "round_id": "dee25927-b941-48aa-a74f-7bc78a278fea",
+   "est_key": "BR:54478827000134",
+   "company_id": "fd3bb583-be70-4644-9187-e7d8d4146469",
+   "mode": "discovery",
+   "decision_id": null,
+   "outcome": "created",
+   "registered_by": "user-rogerio-palhari",
+   "registered_at": "2026-10-16T00:52:22.482Z",
+   "detail": {
+    "evidence": [
+     201
+    ],
+    "channels": [],
+    "profile": 200,
+    "screening": 201,
+    "trace": {
+     "roundId": "milho-gmo-indiara-100km-r1",
+     "key": "BR:54478827000134",
+     "status": "discovery",
+     "mode": "discovery",
+     "decision": "discovery",
+     "decidedBy": "user-rogerio-palhari",
+     "decidedAt": "2026-10-16T00:52:16.255Z",
+     "pending": [
+      "Canal de compras publicado não encontrado.",
+      "Operação atual não comprovada em fonte própria ou oficial.",
+      "Uso de milho não comprovado.",
+      "Compra de terceiros não comprovada.",
+      "Aceitação da variedade GMO não confirmada."
+     ]
+    }
+   }
+  }
+ ]
+}

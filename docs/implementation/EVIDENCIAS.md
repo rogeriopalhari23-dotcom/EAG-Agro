@@ -2775,4 +2775,88 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 
   - Entradas em `candidatas-identificadas.csv` (importação) e `sipeagro-recorte-10.csv` (linhas oficiais das 10, para o importador do SIPEAGRO e a conciliação).
   - Evidência por candidata: registro oficial do MAPA, que é **indício de atividade**; não prova uso de milho nem compra.
-- **Pendente:** conferência da tela e execução no painel. O login do Access (cloudflared) expirou e o novo login exige o navegador de Rogério. Nada foi gravado em produção nesta etapa.
+- **Pendente:** conferência da tela e execução no painel. O login do Access (cloudflared) expirou e o novo login exige o navegador de Rogério. Nada foi gravado em produção nesta etapa. Concluído na seção seguinte.
+
+## Primeira rodada real: execução, cadastro em descoberta e triagem (2026-10-16 UTC, autorizada por Rogério)
+
+- **Correção de redação.** Na preparação, Nutrir, BRF Rio Verde e Rei do Milho foram descritas como "na área", o que estava errado. O filtro está certo.
+  - A área de 100 km inclui de propósito os municípios **cortados** pelo raio, para nenhuma unidade possível ficar de fora. Itaberaí (Nutrir), Rio Verde (BRF) e Inhumas (Rei do Milho) são municípios assim: centroides a 123,8, 129,2 e 108,8 km; alcance mínimo de 82,5, 41,3 e 89,1 km.
+  - Pelas distâncias registradas, as três unidades ficam **fora** dos 100 km. A Rei do Milho está a 106,5 km pelo endereço da unidade.
+  - Dentro dos 100 km pelo centroide estão só Rural Forte (Pontalina, 59,7 km) e Sociagro (Paraúna, 72,8 km).
+  - Origem conferida: centroide IBGE de Indiara/GO (-17,1852; -49,9682), haversine, faixa de 90 a 100 km.
+- **"Fora de grandes grupos"** foi critério de prioridade **deste lote**, não regra do sistema. O código não exclui grupos; a configuração só ordena por porte.
+- **Login do Access renovado por `cloudflared access login`.** A sessão do navegador de Rogério estava ativa, e o token não foi exibido.
+- **Tela conferida em produção** (Chrome sem interface):
+  - Início carregou em ~2,9 s e Tarefas em ~2,6 s, sem aviso de erro;
+  - na tela Rodadas, a rodada `dee25927-b941-48aa-a74f-7bc78a278fea` mostrou a configuração ("milho GMO · origem Indiara/GO (BR) · raio 100 km · revisão 1"), 4 itens suportados e 8 parciais, a área (63 municípios: 28 inteiros, 35 parciais) e o critério da faixa;
+  - **ciência registrada pelo botão da tela** (00:36:50 UTC), antes de qualquer execução; nenhum erro na página.
+- **Importação** pelas rotas do painel:
+  - 10 candidatas identificadas, pelo CNPJ da lista oficial do MAPA;
+  - 10 estabelecimentos do recorte SIPEAGRO, todos conciliados com a unidade identificada pela máscara do CNPJ, sem duplicar.
+  - Uma linha oficial ficou fora da área: a VF Rações (registro GO0014010) aparece nos dados abertos em Hidrolândia **e** em Nova Fátima. A Receita confirmou Hidrolândia; fica registrado como divergência da fonte.
+- **Consultas à Receita** (publica.cnpj.ws, reais; limite compartilhado entre execuções):
+
+| Execução (UTC) | Consultas | Resultado |
+|---|---|---|
+| 00:37 | 3 | 2 ok; **429** na terceira, fonte bloqueada no resto da execução |
+| 00:42 | 3 | 3 ok; 5 adiadas pelo limite |
+| 00:45 | 1 | **429**; fonte bloqueada |
+| 00:46 | 3 | 3 ok; 2 adiadas |
+| 00:49 | 2 | 2 ok |
+
+  - Total: 12 consultas, 10 ok e 2 com 429. As esperas foram de 1 a 2 minutos; nenhuma repetição fora do limite.
+  - O 429 apareceu mesmo dentro de 3 por minuto. O endereço de saída da Cloudflare é compartilhado, e o serviço gratuito pode limitar antes.
+  - Lacuna de exibição: o resumo da execução conta como "adiadas" só as do limite interno. As bloqueadas pelo 429 aparecem como pendência por estabelecimento, mas não nesse número.
+- **Resultado final:** 10 de 10 **ativas** na Receita, 0 exceções, todas em "Descoberta".
+
+| Empresa | CNPJ | Município (Receita) | Distância (centroide, ESTIMADA) | Atividade principal (Receita) | Tipo |
+|---|---|---|---|---|---|
+| Cooperativa Mista dos Produtores Rurais de Pontalina | 17.802.890/0002-39 | Pontalina | 59,7 km | 5211-7/01 armazéns gerais | Filial |
+| P&S Produtos Agropecuários | 09.276.439/0002-05 | Abadia de Goiás | 70,6 km | 1066-0/00 alimentos para animais | Filial |
+| Yabagata Nutrição Animal | 21.196.572/0001-68 | Trindade | 75,5 km | 1066-0/00 | Matriz, micro |
+| Rural Cria Ind. e Com. de Rações | 54.478.827/0001-34 | Trindade | 75,5 km | 1066-0/00 | Matriz, pequena |
+| VF Ind. e Com. de Rações | 11.595.239/0001-78 | Hidrolândia | 77,0 km | 1066-0/00 | Matriz, micro |
+| Cooperativa Agropecuária de Aurilândia | 01.225.945/0001-74 | Aurilândia | 80,5 km | 4692-3/00 atacado geral | Matriz |
+| Campo Rações | 05.621.758/0001-60 | Acreúna | 48,2 km | 1066-0/00 | Matriz |
+| SIAP Rações | 43.177.285/0001-43 | Acreúna | 48,2 km | 1066-0/00 | Matriz |
+| Ind. e Com. de Rações Herlan | 50.478.250/0001-00 | Caturaí | 91,0 km, **conferir** | 1066-0/00 | Matriz |
+| Rações Pérola | 41.809.266/0001-67 | Adelândia | 93,6 km, **conferir** | 1066-0/00 | Matriz |
+
+  - Fonte de cada uma:
+    - CNPJ: lista oficial do MAPA SIPEAGRO de 21/07/2026 (gov.br), casado pelo registro e pela máscara;
+    - atividade: dados abertos SIPEAGRO de 11/10/2026;
+    - situação, atividade principal e município: Receita (publica.cnpj.ws), consultas de 16/10/2026.
+  - Distâncias pelo centroide são **estimativas**.
+  - Herlan e Pérola ficam em municípios só em parte dentro do raio (alcance de 80,4–103,7 e 81,6–103,0 km). Elas **mantêm a pendência de localização real** da unidade, que segue no cadastro.
+- **Atividade × uso × compra, em todas as 10:**
+  - atividade cadastrada como fabricante (MAPA) é **indício**;
+  - uso de milho **não comprovado**;
+  - compra de terceiros **sem evidência**;
+  - aceitação de GMO **não confirmada**;
+  - papel indefinido. As duas cooperativas têm atividade principal de atacado ou armazém, mas registro de fabricante no MAPA. Pelas regras, o código de atividade não define revenda.
+- **Cadastro em descoberta** (rota da rodada, produto `product-03` Milho GMO, com triagem):
+  - 10 empresas criadas, sem duplicidade: nenhuma raiz de CNPJ existia antes;
+  - cada uma com 1 evidência (registro do MAPA, sem `consumes_as_input`) e o perfil "possível";
+  - nenhum canal, pessoa, contato, ficha, ligação ou envio.
+  - Ids: Pontalina `f46c0e88`, P&S `34f3f6eb`, Yabagata `697a7287`, Rural Cria `fd3bb583`, VF `b3fb678b`, Aurilândia `0c80efda`, Campo `bc68d221`, SIAP `e41f2793`, Herlan `9bb408cd`, Pérola `6c404026`.
+- **Triagem de sanções:** 10 execuções concluídas às 00:52 UTC, **0 ocorrências**. Listas de 24/09/2026 (OFAC SDN, CEIS, CNEP…), válidas até cerca de 24/10/2026.
+- **Estado preservado** (retratos antes e depois do cadastro):
+  - mudaram só `companies` (+10), `evidence` (+10), `buyer_profiles` (+10), `screening_runs` (+10), `round_registrations` (+10) e `audit_log`;
+  - as 27 empresas, 12 evidências e 26 perfis anteriores estão idênticos linha a linha (SHA-256);
+  - contatos, fichas, versões, aprovações, tarefas, envios, cópias, supressões, canais, campanhas, validações T11 e parâmetros: idênticos;
+  - T11 com 0 validações; canais `planned`; campanhas 2 `draft` + 1 `ended`; cópia `{"enabled":false}`;
+  - ponte lendo com sucesso (00:54:45 UTC);
+  - Rialma, Caçu e Rações Ipê sem alteração.
+- **Reais × simulados:**
+  - nesta etapa, SIPEAGRO (dados abertos e PDF oficial) e Receita foram chamados **de verdade**;
+  - o OpenStreetMap falhou de verdade (502 duas vezes) e **nenhuma conclusão sobre ausência de empresas** foi tirada dessa falha;
+  - os testes automatizados do código continuam com respostas simuladas.
+- **Relatório e exportação:** `rodadas/rodada-1-milho-indiara-100km/relatorio.md` e `exportacao.json`.
+- **Caminho no painel:** menu lateral → **Rodadas** → "Rodada 1 — milho GMO, Indiara/GO, 100 km (16/10/2026)" → Abrir; resultados no filtro "Todos" ou "Cadastrados". As empresas também aparecem em **Empresas**, com situação "Descoberta".
+- **Pendências:**
+  - prova de uso de milho e de compra de terceiros, por fonte própria ou oficial, para cada uma;
+  - localização real de Herlan e Pérola;
+  - papel das duas cooperativas (fabricação própria ou armazenagem e revenda);
+  - canal de compras de todas;
+  - porte não informado pela Receita em 4 delas;
+  - OpenStreetMap a testar de novo pelo navegador em outro horário.
