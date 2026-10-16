@@ -3042,3 +3042,45 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   5. no painel, conferir que a Rodada 1 mostra "cadastro sem decisão comercial individual" e "canal e executor não registrados (cadastro anterior…)" nos 10, sem mudar dados (retratos iguais), e uma leitura da ponte;
   6. com autorização, gravar a anotação (`rodada.mjs anotar … --executor "<quem grava>" --apply`) e conferir a data do servidor, os cadastros intactos e 0 decisões;
   7. reversão: `wrangler rollback aefbf8b7-5c99-439c-8da2-356cf258b79f`. O código anterior ignora os campos novos; a anotação continua na auditoria, sem efeito sobre ele.
+
+## Publicação da rastreabilidade e anotação complementar da Rodada 1 (2026-10-16, autorizada por Rogério)
+
+- **Conjunto publicado:** de `896ef25` para `c456b74`.
+  - Só `c456b74` traz código: `src/provenance.js`, `src/worker.js`, `src/store.js`, `src/rounds.js`, `src/rodada/acceptance.js`, `src/rodada/report.js`, `public/app.js`.
+  - `440d173` e `5af1e66` são documentação. Os scripts mudados rodam fora do Worker.
+  - **Sem migração** ("No migrations to apply").
+- **Antes:**
+  - Worker vigente `aefbf8b7-5c99-439c-8da2-356cf258b79f`;
+  - Time Travel `00000814-000002ca-00005106-4a8f8d5457ce83b69dde6091bed2dc68`;
+  - retrato do estado.
+- **Publicação:** `npm run deploy` (17:15 UTC), com o predeploy completo: **505 + 2 + 37**, 0 falhas, e `validate-deploy` ok.
+  - Worker **`23b985fd-3dbc-4a6b-9cfc-e48a90418da3`**.
+  - **Reversão:** `wrangler rollback aefbf8b7-5c99-439c-8da2-356cf258b79f`. O código anterior ignora os campos novos e a anotação, que fica na auditoria sem efeito sobre ele. Nunca `64808403`. Time Travel e backup só para desastre.
+- **Rótulos dos 10 cadastros antigos, conferidos pela API e pelo painel:**
+  - "cadastro sem decisão comercial individual";
+  - operação "identidade autenticada: user-rogerio-palhari (não prova ação humana); canal e executor não registrados (cadastro anterior à regra de rastreabilidade)".
+  - Nenhum canal ou executor inferido; nenhum rótulo de decisão.
+- **Duplicidade conferida antes de gravar:** 0 anotações na rodada (API e auditoria).
+- **Anotação gravada:** `rodada.mjs anotar … --apply`.
+  - Identificador **`aaf609f8-5e25-4045-aee0-b1d1532d564a`** (`audit_log`, `round.annotated`).
+  - Requisição `2ae22d31-f969-4a3e-9465-a2b17df8cfa7`; **data do servidor 2026-10-16T17:20:25 UTC**.
+  - **Referências:** operação original `a77a0236-8994-4cbb-b2e4-369d30931dae` e os 10 estabelecimentos.
+  - **Autorização dos cadastros:** de Rogério, 16/10/2026 (citada no corpo).
+  - **Autorização desta gravação:** de Rogério, 16/10/2026 ("Autorizo publicar a rastreabilidade e gravar a anotação complementar…").
+  - **Operação desta anotação:**
+    - canal `script`;
+    - executor "Claude (automação, comando scripts/rodada.mjs anotar)";
+    - identidade autenticada: sessão do Access de Rogério.
+  - O texto registra que Rogério **não** executou cliques nem a operação manualmente, e que o canal original foi script, não registrado na época.
+- **Conferido depois:**
+  - anotação acessível pela API e pelo painel ("Anotações complementares", com texto, operação citada e executor);
+  - **10 cadastros idênticos** aos de antes (hash);
+  - **0 decisões**;
+  - rodada **encerrada** (pesquisa pública `closed`, revisão 2);
+  - Início e Tarefas sem erro; nenhum erro na página.
+- **Estado:**
+  - conteúdo sensível idêntico (SHA-256);
+  - só `audit_log` +1 (a anotação) e `bridge_nonces` (rotação normal);
+  - T11 com 0 validações; canais `planned`; campanhas 2 `draft` + 1 `ended`; cópia `{"enabled":false}`;
+  - `send_outbox` 28, o último de 14/10, nenhum envio novo.
+  - **Ponte:** leitura bem-sucedida às 17:23:42 UTC, depois da publicação.
