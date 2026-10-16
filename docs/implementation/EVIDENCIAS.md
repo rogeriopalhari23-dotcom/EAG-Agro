@@ -2993,3 +2993,26 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Ponte:** leitura bem-sucedida às 16:38:24 UTC, depois da publicação.
 - **Relatório e exportação de produção:** `rodadas/rodada-1-milho-indiara-100km/relatorio.md` e `exportacao.json`, gerados pelo painel. Eles trazem as cinco seções do fechamento. O `relatorio-consolidado.md` anterior fica como a versão gerada localmente antes da publicação.
 - **Caminho no painel:** menu lateral → **Rodadas** → "Rodada 1 — milho GMO, Indiara/GO, 100 km (16/10/2026)" → Abrir → Resultados. A linha da fase e a das consultas ficam no topo; em cada estabelecimento estão "Fechamento: pesquisa pública encerrada · qualificação comercial incompleta" e a linha da triagem com validade.
+
+## Rodada 1: rastreabilidade dos 10 cadastros e encerramento da etapa (2026-10-16; só leitura e documentação)
+
+- **Conferência só por leitura do banco**, sem alterar dados. O detalhe por empresa está em `rodadas/rodada-1-milho-indiara-100km/rastreabilidade.md`.
+- **Vínculo comprovado:**
+  - cada uma das 10 empresas tem linha em `round_registrations` (rodada → estabelecimento → `company_id`; modo `discovery`; `decision_id` vazio);
+  - as candidatas são as do arquivo (CNPJ da lista oficial do MAPA) mais as do SIPEAGRO (registro e máscara), importadas às 00:37:09 e 00:37:10 UTC;
+  - **uma única operação de cadastro**, requisição `a77a0236-8994-4cbb-b2e4-369d30931dae`, liga `round.registered` (00:52:31) aos 10 `company.created`, 10 `evidence.created`, 10 `profile.saved` e 10 `sanctions.screened`.
+- **"Nenhuma decisão" está correto:** o modo descoberta cadastra sem decisão individual, e `round_decisions` da rodada = 0. Os campos `decidedBy` e `decidedAt` do `trace` são o operador e o instante do lote, não uma decisão.
+- **Autoria:**
+  - as operações foram executadas **por Claude**, pelo script `r1.mjs`, nas rotas do painel e com a sessão do Access de Rogério. Só a ciência saiu do botão da tela, por automação do navegador;
+  - o banco registra `user-rogerio-palhari` sem distinguir clique de script;
+  - a autorização (instrução de Rogério em 16/10/2026) está só neste arquivo, não no banco.
+- **Correção proposta, não aplicada:**
+  - gravar a autorização e a origem da operação (painel ou script) no cadastro da rodada;
+  - renomear os campos do `trace`;
+  - acrescentar uma única anotação de auditoria nova para a Rodada 1, com a data em que for gravada, sem reescrever linhas nem criar decisões retroativas.
+  - Exige rota nova e publicação.
+- **Versão e testes:**
+  - Worker em produção `aefbf8b7-5c99-439c-8da2-356cf258b79f` (commit `896ef25`, 16:33 UTC);
+  - testes da publicação: 501 + 2 + 37, 0 falhas, e `validate-deploy` ok;
+  - a rodada foi executada e cadastrada no Worker anterior, `4d7cfa4c`.
+- **Etapa da Rodada 1 encerrada.** As empresas seguem em "Descoberta"; as pendências de contato aguardam a liberação aplicável. Bloqueios mantidos: T11 pendente, canais `planned`, campanhas inativas, cópia desligada, nenhum envio. Sem suíte (alteração só documental).
