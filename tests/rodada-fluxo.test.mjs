@@ -161,8 +161,12 @@ test("Lote com pendências parciais: falha 500 e limite 429 não param a rodada;
   assert.equal(by("00000000000191").status, "qualified_use");
   for (const id of ["11111111000191", "22222222000191", "33333333000191"]) {
     assert.equal(by(id).status, "exception");
-    assert.ok(by(id).pending.some((p) => /pendente|limite/.test(p)), id);
+    assert.ok(by(id).pending.some((p) => /pendente|limite|adiada/.test(p)), id);
   }
+  // Situação estruturada: 500 é falha; 429 e as bloqueadas depois dele são adiadas; o resumo conta igual.
+  assert.equal(by("11111111000191").lookup.status, "failed");
+  assert.deepEqual([by("22222222000191").lookup.cause, by("33333333000191").lookup.cause], ["http_429", "blocked_after_429"]);
+  assert.deepEqual({ fetched: run.lookups.fetched, failed: run.lookups.failed, deferred: run.lookups.deferred }, { fetched: 1, failed: 1, deferred: 2 });
 });
 
 test("Reexecução sem duplicidade: mesma entrada não cria nada; nova candidata entra; evidência nova atualiza", async () => {

@@ -62,23 +62,32 @@ export async function runRound({ config: raw, municipalities, candidates, fetche
     // Consulta cadastral: só com identificador completo e fonte configurada para o país; reaproveita a anterior válida.
     const src = registrySources.find((s) => !s.countries || s.countries.includes(est.country));
     let registry = old?.registry ?? null, fetchProblem = null;
+    // Situação da consulta cadastral desta execução (o resumo conta a partir daqui, nunca do texto das pendências):
+    // fetched | cached | deferred (limite interno, HTTP 429 ou fonte bloqueada após 429) | failed | not_found |
+    // unavailable (sem fonte ou sem implementação) | not_applicable (sem identificador).
+    let lookup = { status: est.provisional ? "not_applicable" : "cached", source: src?.id ?? null };
     const maxAgeMs = (src?.maxAgeDays ?? 30) * 86400000;
     const fresh = registry && Date.parse(now) - Date.parse(registry.fetchedAt) <= maxAgeMs;
     if (!est.provisional && !fresh) {
-      if (!src) fetchProblem = `Fonte cadastral não configurada para ${est.country}.`;
-      else if (!fetchers[src.id]) fetchProblem = `Fonte ${src.id} sem implementação disponível nesta execução.`;
-      else if (blocked.has(src.id)) fetchProblem = `Fonte ${src.id} em limite de consulta: tentar depois.`;
+      if (!src) (fetchProblem = `Fonte cadastral não configurada para ${est.country}.`), (lookup = { status: "unavailable", source: null, cause: "no_source" });
+      else if (!fetchers[src.id]) (fetchProblem = `Fonte ${src.id} sem implementação disponível nesta execução.`), (lookup = { status: "unavailable", source: src.id, cause: "no_implementation" });
+      else if (blocked.has(src.id)) (fetchProblem = `Consulta a ${src.id} adiada: a fonte limitou as requisições nesta execução (HTTP 429); reexecutar depois.`), (lookup = { status: "deferred", source: src.id, cause: "blocked_after_429" });
       else {
         try {
           await limiters.get(src.id)();
           const rec = await fetchers[src.id](est);
           registry = rec ? { ...rec, source: src.id, fetchedAt: now } : null;
+          lookup = { status: rec ? "fetched" : "not_found", source: src.id };
           if (!rec) fetchProblem = `Identificador não encontrado em ${src.id}.`;
         } catch (err) {
-          if (err?.code === "rate_budget") fetchProblem = `Consulta a ${src.id} adiada pelo limite de ${src.rateLimitPerMinute ?? "?"}/min: reexecutar para continuar.`;
-          else {
-            if (err?.status === 429) blocked.add(src.id);
+          if (err?.code === "rate_budget") (fetchProblem = `Consulta a ${src.id} adiada pelo limite de ${src.rateLimitPerMinute ?? "?"}/min: reexecutar para continuar.`), (lookup = { status: "deferred", source: src.id, cause: "budget" });
+          else if (err?.status === 429) {
+            blocked.add(src.id);
+            fetchProblem = `Consulta a ${src.id} adiada: a fonte respondeu HTTP 429 (limite de requisições); reexecutar depois.`;
+            lookup = { status: "deferred", source: src.id, cause: "http_429" };
+          } else {
             fetchProblem = `Consulta a ${src.id} falhou (${err?.status ?? err?.code ?? "erro"}): pendente.`;
+            lookup = { status: "failed", source: src.id, cause: String(err?.status ?? err?.code ?? "erro") };
           }
         }
       }
@@ -95,7 +104,7 @@ export async function runRound({ config: raw, municipalities, candidates, fetche
       key: est.key, provisional: est.provisional, country: est.country, registrationId: est.registrationId, names: est.names,
       municipality: munName ?? null, registry, distance: d, assessment: a, status: c.status, reasons: c.reasons, checks: c.checks,
       siblings, sizeHint: est.hints?.size ?? registry?.size ?? "unknown", segment: est.hints?.segment ?? null, pending,
-      intake: [...new Set(est.sources.map((x) => x.mode).filter(Boolean))], conciliatedFrom: est.conciliatedFrom ?? [],
+      intake: [...new Set(est.sources.map((x) => x.mode).filter(Boolean))], conciliatedFrom: est.conciliatedFrom ?? [], lookup,
     };
     const fp = fingerprint({ input: est, registry: registry && { ...registry, fetchedAt: undefined }, status: result.status, pending });
     counters[!old ? "created" : old.fingerprint === fp ? "unchanged" : "updated"]++;
@@ -106,5 +115,7 @@ export async function runRound({ config: raw, municipalities, candidates, fetche
   const sizeRank = (s) => { const i = config.priorities.size.indexOf(s); return i < 0 ? 99 : i; };
   const segRank = (s) => { const i = config.priorities.segments.indexOf(s); return i < 0 ? 99 : i; };
   results.sort((x, y) => PRIORITY[x.status] - PRIORITY[y.status] || sizeRank(x.sizeHint) - sizeRank(y.sizeHint) || segRank(x.segment) - segRank(y.segment) || (x.distance.km ?? 1e9) - (y.distance.km ?? 1e9));
-  return { ok: true, config, origin, results, exceptions: results.filter((r) => r.status === "exception"), review: results.filter((r) => r.status === "exception" || r.checks?.length), counters, state: next };
+  // Contagem das consultas pela situação estruturada de cada estabelecimento (consistente com as pendências).
+  const lookups = Object.fromEntries(["fetched", "cached", "deferred", "failed", "not_found", "unavailable", "not_applicable"].map((k) => [k, results.filter((r) => r.lookup.status === k).length]));
+  return { ok: true, config, origin, results, lookups, exceptions: results.filter((r) => r.status === "exception"), review: results.filter((r) => r.status === "exception" || r.checks?.length), counters, state: next };
 }

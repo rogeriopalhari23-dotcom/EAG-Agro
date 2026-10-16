@@ -246,3 +246,36 @@ test("Rodada internacional pelo painel: sem conjunto de municípios nem fonte ca
   const p = await ctx.api("/api/rounds", "POST", { name: "Piloto como configuração", config: pilot });
   assert.ok(p.data.preflight.items.some((x) => x.area === "fonte casadosdados" && x.level === "unsupported" && /pago/.test(x.message)));
 });
+
+test("Resumo × estabelecimentos: consultas limitadas pela fonte (HTTP 429) contam como adiadas, igual às do limite interno", async (t) => {
+  const ctx = setup();
+  t.after(ctx.close);
+  const realFetch = globalThis.fetch;
+  let calls = 0;
+  // 1ª consulta ok, 2ª responde 429 (como em produção em 16/10/2026); depois disso a fonte não é mais chamada.
+  globalThis.fetch = async (url) => {
+    const m = /publica\.cnpj\.ws\/cnpj\/(\d{14})/.exec(String(url));
+    if (!m) throw new Error(`rede inesperada: ${url}`);
+    calls++;
+    if (calls === 2) return new Response("{}", { status: 429 });
+    return Response.json({ razao_social: "X", estabelecimento: { situacao_cadastral: "Ativa", cidade: { nome: "Rio Verde" }, estado: { sigla: "GO" } } });
+  };
+  t.after(() => (globalThis.fetch = realFetch));
+  const id = (await ctx.api("/api/rounds", "POST", { name: "429", config: { ...CONFIG, sources: [{ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3 }] } })).data.id;
+  const base = `/api/rounds/${id}`;
+  const csv = ["cnpj;nome;municipio;uf", ...[1, 2, 3, 4, 5].map((i) => `${String(i).repeat(8)}000191;Empresa ${i};Rio Verde;GO`)].join("\n");
+  await ctx.api(`${base}/candidates`, "POST", { intake: "import", source: "import-file", format: "csv", text: csv });
+  await ctx.api(`${base}/preflight-ack`, "POST", { revision: 1 });
+  const s = (await ctx.api(`${base}/run`, "POST", {})).data;
+  assert.equal(calls, 2, "depois do 429 a fonte não é chamada de novo");
+  const results = (await ctx.api(base)).data.results;
+  const adiadas = results.filter((r) => r.lookup?.status === "deferred");
+  assert.equal(adiadas.length, 4, "1 com 429 + 3 bloqueadas depois dele");
+  assert.equal(s.deferred, adiadas.length, "o resumo conta o mesmo que os estabelecimentos");
+  assert.equal(s.lookups.deferred, adiadas.length);
+  assert.equal(s.lookups.fetched, 1);
+  assert.deepEqual(adiadas.map((r) => r.lookup.cause).sort(), ["blocked_after_429", "blocked_after_429", "blocked_after_429", "http_429"]);
+  for (const r of adiadas) assert.ok(r.pending.some((p) => /adiada/.test(p)), r.names[0]);
+  assert.equal(results.filter((r) => r.pending.some((p) => /adiada/.test(p))).length, s.deferred, "nenhuma pendência de limite fora da contagem");
+  assert.equal(s.lookups.failed, 0, "429 não é contado como falha");
+});

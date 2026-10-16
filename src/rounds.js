@@ -274,8 +274,9 @@ export async function executeRound(request, env, actor, rid, id, deps = {}) {
   for (const k of prevRows.map((x) => x.est_key).filter((k) => !keys.has(k))) stmts.push(s(env, "DELETE FROM round_establishments WHERE round_id=? AND est_key=?", id, k));
   for (const c of calls) stmts.push(s(env, "INSERT INTO round_source_calls(id,round_id,source_id,called_at,outcome) VALUES (?,?,?,?,?)", crypto.randomUUID(), id, c.source, at, c.outcome));
   for (const group of chunks(stmts)) await commit(env, group);
-  const deferred = run.results.filter((x) => x.pending.some((p) => /adiada pelo limite/.test(p))).length;
-  const summary = { at, counters: run.counters, total: run.results.length, exceptions: run.exceptions.length, review: run.review.length, byStatus: Object.fromEntries([...new Set(run.results.map((x) => x.status))].map((st) => [st, run.results.filter((x) => x.status === st).length])), sourceCalls: calls.length, deferred };
+  // Adiadas = limite interno, HTTP 429 ou fonte bloqueada após 429 (situação estruturada de cada estabelecimento).
+  const deferred = run.lookups.deferred;
+  const summary = { at, counters: run.counters, total: run.results.length, exceptions: run.exceptions.length, review: run.review.length, byStatus: Object.fromEntries([...new Set(run.results.map((x) => x.status))].map((st) => [st, run.results.filter((x) => x.status === st).length])), sourceCalls: calls.length, deferred, lookups: run.lookups };
   await commit(env, [
     s(env, "UPDATE discovery_rounds SET last_run_at=?,last_run_json=?,status=CASE WHEN status='draft' THEN 'active' ELSE status END,updated_at=? WHERE id=?", at, JSON.stringify(summary), at, id),
     auditStatement(env, actor, rid, "round.executed", "discovery_round", id, summary),

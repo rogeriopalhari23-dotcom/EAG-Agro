@@ -4296,7 +4296,7 @@ async function showRound(id) {
         { class: "toolbar" },
         button("Executar rodada", async () => {
           const s = await api(`${base}/run`, "POST", {});
-          notice(`Rodada executada: ${s.total} estabelecimentos (novos ${s.counters.created}, alterados ${s.counters.updated}, sem mudança ${s.counters.unchanged}); ${s.review} para revisar${s.deferred ? `; ${s.deferred} consulta(s) adiada(s) pelo limite da fonte: execute de novo em 1 minuto` : ""}.`);
+          notice(`Rodada executada: ${s.total} estabelecimentos (novos ${s.counters.created}, alterados ${s.counters.updated}, sem mudança ${s.counters.unchanged}); ${s.review} para revisar${s.deferred ? `; ${s.deferred} consulta(s) adiada(s) por limite de requisições (interno ou da fonte): execute de novo em 1 a 2 minutos` : ""}${s.lookups?.failed ? `; ${s.lookups.failed} consulta(s) com falha` : ""}.`);
           await showRound(id);
         }, true),
       ),
