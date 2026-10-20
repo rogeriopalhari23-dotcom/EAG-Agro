@@ -3126,3 +3126,32 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Campanhas: 3 `draft` + 1 `ended`. A contagem de 16/10 era 2 `draft` + 1 `ended`; esta publicação e as conferências não criaram campanha (só leitura).
 - **Ponte:** leitura bem-sucedida às 17:45:06 UTC, depois da publicação.
 - **Incidente de exposição, sem efeito em dados:** ao renovar a sessão com `cloudflared access login`, o token do Access (aplicação do Compass, validade de 24 h) apareceu na saída do terminal desta sessão de trabalho. Não foi gravado em Git, documento ou serviço externo; o arquivo temporário foi apagado. Recomendação: revogar as sessões do Access do Compass no painel Zero Trust.
+
+## Contenção do token do Access exposto e origem da campanha adicional (2026-10-20, autorizadas por Rogério)
+
+- **Revogação (mecanismo oficial):**
+  - `POST /accounts/…/access/apps/5c5864c5-9233-4c2a-9c6f-cd0e8ff3c574/revoke_tokens` (aplicação "EAG Compass", a da política `d73f5c77` que emitiu o token);
+  - 2026-10-20T17:49:43Z, resposta 202.
+  - **Não alterados:** a aplicação da ponte (`3213e655…`, token de serviço `eag-compass-ponte-windows`), as políticas, as credenciais e as aplicações de descadastro e do Workers.
+- **Conferência:**
+  - token antigo em cache → 302 em `/api/session` (antes: 200);
+  - acesso renovado com a saída descartada (nenhum token, cookie ou cabeçalho exibido) → novo token 200;
+  - ponte: leituras bem-sucedidas às 17:49:52Z e 17:51:06Z, depois da revogação (consulta `SELECT` em `reply_reader_state`).
+- **Registro privado** (fora do Git):
+  - entrada 2 em `C:\Users\Roger\eag-compass-registros\incidentes\REGISTRO-INCIDENTES.md`, classificação **pendente de avaliação**, sem o token e sem presumir acesso indevido;
+  - índice linha 2, SHA-256 `956c59c0…8914`.
+  - Lacunas registradas: a transcrição local da sessão contém o texto do token, agora revogado; os logs do Access de 17:44Z a 17:49Z não foram revisados.
+- **Campanha adicional (investigação só de leitura, `SELECT` em `campaigns` e `audit_log`):**
+  - **Campanha:** `ae80e57a-02de-437e-b215-2d883ef3f77b`, "Coffee not roasted or decaffeinated, in grain · Estados Unidos", internacional, `draft`, versão 1, produto `product-05`, criada em 2026-10-16T18:05:18.590Z por `user-rogerio-palhari`, sem alteração depois.
+  - **Histórico:**
+    - 18:04:33Z `country_analysis.created` (EUA, 12 meses, MDIC 2026-09), requisição `ca2269c5…`;
+    - 18:05:18Z `commodity_selection.created` e `campaign.created` na **mesma requisição** `6a97710a…`, café em grão HS 090111, `needsCommercialValidation: true`.
+  - **Evidência:**
+    - a campanha nasceu da rota de seleção de commodity do Radar Internacional (`src/selections.js` cria uma campanha `draft` por item selecionado, R12.8);
+    - o canal declarado é `panel` (o cabeçalho que o cliente web `public/app.js` envia em toda chamada) e a identidade autenticada é a sessão do Access de Rogério;
+    - nenhuma chamada desta sessão de trabalho do Claude foi a produção entre 17:58 e 18:08 de 16/10 (todas locais, na prévia); nenhuma outra sessão do Claude registrada nesse intervalo;
+    - nenhum script do repositório chama `/selections`.
+  - **Inferência, não comprovada:** ação manual pelo painel, no navegador com a sessão de Rogério (o Edge havia sido aberto em produção para ele naquela tarde). O canal `panel` é declarado pelo cliente e não prova clique humano.
+  - Não é teste fictício (nome real de commodity e país; sem "TESTE").
+  - A campanha não foi alterada, encerrada nem excluída.
+- **Não feito:** nova publicação; nenhuma alteração em fichas, T11, canais, campanhas ou envios.
