@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-20T17:46:03.674Z",
+  "updatedAt": "2026-10-20T18:53:54.315Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -890,6 +890,29 @@
       "validation": "npm run check 507+2+37 (inclui tests/painel-redesign.test.mjs); npm run test:ui (Playwright 1.63.0 externo + Chrome do sistema) passou; tests/ui-rodadas.mjs passou pelo assistente; validate-deploy",
       "evidence": "docs/implementation/redesign/MATRIZ-PRESERVACAO.md",
       "blockedBy": "Publicado em 2026-10-20 com autorização de Rogério: Worker 5c993fec-0c67-47b6-b59a-56250a6d6d72 (commits c3fe727, 683e6db), sem migração; reversão: wrangler rollback 23b985fd-3dbc-4a6b-9cfc-e48a90418da3. Conferência em produção só leitura em EVIDENCIAS.md."
+    },
+    {
+      "id": "RODADAS-SIMPLIFICACAO",
+      "title": "Rodadas: origem sem código/coordenada digitados, produto preso à commodity, segmentos por commodity e tela por seções",
+      "status": "implemented",
+      "dependsOn": [
+        "RODADAS-FLUXO-GERAL",
+        "REDESIGN-INTERFACE"
+      ],
+      "plan": "docs/implementation/rodadas/FLUXO-RODADAS.md",
+      "section": "Capacidades (2026-10-20)",
+      "read": [
+        "src/rounds.js",
+        "src/rodada/config.js",
+        "src/rodada/segments.js",
+        "public/app.js",
+        "tests/rodada-origem-produto.test.mjs",
+        "tests/ui-rodadas.mjs"
+      ],
+      "acceptance": "Sem Código IBGE, latitude ou longitude na tela; cidade escolhida na base oficial com estado (homônimos recusados sem estado); fora do Brasil sem fonte, limitação explicada sem pedir coordenada; produto do cadastro só da commodity da rodada (servidor recusa outro); segmentos sugeridos por commodity sem herança; tela com resumo e seções; mesmos bloqueios.",
+      "validation": "npm run check 513+2+37; tests/ui-rodadas.mjs; npm run test:ui; roteiro da prévia local (café Guaxupé/MG 150 km, 15 conferências)",
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Não publicado: aguarda avaliação de Rogério na prévia. Depois da publicação, a rodada real 'cafe' (16261787…) precisa ser corrigida por Rogério em 'Editar configuração' (commodity Café/product-05, Guaxupé/MG, segmento), gerando revisão 2 com nova ciência."
     }
   ]
 }

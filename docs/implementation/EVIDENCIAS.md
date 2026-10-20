@@ -3200,3 +3200,51 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - **Campanha adicional: identificada; autoria não comprovada.**
     - Comprovados: identificador, nome, criação em 16/10 às 18:05:18Z pela rota de seleção do Radar Internacional, sessão do Access de Rogério e canal declarado `panel`, sem alterações depois.
     - **Não comprovado:** clique humano. O canal é declarado pelo cliente. A inferência de ação manual de Rogério no painel depende da confirmação dele.
+
+## Rodadas: origem sem campos técnicos, produto preso à commodity e tela por seções (2026-10-20, na branch, não publicado)
+
+- **Investigação da rodada "cafe" em produção (só leitura, `SELECT`):**
+  - rodada `16261787-3226-4140-8969-bda16e303cac`, criada por `user-rogerio-palhari` pelo painel em 2026-10-20T18:28:36Z;
+  - `draft`, revisão 1, sem ciência, sem execução;
+  - 0 candidatas, 0 decisões, 0 cadastros.
+  - Configuração gravada: commodity digitada livremente como `cafe` (o catálogo usa `coffee`, produto `product-05`), cidade `guaxupé` sem código IBGE, nenhum segmento e as três fontes do modelo.
+- **Causa do "Produto: Soja GMO":** o seletor do cadastro listava o catálogo inteiro e mostrava o primeiro item (`product-01`), sem relação com a rodada. Nada foi cadastrado com ele.
+- **Correção proposta para a rodada real, não aplicada:** depois da publicação, em "Editar configuração":
+  - escolher Café e o produto `product-05`, e Guaxupé/MG na lista;
+  - escolher o segmento torrefação ou outro segmento comprador.
+  - Isso gera a revisão 2, que exige nova ciência; nenhum registro é alterado retroativamente.
+- **Implementado** (branch `redesign-interface`):
+  - **Origem:**
+    - campos Código IBGE, Latitude e Longitude retirados da tela;
+    - país pelo nome (lista pesquisável; o Brasil foi incluído porque a tabela de países é a de importadores), estado e cidade com busca na base oficial;
+    - no Brasil, o servidor resolve e grava código IBGE, nome e UF oficiais;
+    - homônimo sem estado recusado (`origin_ambiguous` com as UFs); código e estado divergentes recusados (`origin_mismatch`);
+    - fora do Brasil sem coordenada, a rodada é salva com geografia "sem suporte", e área e execução são recusadas com explicação simples; coordenada de versão anterior é preservada.
+  - **Produto:**
+    - `commodity.productId` na configuração, conferido na criação e na edição;
+    - o cadastro recusa produto de outra commodity ou diferente do configurado (`product_mismatch`);
+    - o painel mostra só produtos da commodity (fixo quando definido) e, sem correspondência no catálogo, pede a definição antes do cadastro.
+  - **Segmentos:**
+    - sugestões por commodity iguais às configurações de exemplo (milho, soja, sorgo, café: torrefação);
+    - trocar de commodity retira os segmentos sugeridos da anterior;
+    - fontes que dependem de regra mostram quando nenhum segmento a tem;
+    - sem segmento, o assistente explica e permite segmento nomeado sem regra.
+  - **Tela da rodada:**
+    - resumo com objetivo, commodity e produto, área, etapa atual, resultados, pendências e próxima ação;
+    - seções Configuração → Buscar/importar → Conferir → Cadastrar, e "Anotações e detalhes técnicos";
+    - limitações em linguagem de uso, com o texto técnico na expansão;
+    - mesmos formulários, confirmações e bloqueios (ciência, triagem, decisões, cadastro em partes).
+- **Verificações** (dados fictícios):
+  - `npm run check`: 513 + 2 + 37, 0 falhas, com `tests/rodada-origem-produto.test.mjs` (6 testes) e `rodadas-worker` atualizado à regra nova;
+  - `tests/ui-rodadas.mjs` passou pelas seções;
+  - `npm run test:ui` passou (Playwright 1.63.0 externo);
+  - roteiro na prévia local: café em Guaxupé/MG, 150 km, com 209 municípios (MG e SP), em 15 conferências OK:
+    - sem campos técnicos;
+    - café sem herdar soja;
+    - segmentos sem ração;
+    - troca café ↔ soja;
+    - edição e reabertura;
+    - local internacional sem suporte;
+    - celular sem rolagem horizontal;
+    - sem erro de JavaScript.
+- **Não feito:** publicação, migração remota (não há migração nova), alteração de registros ou liberações de produção.

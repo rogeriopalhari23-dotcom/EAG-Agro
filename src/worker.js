@@ -205,6 +205,9 @@ async function route(request, env, rid) {
   // Rodadas de descoberta e qualificação (fluxo geral, configurado por rodada).
   if (path === "/api/rounds" && method === "GET") return response(await rounds.listRounds(env, actor));
   if (path === "/api/rounds" && method === "POST") return response(await rounds.createRound(request, env, actor, rid), 201);
+  if (path === "/api/round-catalog" && method === "GET") return response(rounds.roundCatalog());
+  if (path === "/api/geo/regions" && method === "GET") return response(await rounds.geoRegions(request, env));
+  if (path === "/api/geo/municipalities" && method === "GET") return response(await rounds.geoMunicipalities(request, env));
   const rnd = path.match(/^\/api\/rounds\/([0-9a-f-]{36})(?:\/(area|osm-query|preflight-ack|candidates|run|decisions|register|export|annotations))?$/);
   if (rnd) {
     const [, rid2, sub] = rnd;

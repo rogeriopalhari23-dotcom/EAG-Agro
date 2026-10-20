@@ -86,22 +86,36 @@ try {
   await click("Rodadas");
   await until(`/Nova rodada/.test(document.body.innerText)`, "tela Rodadas");
 
-  // Criar: Sorgo, origem Uberlândia/MG (fora do piloto), 200 km, proporcional 10%.
+  // Criar pelo formulário em 4 passos (2026-10-20): commodity e produto do catálogo, país pelo nome, estado e cidade
+  // escolhidos (sem código IBGE nem coordenada), raio; segmentos e fontes no passo 3; revisar e criar.
+  const fset = (n, v, ev = "change") => js(`(() => { const c = document.querySelector('.round-form [name="${n}"]'); c.value = ${JSON.stringify(v)}; c.dispatchEvent(new Event("input", { bubbles: true })); c.dispatchEvent(new Event("${ev}", { bubbles: true })); return true; })()`);
+  const next = () => js(`(() => { [...document.querySelectorAll(".round-form button")].find((b) => b.textContent === "Continuar" && !b.hidden).click(); return true; })()`);
+  const stepIs = (label) => until(`/${label}/.test(document.querySelector(".round-form .wizard-steps .current").textContent)`, label);
+  await js(`(() => { const d = [...document.querySelectorAll("details")].find((x) => x.querySelector("summary").textContent === "Nova rodada"); d.open = true; return true; })()`);
+  assert.ok(!/Código IBGE|Latitude|Longitude/.test(await js(`document.querySelector(".round-form").innerText`)), "sem campos técnicos de localização");
+  await fset("name", "Soja Rio Verde (teste de tela)");
+  await fset("code", "soy");
+  await fset("configProductId", "product-01");
+  // Enviar no passo 1 só avança (nunca cria antes da revisão).
+  await js(`document.querySelector(".round-form").requestSubmit()`);
+  await stepIs("Local e alcance");
+  await until(`document.querySelector('.round-form [name="countryName"]').value === "Brasil"`, "país pelo nome");
+  await fset("region", "GO");
+  await fset("municipality", "Rio Verde", "input");
+  await fset("radius", "150");
+  await next();
+  await stepIs("Fontes e limites");
+  await until(`/Segmentos compradores de Soja/.test(document.querySelector(".round-form").innerText)`, "segmentos da soja");
   await js(`(() => {
-    const d = [...document.querySelectorAll("details")].find((x) => x.querySelector("summary").textContent === "Nova rodada"); d.open = true;
-    const f = d.querySelector("form"); const set = (n, v) => { f.querySelector('[name="' + n + '"]').value = v; };
-    set("name", "Soja Rio Verde (teste de tela)"); set("code", "soy"); set("clabel", "soja"); set("region", "GO"); set("municipality", "Rio Verde");
-    set("radius", "150"); set("scope", "br_email_automatic");
-    const adv = JSON.parse(f.querySelector('[name="advanced"]').value);
+    const t = document.querySelector('.round-form [name="advanced"]'); const adv = JSON.parse(t.value);
     adv.segments = { feed_mill: { label: "fábrica de ração", discovery: { sipeagro: { activity: ["FABRICANTE"] } } }, crusher: { label: "esmagadora" } };
-    f.querySelector('[name="advanced"]').value = JSON.stringify(adv);
-    // Assistente em 4 passos (redesign 2026-10): enviar antes da revisão só avança o passo.
-    f.requestSubmit();
-    if (f.querySelector('[name=code]').closest("fieldset").hidden !== true) throw new Error("enviar no passo 1 não pode criar a rodada");
-    const next = [...f.querySelectorAll("button")].find((b) => b.textContent === "Continuar");
-    next.click(); next.click();
-    if (!/Revisar e criar/.test(f.querySelector(".wizard-steps .current").textContent)) throw new Error("revisão não alcançada");
-    f.requestSubmit(); return true; })()`);
+    adv.sources = [{ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 }, { id: "osm-overpass", kind: "discovery" }, { id: "mapa-sipeagro", kind: "discovery" }];
+    t.value = JSON.stringify(adv); t.dispatchEvent(new Event("change")); return true; })()`);
+  await fset("scope", "br_email_automatic");
+  await next();
+  await stepIs("Revisar e salvar");
+  assert.match(await js(`document.querySelector(".round-form").innerText`), /Rio Verde\/GO/);
+  await js(`document.querySelector(".round-form").requestSubmit()`);
   await until(`/Antes de executar/.test(document.body.innerText)`, "rodada criada");
   await until(`/Municípios/.test(document.body.innerText) && !/Calculando a área/.test(document.body.innerText)`, "área calculada");
   const areaText = await js(`document.body.innerText`);
@@ -113,9 +127,13 @@ try {
   await click("Executar rodada");
   await until(`/ciência/.test(document.getElementById("notice").innerText)`, "recusa sem ciência");
   await click("Registrar ciência das limitações");
+  // Com a ciência registrada, a rodada passa para a seção Buscar/importar; o registro fica na seção Configuração.
+  await until(`document.querySelector('.round-tabs [data-tab="buscar"]')?.getAttribute("aria-selected") === "true"`, "próxima seção");
+  await js(`document.querySelector('.round-tabs [data-tab="config"]').click()`);
   await until(`/Ciência registrada por/.test(document.body.innerText)`, "ciência registrada");
 
-  // Importação de CSV pelo seletor de arquivo.
+  // Importação de CSV pelo seletor de arquivo (seção Buscar/importar).
+  await js(`document.querySelector('.round-tabs [data-tab="buscar"]').click()`);
   const doc = await send("DOM.getDocument", {});
   const q = await send("DOM.querySelector", { nodeId: doc.result.root.nodeId, selector: 'input[type="file"]' });
   await send("DOM.setFileInputFiles", { nodeId: q.result.nodeId, files: [csvPath] });
@@ -139,7 +157,8 @@ try {
   assert.match(afterRun, /Ômega Grãos/, "exceção (CNPJ não encontrado) aparece para revisão");
   assert.match(afterRun, /ESTIMADA/);
 
-  // Decisão em lote: mostrar todos, selecionar Alfa e aceitar.
+  // Decisão em lote: mostrar todos, selecionar Alfa e aceitar (seção Conferir).
+  await js(`document.querySelector('.round-tabs [data-tab="conferir"]').click()`);
   await js(`(() => { const s = document.querySelector('select[name="filter"]'); s.value = "all"; s.dispatchEvent(new Event("change")); return true; })()`);
   await js(`(() => { document.querySelector('input[aria-label="Selecionar Alfa Esmagadora"]').click(); return true; })()`);
   await js(`(() => { document.querySelector('select[name="decision"]').value = "accept"; return true; })()`);
@@ -147,8 +166,10 @@ try {
   await until(`/1 decisão\\(ões\\) registrada\\(s\\) por/.test(document.getElementById("notice").innerText)`, "decisão em lote");
   await until(`/Decisão: Aceita para cadastro por/.test(document.body.innerText)`, "decisão visível com responsável e data");
 
-  // Cadastro em descoberta com produto escolhido.
-  await js(`(() => { document.querySelector('select[name="productId"]').value = "product-01"; return true; })()`);
+  // Cadastro em descoberta: o produto vem da configuração (fixo) e o servidor recusa produto de outra commodity.
+  await js(`document.querySelector('.round-tabs [data-tab="cadastrar"]').click()`);
+  assert.equal(await js(`document.querySelector('select[name="productId"]').value`), "product-01");
+  assert.equal(await js(`document.querySelector('select[name="productId"]').disabled`), true, "produto preso à configuração");
   await click("Cadastrar no Compass");
   await until(`/Cadastro \\(descoberta\\)/.test(document.getElementById("notice").innerText)`, "cadastro");
   const reg = await noticeText();

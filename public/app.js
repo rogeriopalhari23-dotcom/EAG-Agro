@@ -311,7 +311,7 @@ async function home() {
   // 1. Em andamento: a rodada mais recente não encerrada, com continuidade, e o estado do canal ao lado.
   const roundList = rounds?.items ?? [];
   const current = roundList.find((r) => r.status !== "closed");
-  const where = (o) => (o?.municipality ? `${o.municipality}/${o.region ?? ""}` : o ? `${o.lat ?? "?"}, ${o.lon ?? "?"}` : "—");
+  const where = (o) => (o?.municipality ? `${o.municipality}/${o.region ?? ""}` : o ? o.label ?? (typeof o.lat === "number" ? "coordenada registrada" : "sem localização") : "—");
   const roundCard = current
     ? el(
         "div",
@@ -4314,6 +4314,35 @@ const DECISION_LABEL = { accept: "Aceita para cadastro", include: "Exceção inc
 const PROOF_LABEL = { proved: "comprovado", indication: "indício", none: "sem evidência" };
 const tag = (label, cls = "") => text("span", label, `tag ${cls}`.trim());
 
+// Limitações da rodada em linguagem de uso. O texto técnico do servidor continua disponível na expansão.
+function plainArea(area) {
+  const src = /^fonte (.+)$/.exec(area);
+  if (src) return sourceName(src[1]);
+  const seg = /^segmentos × (.+)$/.exec(area);
+  if (seg) return `Segmentos em ${sourceName(seg[1])}`;
+  return { geografia: "Localização e área", "proximidade do limite": "Perto do limite do raio", identificador: "Identificação das empresas", "descoberta automática": "Busca automática", "cadastro oficial": "Dados cadastrais oficiais", "prova de uso e compra": "Prova de uso e compra", "triagem de sanções": "Triagem de sanções" }[area] ?? area;
+}
+function plainMessage(x) {
+  const src = /^fonte (.+)$/.exec(x.area);
+  if (src) return x.level === "unsupported" ? `Não será usada: ${x.message.replace(/^[^:]*:\s*/, "")}` : SOURCE_PLAIN[src[1]]?.[1] ?? x.message;
+  const seg = /^segmentos × (.+)$/.exec(x.area);
+  if (seg) {
+    if (x.level === "unsupported") return `Nenhum segmento escolhido: ${sourceName(seg[1])} não sabe o que procurar.`;
+    if (x.level === "partial") return `Alguns segmentos não têm regra de busca nesta fonte; eles ficam só com arquivo e pesquisa manual.`;
+    return `Todos os segmentos têm regra de busca nesta fonte.`;
+  }
+  const M = {
+    geografia: { supported: "A área é calculada pelos municípios oficiais a partir da cidade de origem e do raio.", partial: "Sem base de municípios deste país: a distância só é calculada quando a candidata tem coordenada da unidade.", unsupported: "Sem localização confirmada da cidade de origem neste país: a área e as distâncias não são calculadas." },
+    identificador: { supported: "Empresas identificadas pelo CNPJ (unidade e matriz).", partial: "Sem regra de identificador para este país: duplicidades precisam de conferência." },
+    "descoberta automática": { partial: "Há busca automática; o resultado é indício e precisa de conferência.", unsupported: "Sem busca automática utilizável: candidatas só por arquivo ou pesquisa manual." },
+    "cadastro oficial": { supported: "Situação, atividade e endereço vêm da Receita Federal.", unsupported: "Sem fonte cadastral neste país: situação e endereço ficam pendentes." },
+    "prova de uso e compra": { partial: "Uso e compra só são comprovados por fonte da própria empresa ou registro oficial; o resto é indício." },
+    "triagem de sanções": { partial: "A triagem de sanções é feita depois do cadastro; o que depende dela continua bloqueado até ela existir e estar válida." },
+    "proximidade do limite": { supported: "Empresas perto do limite do raio pedem conferência da localização; ninguém é excluído por isso." },
+  };
+  return M[x.area]?.[x.level] ?? x.message;
+}
+
 function roundConfigTemplate() {
   return {
     id: "nova-rodada",
@@ -4323,195 +4352,432 @@ function roundConfigTemplate() {
     radius: { value: 150, unit: "km", method: "haversine" },
     nearLimit: { fraction: 0.1 },
     priorities: { size: [], segments: [] },
-    sources: [
-      { id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 },
-      { id: "osm-overpass", kind: "discovery" },
-      { id: "mapa-sipeagro", kind: "discovery" },
-    ],
+    // Fontes escolhidas no passo 3 conforme os segmentos; a Receita entra por padrão no Brasil.
+    sources: [{ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 }],
     evidence: { confirming: ["own_source", "official_record"] },
     locale: { language: "pt-BR", timezone: "America/Sao_Paulo" },
     compliance: { scope: "br_email_automatic" },
   };
 }
 
-// Campos principais em formulário; segmentos, fontes e prioridades no bloco avançado (JSON).
-function roundConfigForm(initial, roundName, onSubmit, label) {
-  const c = initial;
-  const f = {
-    name: input("Nome da rodada", "name", "text", roundName ?? ""),
-    code: input("Commodity (código)", "code", "text", c.commodity?.code ?? ""),
-    clabel: input("Commodity (nome no relatório)", "clabel", "text", c.commodity?.label ?? "", false),
-    variety: input("Variedade ou especificação (ex.: GMO)", "variety", "text", c.commodity?.variety ?? "", false),
-    country: input("País (ISO, 2 letras)", "country", "text", c.origin?.country ?? "BR"),
-    region: input("UF / região", "region", "text", c.origin?.region ?? "", false),
-    municipality: input("Município de origem", "municipality", "text", c.origin?.municipality ?? "", false),
-    code7: input("Código IBGE (opcional)", "municipalityCode", "text", c.origin?.municipalityCode ?? "", false),
-    lat: input("Latitude (fora do Brasil)", "lat", "text", c.origin?.lat ?? "", false),
-    lon: input("Longitude (fora do Brasil)", "lon", "text", c.origin?.lon ?? "", false),
-    radius: input("Raio", "radius", "number", c.radius?.value ?? 150),
-    unit: select("Unidade", "unit", [["km", "km"], ["mi", "milhas"]], c.radius?.unit ?? "km"),
-    nearKind: select("Perto do limite", "nearKind", [["fraction", "Proporcional ao raio (%)"], ["distance", "Margem fixa (na unidade do raio)"]], c.nearLimit?.distance != null ? "distance" : "fraction"),
-    nearValue: input("Valor (% do raio ou margem)", "nearValue", "number", c.nearLimit?.distance ?? Math.round((c.nearLimit?.fraction ?? 0.1) * 100)),
-    language: input("Idioma", "language", "text", c.locale?.language ?? "pt-BR"),
-    timezone: input("Fuso", "timezone", "text", c.locale?.timezone ?? "America/Sao_Paulo"),
-    scope: input("Escopo de compliance", "scope", "text", c.compliance?.scope ?? ""),
-    research: select("Pesquisa pública", "researchPhase", [["open", "Aberta"], ["closed", "Encerrada: desconhecidos viram pendência de contato futuro"]], c.research?.publicPhase ?? "open"),
-  };
-  const advanced = input(
-    "Especificação, segmentos (com regras de descoberta), fontes, prioridades e perfil do comprador (JSON)",
-    "advanced",
-    "textarea",
-    JSON.stringify({ spec: c.commodity?.spec, segments: c.commodity?.segments ?? {}, nameHints: c.commodity?.nameHints ?? [], restrictionHints: c.commodity?.restrictionHints ?? [], buyer: c.buyer, sources: c.sources, priorities: c.priorities, evidence: c.evidence }, null, 2),
-  );
-  advanced.control.rows = 14;
-  advanced.control.maxLength = 20000;
-  return makeForm(
-    [
-      { group: "Rodada e commodity", fields: [f.name, f.code, f.clabel, f.variety] },
-      { group: "Origem", hint: "No Brasil, qualquer município do IBGE (nome + UF, ou o código). Fora do Brasil, informe a coordenada.", fields: [f.country, f.region, f.municipality, f.code7, f.lat, f.lon] },
-      { group: "Raio e proximidade do limite", hint: "A faixa perto do limite pede conferência da localização; não exclui ninguém.", fields: [f.radius, f.unit, f.nearKind, f.nearValue] },
-      { group: "Idioma, fuso e compliance", fields: [f.language, f.timezone, f.scope] },
-      { group: "Fase da pesquisa", hint: "Encerrada: nenhuma confirmação campo a campo; o que segue desconhecido vai para contato futuro.", fields: [f.research] },
-      { group: "Avançado", collapsed: true, fields: [advanced] },
-    ],
-    async (v) => {
-      let adv;
-      try {
-        adv = JSON.parse(v.advanced || "{}");
-      } catch {
-        throw new Error("O bloco avançado não é um JSON válido.");
-      }
-      const num = (x) => (x === "" || x == null ? undefined : Number(String(x).replace(",", ".")));
-      const origin = { country: v.country.trim().toUpperCase() };
-      if (v.region) origin.region = v.region.trim().toUpperCase();
-      if (v.municipality) origin.municipality = v.municipality.trim();
-      if (v.municipalityCode) origin.municipalityCode = v.municipalityCode.trim();
-      if (num(v.lat) != null && num(v.lon) != null) Object.assign(origin, { lat: num(v.lat), lon: num(v.lon) });
-      const slug = (v.name || "rodada").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-      const config = {
-        ...c,
-        id: c.id && c.id !== "nova-rodada" ? c.id : slug || "rodada",
-        commodity: { ...(c.commodity ?? {}), code: v.code.trim(), label: v.clabel.trim() || undefined, variety: v.variety.trim() || undefined, spec: adv.spec ?? c.commodity?.spec, segments: adv.segments ?? {}, nameHints: adv.nameHints ?? [], restrictionHints: adv.restrictionHints ?? [] },
-        buyer: adv.buyer ?? c.buyer,
-        sources: adv.sources ?? [],
-        priorities: adv.priorities ?? { size: [], segments: [] },
-        evidence: adv.evidence ?? c.evidence,
-        origin,
-        radius: { value: num(v.radius), unit: v.unit, method: "haversine" },
-        nearLimit: v.nearKind === "fraction" ? { fraction: num(v.nearValue) / 100 } : { distance: num(v.nearValue) },
-        locale: { language: v.language.trim(), timezone: v.timezone.trim() },
-        compliance: { ...(c.compliance ?? {}), scope: v.scope.trim() },
-        research: { ...(c.research ?? {}), publicPhase: v.researchPhase },
-      };
-      await onSubmit(v.name.trim(), config);
-    },
-    label,
-  );
+// Nomes de uso das commodities do catálogo (o código continua o do catálogo).
+const COMMODITY_PT = { soy: "Soja", corn: "Milho", coffee: "Café", sugar: "Açúcar", ethanol: "Etanol", industrial_alcohol: "Álcool industrial", wheat: "Trigo", sorghum: "Sorgo", soy_meal: "Farelo de soja", canola_meal: "Farelo de canola", cotton_meal: "Farelo de algodão", soy_oil: "Óleo de soja", canola_oil: "Óleo de canola", cotton_oil: "Óleo de algodão", palm_oil: "Óleo de palma", soy_lecithin: "Lecitina de soja", ddgs: "DDGS", cgf: "CGF", cgm: "CGM", uco: "UCO", cso: "CSO" };
+const commodityName = (code) => COMMODITY_PT[code] ?? code;
+function catalogCommodities() {
+  const map = new Map();
+  for (const p of state.products) if (p.active !== 0) (map.get(p.commodity) ?? map.set(p.commodity, []).get(p.commodity)).push(p);
+  return [...map.entries()].map(([code, products]) => ({ code, label: commodityName(code), products })).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 }
+const UF_NAMES = { AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará", DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás", MA: "Maranhão", MT: "Mato Grosso", MS: "Mato Grosso do Sul", MG: "Minas Gerais", PA: "Pará", PB: "Paraíba", PR: "Paraná", PE: "Pernambuco", PI: "Piauí", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte", RS: "Rio Grande do Sul", RO: "Rondônia", RR: "Roraima", SC: "Santa Catarina", SP: "São Paulo", SE: "Sergipe", TO: "Tocantins" };
+// Nomes de uso das fontes; o identificador técnico fica nos detalhes.
+const SOURCE_PLAIN = {
+  "br-cnpj-ws": ["Receita Federal (consulta por CNPJ)", "Completa situação, atividade, porte e endereço de quem já tem CNPJ. Não procura empresas pelo nome."],
+  "osm-overpass": ["Mapa colaborativo (OpenStreetMap)", "Procura estabelecimentos mapeados dentro do raio. Cobertura irregular; quase nunca traz CNPJ."],
+  "mapa-sipeagro": ["Registros do MAPA (arquivo público)", "Estabelecimentos registrados no Ministério da Agricultura, por atividade. CNPJ incompleto; não prova uso nem compra."],
+  "import-file": ["Arquivo de candidatas", "Lista própria em CSV ou JSON, com a fonte de cada linha."],
+  assisted: ["Pesquisa manual com fonte", "Você registra cada empresa com o endereço da página que comprova."],
+  casadosdados: ["Casa dos Dados (serviço pago)", "Não é usada sem autorização de despesa."],
+};
+const sourceName = (id) => SOURCE_PLAIN[id]?.[0] ?? id;
+async function roundCatalogData() {
+  return (state.roundCatalog ??= await api("/api/round-catalog"));
+}
+async function countriesData() {
+  // A tabela de países é a dos importadores (Brasil fica de fora por ser o exportador); a origem pode ser o Brasil.
+  if (!state.countries) {
+    const list = (await api("/api/countries")).items.filter((c) => c.iso2);
+    state.countries = list.some((c) => c.iso2 === "BR") ? list : [{ iso2: "BR", iso3: "BRA", name_pt: "Brasil", name_en: "Brazil" }, ...list];
+  }
+  return state.countries;
+}
+const slugKey = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
 
-// Assistente de criação em 4 passos sobre o MESMO formulário de configuração (mesmos campos, mesma validação e o mesmo
-// envio). Só reorganiza a apresentação; criar não executa: ciência das limitações e execução ficam na tela da rodada.
-const WIZARD_STEPS = [
-  ["Objetivo e commodity", ["Rodada e commodity"]],
-  ["Local e alcance", ["Origem", "Raio e proximidade do limite"]],
-  ["Fontes e limites", ["Idioma, fuso e compliance", "Fase da pesquisa", "Avançado"]],
-  ["Revisar e criar", []],
-];
-function wizardize(form) {
-  form.classList.add("wizard");
-  const groups = [...form.querySelectorAll(":scope > fieldset.group, :scope > details.group")];
-  const titleOf = (g) => (g.querySelector(":scope > legend, :scope > summary")?.textContent || "").trim();
-  const stepOf = (g) => WIZARD_STEPS.findIndex(([, t]) => t.includes(titleOf(g)));
-  const submitBar = form.querySelector(":scope > .toolbar");
-  const err = form.querySelector(":scope > p.error");
-  const advanced = form.querySelector('textarea[name="advanced"]');
-  const steps = el("ol", { class: "wizard-steps", "aria-label": "Passos da nova rodada" }, ...WIZARD_STEPS.map(([l], i) => el("li", {}, text("span", String(i + 1), "n"), text("span", l))));
-  const sources = el("div", { class: "panel-like" });
-  const review = el("div", { class: "review-grid", "aria-live": "polite" });
-  const back = el("button", { type: "button" }, "Voltar");
-  const next = el("button", { type: "button", class: "primary" }, "Continuar");
-  const nav = el("div", { class: "wizard-nav" }, back, next);
-  let cur = 0;
-  const parseAdv = () => {
+// Configuração da rodada em 4 passos (criação e edição usam o mesmo formulário): objetivo e commodity → local e alcance →
+// fontes e segmentos → revisar. Código IBGE e coordenadas não são digitados: no Brasil vêm do município escolhido na base
+// oficial; uma coordenada de versão anterior é preservada enquanto a origem não muda. O bloco técnico (JSON) guarda
+// segmentos com regras, fontes com limites, especificação, comprador, prioridades e evidência.
+function roundForm(initial, roundName, onSubmit, label) {
+  const c = structuredClone(initial);
+  const commodities = catalogCommodities();
+  const form = el("form", { class: "wizard round-form", novalidate: "" });
+  const error = el("p", { class: "error", hidden: "" });
+  const fail = (msg) => {
+    error.textContent = msg;
+    error.hidden = false;
+    error.scrollIntoView({ block: "nearest" });
+    return false;
+  };
+  const adv = (() => {
+    const f = input("Detalhes técnicos da configuração (JSON)", "advanced", "textarea", JSON.stringify({ spec: c.commodity?.spec, segments: c.commodity?.segments ?? {}, nameHints: c.commodity?.nameHints ?? [], restrictionHints: c.commodity?.restrictionHints ?? [], buyer: c.buyer, sources: c.sources ?? [], priorities: c.priorities, evidence: c.evidence }, null, 2), false);
+    f.control.rows = 14;
+    f.control.maxLength = 20000;
+    return f;
+  })();
+  const readAdv = () => {
     try {
-      return JSON.parse(advanced?.value || "{}");
+      return JSON.parse(adv.control.value || "{}");
     } catch {
       return null;
     }
   };
-  const renderSources = () => {
-    const adv = parseAdv();
-    sources.replaceChildren(
-      text("h3", "Fontes configuradas e limites"),
-      adv
-        ? el(
-            "ul",
-            { class: "plain-list" },
-            ...(adv.sources ?? []).map((x) => text("li", `${x.id} · ${x.kind ?? "tipo não informado"}${x.countries ? ` · ${x.countries.join(", ")}` : ""}${x.rateLimitPerMinute ? ` · até ${x.rateLimitPerMinute} consulta(s)/min` : ""}${x.maxAgeDays ? ` · reaproveita até ${x.maxAgeDays} dia(s)` : ""}`)),
-            (adv.sources ?? []).length ? null : text("li", "Nenhuma fonte: a rodada só recebe importação e pesquisa assistida."),
-          )
-        : text("p", "O bloco avançado não é um JSON válido; corrija antes de continuar.", "error"),
-      text("small", "Fontes, limites por minuto, validade do cache, segmentos e prioridades são editados no bloco Avançado abaixo. A cobertura real de cada fonte aparece na tela da rodada, antes de executar.", "muted"),
+  const writeAdv = (patch) => {
+    const a = readAdv() ?? {};
+    adv.control.value = JSON.stringify({ ...a, ...patch }, null, 2);
+  };
+
+  // ---------- Passo 1: objetivo e commodity ----------
+  const name = input("Nome da rodada", "name", "text", roundName ?? "");
+  const known = commodities.some((x) => x.code === c.commodity?.code);
+  const commodity = select("Commodity", "code", [["", "Escolha a commodity"], ...commodities.map((x) => [x.code, x.label]), ...(c.commodity?.code && !known ? [[c.commodity.code, `${c.commodity.code} (sem correspondência no catálogo)`]] : [])], c.commodity?.code ?? "");
+  const productSel = select("Produto do catálogo que esta rodada cadastra", "configProductId", [], "");
+  const productHint = text("p", "", "form-hint");
+  const variety = input("Variedade ou especificação (opcional, ex.: GMO)", "variety", "text", c.commodity?.variety ?? "", false);
+  const fillProducts = (keep) => {
+    const list = commodities.find((x) => x.code === commodity.control.value)?.products ?? [];
+    productSel.control.replaceChildren(...(list.length === 1 ? [] : [el("option", { value: "" }, list.length ? "Escolha o produto" : "Nenhum produto desta commodity no catálogo")]), ...list.map((p) => el("option", { value: p.id }, p.variant_name + (p.identity_status === "pending" ? " — identidade pendente" : ""))));
+    productSel.control.value = list.some((p) => p.id === keep) ? keep : list.length === 1 ? list[0].id : "";
+    productSel.control.disabled = !list.length;
+    productHint.textContent = !commodity.control.value
+      ? ""
+      : !known && commodity.control.value === c.commodity?.code
+        ? `A commodity "${c.commodity.code}" foi digitada livremente e não corresponde ao catálogo. Escolha a commodity do catálogo para poder cadastrar empresas.`
+        : list.length
+          ? "O cadastro usará este produto; trocar depois exige editar a configuração."
+          : "Sem produto no catálogo para esta commodity: cadastre-o no Catálogo antes de cadastrar empresas pela rodada.";
+  };
+  let lastCommodity = commodity.control.value;
+  commodity.control.addEventListener("change", () => {
+    fillProducts("");
+    // Trocar de commodity não leva segmentos sugeridos da anterior (ex.: ração do milho numa rodada de café).
+    const presets = state.roundCatalog?.segmentPresets ?? {};
+    const prev = presets[lastCommodity] ?? {};
+    const a = readAdv();
+    if (a && lastCommodity !== commodity.control.value) {
+      const kept = Object.fromEntries(Object.entries(a.segments ?? {}).filter(([k]) => !(k in prev)));
+      const removed = Object.keys(a.segments ?? {}).filter((k) => k in prev);
+      writeAdv({ segments: kept });
+      if (removed.length) notice(`Segmentos de ${commodityName(lastCommodity)} retirados (${removed.map((k) => prev[k].label).join(", ")}); escolha os da nova commodity no passo 3.`);
+    }
+    lastCommodity = commodity.control.value;
+  });
+  fillProducts(c.commodity?.productId ?? "");
+  const step1 = el("fieldset", { class: "group" }, el("legend", {}, "Objetivo e commodity"), el("div", { class: "form-grid" }, name.node, commodity.node, productSel.node, variety.node), productHint);
+
+  // ---------- Passo 2: local e alcance ----------
+  const o = c.origin ?? {};
+  const countryList = el("datalist", { id: `paises-${Math.random().toString(36).slice(2, 8)}` });
+  const country = input("País", "countryName", "text", "", true);
+  country.control.setAttribute("list", countryList.id);
+  country.control.setAttribute("autocomplete", "off");
+  const regionSel = select("Estado", "region", [["", "Escolha o estado"], ...Object.entries(UF_NAMES).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([k, v]) => [k, `${v} (${k})`])], String(o.region ?? "").toUpperCase());
+  const regionTxt = input("Estado ou região (opcional)", "regionText", "text", o.country !== "BR" ? o.region ?? "" : "", false);
+  const cityList = el("datalist", { id: `cidades-${Math.random().toString(36).slice(2, 8)}` });
+  const city = input("Cidade", "municipality", "text", o.municipality ?? "", false);
+  city.control.setAttribute("list", cityList.id);
+  city.control.setAttribute("autocomplete", "off");
+  const cityStatus = el("p", { class: "form-hint", "aria-live": "polite" });
+  const radius = input("Raio", "radius", "number", c.radius?.value ?? 150);
+  radius.control.min = "1";
+  const unit = select("Unidade", "unit", [["km", "km"], ["mi", "milhas"]], c.radius?.unit ?? "km");
+  const nearKind = select("Perto do limite", "nearKind", [["fraction", "Proporcional ao raio (%)"], ["distance", "Margem fixa (na unidade do raio)"]], c.nearLimit?.distance != null ? "distance" : "fraction");
+  const nearValue = input("Valor (% do raio ou margem)", "nearValue", "number", c.nearLimit?.distance ?? Math.round((c.nearLimit?.fraction ?? 0.1) * 100));
+  const abroadNote = el("div", { class: "callout warn", hidden: "" });
+  let iso = o.country ?? "BR";
+  let picked = o.municipalityCode ? { code: String(o.municipalityCode), name: o.municipality, uf: String(o.region ?? "").toUpperCase() } : null;
+  const keepCoord = typeof o.lat === "number" && typeof o.lon === "number" ? { lat: o.lat, lon: o.lon, label: o.label, country: o.country, municipality: o.municipality ?? "" } : null;
+  let cityOptions = [];
+  const showCountry = () => {
+    const br = iso === "BR";
+    regionSel.node.hidden = !br;
+    regionTxt.node.hidden = br;
+    abroadNote.hidden = br;
+    if (!br) {
+      const still = keepCoord && keepCoord.country === iso && (city.control.value || "") === keepCoord.municipality;
+      abroadNote.replaceChildren(
+        text("strong", "Localização fora do Brasil. "),
+        still
+          ? "Esta configuração já tem a localização registrada na versão anterior; ela é mantida enquanto país e cidade não mudarem."
+          : "O Compass ainda não tem fonte para localizar cidades pelo nome fora do Brasil. A rodada pode ser salva, mas a área, a busca no mapa e o cálculo de distâncias não ficam disponíveis; candidatas entram por arquivo ou pesquisa manual, com a distância desconhecida.",
+      );
+    }
+    updateCityStatus();
+  };
+  const updateCityStatus = () => {
+    if (iso !== "BR") return cityStatus.replaceChildren();
+    if (picked && normKey(picked.name) === normKey(city.control.value) && picked.uf === regionSel.control.value) cityStatus.replaceChildren(tag(`${picked.name}/${picked.uf}`, "ok"), " base oficial do IBGE; área calculada a partir desta cidade.");
+    else cityStatus.textContent = regionSel.control.value ? "Digite e escolha a cidade na lista." : "Escolha o estado e depois a cidade.";
+  };
+  let cityTimer;
+  const searchCities = () => {
+    clearTimeout(cityTimer);
+    cityTimer = setTimeout(() => safe(async () => {
+      if (iso !== "BR" || !regionSel.control.value) return;
+      const q = city.control.value.trim();
+      const res = await api(`/api/geo/municipalities?uf=${regionSel.control.value}&q=${encodeURIComponent(q)}`);
+      cityOptions = res.items;
+      cityList.replaceChildren(...res.items.map((m) => el("option", { value: m.name }, `${m.name}/${m.uf}`)));
+      const exact = res.items.find((m) => normKey(m.name) === normKey(q));
+      if (exact) picked = exact;
+      updateCityStatus();
+    }), 180);
+  };
+  city.control.addEventListener("input", () => {
+    if (picked && normKey(picked.name) !== normKey(city.control.value)) picked = null;
+    searchCities();
+    if (iso !== "BR") showCountry();
+  });
+  regionSel.control.addEventListener("change", () => {
+    picked = null;
+    city.control.value = "";
+    cityList.replaceChildren();
+    searchCities();
+    updateCityStatus();
+  });
+  country.control.addEventListener("change", () => {
+    const v = country.control.value.trim();
+    const hit = (state.countries ?? []).find((x) => normKey(x.name_pt) === normKey(v) || normKey(x.name_en) === normKey(v) || x.iso2 === v.toUpperCase());
+    if (hit) {
+      iso = hit.iso2;
+      country.control.value = hit.name_pt;
+    } else iso = null;
+    picked = null;
+    showCountry();
+  });
+  safe(async () => {
+    const list = await countriesData();
+    countryList.replaceChildren(...list.map((x) => el("option", { value: x.name_pt })));
+    country.control.value = list.find((x) => x.iso2 === iso)?.name_pt ?? iso ?? "";
+    showCountry();
+    if (iso === "BR" && regionSel.control.value) searchCities();
+  });
+  const nearBox = el("details", { class: "group" }, el("summary", {}, "Faixa perto do limite do raio"), text("p", "Empresas nessa faixa pedem conferência da localização; ninguém é excluído por isso.", "form-hint"), el("div", { class: "form-grid" }, nearKind.node, nearValue.node));
+  const step2 = el("fieldset", { class: "group" }, el("legend", {}, "Local e alcance"), el("div", { class: "form-grid" }, country.node, regionSel.node, regionTxt.node, el("div", { class: "city-field" }, city.node, cityStatus), radius.node, unit.node), countryList, cityList, abroadNote, nearBox);
+
+  // ---------- Passo 3: fontes e segmentos ----------
+  const segBox = el("div", { class: "seg-box" });
+  const srcBox = el("div", { class: "seg-box" });
+  const research = select("Pesquisa pública", "researchPhase", [["open", "Aberta"], ["closed", "Encerrada: o que seguir desconhecido vira pendência de contato futuro"]], c.research?.publicPhase ?? "open");
+  const language = input("Idioma", "language", "text", c.locale?.language ?? "pt-BR");
+  const timezone = input("Fuso", "timezone", "text", c.locale?.timezone ?? "America/Sao_Paulo");
+  const scope = input("Escopo de compliance", "scope", "text", c.compliance?.scope ?? "");
+  const renderStep3 = () => {
+    const cat = state.roundCatalog;
+    const a = readAdv();
+    if (!cat || !a) {
+      segBox.replaceChildren(text("p", a ? "Carregando…" : "Os detalhes técnicos não são um JSON válido; corrija-os abaixo.", a ? "muted" : "error"));
+      return;
+    }
+    const code = commodity.control.value;
+    const presets = cat.segmentPresets[code] ?? {};
+    const chosen = a.segments ?? {};
+    const all = { ...presets, ...chosen };
+    const ruleText = (seg) => {
+      const rules = Object.keys(seg.discovery ?? {});
+      return rules.length ? `busca automática em: ${rules.map((r) => (r === "osm" ? "mapa colaborativo" : r === "sipeagro" ? "registros do MAPA" : r)).join(", ")}` : "sem regra de busca automática: só arquivo e pesquisa manual";
+    };
+    const toggle = (k, on) => {
+      const x = readAdv() ?? {};
+      const segs = { ...(x.segments ?? {}) };
+      if (on) segs[k] = chosen[k] ?? presets[k];
+      else delete segs[k];
+      writeAdv({ segments: segs });
+      renderStep3();
+    };
+    const custom = input("Outro segmento comprador (nome)", "customSegment", "text", "", false);
+    segBox.replaceChildren(...[
+      text("h3", `Segmentos compradores de ${commodityName(code) || "—"}`),
+      Object.keys(all).length
+        ? el("div", { class: "pick-list" }, ...Object.entries(all).map(([k, seg]) => el("label", {}, el("input", { type: "checkbox", ...(k in chosen ? { checked: "" } : {}), onchange: (e) => toggle(k, e.target.checked) }), el("span", {}, text("strong", seg.label ?? k), text("small", ruleText(seg))))))
+        : null,
+      !Object.keys(presets).length
+        ? el("div", { class: "callout warn" }, text("p", `Não há segmentos sugeridos para ${commodityName(code) || "esta commodity"} no Compass. Nenhum segmento de outra commodity é aplicado. Informe abaixo quem compra (ex.: torrefação, indústria de solúvel); sem regra de busca, essas empresas entram por arquivo ou pesquisa manual.`))
+        : null,
+      !Object.keys(chosen).length ? el("div", { class: "callout warn" }, text("p", "Nenhum segmento escolhido: a busca automática não terá o que procurar. Escolha ao menos um segmento ou siga só com arquivo e pesquisa manual.")) : null,
+      el("div", { class: "toolbar" }, custom.node, button("Adicionar segmento", () => {
+        const label = custom.control.value.trim();
+        if (!label) throw new Error("Escreva o nome do segmento.");
+        const x = readAdv() ?? {};
+        writeAdv({ segments: { ...(x.segments ?? {}), [slugKey(label) || "segmento"]: { label } } });
+        renderStep3();
+      })),
+    ].filter(Boolean));
+    const sources = a.sources ?? [];
+    const chosenSegs = Object.values(chosen);
+    const br = iso === "BR";
+    const srcRow = (id) => {
+      const info = cat.sources[id];
+      if (!info) return null;
+      const on = sources.some((s) => s.id === id);
+      const covers = info.countries === "*" || (Array.isArray(info.countries) && info.countries.includes(iso));
+      const rule = info.segmentRule;
+      const withRule = rule ? chosenSegs.filter((s) => s.discovery?.[rule]).length : null;
+      const status = !covers ? `não cobre ${state.countries?.find((x) => x.iso2 === iso)?.name_pt ?? iso}` : info.cost === "paid" ? "serviço pago: não roda sem autorização de despesa" : rule && !withRule ? "nenhum segmento escolhido tem regra para esta fonte: ela não sabe o que procurar" : rule ? `${withRule} de ${chosenSegs.length} segmento(s) com regra` : "";
+      return el(
+        "label",
+        {},
+        el("input", {
+          type: "checkbox",
+          ...(on ? { checked: "" } : {}),
+          ...(!covers || info.cost === "paid" ? { disabled: "" } : {}),
+          onchange: (e) => {
+            const x = readAdv() ?? {};
+            const list = (x.sources ?? []).filter((s) => s.id !== id);
+            if (e.target.checked) list.push(id === "br-cnpj-ws" ? { id, kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 } : { id, kind: info.role === "registry" ? "registry" : "discovery" });
+            writeAdv({ sources: list });
+            renderStep3();
+          },
+        }),
+        el("span", {}, text("strong", sourceName(id)), text("small", SOURCE_PLAIN[id]?.[1] ?? info.provides), status ? text("small", status, rule && !withRule ? "warn-text" : "muted") : null),
+      );
+    };
+    srcBox.replaceChildren(
+      text("h3", "Fontes"),
+      el("div", { class: "pick-list" }, ...["br-cnpj-ws", "osm-overpass", "mapa-sipeagro"].map(srcRow)),
+      text("small", `Arquivo de candidatas e pesquisa manual com fonte ficam sempre disponíveis.${br ? "" : " Fora do Brasil, a Receita Federal e os registros do MAPA não se aplicam."}`, "muted"),
     );
   };
+  const step3 = el(
+    "fieldset",
+    { class: "group" },
+    el("legend", {}, "Fontes e limites"),
+    segBox,
+    srcBox,
+    el("div", { class: "form-grid" }, research.node),
+    el("details", { class: "group" }, el("summary", {}, "Idioma, fuso e compliance"), el("div", { class: "form-grid" }, language.node, timezone.node, scope.node)),
+    el("details", { class: "group" }, el("summary", {}, "Detalhes técnicos (JSON)"), text("p", "Regras de busca por segmento, limites das fontes, especificação, comprador, prioridades e critérios de evidência. As escolhas acima atualizam este bloco.", "form-hint"), adv.node),
+  );
+  adv.control.addEventListener("change", () => renderStep3());
+
+  // ---------- Passo 4: revisar ----------
+  const review = el("div", { class: "review-grid", "aria-live": "polite" });
+  const steps = [step1, step2, step3, review];
+  const names = ["Objetivo e commodity", "Local e alcance", "Fontes e limites", "Revisar e salvar"];
+  const stepList = el("ol", { class: "wizard-steps", "aria-label": "Passos da configuração" }, ...names.map((l, i) => el("li", {}, text("span", String(i + 1), "n"), text("span", l))));
+  const back = el("button", { type: "button" }, "Voltar");
+  const next = el("button", { type: "button", class: "primary" }, "Continuar");
+  const submit = el("button", { type: "submit", class: "primary" }, label);
+  let cur = 0;
+  const buildConfig = () => {
+    const a = readAdv();
+    if (!a) throw new Error("Os detalhes técnicos não são um JSON válido.");
+    const num = (x) => (x === "" || x == null ? undefined : Number(String(x).replace(",", ".")));
+    const code = commodity.control.value;
+    const origin = { country: iso };
+    if (iso === "BR") {
+      origin.region = regionSel.control.value;
+      origin.municipality = picked?.name ?? city.control.value.trim();
+      if (picked) origin.municipalityCode = picked.code;
+    } else {
+      if (regionTxt.control.value.trim()) origin.region = regionTxt.control.value.trim();
+      if (city.control.value.trim()) origin.municipality = city.control.value.trim();
+      if (keepCoord && keepCoord.country === iso && (city.control.value.trim() || "") === keepCoord.municipality) Object.assign(origin, { lat: keepCoord.lat, lon: keepCoord.lon, ...(keepCoord.label ? { label: keepCoord.label } : {}) });
+    }
+    const slug = (name.control.value || "rodada").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+    return {
+      ...c,
+      id: c.id && c.id !== "nova-rodada" ? c.id : slug || "rodada",
+      commodity: { ...(c.commodity ?? {}), code, label: commodityName(code), productId: productSel.control.value || undefined, variety: variety.control.value.trim() || undefined, spec: a.spec, segments: a.segments ?? {}, nameHints: a.nameHints ?? [], restrictionHints: a.restrictionHints ?? [] },
+      buyer: a.buyer ?? c.buyer,
+      sources: a.sources ?? [],
+      priorities: a.priorities ?? { size: [], segments: [] },
+      evidence: a.evidence ?? c.evidence,
+      origin,
+      radius: { value: num(radius.control.value), unit: unit.control.value, method: "haversine" },
+      nearLimit: nearKind.control.value === "fraction" ? { fraction: num(nearValue.control.value) / 100 } : { distance: num(nearValue.control.value) },
+      locale: { language: language.control.value.trim(), timezone: timezone.control.value.trim() },
+      compliance: { ...(c.compliance ?? {}), scope: scope.control.value.trim() },
+      research: { ...(c.research ?? {}), publicPhase: research.control.value },
+    };
+  };
+  // Validação de cada passo (no Brasil, a cidade precisa existir na base oficial no estado escolhido; homônimo de outro
+  // estado nunca é aceito por aproximação).
+  const validate = async (i) => {
+    if (i === 0) {
+      if (!name.control.value.trim()) return fail("Dê um nome à rodada.");
+      if (!commodities.some((x) => x.code === commodity.control.value)) return fail("Escolha a commodity do catálogo.");
+      if (!productSel.control.value) return fail("Escolha o produto do catálogo que esta rodada cadastra.");
+    }
+    if (i === 1) {
+      if (!iso) return fail("Escolha o país na lista.");
+      if (!(Number(radius.control.value) > 0)) return fail("Informe o raio.");
+      if (!(Number(nearValue.control.value) > 0)) return fail("Informe a faixa perto do limite.");
+      if (iso === "BR") {
+        if (!regionSel.control.value) return fail("Escolha o estado.");
+        const q = city.control.value.trim();
+        if (!q) return fail("Escolha a cidade.");
+        if (!picked || normKey(picked.name) !== normKey(q) || picked.uf !== regionSel.control.value) {
+          const res = await api(`/api/geo/municipalities?uf=${regionSel.control.value}&q=${encodeURIComponent(q)}`);
+          const exact = res.items.filter((m) => normKey(m.name) === normKey(q));
+          if (exact.length !== 1) return fail(`"${q}" não foi encontrada em ${UF_NAMES[regionSel.control.value]}. Escolha a cidade na lista.`);
+          picked = exact[0];
+          city.control.value = picked.name;
+          updateCityStatus();
+        }
+      }
+    }
+    if (i === 2 && !readAdv()) return fail("Os detalhes técnicos não são um JSON válido.");
+    return true;
+  };
   const renderReview = () => {
-    const v = Object.fromEntries(new FormData(form));
-    const adv = parseAdv() ?? {};
-    const box = (title, pairs) => el("div", {}, text("h3", title), el("dl", {}, ...pairs.filter(([, x]) => x !== undefined && x !== "").flatMap(([k, x]) => [text("dt", k), text("dd", x)])));
+    const v = buildConfig();
+    const prod = state.products.find((p) => p.id === v.commodity.productId);
+    const where = v.origin.country === "BR" ? `${v.origin.municipality}/${v.origin.region}` : [v.origin.municipality, v.origin.region, state.countries?.find((x) => x.iso2 === v.origin.country)?.name_pt ?? v.origin.country].filter(Boolean).join(", ");
+    const segs = Object.values(v.commodity.segments ?? {});
+    const box = (title, pairs) => el("div", {}, text("h3", title), el("dl", {}, ...pairs.flatMap(([k, x]) => [text("dt", k), text("dd", x)])));
+    const warns = [];
+    if (!segs.length) warns.push("Nenhum segmento escolhido: a busca automática não terá o que procurar; candidatas por arquivo ou pesquisa manual.");
+    for (const s of v.sources) {
+      const rule = state.roundCatalog?.sources[s.id]?.segmentRule;
+      if (rule && !segs.some((g) => g.discovery?.[rule])) warns.push(`${sourceName(s.id)} está escolhida, mas nenhum segmento tem regra para ela: não encontrará nada.`);
+    }
+    if (v.origin.country !== "BR" && typeof v.origin.lat !== "number") warns.push("Fora do Brasil sem localização confirmada: área e distâncias não serão calculadas.");
     review.replaceChildren(
-      box("Objetivo e commodity", [["Nome", v.name], ["Commodity", [v.code, v.clabel && `(${v.clabel})`].filter(Boolean).join(" ")], ["Variedade", v.variety || "—"], ["Especificação", adv.spec ? JSON.stringify(adv.spec) : "—"]]),
-      box("Local e alcance", [["País", v.country], ["UF/região", v.region || "—"], ["Município", v.municipality || "—"], ["IBGE", v.municipalityCode || "—"], ["Coordenada", v.lat && v.lon ? `${v.lat}, ${v.lon}` : "—"], ["Raio", `${v.radius} ${v.unit}`], ["Perto do limite", v.nearKind === "fraction" ? `${v.nearValue}% do raio` : `${v.nearValue} ${v.unit}`]]),
-      box("Fontes e limites", [["Fontes", (adv.sources ?? []).map((x) => x.id).join(", ") || "nenhuma"], ["Segmentos", Object.keys(adv.segments ?? {}).join(", ") || "nenhum"], ["Idioma e fuso", `${v.language} · ${v.timezone}`], ["Compliance", v.scope || "—"], ["Pesquisa pública", v.researchPhase === "closed" ? "encerrada" : "aberta"]]),
-      el("div", {}, text("h3", "Depois de criar"), text("p", "Criar não executa nem faz contato. Na tela da rodada: conferir a área, registrar ciência das limitações, trazer candidatas e executar.", "muted")),
+      box("Objetivo e commodity", [["Nome", name.control.value.trim()], ["Commodity", commodityName(v.commodity.code)], ["Produto", prod?.variant_name ?? "—"], ["Variedade", v.commodity.variety ?? "—"]]),
+      box("Local e alcance", [["Origem", where], ["Raio", `${v.radius.value} ${v.radius.unit === "mi" ? "milhas" : "km"}`], ["Perto do limite", v.nearLimit.fraction != null ? `últimos ${Math.round(v.nearLimit.fraction * 100)}% do raio` : `últimos ${v.nearLimit.distance} ${v.radius.unit}`]]),
+      box("Fontes e segmentos", [["Segmentos", segs.map((s) => s.label).join(", ") || "nenhum"], ["Fontes", v.sources.map((s) => sourceName(s.id)).join(", ") || "só arquivo e pesquisa manual"], ["Pesquisa pública", v.research.publicPhase === "closed" ? "encerrada" : "aberta"]]),
+      el("div", {}, text("h3", "Antes de executar"), text("p", "Salvar não executa nem faz contato. Na rodada: conferir a área, registrar ciência das limitações, trazer candidatas e executar.", "muted"), ...warns.map((w) => text("p", w, "warn-text"))),
     );
   };
   const show = (i) => {
     cur = i;
-    for (const g of groups) g.hidden = stepOf(g) !== -1 && stepOf(g) !== i;
-    sources.hidden = i !== 2;
-    review.hidden = i !== 3;
-    submitBar.hidden = i !== 3;
+    steps.forEach((s, k) => (s.hidden = k !== i));
+    submit.hidden = i !== 3;
     next.hidden = i === 3;
     back.disabled = i === 0;
-    [...steps.children].forEach((li, k) => {
+    [...stepList.children].forEach((li, k) => {
       li.className = k === i ? "current" : k < i ? "before" : "";
       li.setAttribute("aria-current", k === i ? "step" : "false");
     });
-    if (i === 2) renderSources();
+    if (i === 2) safe(async () => (await roundCatalogData(), renderStep3()));
     if (i === 3) renderReview();
   };
-  next.addEventListener("click", () => {
-    for (const g of groups.filter((x) => stepOf(x) === cur))
-      for (const c of g.querySelectorAll("input,select,textarea"))
-        if (!c.checkValidity()) {
-          if (g.tagName === "DETAILS") g.open = true;
-          c.reportValidity();
-          return;
-        }
-    if (cur === 2 && !parseAdv()) {
-      err.textContent = "O bloco avançado não é um JSON válido.";
-      err.hidden = false;
-      return;
-    }
-    err.hidden = true;
-    show(cur + 1);
-    steps.scrollIntoView({ block: "nearest" });
-  });
+  next.addEventListener("click", () =>
+    safe(async () => {
+      next.disabled = true;
+      try {
+        error.hidden = true;
+        if (await validate(cur)) show(cur + 1);
+      } finally {
+        next.disabled = false;
+      }
+    }),
+  );
   back.addEventListener("click", () => show(Math.max(0, cur - 1)));
-  // Enter num campo não cria a rodada antes do passo de revisão.
-  form.addEventListener("submit", (e) => {
-    if (cur < 3) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      next.click();
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (cur < 3) return next.click();
+    submit.disabled = true;
+    error.hidden = true;
+    try {
+      for (const k of [0, 1, 2]) if (!(await validate(k))) return show(k);
+      await onSubmit(name.control.value.trim(), buildConfig());
+    } catch (err) {
+      fail(err.message);
+    } finally {
+      submit.disabled = false;
     }
-  }, true);
-  const adv = groups.find((g) => titleOf(g) === "Avançado");
-  form.prepend(steps);
-  if (adv) adv.before(sources);
-  else form.insertBefore(sources, err);
-  form.insertBefore(review, err);
-  form.insertBefore(nav, err);
+  });
+  form.append(stepList, ...steps, error, el("div", { class: "wizard-nav" }, back, next, submit));
   show(0);
   return form;
 }
@@ -4519,7 +4785,7 @@ function wizardize(form) {
 async function rodadasView() {
   const node = section("Rodadas", "Descoberta e qualificação configuradas por rodada: commodity, origem, raio, fontes e critérios. Nada aqui faz contato ou libera envio.");
   const list = (await api("/api/rounds")).items;
-  const where = (o) => (o?.municipality ? `${o.municipality}/${o.region ?? ""}` : `${o?.lat ?? "?"}, ${o?.lon ?? "?"}`);
+  const where = (o) => (o?.municipality ? `${o.municipality}/${o.region ?? ""}` : o?.label ?? (typeof o?.lat === "number" ? "coordenada registrada" : "sem localização"));
   node.append(
     panel(
       "Rodadas",
@@ -4527,7 +4793,7 @@ async function rodadasView() {
         el(
           "div",
           { class: "row" },
-          el("div", {}, text("strong", r.name), text("small", `${r.commodity ?? "—"}${r.variety ? ` ${r.variety}` : ""} · ${where(r.origin)} · ${r.radius?.value} ${r.radius?.unit} · ${r.lastRun ? `${r.lastRun.total} estabelecimentos, ${r.lastRun.review} para revisar` : "ainda não executada"}`)),
+          el("div", {}, text("strong", r.name), text("small", `${commodityName(r.commodity) ?? "—"}${r.variety ? ` ${r.variety}` : ""} · ${where(r.origin)} · ${r.radius?.value} ${r.radius?.unit} · ${r.lastRun ? `${r.lastRun.total} estabelecimentos, ${r.lastRun.review} para revisar` : "ainda não executada"}`)),
           tag(r.status === "draft" ? "Rascunho" : r.status === "closed" ? "Encerrada" : "Ativa", r.status === "active" ? "ok" : ""),
           button("Abrir", () => showRound(r.id)),
         ),
@@ -4539,13 +4805,11 @@ async function rodadasView() {
       (() => {
         const box = details(
           "Nova rodada",
-          wizardize(
-            roundConfigForm(roundConfigTemplate(), "", async (name, config) => {
+          roundForm(roundConfigTemplate(), "", async (name, config) => {
               const r = await api("/api/rounds", "POST", { name, config });
               notice("Rodada criada. Confira a área e as limitações antes de executar.");
               await showRound(r.id);
             }, "Criar rodada"),
-          ),
         );
         box.classList.add("wizard-box");
         if (state.openWizard) {
@@ -4595,40 +4859,18 @@ async function showRound(id) {
   const r = await api(`/api/rounds/${id}`);
   const base = `/api/rounds/${id}`;
   const o = r.config.origin ?? {};
-  const node = section(r.name, `${r.config.commodity?.label ?? r.config.commodity?.code}${r.config.commodity?.variety ? ` ${r.config.commodity.variety}` : ""} · origem ${o.municipality ? `${o.municipality}/${o.region ?? ""}` : `${o.lat}, ${o.lon}`} (${o.country}) · raio ${r.config.radius?.value} ${r.config.radius?.unit} · configuração revisão ${r.revision}`);
+  const node = section(r.name, `${commodityName(r.config.commodity?.code)}${r.config.commodity?.variety ? ` ${r.config.commodity.variety}` : ""} · origem ${o.municipality ? `${o.municipality}${o.region ? `/${o.region}` : ""}` : o.label ?? "sem localização"} (${o.country}) · raio ${r.config.radius?.value} ${r.config.radius?.unit === "mi" ? "milhas" : "km"}`);
   const pf = r.preflight;
   node.dataset.step = "0";
   state.ctxRound = { id, name: r.name };
-  // Progresso da rodada (só leitura) e atalhos para cada parte da tela.
-  {
-    const res = r.results ?? [];
-    const lk = r.lastRun?.lookups;
-    const registered = res.filter((x) => x.registration).length;
-    const closed = res.find((x) => x.closure)?.closure.publicResearch === "closed";
-    const step = (k, v, why, cls) => el("li", { class: cls }, text("span", k, "k"), text("strong", v), why ? text("small", why) : null);
-    const ack = !pf.requiresAcknowledgement || r.acknowledged;
-    node.append(
-      el(
-        "ol",
-        { class: "progress", "aria-label": "Progresso da rodada" },
-        step("Configuração", `Revisão ${r.revision}`, r.status === "closed" ? "rodada encerrada" : r.status === "draft" ? "rascunho" : "ativa", "done"),
-        step("Limitações", ack ? "Ciência registrada" : "Ciência pendente", pf.overall === "supported" ? "tudo suportado" : "há itens parciais ou sem suporte", ack ? "done" : "todo"),
-        step("Candidatas", String(r.candidates.reduce((n, c) => n + c.n, 0)), `${r.candidates.length} origem(ns) de entrada`, r.candidates.length ? "done" : "todo"),
-        step("Execução", r.lastRun ? `${r.lastRun.total} estabelecimentos` : "Não executada", lk ? `reaproveitadas ${lk.cached} · adiadas ${lk.deferred} · falhas ${lk.failed}` : null, r.lastRun ? (lk?.deferred || lk?.failed ? "attention" : "done") : "todo"),
-        step("Conferência", r.lastRun ? `${r.lastRun.review} para conferir` : "—", r.lastRun ? `${r.lastRun.exceptions} exceção(ões)` : null, r.lastRun?.review ? "attention" : r.lastRun ? "done" : ""),
-        step("Cadastro", `${registered} cadastrada(s)`, "descoberta não é qualificação", registered ? "done" : ""),
-        step("Pesquisa pública", closed ? "Encerrada" : "Aberta", closed ? "não conclui a qualificação comercial" : null, closed ? "done" : ""),
-      ),
-      el("nav", { class: "anchors", "aria-label": "Partes da rodada" }, ...[["r-limites", "Limitações"], ["r-area", "Área"], ["r-candidatas", "Candidatas"], ["r-resultados", "Resultados e cadastro"], ["r-anotacoes", "Anotações"]].map(([h, l]) => el("a", { href: `#${h}`, onclick: (e) => { e.preventDefault(); document.getElementById(h)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); } }, l))),
-    );
-  }
-
-  // 1. Limitações antes da execução
-  node.append(
-    panel(
-      "Antes de executar: o que esta configuração cobre",
-      el("div", { class: pf.overall === "supported" ? "callout" : "callout warn" }, text("p", pf.overall === "supported" ? "Tudo suportado." : "Há limitações. O que é parcial ou sem suporte não é tratado como completo: registre ciência antes de executar.")),
-      rows(pf.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", x.area), text("small", x.message)), tag(...LEVEL_TAG[x.level]))),
+  // 1. Limitações antes da execução, em linguagem de uso; o texto técnico completo fica na expansão.
+  const lvlN = (l) => pf.items.filter((x) => x.level === l).length;
+  const notCovered = pf.items.filter((x) => x.level !== "supported");
+  const limPanel = panel(
+      "Antes de executar: limitações desta configuração",
+      el("div", { class: pf.overall === "supported" ? "callout" : "callout warn" }, text("p", pf.overall === "supported" ? "Tudo coberto por esta configuração." : `${lvlN("supported")} coberto(s), ${lvlN("partial")} parcial(is), ${lvlN("unsupported")} sem suporte. O que é parcial ou sem suporte não é tratado como completo: registre ciência antes de executar.`)),
+      notCovered.length ? rows(notCovered, (x) => el("div", { class: "row" }, el("div", {}, text("strong", plainArea(x.area)), text("small", plainMessage(x))), tag(...LEVEL_TAG[x.level]))) : null,
+      details(`Ver todos os ${pf.items.length} itens, com o texto técnico`, rows(pf.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", x.area), text("small", x.message)), tag(...LEVEL_TAG[x.level])))),
       r.acknowledged
         ? text("small", `Ciência registrada por ${r.acknowledged.by} em ${fmtDate(r.acknowledged.at)} (revisão ${r.revision}).`, "muted")
         : writable() && pf.requiresAcknowledgement
@@ -4638,17 +4880,20 @@ async function showRound(id) {
               await showRound(id);
             }, true)
           : null,
-    ),
   );
+  node.append(limPanel);
 
   // 2. Área calculada
   const areaBody = el("div", {}, text("p", "Calculando a área…", "muted"));
-  node.append(panel("Área da rodada", areaBody));
+  const areaPanel = panel("Área da rodada", areaBody);
+  node.append(areaPanel);
+  const areaSummary = text("strong", "calculando…");
   api(`${base}/area`)
-    .then((a) =>
+    .then((a) => {
+      areaSummary.textContent = `${a.summary.municipalities} municípios (${a.summary.regions.join(", ") || "—"})`;
       areaBody.replaceChildren(
         kv([
-          ["Base", a.dataset ?? "sem conjunto oficial de municípios (distância só pela coordenada da unidade)"],
+          ["Base", a.dataset ? "Municípios oficiais do IBGE" : "sem base de municípios: a distância só sai pela coordenada da unidade"],
           ["Raio", `${a.radiusKm} km`],
           ["Perto do limite", a.criterion],
           ["Municípios", `${a.summary.municipalities} (inteiros ${a.summary.full}, parciais ${a.summary.partial}, a conferir ${a.summary.review})`],
@@ -4658,20 +4903,27 @@ async function showRound(id) {
           "Ver municípios",
           el("div", { class: "rows" }, ...a.municipalities.map((m) => el("div", { class: "row" }, el("div", {}, text("strong", `${m.name}/${m.region}`), text("small", `centroide ${m.centroidKm} km (estimativa) · alcance ${m.minKm}–${m.maxKm} km`)), m.review ? tag("conferir", "warn") : tag(m.coverage === "full" ? "inteiro" : "parcial")))),
         ),
-      ),
-    )
-    .catch((e) => areaBody.replaceChildren(text("p", e.message, "error")));
+        ...(a.dataset ? [details("Detalhes técnicos da área", text("p", `Base: ${a.dataset}. Distância por haversine a partir do centroide do município de origem.`, "muted"))] : []),
+      );
+    })
+    .catch((e) => {
+      areaSummary.textContent = "indisponível";
+      areaBody.replaceChildren(el("div", { class: "callout warn" }, text("p", e.message)));
+    });
 
   // 3. Candidatas: automática, importação e pesquisa assistida
-  const counts = r.candidates.length ? r.candidates.map((c) => `${INTAKE_LABEL[c.intake] ?? c.intake} · ${r.sources[c.source_id]?.label ?? c.source_id}: ${c.n}`) : ["Nenhuma candidata ainda."];
+  const counts = r.candidates.length ? r.candidates.map((c) => `${INTAKE_LABEL[c.intake] ?? c.intake} · ${sourceName(c.source_id)}: ${c.n}`) : ["Nenhuma candidata ainda."];
   const cand = panel("Candidatas", el("ul", {}, ...counts.map((x) => text("li", x))));
   if (writable()) {
-    if ((r.config.sources ?? []).some((x) => x.id === "osm-overpass"))
+    const osmSegs = Object.values(r.config.commodity?.segments ?? {}).filter((g) => g.discovery?.osm);
+    if ((r.config.sources ?? []).some((x) => x.id === "osm-overpass") && !osmSegs.length)
+      cand.append(el("div", { class: "callout warn" }, text("p", "A busca no mapa colaborativo está escolhida, mas nenhum segmento tem regra para ela. Edite a configuração (Fontes e limites) ou traga candidatas por arquivo ou pesquisa manual.")));
+    if ((r.config.sources ?? []).some((x) => x.id === "osm-overpass") && osmSegs.length)
       cand.append(
         el(
           "div",
           { class: "toolbar" },
-          button("Descoberta automática: OpenStreetMap", async () => {
+          button("Buscar no mapa colaborativo (OpenStreetMap)", async () => {
             const q = await api(`${base}/osm-query`);
             // O servidor público do OSM recusa a Cloudflare: a consulta sai deste navegador.
             const res = await fetch(q.endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: `data=${encodeURIComponent(q.query)}` });
@@ -4694,7 +4946,7 @@ async function showRound(id) {
             notice(`OpenStreetMap: ${els.length} objetos lidos; ${added} candidatas novas, ${dup} já existentes. Entram como indício, provisórias até conciliar.`);
             await showRound(id);
           }),
-          text("small", "A consulta sai deste navegador (o servidor público do OSM recusa a Cloudflare).", "muted"),
+          text("small", "A busca no mapa é feita a partir deste navegador.", "muted"),
         ),
       );
     const file = el("input", { type: "file", accept: ".csv,.json,.txt", "aria-label": "Arquivo para importar" });
@@ -4829,7 +5081,7 @@ async function showRound(id) {
     ? el("div", { class: "callout" }, text("p", `Pesquisa pública: ${withCl[0].closure.publicResearch === "closed" ? "encerrada" : "aberta"}. Qualificação comercial incompleta em ${withCl.filter((x) => x.closure.commercialQualification !== "complete").length} de ${withCl.length}: encerrar a pesquisa pública não conclui a qualificação nem promove a empresa. Pendências para contato futuro: ${withCl.reduce((n, x) => n + x.closure.contact.length, 0)}.`))
     : null;
   const lk = r.lastRun?.lookups;
-  const lookupLine = lk ? text("small", `Consultas cadastrais na última execução: ${lk.fetched} feitas, ${lk.cached} reaproveitadas, ${lk.deferred} adiadas (limite interno ou HTTP 429), ${lk.failed} com falha, ${lk.not_found} não encontradas, ${lk.unavailable} sem fonte, ${lk.not_applicable} sem identificador.`, "muted") : null;
+  const lookupLine = lk ? text("small", `Consultas cadastrais na última execução: ${lk.fetched} feitas, ${lk.cached} reaproveitadas, ${lk.deferred} adiadas (limite de consultas por minuto; executar de novo retoma sem duplicar), ${lk.failed} com falha, ${lk.not_found} não encontradas, ${lk.unavailable} sem fonte, ${lk.not_applicable} sem identificador.`, "muted") : null;
   const resPanel = panel(
     "Resultados",
     phaseLine,
@@ -4844,7 +5096,7 @@ async function showRound(id) {
     resPanel.append(
       el(
         "div",
-        { class: "toolbar" },
+        { class: "toolbar part-conferir" },
         decision.node,
         note.node,
         button("Registrar decisão em lote", async () => {
@@ -4856,19 +5108,26 @@ async function showRound(id) {
         }),
       ),
     );
-    const prod = productSelect("productId");
+    // Produto acompanha a configuração da rodada: só produtos da mesma commodity; definido na configuração, fica fixo.
+    const allowed = state.products.filter((p) => p.commodity === r.config.commodity?.code);
+    const fixed = allowed.find((p) => p.id === r.config.commodity?.productId);
+    const prod = select("Produto", "productId", fixed ? [[fixed.id, fixed.variant_name]] : [["", "Escolha o produto"], ...allowed.map((p) => [p.id, p.variant_name])], fixed?.id ?? "");
+    if (fixed) prod.control.disabled = true;
     const mode = select("Cadastro", "mode", [["discovery", "Descoberta (sem aprovação individual; sem exceções nem recusadas)"], ["accept", "Só as aceitas"]], "discovery");
     const screen = el("input", { type: "checkbox", name: "screening" });
     const authRef = input("Referência da autorização (opcional)", "authorizationRef", "text", "", false);
-    resPanel.append(
+    if (!allowed.length)
+      resPanel.append(el("div", { class: "callout warn part-cadastrar-msg" }, text("p", `A commodity desta rodada (${r.config.commodity?.code ?? "—"}) não corresponde a nenhum produto do catálogo. Edite a configuração e escolha a commodity e o produto do catálogo antes de cadastrar.`)));
+    else resPanel.append(
       el(
         "div",
-        { class: "toolbar" },
+        { class: "toolbar part-cadastrar" },
         prod.node,
         mode.node,
         authRef.node,
         el("label", {}, screen, " Rodar a triagem de sanções logo após o cadastro"),
         button("Cadastrar no Compass", async () => {
+          if (!prod.control.value) throw new Error("Escolha o produto do catálogo desta rodada.");
           // O servidor cadastra em partes; repete até não restar nenhuma.
           const out = { items: [], mode: mode.control.value };
           for (let round = 0; round < 100; round++) {
@@ -4887,7 +5146,7 @@ async function showRound(id) {
   resPanel.append(
     el(
       "div",
-      { class: "toolbar" },
+      { class: "toolbar part-exportar" },
       button("Exportar (JSON)", async () => downloadFile(`rodada-${r.config.id}.json`, JSON.stringify(await api(`${base}/export`), null, 1), "application/json")),
       button("Relatório (markdown)", async () => downloadFile(`relatorio-${r.config.id}.md`, (await api(`${base}/export`)).report, "text/markdown")),
     ),
@@ -4905,23 +5164,92 @@ async function showRound(id) {
       await showRound(id);
     }, "Registrar anotação")));
   node.append(resPanel, notePanel);
-  if (writable() && r.status !== "closed")
-    node.append(
-      details(
-        "Editar configuração",
-        roundConfigForm(r.config, r.name, async (name, config) => {
-          await api(base, "PUT", { expectedRevision: r.revision, config });
-          notice("Configuração salva. As limitações foram recalculadas: registre ciência de novo antes de executar.");
-          await showRound(id);
-        }, "Salvar configuração"),
-      ),
-    );
-  const PANEL_ID = { "Antes de executar": "r-limites", "Área da rodada": "r-area", Candidatas: "r-candidatas", Resultados: "r-resultados", "Anotações complementares": "r-anotacoes" };
-  for (const p of node.querySelectorAll(":scope > .panel")) {
-    const h = p.querySelector(":scope > h2")?.textContent || "";
-    const k = Object.keys(PANEL_ID).find((x) => h.startsWith(x));
-    if (k) p.id = PANEL_ID[k];
-  }
+  const editBox =
+    writable() && r.status !== "closed"
+      ? details(
+          "Editar configuração",
+          roundForm(r.config, r.name, async (name, config) => {
+            await api(base, "PUT", { expectedRevision: r.revision, config });
+            notice("Configuração salva. As limitações foram recalculadas: registre ciência de novo antes de executar.");
+            await showRound(id);
+          }, "Salvar configuração"),
+        )
+      : null;
+  // Organização da tela: resumo (objetivo, commodity, área, etapa, resultados, pendências e próxima ação) e as seções
+  // Configuração → Buscar/importar → Conferir → Cadastrar, com anotações e detalhes técnicos à parte. Só apresentação:
+  // os mesmos formulários, as mesmas confirmações e os mesmos bloqueios do servidor.
+  const cfgC = r.config.commodity ?? {};
+  const prodCfg = state.products.find((p) => p.id === cfgC.productId);
+  const inCatalog = state.products.some((p) => p.commodity === cfgC.code);
+  const segs = Object.values(cfgC.segments ?? {});
+  const ack = !pf.requiresAcknowledgement || r.acknowledged;
+  const registeredN = results.filter((x) => x.registration).length;
+  const candN = r.candidates.reduce((n, c) => n + c.n, 0);
+  const where = o.municipality ? `${o.municipality}${o.region ? `/${o.region}` : ""}` : o.label ?? (typeof o.lat === "number" ? "coordenada registrada" : "origem sem localização");
+  const stage = !ack ? "config" : !r.lastRun ? "buscar" : r.lastRun.review > 0 && registeredN === 0 ? "conferir" : "cadastrar";
+  const SECTIONS = [
+    ["config", "1. Configuração"],
+    ["buscar", "2. Buscar/importar candidatas"],
+    ["conferir", "3. Conferir resultados"],
+    ["cadastrar", "4. Cadastrar"],
+    ["detalhes", "Anotações e detalhes técnicos"],
+  ];
+  const pend = [];
+  if (!inCatalog) pend.push(`Commodity "${cfgC.code}" sem correspondência no catálogo: escolha a commodity e o produto na configuração antes de cadastrar.`);
+  else if (!prodCfg) pend.push("Produto do catálogo não definido na configuração: será pedido no cadastro.");
+  if (!segs.length) pend.push("Nenhum segmento comprador escolhido: a busca automática não tem o que procurar.");
+  if (!ack) pend.push("Registrar ciência das limitações antes de executar.");
+  if (r.lastRun?.lookups?.deferred) pend.push(`${r.lastRun.lookups.deferred} consulta(s) adiada(s) pelo limite por minuto: executar de novo retoma sem duplicar.`);
+  if (r.lastRun?.review) pend.push(`${r.lastRun.review} estabelecimento(s) para conferir (exceções ou perto do limite).`);
+  if (o.country !== "BR" && typeof o.lat !== "number") pend.push("Fora do Brasil sem localização confirmada: área e distâncias não são calculadas.");
+  const NEXT = {
+    config: ack ? "Revisar a configuração" : "Conferir limitações e registrar ciência",
+    buscar: candN ? "Executar a rodada" : "Trazer candidatas",
+    conferir: "Conferir resultados",
+    cadastrar: registeredN ? "Ver cadastro e exportar" : "Cadastrar no Compass",
+  };
+  const panels = {};
+  const tabBar = el("div", { class: "tabs round-tabs", role: "tablist", "aria-label": "Etapas da rodada" });
+  const go = (k) => {
+    state.roundTab = { id, tab: k, stage };
+    for (const b of tabBar.children) b.setAttribute("aria-selected", b.dataset.tab === k ? "true" : "false");
+    for (const [key, p] of Object.entries(panels)) p.hidden = key !== k;
+  };
+  const item = (k, v, extra) => el("div", {}, text("span", k, "k"), v instanceof Node ? v : text("strong", v), extra ? text("small", extra) : null);
+  const summary = el(
+    "div",
+    { class: "company-summary round-summary" },
+    item("Objetivo", `Compradores de ${commodityName(cfgC.code)}${cfgC.variety ? ` ${cfgC.variety}` : ""} até ${r.config.radius?.value} ${r.config.radius?.unit === "mi" ? "milhas" : "km"} de ${where}`, prodCfg ? `Produto: ${prodCfg.variant_name}` : inCatalog ? "Produto a definir" : "Commodity fora do catálogo"),
+    item("Área", areaSummary, segs.length ? `Segmentos: ${segs.map((g) => g.label).join(", ")}` : "Sem segmentos escolhidos"),
+    item("Etapa atual", SECTIONS.find(([k]) => k === stage)[1].replace(/^\d\. /, ""), r.status === "closed" ? "rodada encerrada" : r.status === "draft" ? "rascunho" : `ativa · revisão ${r.revision}`),
+    item("Resultados", r.lastRun ? `${r.lastRun.total} estabelecimento(s)` : candN ? `${candN} candidata(s), não executada` : "Ainda sem candidatas", r.lastRun ? `${r.lastRun.review} para conferir · ${registeredN} cadastrado(s)` : null),
+    el("div", { class: "next" }, el("p", {}, text("strong", "Pendências: "), pend.length ? "" : "nenhuma."), pend.length ? el("ul", {}, ...pend.map((x) => text("li", x))) : null, button(`Próxima ação: ${NEXT[stage]}`, () => go(stage), true)),
+  );
+  // Seção Cadastrar: barra de cadastro e exportação saem do painel de resultados.
+  const moved = [...resPanel.querySelectorAll(":scope > .part-cadastrar-msg, :scope > .part-cadastrar, :scope > .part-exportar")];
+  const cadPanel = panel("Cadastrar no Compass", text("p", "Cadastrar em descoberta não é qualificação comercial nem libera contato. Exceções e recusadas ficam de fora; a triagem de sanções pode rodar logo após o cadastro.", "muted"), text("p", `${registeredN} estabelecimento(s) já cadastrado(s) por esta rodada.`), ...moved);
+  // Detalhes técnicos: identificadores, fontes e configuração completa.
+  const techPanel = panel(
+    "Detalhes técnicos",
+    kv([
+      ["Rodada", id],
+      ["Configuração", `${r.config.id} · revisão ${r.revision}`],
+      ["Commodity (código)", `${cfgC.code}${cfgC.productId ? ` · produto ${cfgC.productId}` : ""}`],
+      ["Origem", [o.country, o.region, o.municipality, o.municipalityCode ? `IBGE ${o.municipalityCode}` : null].filter(Boolean).join(" · ")],
+      ["Fontes", (r.config.sources ?? []).map((x) => x.id).join(", ") || "nenhuma"],
+    ]),
+    details("Fontes configuradas", rows(r.config.sources ?? [], (x) => el("div", { class: "row" }, el("div", {}, text("strong", `${sourceName(x.id)} (${x.id})`), text("small", [r.sources[x.id]?.label, x.rateLimitPerMinute ? `${x.rateLimitPerMinute}/min` : null, x.maxAgeDays ? `reaproveita até ${x.maxAgeDays} dias` : null].filter(Boolean).join(" · ")))))),
+    details("Configuração completa (JSON)", el("pre", { class: "message" }, JSON.stringify(r.config, null, 2))),
+  );
+  panels.config = el("div", { class: "tab-panel", role: "tabpanel" }, limPanel, areaPanel, editBox);
+  panels.buscar = el("div", { class: "tab-panel", role: "tabpanel" }, cand);
+  panels.conferir = el("div", { class: "tab-panel", role: "tabpanel" }, resPanel);
+  panels.cadastrar = el("div", { class: "tab-panel", role: "tabpanel" }, cadPanel);
+  panels.detalhes = el("div", { class: "tab-panel", role: "tabpanel" }, notePanel, techPanel);
+  for (const [k, l] of SECTIONS) tabBar.append(el("button", { type: "button", role: "tab", "data-tab": k, onclick: () => go(k) }, l));
+  const head = node.querySelector(".page-head");
+  node.replaceChildren(head, summary, tabBar, ...Object.values(panels));
+  go(state.roundTab?.id === id && state.roundTab.stage === stage ? state.roundTab.tab : stage);
   showScreen(node, "Rodadas", r.name);
 }
 

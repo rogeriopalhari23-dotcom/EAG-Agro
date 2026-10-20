@@ -28,6 +28,9 @@ Todas as rotas `/api/*`, exceto GET health, exigem identidade autenticada e usu�
 | GET/POST /api/pauses | Lista/escrita com scope/scopeRef/reason. Operação global exige gestor/admin. |
 | POST /api/pauses/:id/resume | Motivo obrigatório; operação global exige gestor/admin; segunda retomada dá 409. |
 | GET /api/audit | Eventos paginados; filtro opcional entityId. |
+| GET /api/round-catalog | Fontes das rodadas (o que fazem, limites, regra por segmento) e segmentos sugeridos por commodity. Só leitura. |
+| GET /api/geo/regions?country= | Estados com municípios na base oficial (só BR); fora do Brasil, `supported:false` e a limitação em texto. |
+| GET /api/geo/municipalities?uf=&q= | Municípios oficiais (código IBGE, nome, UF) por estado e trecho do nome; sem estado, exige 3 letras. Só leitura. |
 
 Perfis operacionais: admin, commercial_manager, seller_analyst. Auditor_viewer consulta e não altera. Parâmetros só admin; exceções/qualificação/declarações gestor ou admin. `finalBuyerRequired` é condição comercial da demanda: alterar exige gestor/admin e `conditionReason`.
 

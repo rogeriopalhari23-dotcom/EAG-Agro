@@ -12,6 +12,7 @@ import { validateRoundConfig } from "./rodada/config.js";
 import { municipalityIndex, resolveOrigin } from "./rodada/distance.js";
 import { roundArea, fromIbgeRow, areaBox } from "./rodada/area.js";
 import { preflight, SOURCE_CATALOG } from "./rodada/sources/catalog.js";
+import { SEGMENT_PRESETS, RULE_SOURCES } from "./rodada/segments.js";
 import { runRound } from "./rodada/batch.js";
 import { buildRegistrationBatch } from "./rodada/acceptance.js";
 import { brCnpjWs } from "./rodada/sources/br-cnpj-ws.js";
@@ -57,15 +58,59 @@ async function municipalitiesFor(env, config, origin, extra = []) {
 }
 
 // Origem: coordenada da configuração ou município do conjunto oficial (qualquer município brasileiro).
-async function originFor(env, config) {
+// optional: na criação e edição, uma origem fora do Brasil sem coordenada é aceita (a rodada fica configurada, sem área);
+// área, busca no mapa e execução exigem a origem e explicam a limitação.
+const ABROAD_UNSUPPORTED = "Fora do Brasil, o Compass ainda não tem fonte para localizar cidades pelo nome. A rodada fica salva, mas a área, a busca no mapa e o cálculo de distâncias não ficam disponíveis; candidatas podem entrar por arquivo ou pesquisa assistida, com a distância desconhecida.";
+async function originFor(env, config, { optional = false } = {}) {
   if (typeof config.origin.lat === "number") return resolveOrigin(config, municipalityIndex([]));
-  if (config.origin.country !== "BR") fail(422, "origin_unsupported", `Sem conjunto oficial de municípios para ${config.origin.country}: informe a coordenada da origem.`);
-  const o = config.origin;
-  const row = o.municipalityCode
-    ? await s(env, "SELECT * FROM municipalities WHERE ibge_code=?", Number(o.municipalityCode)).first()
-    : await s(env, "SELECT * FROM municipalities WHERE uf=? AND name_normalized=?", String(o.region ?? "").toUpperCase(), normalizeName(o.municipality ?? "")).first();
-  if (!row) fail(422, "origin_not_found", "Município de origem não encontrado na base oficial do IBGE (confira nome e UF ou o código IBGE).");
-  return resolveOrigin(config, municipalityIndex([fromIbgeRow(row)]));
+  if (config.origin.country !== "BR") {
+    if (optional) return null;
+    fail(422, "origin_unsupported", ABROAD_UNSUPPORTED);
+  }
+  const row = await municipalityOf(env, config.origin);
+  return resolveOrigin({ ...config, origin: { ...config.origin, municipalityCode: row.ibge_code } }, municipalityIndex([fromIbgeRow(row)]));
+}
+
+// Município brasileiro da origem: pelo código (conferido contra nome e UF, se vierem) ou por nome + UF. Sem UF, um nome
+// que existe em mais de um estado é recusado (homônimos); nunca se escolhe um deles por aproximação.
+async function municipalityOf(env, o) {
+  const uf = String(o.region ?? "").trim().toUpperCase();
+  const name = String(o.municipality ?? "").trim();
+  if (o.municipalityCode != null && String(o.municipalityCode).trim() !== "") {
+    const row = await s(env, "SELECT * FROM municipalities WHERE ibge_code=?", Number(o.municipalityCode)).first();
+    if (!row) fail(422, "origin_not_found", "Cidade de origem não encontrada na base oficial do IBGE.");
+    if ((uf && uf !== row.uf) || (name && normalizeName(name) !== row.name_normalized))
+      fail(422, "origin_mismatch", `A cidade escolhida não confere com o estado ou o nome informado (base oficial: ${row.name}/${row.uf}). Escolha a cidade de novo na lista.`);
+    return row;
+  }
+  if (!name) fail(422, "origin_not_found", "Escolha a cidade de origem.");
+  const rows = (await s(env, `SELECT * FROM municipalities WHERE name_normalized=?${uf ? " AND uf=?" : ""} LIMIT 30`, normalizeName(name), ...(uf ? [uf] : [])).all()).results;
+  if (!rows.length) fail(422, "origin_not_found", uf ? `Não existe "${name}" em ${uf} na base oficial do IBGE. Escolha a cidade na lista.` : `Cidade "${name}" não encontrada na base oficial do IBGE.`);
+  if (rows.length > 1) fail(422, "origin_ambiguous", `Há ${rows.length} cidades chamadas "${rows[0].name}" (${rows.map((r) => r.uf).sort().join(", ")}): escolha o estado.`, { ufs: rows.map((r) => r.uf).sort() });
+  return rows[0];
+}
+
+// Configuração a gravar: no Brasil, o município resolvido fica registrado (código IBGE, nome e UF oficiais) para o
+// cálculo e a rastreabilidade, sem a pessoa digitar código nem coordenada. Coordenada informada antes é preservada.
+async function resolvedConfig(env, tenant, raw) {
+  const config = validated(raw);
+  await productOfConfig(env, tenant, config);
+  if (config.origin.country !== "BR" || typeof config.origin.lat === "number") {
+    await originFor(env, config, { optional: true });
+    return raw;
+  }
+  const row = await municipalityOf(env, config.origin);
+  return { ...raw, origin: { ...raw.origin, municipality: row.name, region: row.uf, municipalityCode: String(row.ibge_code) } };
+}
+
+// Produto que a rodada cadastra: precisa existir e ser da commodity da rodada (nunca o primeiro do catálogo por padrão).
+async function productOfConfig(env, tenant, config) {
+  const id = config.commodity.productId;
+  if (!id) return null;
+  const p = await product(env, tenant, id);
+  if (p.commodity !== config.commodity.code)
+    fail(422, "product_mismatch", `O produto ${p.variant_name} é de outra commodity (${p.commodity}); a rodada é de ${config.commodity.label ?? config.commodity.code}.`);
+  return p;
 }
 
 function validated(raw) {
@@ -154,12 +199,12 @@ export async function createRound(request, env, actor, rid) {
   requireRole(actor, WRITE_ROLES);
   const i = await bodyJson(request);
   const name = str(i.name, "nome", 120);
-  const config = validated(i.config);
-  await originFor(env, config);
+  const stored = await resolvedConfig(env, actor.tenant_id, i.config);
+  const config = validated(stored);
   const id = crypto.randomUUID(), at = now();
   const pf = preflightFor(config);
   await commit(env, [
-    s(env, "INSERT INTO discovery_rounds(id,tenant_id,name,config_json,status,preflight_json,created_by,created_at,updated_at) VALUES (?,?,?,?,'draft',?,?,?,?)", id, actor.tenant_id, name, JSON.stringify(i.config), JSON.stringify(pf), actor.id, at, at),
+    s(env, "INSERT INTO discovery_rounds(id,tenant_id,name,config_json,status,preflight_json,created_by,created_at,updated_at) VALUES (?,?,?,?,'draft',?,?,?,?)", id, actor.tenant_id, name, JSON.stringify(stored), JSON.stringify(pf), actor.id, at, at),
     auditStatement(env, actor, rid, "round.created", "discovery_round", id, { name, configId: config.id }),
   ]);
   return { id, preflight: pf };
@@ -171,12 +216,12 @@ export async function updateRoundConfig(request, env, actor, rid, id) {
   if (r.status === "closed") fail(409, "round_closed", "Rodada encerrada.");
   const i = await bodyJson(request);
   if (i.expectedRevision !== r.config_revision) fail(409, "revision_conflict", "A configuração mudou desde a última leitura; atualize antes de salvar.");
-  const config = validated(i.config);
-  await originFor(env, config);
+  const stored = await resolvedConfig(env, actor.tenant_id, i.config);
+  const config = validated(stored);
   const pf = preflightFor(config);
   // Configuração nova = limitações novas: a ciência anterior deixa de valer.
   await commit(env, [
-    s(env, "UPDATE discovery_rounds SET config_json=?,config_revision=config_revision+1,preflight_json=?,preflight_ack_by=NULL,preflight_ack_at=NULL,preflight_ack_revision=NULL,updated_at=? WHERE id=? AND config_revision=?", JSON.stringify(i.config), JSON.stringify(pf), now(), id, r.config_revision),
+    s(env, "UPDATE discovery_rounds SET config_json=?,config_revision=config_revision+1,preflight_json=?,preflight_ack_by=NULL,preflight_ack_at=NULL,preflight_ack_revision=NULL,updated_at=? WHERE id=? AND config_revision=?", JSON.stringify(stored), JSON.stringify(pf), now(), id, r.config_revision),
     auditStatement(env, actor, rid, "round.config_updated", "discovery_round", id, { fromRevision: r.config_revision }),
   ]);
   return { id, revision: r.config_revision + 1, preflight: pf };
@@ -396,6 +441,13 @@ export async function registerFromRound(request, env, actor, rid, id, dispatch) 
   const i = await bodyJson(request);
   const mode = oneOf(i.mode, ["discovery", "accept"], "modo");
   const p = await product(env, actor.tenant_id, str(i.productId, "produto", 80));
+  // O produto acompanha a configuração da rodada: outra commodity é recusada; troca intencional passa pela revisão da
+  // configuração (commodity.productId), nunca por uma escolha solta no cadastro.
+  const rc = validated(r.config);
+  if (p.commodity !== rc.commodity.code)
+    fail(422, "product_mismatch", `O produto ${p.variant_name} (${p.commodity}) não é da commodity desta rodada (${rc.commodity.label ?? rc.commodity.code}). Ajuste a configuração da rodada antes de cadastrar.`);
+  if (rc.commodity.productId && rc.commodity.productId !== p.id)
+    fail(422, "product_mismatch", "O produto difere do definido na configuração da rodada; para trocar, edite a configuração (nova revisão).");
   const rows = (await s(env, "SELECT result_json FROM round_establishments WHERE round_id=?", id).all()).results.map((x) => JSON.parse(x.result_json));
   const decRows = (await s(env, "SELECT id,est_key,decision,decided_by,decided_at FROM round_decisions WHERE round_id=? AND superseded_at IS NULL", id).all()).results;
   const done = new Set((await s(env, "SELECT est_key FROM round_registrations WHERE round_id=? AND outcome IN ('created','already_exists')", id).all()).results.map((x) => x.est_key));
@@ -459,4 +511,32 @@ export async function exportRound(env, actor, id) {
   const regConf = registrations.length ? await registeredConflicts(env, actor, id) : {};
   for (let k = 0; k < results.length; k++) results[k] = withConflicts(results[k], regConf[results[k].key]);
   return { round: { id: r.id, name: r.name, revision: r.config_revision, exportedAt: now() }, config: r.config, preflight: parse(r.preflight_json), results, decisions, registrations, screenings, annotations, report: renderReport({ config, origin, results, counters, screenings, registrations: registrations.map((x) => x.view), annotations }, { title: r.name }) };
+}
+
+// Catálogo para montar a rodada no painel (só leitura): fontes com o que fazem e seus limites, e segmentos sugeridos
+// por commodity (sugestão; nada é aplicado sem escolha).
+export function roundCatalog() {
+  return {
+    sources: Object.fromEntries(Object.entries(SOURCE_CATALOG).map(([k, x]) => [k, { label: x.label, role: x.role, mode: x.mode, countries: x.countries, cost: x.cost, provides: x.provides, limits: x.limits, segmentRule: x.needsSegmentRule ?? null }])),
+    segmentPresets: SEGMENT_PRESETS,
+    ruleSources: RULE_SOURCES,
+  };
+}
+
+// Geografia oficial (só leitura) para escolher a origem sem digitar código nem coordenada.
+export async function geoRegions(request, env) {
+  const country = (new URL(request.url).searchParams.get("country") || "BR").toUpperCase();
+  if (country !== "BR") return { country, supported: false, items: [], message: ABROAD_UNSUPPORTED };
+  const rows = (await s(env, "SELECT uf, COUNT(*) n FROM municipalities GROUP BY uf ORDER BY uf").all()).results;
+  return { country, supported: true, items: rows.map((r) => ({ code: r.uf, municipalities: r.n })) };
+}
+export async function geoMunicipalities(request, env) {
+  const u = new URL(request.url).searchParams;
+  const uf = (u.get("uf") || "").trim().toUpperCase();
+  const q = normalizeName((u.get("q") || "").slice(0, 60));
+  if (uf && !/^[A-Z]{2}$/.test(uf)) fail(422, "invalid_field", "Estado inválido.");
+  if (!uf && q.length < 3) fail(422, "invalid_field", "Escolha o estado ou digite ao menos 3 letras da cidade.");
+  const like = q.replace(/[%_]/g, "");
+  const rows = (await s(env, `SELECT ibge_code, name, uf FROM municipalities WHERE 1=1${uf ? " AND uf=?" : ""}${like ? " AND name_normalized LIKE ?" : ""} ORDER BY (name_normalized=?) DESC, (name_normalized LIKE ?) DESC, name LIMIT 30`, ...(uf ? [uf] : []), ...(like ? [`%${like}%`] : []), like, `${like}%`).all()).results;
+  return { items: rows.map((r) => ({ code: String(r.ibge_code), name: r.name, uf: r.uf })) };
 }

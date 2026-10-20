@@ -243,8 +243,12 @@ test("Rodada internacional pelo painel: sem conjunto de municípios nem fonte ca
   assert.ok(pf.items.some((x) => x.area === "cadastro oficial" && x.level === "unsupported"));
   assert.ok(pf.items.some((x) => x.area === "geografia" && x.level === "partial"));
   assert.ok(pf.items.some((x) => x.area === "identificador" && x.level === "partial"));
+  // Sem coordenada fora do Brasil (regra de 2026-10-20): a rodada é salva sem pedir latitude/longitude, a geografia
+  // aparece como sem suporte e área e execução continuam recusadas com a explicação.
   const noCoord = await ctx.api("/api/rounds", "POST", { name: "x", config: { ...cfg, origin: { country: "DE", municipality: "Hamburg" } } });
-  assert.equal(noCoord.data.error.code, "origin_unsupported");
+  assert.equal(noCoord.status, 201);
+  assert.ok(noCoord.data.preflight.items.some((x) => x.area === "geografia" && x.level === "unsupported"));
+  assert.equal((await ctx.api(`/api/rounds/${noCoord.data.id}/area`)).data.error.code, "origin_unsupported");
   // Casa dos Dados (paga) configurada no Brasil: aparece bloqueada, nunca executada.
   const pilot = JSON.parse(read("docs/implementation/rodadas/exemplos/milho-gmo-indiara-300km.json"));
   const p = await ctx.api("/api/rounds", "POST", { name: "Piloto como configuração", config: pilot });

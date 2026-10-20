@@ -20,6 +20,8 @@ export function validateRoundConfig(cfg) {
   if (!str(c.code)) e.push("commodity.code obrigatório (ex.: corn, soy, coffee).");
   if (c.variety != null && !str(c.variety)) e.push("commodity.variety, se informada, deve ser texto (ex.: GMO).");
   for (const k of ["nameHints", "restrictionHints"]) if (c[k] != null && !Array.isArray(c[k])) e.push(`commodity.${k} deve ser lista.`);
+  // Produto do catálogo que a rodada cadastra (opcional na configuração; obrigatório e conferido no cadastro).
+  if (c.productId != null && !str(c.productId)) e.push("commodity.productId, se informado, deve ser o identificador de um produto do catálogo.");
   // Comprador e finalidade de uso.
   const b = cfg.buyer ?? {};
   if (!Array.isArray(b.roles) || !b.roles.length) e.push("buyer.roles obrigatório (ex.: [\"final_consumer\", \"processor\"]).");
