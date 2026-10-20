@@ -396,8 +396,12 @@ export async function today(env, actor) {
     await s(env, "SELECT o.id,o.status,o.block_reason,o.planned_date,o.step_no,o.company_id,c.legal_name FROM send_outbox o JOIN companies c ON c.id=o.company_id WHERE o.tenant_id=? AND o.status IN ('pending','temp_failed','blocked','indeterminate','waiting_sequence','leased') ORDER BY o.planned_date,o.step_no LIMIT 200", actor.tenant_id).all()
   ).results;
   const channel = await s(env, "SELECT state FROM channels WHERE tenant_id=? AND channel='email'", actor.tenant_id).first();
+  // Leitura da ponte (só informação): última leitura bem-sucedida e se está dentro do prazo que libera envio.
+  const reader = await s(env, "SELECT last_read_ok_at, reader FROM reply_reader_state WHERE tenant_id=?", actor.tenant_id).first();
+  const readOk = reader?.last_read_ok_at ?? null;
   return {
     channel: channel?.state ?? "planned",
+    reader: { lastReadOkAt: readOk, source: reader?.reader ?? null, healthy: !!readOk && Date.parse(readOk) >= Date.now() - READER_MAX_AGE_MS, maxAgeMinutes: READER_MAX_AGE_MS / 60000 },
     rampStep: st.ramp_step,
     dailyCap: ramp[Math.min(st.ramp_step, Math.max(0, ramp.length - 1))] ?? null,
     sentToday: st.day === day ? st.sent_today : 0,

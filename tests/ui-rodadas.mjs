@@ -95,6 +95,12 @@ try {
     const adv = JSON.parse(f.querySelector('[name="advanced"]').value);
     adv.segments = { feed_mill: { label: "fábrica de ração", discovery: { sipeagro: { activity: ["FABRICANTE"] } } }, crusher: { label: "esmagadora" } };
     f.querySelector('[name="advanced"]').value = JSON.stringify(adv);
+    // Assistente em 4 passos (redesign 2026-10): enviar antes da revisão só avança o passo.
+    f.requestSubmit();
+    if (f.querySelector('[name=code]').closest("fieldset").hidden !== true) throw new Error("enviar no passo 1 não pode criar a rodada");
+    const next = [...f.querySelectorAll("button")].find((b) => b.textContent === "Continuar");
+    next.click(); next.click();
+    if (!/Revisar e criar/.test(f.querySelector(".wizard-steps .current").textContent)) throw new Error("revisão não alcançada");
     f.requestSubmit(); return true; })()`);
   await until(`/Antes de executar/.test(document.body.innerText)`, "rodada criada");
   await until(`/Municípios/.test(document.body.innerText) && !/Calculando a área/.test(document.body.innerText)`, "área calculada");

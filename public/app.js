@@ -135,46 +135,143 @@ const details = (title, content) =>
   el("details", {}, el("summary", {}, title), content);
 // ===== Blocos novos do redesign (inseridos em public/app.js) =====
 
-// Cabeçalho de página: título e uma frase de apoio (sem rótulo decorativo).
+// Cabeçalho de página: título e uma frase de apoio. O rótulo superior mostra a etapa da jornada (só organização visual).
 function section(title, subtitle) {
   return el("div", {}, el("div", { class: "page-head" }, text("h1", title), subtitle ? text("p", subtitle, "muted") : null));
 }
 
-// Navegação principal curta; telas de apoio ficam sob o item "pai" (abas ou Configurações).
-const MAIN_NAV = ["Início", "Radar Nacional", "Radar Internacional", "Rodadas", "Empresas", "Abordagem", "Configurações"];
+// Ícones de traço simples (rótulo sempre visível ao lado; nunca o ícone sozinho como informação).
+const ICONS = {
+  home: "M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5",
+  layers: "M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17l9 5 9-5",
+  radar: "M12 12m-8 0a8 8 0 1 0 16 0a8 8 0 1 0-16 0M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 12l6-6",
+  globe: "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z",
+  building: "M4 21V5l8-2v18M12 8l8 2v11M3 21h18M7 8h2M7 12h2M7 16h2M15 13h2M15 17h2",
+  file: "M14 3H6v18h12V7l-4-4zM14 3v4h4M9 12h6M9 16h6",
+  check: "M4 6h3M4 12h3M4 18h3M10 6h10M10 12h10M10 18h10",
+  send: "M21 3L10 14M21 3l-7 18-4-7-7-4 18-7z",
+  target: "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 12m-5 0a5 5 0 1 0 10 0a5 5 0 1 0-10 0M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0",
+  gear: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
+  shield: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3zM9 12l2 2 4-4",
+  arrow: "M5 12h14M13 6l6 6-6 6",
+  back: "M19 12H5M11 6l-6 6 6 6",
+  plus: "M12 5v14M5 12h14",
+};
+function icon(name, cls = "icon") {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", cls);
+  const p = document.createElementNS(ns, "path");
+  p.setAttribute("d", ICONS[name] || ICONS.arrow);
+  svg.append(p);
+  return svg;
+}
+
+// Navegação agrupada. As chaves continuam sendo os nomes das telas (navigate() e atalhos internos não mudam).
+const NAV_GROUPS = [
+  [null, [["Início", "home"]]],
+  ["Descoberta", [["Rodadas", "layers"], ["Radar Nacional", "radar"], ["Radar Internacional", "globe"]]],
+  ["Organização", [["Empresas", "building"]]],
+  ["Abordagem", [["Fichas", "file"], ["Tarefas", "check"], ["Envios", "send"], ["Campanhas", "target"]]],
+  ["Administração", [["Configurações", "gear"], ["Compliance e auditoria", "shield"]]],
+];
+const NAV_LABEL = { Início: "Visão geral", Envios: "Envios e respostas" };
+const navLabel = (v) => NAV_LABEL[v] || v;
+const NAV_KEYS = NAV_GROUPS.flatMap(([, items]) => items.map(([k]) => k));
+const MAIN_NAV = NAV_KEYS;
+// Telas de apoio ficam sob o item "pai" (abas ou Configurações). Nomes antigos (Hoje, Radar, Internacional) são apelidos.
 const PARENT = {
   Hoje: "Início",
   Radar: "Radar Nacional",
   Internacional: "Radar Internacional",
   "Lista mensal": "Radar Internacional",
-  Fichas: "Abordagem",
-  Envios: "Abordagem",
-  Tarefas: "Abordagem",
-  Campanhas: "Configurações",
+  Abordagem: "Fichas",
   Catálogo: "Configurações",
   Parâmetros: "Configurações",
   Supressão: "Configurações",
   Pausas: "Configurações",
   "Setores e CNAE": "Configurações",
 };
+const GROUP_OF = Object.fromEntries(NAV_GROUPS.flatMap(([g, items]) => items.map(([k]) => [k, g])));
+
+// Jornada em 6 etapas: organização da interface. Não é estado comercial, não promove empresa nem libera ação.
+const JOURNEY = [
+  { label: "Descobrir", hint: "Rodadas e radares", go: () => navigate("Rodadas") },
+  { label: "Organizar", hint: "Cadastros em descoberta, duplicidades e conciliação", go: () => goCompanies({ status: "discovered" }) },
+  { label: "Qualificar e priorizar", hint: "Evidências, perfil (ICP), porte e triagem", go: () => goCompanies({ profile: "in_icp" }) },
+  { label: "Identificar e preparar", hint: "Responsáveis, canal e fichas", go: () => navigate("Fichas") },
+  { label: "Abordar", hint: "Envios e campanhas, só com aprovação individual", go: () => navigate("Envios") },
+  { label: "Acompanhar", hint: "Respostas, retornos e tarefas", go: () => navigate("Tarefas") },
+];
+const STEP_OF = { Início: -1, Hoje: -1, Rodadas: 0, "Radar Nacional": 0, Radar: 0, "Radar Internacional": 0, Internacional: 0, "Lista mensal": 0, Fichas: 3, Abordagem: 3, Envios: 4, Campanhas: 4, Tarefas: 5 };
+function stepOfView(view) {
+  if (view === "Empresas") return state.companyFilters?.profile === "in_icp" ? 2 : 1;
+  return STEP_OF[view] ?? null;
+}
+// Etapa de uma empresa aberta: só leitura do estágio já existente.
+const COMPANY_STEP = { discovered: 1, prospected: 2, qualifying: 2, qualified: 2, in_contact: 4, confirmed_opportunity: 5, blocked: 2, inactive: 1 };
+function goCompanies(filters) {
+  state.search = "";
+  state.companyFilters = filters;
+  state.offset = 0;
+  return navigate("Empresas");
+}
+function renderJourney(step) {
+  const bar = $("journey");
+  if (!bar) return;
+  state.step = step;
+  if (step === null || step === undefined) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  const ctx = [];
+  if (state.ctxRound) ctx.push(el("button", { type: "button", class: "ctx-chip", onclick: () => safe(() => showRound(state.ctxRound.id)) }, icon("layers", "icon sm"), el("span", {}, text("small", "Rodada"), text("strong", state.ctxRound.name))));
+  if (state.ctxCompany) ctx.push(el("button", { type: "button", class: "ctx-chip", onclick: () => safe(() => showCompany(state.ctxCompany.id)) }, icon("building", "icon sm"), el("span", {}, text("small", "Empresa"), text("strong", state.ctxCompany.name))));
+  bar.replaceChildren(
+    el(
+      "ol",
+      { class: "journey-steps", "aria-label": "Jornada de prospecção (organização da interface; não altera o estado das empresas)" },
+      ...JOURNEY.map((s, i) =>
+        el(
+          "li",
+          { class: i === step ? "current" : i < step ? "before" : "" },
+          el("button", { type: "button", "aria-current": i === step ? "step" : "false", title: s.hint, onclick: () => safe(s.go) }, text("span", String(i + 1).padStart(2, "0"), "n"), el("span", { class: "l" }, text("strong", s.label), text("small", s.hint))),
+        ),
+      ),
+    ),
+    ...(ctx.length ? [el("div", { class: "journey-ctx", "aria-label": "Voltar ao contexto" }, text("span", "Continuar em", "k"), ...ctx)] : []),
+  );
+}
+
 function fmtDate(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
+const fmtDay = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? String(iso ?? "—") : d.toLocaleDateString("pt-BR");
+};
 function setCrumb(...parts) {
   const nodes = [];
   parts.forEach((p, i) => {
-    if (i) nodes.push(" / ");
-    nodes.push(i < parts.length - 1 && MAIN_NAV.includes(p) ? el("button", { type: "button", onclick: () => navigate(p) }, p) : p);
+    if (i) nodes.push(el("span", { class: "sep", "aria-hidden": "true" }, "/"));
+    nodes.push(i < parts.length - 1 && views[p] ? el("button", { type: "button", onclick: () => navigate(p) }, navLabel(p)) : text("span", navLabel(p)));
   });
   $("breadcrumb").replaceChildren(...nodes);
 }
 function markNav(view) {
-  const parent = PARENT[view] || view;
-  for (const b of $("navigation").querySelectorAll("button")) b.setAttribute("aria-current", b.dataset.view === parent ? "page" : "false");
-  // Nomes antigos (Hoje, Radar, Internacional) são apelidos do item principal.
-  setCrumb(...(parent === view || ["Hoje", "Radar", "Internacional"].includes(view) ? [parent] : [parent, view]));
+  const key = NAV_KEYS.includes(view) ? view : PARENT[view] || view;
+  for (const b of $("navigation").querySelectorAll("button")) b.setAttribute("aria-current", b.dataset.view === key ? "page" : "false");
+  const group = GROUP_OF[key];
+  const trail = ["Hoje", "Radar", "Internacional", "Abordagem"].includes(view) || key === view ? [key] : [key, view];
+  $("breadcrumb").replaceChildren();
+  setCrumb(...trail);
+  if (group) $("breadcrumb").prepend(text("span", group, "group"), el("span", { class: "sep", "aria-hidden": "true" }, "/"));
+  renderJourney(stepOfView(view));
   closeMenu();
 }
 function closeMenu() {
@@ -185,84 +282,291 @@ function closeMenu() {
 function showScreen(node, ...crumb) {
   $("content").replaceChildren(node);
   if (crumb.length) setCrumb(...crumb);
+  if (node.dataset?.step !== undefined) renderJourney(Number(node.dataset.step));
   $("content").focus({ preventScroll: true });
   window.scrollTo({ top: 0 });
 }
 
-// Início: o que precisa de atenção agora, com uma ação por item. Só dados reais; zero é zero.
+// Visão geral: em que estou trabalhando, o que posso fazer agora, o que está bloqueado e por quê, qual a próxima ação.
+// Só dados reais; cada número diz o que conta e leva aos registros. Zero é zero.
+const PIPELINE_ORDER = ["discovered", "prospected", "qualifying", "qualified", "in_contact", "confirmed_opportunity", "blocked", "inactive"];
+const DAY_MS = 86400000;
 async function home() {
-  const [d, fichas, tasks, today] = await Promise.all([
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const opt = (p) => api(p).catch(() => null);
+  const [d, fichas, tasks, today, rounds, sanctions, t11, params] = await Promise.all([
     api("/api/dashboard"),
     api("/api/fichas?limit=100"),
-    api(`/api/tasks?until=${new Date().toISOString().slice(0, 10)}&limit=100`),
+    api(`/api/tasks?until=${todayIso}&limit=100`),
     api("/api/sending/today"),
+    opt("/api/rounds"),
+    opt("/api/sanctions/sources"),
+    opt("/api/compliance/t11"),
+    opt("/api/parameters"),
   ]);
-  const p = d.pipeline;
-  const total = Object.values(p).reduce((a, b) => a + b, 0);
-  const waiting = fichas.items.filter((f) => f.status === "in_approval").length;
-  const openTasks = tasks.items.filter((t) => t.status === "open").length;
-  const stuck = today.queue.filter((o) => ["blocked", "indeterminate"].includes(o.status)).length;
-  const node = section("Início", "O que precisa da sua atenção agora.");
-  const channel = {
-    planned: ["Envio de e-mails desligado", "O canal está em planejamento: nenhuma mensagem sai, mesmo com ficha aprovada."],
-    internal_test: ["Envio em teste interno", "Só os endereços da lista interna recebem mensagens. Empresas não recebem nada."],
-    enabled: ["Envio ligado", `Sai somente o que foi aprovado individualmente, na janela do destinatário e dentro do limite do dia (${today.sentToday} de ${today.dailyCap ?? "—"} hoje).`],
-  }[today.channel] || ["Canal de e-mail", lbl(today.channel)];
-  node.append(
-    el("div", { class: today.stopped ? "callout warn" : "callout" }, el("p", {}, text("strong", today.stopped ? "Envio parado automaticamente. " : `${channel[0]}. `), today.stopped ? `Motivo: ${today.stopped.reason}. Só a retomada registrada da operação libera novos envios.` : channel[1]), button("Ver envios", () => navigate("Envios"))),
+  const p = d.prospectPipeline || d.pipeline;
+  const node = section("Visão geral", "Em que você está trabalhando, o que dá para fazer agora, o que está bloqueado e por quê.");
+  node.dataset.step = "-1";
+
+  // 1. Em andamento: a rodada mais recente não encerrada, com continuidade, e o estado do canal ao lado.
+  const roundList = rounds?.items ?? [];
+  const current = roundList.find((r) => r.status !== "closed");
+  const where = (o) => (o?.municipality ? `${o.municipality}/${o.region ?? ""}` : o ? `${o.lat ?? "?"}, ${o.lon ?? "?"}` : "—");
+  const roundCard = current
+    ? el(
+        "div",
+        { class: "hero-main" },
+        text("span", "Rodada em andamento", "eyebrow-tag"),
+        text("h2", current.name),
+        text("p", `${current.commodity ?? "—"}${current.variety ? ` ${current.variety}` : ""} · origem ${where(current.origin)} · raio ${current.radius?.value} ${current.radius?.unit}`, "hero-sub"),
+        current.lastRun
+          ? el(
+              "div",
+              { class: "hero-stats" },
+              ...[
+                [current.lastRun.total, "estabelecimentos na última execução"],
+                [current.lastRun.review, "para conferir"],
+                [current.lastRun.exceptions, "exceções"],
+                [current.lastRun.lookups?.deferred ?? current.lastRun.deferred ?? 0, "consultas adiadas"],
+              ].map(([n, l]) => el("div", {}, text("strong", n, "num"), text("span", l))),
+            )
+          : text("p", "Configurada, ainda não executada. Antes de executar: conferir a área e registrar ciência das limitações.", "hero-sub"),
+        el(
+          "div",
+          { class: "toolbar" },
+          button("Continuar rodada", () => showRound(current.id), true),
+          button("Nova rodada", () => ((state.openWizard = true), navigate("Rodadas"))),
+          roundList.length > 1 ? button(`Todas as rodadas (${roundList.length})`, () => navigate("Rodadas")) : null,
+        ),
+      )
+    : el(
+        "div",
+        { class: "hero-main" },
+        text("span", "Nenhuma rodada em andamento", "eyebrow-tag"),
+        text("h2", "Comece por uma rodada de descoberta"),
+        text("p", "Commodity, origem, raio, fontes e limites. Criar e executar não faz contato nem libera envio.", "hero-sub"),
+        el("div", { class: "toolbar" }, button("Criar rodada", () => ((state.openWizard = true), navigate("Rodadas")), true), roundList.length ? button(`Rodadas (${roundList.length})`, () => navigate("Rodadas")) : null),
+      );
+  const ch = {
+    planned: ["Planejado", "nenhuma mensagem sai, mesmo com ficha aprovada"],
+    internal_test: ["Teste interno", "só endereços da lista interna recebem"],
+    enabled: ["Liberado", `sai só o aprovado individualmente (${today.sentToday} de ${today.dailyCap ?? "—"} hoje)`],
+  }[today.channel] || [lbl(today.channel), ""];
+  const rd = today.reader;
+  const readerAge = rd?.lastReadOkAt ? Math.round((Date.now() - Date.parse(rd.lastReadOkAt)) / 60000) : null;
+  const status = (k, v, why, kind) => el("div", { class: `status-line ${kind || ""}`.trim() }, text("span", k, "k"), el("div", {}, text("strong", v), why ? text("small", why) : null));
+  const channelCard = el(
+    "div",
+    { class: "hero-side", "aria-label": "Canal e ponte" },
+    text("span", "Canal e ponte", "eyebrow-tag"),
+    status("E-mail", ch[0], ch[1], today.channel === "enabled" ? "ok" : "neutral"),
+    today.stopped ? status("Parada automática", "Ativa", `${today.stopped.reason}; só a retomada registrada libera`, "bad") : status("Parada automática", "Não acionada", "para sozinha se a leitura das respostas falhar", "neutral"),
+    status(
+      "Leitura da ponte",
+      rd?.lastReadOkAt ? `${rd.healthy ? "Em dia" : "Atrasada"} · ${fmtDate(rd.lastReadOkAt)}` : "Sem leitura registrada",
+      rd?.lastReadOkAt ? `há ${readerAge} min; prazo ${rd.maxAgeMinutes} min${rd.source ? ` · ${rd.source === "bridge" ? "ponte" : rd.source}` : ""}` : "sem leitura recente o envio não é liberado",
+      rd?.healthy ? "ok" : "warn",
+    ),
+    today.internalCopy ? status("Cópia interna", today.internalCopy.enabled ? "Ligada" : "Desligada", today.internalCopy.enabled ? "mensagem separada a cada e-mail aceito" : "nenhuma cópia é enviada", "neutral") : null,
+    button("Ver envios e respostas", () => navigate("Envios")),
   );
-  const items = [
-    [waiting, "Fichas aguardando sua aprovação", "Cada destinatário é aprovado individualmente; nada sai sem isso.", "Revisar fichas", "Fichas"],
-    [openTasks, "Tarefas de contato para hoje", "Respostas, ligações e confirmações em aberto.", "Ver tarefas", "Tarefas"],
-    [stuck, "Envios bloqueados ou indeterminados", "Precisam de decisão registrada antes de voltar à fila.", "Resolver envios", "Envios"],
-    [p.qualifying || 0, "Empresas em qualificação", "Faltam evidências, demanda ou validações para qualificar.", "Revisar empresas", "Empresas"],
-  ];
-  // G1: revisão anual da retenção A1 (decisão de 08/10/2026). Só lembra; nada expira nem é liberado sozinho.
+  node.append(el("section", { class: "hero", "aria-label": "Em andamento" }, roundCard, channelCard));
+
+  // 2. Agora: disponível, aguardando, bloqueado, concluído. Cada item tem contagem, significado e caminho.
+  const inApproval = fichas.items.filter((f) => f.status === "in_approval");
+  const openTasks = tasks.items.filter((t) => t.status === "open" && !t.blocked?.length);
+  const blockedTasks = tasks.items.filter((t) => t.blocked?.length);
+  const byReason = {};
+  for (const t of blockedTasks) for (const b of t.blocked) (byReason[b] ||= []).push(t);
+  const stuck = today.queue.filter((o) => ["blocked", "indeterminate", "perm_failed"].includes(o.status));
+  const scheduled = today.queue.filter((o) => !stuck.includes(o));
+  const lanes = { available: [], waiting: [], blocked: [], done: [] };
+  const add = (lane, n, title, why, label, go, level) => n > 0 && lanes[lane].push({ n, title, why, label, go, level });
+  add("available", inApproval.length, "Fichas para revisar", "Revisar não envia: cada destinatário é aprovado à parte e o canal decide se algo sai.", "Revisar fichas", () => navigate("Fichas"));
+  add("available", openTasks.length, "Tarefas liberadas até hoje", "Respostas, confirmações e ligações sem bloqueio.", "Ver tarefas", () => navigate("Tarefas"));
+  add("available", p.discovered || 0, "Cadastros em descoberta", "Organizar: conferir unidade, duplicidade e conciliação. Não é qualificação.", "Organizar", () => goCompanies({ status: "discovered" }));
+  for (const r of roundList.filter((x) => x.status !== "closed")) {
+    if (!r.lastRun) add("available", 1, `Rodada a executar: ${r.name}`, "Conferir área e limitações, registrar ciência e executar.", "Abrir rodada", () => showRound(r.id));
+    else add("available", r.lastRun.review, `Para conferir em ${r.name}`, "Exceções e itens perto do limite; conferir não aceita nem cadastra nada.", "Abrir rodada", () => showRound(r.id));
+  }
+  add("waiting", scheduled.length, "Envios na fila", "Saem um por vez, na janela do destinatário, se o canal permitir.", "Ver fila", () => navigate("Envios"));
+  for (const r of roundList) if (r.lastRun?.lookups?.deferred) add("waiting", r.lastRun.lookups.deferred, `Consultas adiadas em ${r.name}`, "Limite de requisições da fonte; executar de novo retoma sem duplicar.", "Abrir rodada", () => showRound(r.id));
+  add("waiting", p.qualifying || 0, "Empresas em qualificação", "Faltam evidências, demanda ou validações.", "Ver empresas", () => goCompanies({ status: "qualifying" }));
+  for (const [reason, list] of Object.entries(byReason))
+    add("blocked", list.length, `${list.length === 1 ? "Tarefa bloqueada" : "Tarefas bloqueadas"}: ${BLOCK_LABEL[reason] || reason}`, reason === "t11_pending" ? "Não são contatos prontos para hoje: ficam visíveis, sem conclusão, até a validação T11 deste escopo." : "Tarefa bloqueada não é concluída; o motivo fica no próprio item.", "Ver motivos", () => navigate("Tarefas"), reason === "t11_pending" ? "neutral" : "warn");
+  add("blocked", stuck.length, "Envios bloqueados ou indeterminados", "Só voltam à fila com decisão registrada.", "Resolver", () => navigate("Envios"), "warn");
+  if (today.stopped) add("blocked", 1, "Envio parado automaticamente", today.stopped.reason, "Ver envios", () => navigate("Envios"), "bad");
+  if (t11?.current?.decision && t11.current.decision !== "approved")
+    add("blocked", 1, `Compliance T11 (${t11.scope}): ${t11.current.decision === "pending" ? "pendente" : lbl(t11.current.decision)}`, `Evidências exigidas: ${(t11.requiredEvidence ?? []).length}. Enquanto pendente, contatos deste escopo não são liberados.`, "Ver compliance", () => navigate("Compliance e auditoria"), "neutral");
+  if (today.channel === "planned") add("blocked", 1, "Canal de e-mail planejado", "Bloqueio esperado nesta fase: nenhum envio comercial sai.", "Ver canal", () => navigate("Envios"), "neutral");
   const rr = d.retentionReview;
-  if (rr?.remind)
-    items.unshift([
-      1,
-      rr.overdue ? `Revisão anual da retenção atrasada (venceu em ${rr.due})` : `Revisão anual da retenção vence em ${rr.due}`,
-      "Registre a revisão da lista de supressão e dos avisos (manter ou avaliar eliminação). Nada expira nem é liberado sozinho.",
-      "Ver supressões",
-      "Supressão",
-    ]);
-  const pending = items.filter(([n]) => n > 0);
-  if (rr?.due) node.append(text("p", `Retenção A1: próxima revisão anual até ${rr.due}${rr.lastReview ? ` (última em ${rr.lastReview.reviewed_on})` : ""}.`, "muted retention-line"));
+  if (rr?.remind) add("available", 1, rr.overdue ? `Revisão anual da retenção atrasada (venceu em ${rr.due})` : `Revisão anual da retenção vence em ${rr.due}`, "Registre a revisão da lista de supressão e dos avisos. Nada expira nem é liberado sozinho.", "Ver supressões", () => navigate("Supressão"), rr.overdue ? "warn" : "");
+  add("done", p.qualified || 0, "Empresas qualificadas", "Estágio já registrado; não autoriza contato sozinho.", "Ver", () => goCompanies({ status: "qualified" }));
+  add("done", p.confirmed_opportunity || 0, "Oportunidades confirmadas", "Registradas pelo fluxo de qualificação.", "Ver", () => goCompanies({ status: "confirmed_opportunity" }));
+  add("done", roundList.filter((r) => r.lastRun).length, "Rodadas executadas", "Com resultados, fechamento e exportação na própria rodada.", "Ver rodadas", () => navigate("Rodadas"));
+  add("done", roundList.filter((r) => r.status === "closed").length, "Rodadas encerradas", "Consulta e anotações complementares continuam disponíveis.", "Ver rodadas", () => navigate("Rodadas"));
+  const LANES = [
+    ["available", "Disponível agora", "Dá para fazer sem esperar ninguém."],
+    ["waiting", "Aguardando", "Depende de fila, fonte ou pesquisa em curso."],
+    ["blocked", "Bloqueado", "Não avança até o motivo ser resolvido; o servidor confere."],
+    ["done", "Concluído", "Já registrado."],
+  ];
+  node.append(
+    el(
+      "section",
+      { class: "board", "aria-label": "Agora" },
+      ...LANES.map(([k, title, why]) =>
+        el(
+          "div",
+          { class: `lane lane-${k}` },
+          el("div", { class: "lane-head" }, text("h2", title), text("span", String(lanes[k].length), "lane-n"), text("small", why)),
+          lanes[k].length
+            ? el(
+                "ul",
+                { class: "lane-list" },
+                ...lanes[k].map((x) =>
+                  el(
+                    "li",
+                    { class: `lane-item ${x.level || ""}`.trim() },
+                    text("span", x.n, "action-count num"),
+                    el("div", {}, text("strong", x.title), text("small", x.why)),
+                    el("button", { type: "button", class: "link-btn", onclick: () => safe(x.go) }, x.label, icon("arrow", "icon sm")),
+                  ),
+                ),
+              )
+            : text("p", k === "available" ? "Nada disponível agora." : k === "blocked" ? "Nenhum bloqueio registrado." : "Nada aqui.", "lane-empty"),
+        ),
+      ),
+    ),
+  );
+
+  // 3. Empresas por estágio já existente (sem testes internos), e prazos de validade.
+  const total = Object.values(p).reduce((a, b) => a + b, 0);
+  const stages = PIPELINE_ORDER.filter((k) => p[k]).concat(Object.keys(p).filter((k) => !PIPELINE_ORDER.includes(k)));
+  const maxN = Math.max(1, ...stages.map((k) => p[k]));
+  const tests = d.internalTests?.total ?? 0;
+  const funnel = el(
+    "section",
+    { class: "panel funnel-panel" },
+    el("div", { class: "panel-head" }, text("h2", "Empresas por estágio"), text("span", `${total} prospect(s)`, "muted")),
+    stages.length
+      ? el(
+          "ul",
+          { class: "stage-bars" },
+          ...stages.map((k) =>
+            el(
+              "li",
+              {},
+              el(
+                "button",
+                { type: "button", onclick: () => safe(() => goCompanies({ status: k })), "aria-label": `${statusLabels[k] || lbl(k)}: ${p[k]} empresa(s). Abrir lista.` },
+                text("span", statusLabels[k] || lbl(k), "stage-l"),
+                el("span", { class: "stage-track" }, el("span", { class: `stage-fill s-${k}`, style: `width:${Math.max(4, Math.round((p[k] / maxN) * 100))}%` })),
+                text("span", p[k], "stage-n num"),
+              ),
+            ),
+          ),
+        )
+      : text("p", "Nenhuma empresa cadastrada.", "empty"),
+    tests
+      ? el("p", { class: "tests-note" }, tag("Teste interno"), ` ${tests} registro(s) de teste interno (${d.internalTests.rule}) fora destas contagens. `, el("button", { type: "button", class: "link-btn", onclick: () => safe(() => ((state.search = "TESTE"), (state.companyFilters = {}), (state.offset = 0), navigate("Empresas"))) }, "Ver testes"))
+      : null,
+  );
+  const due = [];
+  const maxH = params?.parameters?.["sanctions_max_age_hours:global"];
+  for (const s of sanctions?.items ?? []) {
+    if (!s.active) continue;
+    if (!s.last_import) {
+      due.push([s.name, "Sem importação registrada", "a triagem que depende desta lista fica incompleta", "warn"]);
+      continue;
+    }
+    const until = maxH ? Date.parse(s.last_import) + maxH * 3600000 : null;
+    const left = until ? Math.floor((until - Date.now()) / DAY_MS) : null;
+    due.push([s.name, until ? (left < 0 ? `Vencida em ${fmtDay(until)}` : `Válida até ${fmtDay(until)}`) : `Importada em ${fmtDay(s.last_import)}`, until ? (left < 0 ? "triagens novas ficam bloqueadas até reimportar" : `faltam ${left} dia(s) · importada em ${fmtDay(s.last_import)}`) : "prazo não parametrizado", left !== null && left < 7 ? (left < 0 ? "bad" : "warn") : ""]);
+  }
+  const ev = params?.parameters?.["email_validation_max_age_days:email"];
+  if (ev) due.push(["Validação de e-mail", `Vale ${ev} dia(s)`, "depois disso o e-mail precisa ser validado de novo antes da ficha", ""]);
+  if (rr?.due) due.push(["Retenção A1", `Revisão anual até ${fmtDay(rr.due + "T12:00:00")}`, rr.lastReview ? `última em ${rr.lastReview.reviewed_on}` : "nenhuma revisão registrada ainda", rr.overdue ? "bad" : rr.remind ? "warn" : ""]);
+  const duePanel = el(
+    "section",
+    { class: "panel due-panel" },
+    el("div", { class: "panel-head" }, text("h2", "Prazos e validade")),
+    due.length ? el("ul", { class: "due-list" }, ...due.map(([k, v, why, lvl]) => el("li", { class: lvl }, text("span", k, "k"), el("div", {}, text("strong", v), text("small", why))))) : text("p", "Prazos indisponíveis para este perfil.", "empty"),
+    rr?.due ? text("p", `Retenção A1: próxima revisão anual até ${rr.due}${rr.lastReview ? ` (última em ${rr.lastReview.reviewed_on})` : ""}.`, "muted retention-line") : null,
+  );
+  node.append(el("div", { class: "split" }, funnel, duePanel));
+
+  // 4. Atalhos de descoberta.
+  node.append(
+    el(
+      "nav",
+      { class: "shortcuts", "aria-label": "Atalhos" },
+      ...[
+        ["radar", "Radar nacional", "Compradores perto da cidade do fornecedor", "Radar Nacional"],
+        ["globe", "Radar internacional", "Países importadores e empresas compradoras", "Radar Internacional"],
+        ["layers", "Rodadas", "Descoberta configurável por commodity e raio", "Rodadas"],
+        ["building", "Empresas", "Lista, filtros, exportação e cadastro", "Empresas"],
+      ].map(([ic, t, why, v]) => el("button", { type: "button", class: "shortcut", onclick: () => navigate(v) }, icon(ic), el("span", {}, text("strong", t), text("small", why)))),
+    ),
+  );
+  return node;
+}
+
+// Compliance e auditoria: somente leitura. Nenhuma validação, liberação ou alteração sai daqui.
+async function complianceView() {
+  const opt = (p) => api(p).catch((e) => ({ error: e.message }));
+  const offset = state.auditOffset || 0;
+  const [t11, channels, sanctions, audit] = await Promise.all([opt("/api/compliance/t11"), opt("/api/channels"), opt("/api/sanctions/sources"), opt(`/api/audit?limit=30&offset=${offset}`)]);
+  const node = section("Compliance e auditoria", "Consulta do estado de compliance, canais, listas de sanções e trilha de auditoria. Esta tela não registra validações nem libera canais.");
+  const err = (x) => (x?.error ? text("p", x.error, "error") : null);
+  const DECISION = { pending: ["Pendente", "warn"], approved: ["Aprovada", "ok"], rejected: ["Recusada", "bad"] };
+  const EVIDENCE = { decisions: "decisões registradas", legal_basis: "base legal", transfer_mechanism: "mecanismo de transferência", incident_register: "registro de incidentes", erasure_test: "teste de eliminação" };
   node.append(
     panel(
-      "Próximas ações",
-      pending.length
+      "T11 — validação por escopo",
+      err(t11) ||
+        el(
+          "div",
+          { class: "rows" },
+          el("div", { class: "row" }, el("div", {}, text("strong", `Escopo ${t11.scope}`), text("small", `Evidências exigidas: ${(t11.requiredEvidence ?? []).map((k) => EVIDENCE[k] || k).join(", ") || "—"}`), text("small", t11.history?.length ? `${t11.history.length} registro(s) no histórico` : "Nenhum registro no histórico.")), tag(...(DECISION[t11.current?.decision] || [lbl(t11.current?.decision), ""]))),
+        ),
+    ),
+    panel(
+      "Canais",
+      err(channels) ||
+        rows(channels.items ?? [], (c) => el("div", { class: "row" }, el("div", {}, text("strong", CHANNEL_NAME[c.channel] || c.channel), text("small", `Desde ${fmtDate(c.changed_at)}${c.evidence_ref ? ` · evidência ${c.evidence_ref}` : ""}`)), tag({ planned: "Planejado", internal_test: "Teste interno", enabled: "Liberado" }[c.state] || c.state, c.state === "enabled" ? "ok" : ""))),
+    ),
+    panel(
+      "Listas de sanções",
+      err(sanctions) || rows(sanctions.items ?? [], (s) => el("div", { class: "row" }, el("div", {}, text("strong", s.name), text("small", `${s.jurisdiction} · ${s.blocking_policy} · última importação ${s.last_import ? fmtDate(s.last_import) : "nenhuma"}`)), tag(s.active ? "Ativa" : "Inativa", s.active ? "ok" : ""))),
+    ),
+  );
+  const ap = panel("Auditoria", text("small", "Eventos mais recentes primeiro. Valores alterados ficam no registro do banco; aqui aparecem ação, entidade, perfil e requisição.", "muted"));
+  if (audit?.error) ap.append(err(audit));
+  else {
+    const ev = audit.events ?? audit.items ?? [];
+    ap.append(
+      ev.length
         ? el(
             "div",
-            { class: "actions-list" },
-            ...pending.map(([n, title, why, label, view]) =>
-              el("div", { class: "action-item" }, text("span", n, "action-count"), el("div", {}, text("strong", title), text("small", why)), button(label, () => navigate(view), true)),
+            { class: "table-wrap" },
+            el(
+              "table",
+              { class: "trade audit" },
+              el("thead", {}, el("tr", {}, ...["Quando", "Ação", "Entidade", "Perfil", "Requisição"].map((h) => el("th", { scope: "col" }, h)))),
+              el("tbody", {}, ...ev.map((e) => el("tr", {}, text("td", fmtDate(e.occurred_at)), el("td", {}, text("code", e.action)), text("td", `${e.entity_type}${e.field_name ? ` · ${e.field_name}` : ""}`), text("td", `${e.actor_id} (${e.actor_role})`), el("td", {}, text("code", (e.request_id || "—").slice(0, 8)))))),
             ),
           )
-        : text("p", "Nada pendente agora. Comece por uma busca de compradores.", "empty"),
-    ),
-    el(
-      "div",
-      { class: "start-grid" },
-      el("div", { class: "start-card" }, text("h2", "Compradores no Brasil"), text("p", "Empresas próximas da cidade do fornecedor, por commodity e raio, em lista e mapa.", "muted"), button("Abrir Radar Nacional", () => navigate("Radar Nacional"), true)),
-      el("div", { class: "start-card" }, text("h2", "Compradores no exterior"), text("p", "Países que importam do Brasil e, em cada um, empresas compradoras e seus responsáveis.", "muted"), button("Abrir Radar Internacional", () => navigate("Radar Internacional"), true)),
-    ),
-    panel(
-      "Empresas no funil",
+        : text("p", "Nenhum evento nesta página.", "empty"),
       el(
         "div",
-        { class: "stats" },
-        ...[
-          ["Cadastradas", total],
-          ["Com evidência", p.prospected || 0],
-          ["Em qualificação", p.qualifying || 0],
-          ["Qualificadas", p.qualified || 0],
-        ].map(([label, value]) => el("div", { class: "stat" }, text("strong", value), text("span", label))),
+        { class: "toolbar" },
+        offset ? button("Mais recentes", () => ((state.auditOffset = Math.max(0, offset - 30)), navigate("Compliance e auditoria"))) : null,
+        ev.length === 30 ? button("Mais antigos", () => ((state.auditOffset = offset + 30), navigate("Compliance e auditoria"))) : null,
       ),
-      el("ol", { class: "flow", "aria-label": "Etapas" }, ...["Buscar compradores", "Revisar empresas", "Contatos e decisores", "Preparar ficha", "Aprovar", "Acompanhar respostas"].map((s) => text("li", s))),
-    ),
-  );
+    );
+  }
+  node.append(ap);
   return node;
 }
 
@@ -1217,6 +1521,18 @@ function companyTabOf(block) {
   if (/^(Evidências|Registrar evidência|Unidades|Perfil comprador|Registrar perfil|Registrar observação de risco|Riscos|Condições|Importação|Compra)/.test(title)) return "evidencias";
   return "resumo";
 }
+// Estado de cada condição pelas evidências registradas: confirmado (válida), indício (pendente), conflito (válida e
+// inválida, ou marcada em conflito) ou desconhecido (nenhuma). Só leitura; não muda a validação nem o estágio.
+const PROOF_CONDITIONS = [["consumes_as_input", "Uso da commodity como insumo"], ["buys_commodity", "Compra de terceiros"], ["imports_from_brazil", "Importa do Brasil"]];
+function proofState(evidence, key) {
+  const rel = evidence.filter((e) => { try { return (JSON.parse(e.metadata_json || "{}").supports || []).includes(key); } catch { return false; } });
+  if (!rel.length) return ["Desconhecido", "", null];
+  const ok = rel.filter((e) => e.validation_status === "valid").length, bad = rel.filter((e) => e.validation_status === "invalid").length;
+  if ((ok && bad) || rel.some((e) => e.validation_status === "conflicting")) return ["Conflito", "bad", `${ok} validada(s) e ${bad} refutada(s)`];
+  if (ok) return ["Confirmado", "ok", `${ok} evidência(s) validada(s)`];
+  if (bad) return ["Refutado", "bad", `${bad} evidência(s) refutada(s)`];
+  return ["Indício", "warn", `${rel.length} evidência(s) com validação pendente`];
+}
 function companySummary(data, goTab) {
   const c = data.company;
   const profile = (data.profiles || [])[0];
@@ -1248,6 +1564,12 @@ function companySummary(data, goTab) {
   } else if (data.openFichas?.length) (pending = `Ficha ${lbl(data.openFichas[0].status).toLowerCase()}; acompanhe os envios em Abordagem.`), (action = ["Abrir ficha", () => showFicha(data.openFichas[0].id)]);
   else (pending = "Pronta para preparar a ficha; o envio só acontece após aprovação individual."), (action = ["Preparar ficha", "ficha"]);
   const item = (k, v, extra) => el("div", {}, text("span", k, "k"), text("strong", v), extra ? text("small", extra) : null);
+  // Quem é a unidade e o que sustenta a relevância: uso da commodity e compra de terceiros ficam separados (um não prova o outro).
+  const whoItem = item("Unidade", unit ? [unit.trade_name || c.legal_name, unit.municipality_name && `${unit.municipality_name}/${unit.uf ?? ""}`].filter(Boolean).join(" · ") : "Unidade não registrada", unit?.cnpj ? `${c.registration_id_type || "Registro"} ${unit.cnpj}` : c.registration_id ? `${c.registration_id_type || "Registro"} ${c.registration_id}` : "sem identificador cadastral");
+  const proofBlock = el("div", { class: "proof" }, text("span", "O que está comprovado", "k"), el("ul", { class: "proof-list" }, ...PROOF_CONDITIONS.map(([key, label]) => {
+    const [st, cls, why] = proofState(data.evidence || [], key);
+    return el("li", {}, tag(st, cls), text("span", label), why ? text("small", why, "muted") : null);
+  })));
   // Próxima ação já registrada (tarefa aberta) prevalece sobre a sugestão calculada; o roteiro fica à mão.
   const task = (data.openTasks || [])[0];
   // Avisos D-EXC (sem identidade) valem para a empresa com ou sem tarefa aberta, inclusive depois da última encerrada.
@@ -1256,11 +1578,11 @@ function companySummary(data, goTab) {
     return el(
       "div",
       { class: "company-summary" },
-      item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
+      whoItem, item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
       item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
       item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
       item("Contato e responsável", contact),
-      item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`),
+      item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`), proofBlock,
       el(
         "div",
         { class: "next" },
@@ -1275,11 +1597,11 @@ function companySummary(data, goTab) {
   return el(
     "div",
     { class: "company-summary" },
-    item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
+    whoItem, item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
     item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
     item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
     item("Contato e responsável", contact),
-    item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`),
+    item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`), proofBlock,
     el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), ...notices, button(action[0], () => (typeof action[1] === "function" ? (document.querySelector("dialog.drawer")?.close(), action[1]()) : goTab(action[1])), true)),
   );
 }
@@ -1309,6 +1631,9 @@ async function companyNode(id, offset = 0, inDrawer = false) {
       c.trade_name ? `${c.trade_name} (${c.legal_name})` : c.legal_name,
       `${c.country_code} · ${statusLabels[c.pipeline_status]} · Fonte: ${c.source_label}`,
     );
+  // Etapa da jornada e contexto de retorno: só leitura do estágio existente.
+  node.dataset.step = String(COMPANY_STEP[c.pipeline_status] ?? 1);
+  state.ctxCompany = { id, name: c.trade_name || c.legal_name };
   if (!inDrawer) node.append(button("Voltar às empresas", () => navigate("Empresas")));
   node.append(details("Pessoas de compras", peoplePanel(id)));
   for (const d of data.demands) {
@@ -2797,6 +3122,8 @@ const BLOCK_LABEL = {
   phone_ambiguous: "telefones divergentes entre as fontes: escolha o número",
   phone_unrecognized: "telefone sem código do país: confira o número",
   t11_pending: "T11 pendente (validação do contato real para este país e canal)",
+  compliance_unavailable: "triagem de sanções ausente ou vencida para a empresa",
+  campaign_not_active: "campanha inativa",
 };
 const CALL_KINDS = ["call_l0", "call_l1", "call_l2"];
 // Avisos D-EXC (sem identidade): orientam o operador; não garantem que a pessoa não será reencontrada.
@@ -4031,10 +4358,10 @@ function roundConfigForm(initial, roundName, onSubmit, label) {
     research: select("Pesquisa pública", "researchPhase", [["open", "Aberta"], ["closed", "Encerrada: desconhecidos viram pendência de contato futuro"]], c.research?.publicPhase ?? "open"),
   };
   const advanced = input(
-    "Segmentos (com regras de descoberta), fontes, prioridades e perfil do comprador (JSON)",
+    "Especificação, segmentos (com regras de descoberta), fontes, prioridades e perfil do comprador (JSON)",
     "advanced",
     "textarea",
-    JSON.stringify({ segments: c.commodity?.segments ?? {}, nameHints: c.commodity?.nameHints ?? [], restrictionHints: c.commodity?.restrictionHints ?? [], buyer: c.buyer, sources: c.sources, priorities: c.priorities, evidence: c.evidence }, null, 2),
+    JSON.stringify({ spec: c.commodity?.spec, segments: c.commodity?.segments ?? {}, nameHints: c.commodity?.nameHints ?? [], restrictionHints: c.commodity?.restrictionHints ?? [], buyer: c.buyer, sources: c.sources, priorities: c.priorities, evidence: c.evidence }, null, 2),
   );
   advanced.control.rows = 14;
   advanced.control.maxLength = 20000;
@@ -4064,7 +4391,7 @@ function roundConfigForm(initial, roundName, onSubmit, label) {
       const config = {
         ...c,
         id: c.id && c.id !== "nova-rodada" ? c.id : slug || "rodada",
-        commodity: { ...(c.commodity ?? {}), code: v.code.trim(), label: v.clabel.trim() || undefined, variety: v.variety.trim() || undefined, segments: adv.segments ?? {}, nameHints: adv.nameHints ?? [], restrictionHints: adv.restrictionHints ?? [] },
+        commodity: { ...(c.commodity ?? {}), code: v.code.trim(), label: v.clabel.trim() || undefined, variety: v.variety.trim() || undefined, spec: adv.spec ?? c.commodity?.spec, segments: adv.segments ?? {}, nameHints: adv.nameHints ?? [], restrictionHints: adv.restrictionHints ?? [] },
         buyer: adv.buyer ?? c.buyer,
         sources: adv.sources ?? [],
         priorities: adv.priorities ?? { size: [], segments: [] },
@@ -4080,6 +4407,113 @@ function roundConfigForm(initial, roundName, onSubmit, label) {
     },
     label,
   );
+}
+
+// Assistente de criação em 4 passos sobre o MESMO formulário de configuração (mesmos campos, mesma validação e o mesmo
+// envio). Só reorganiza a apresentação; criar não executa: ciência das limitações e execução ficam na tela da rodada.
+const WIZARD_STEPS = [
+  ["Objetivo e commodity", ["Rodada e commodity"]],
+  ["Local e alcance", ["Origem", "Raio e proximidade do limite"]],
+  ["Fontes e limites", ["Idioma, fuso e compliance", "Fase da pesquisa", "Avançado"]],
+  ["Revisar e criar", []],
+];
+function wizardize(form) {
+  form.classList.add("wizard");
+  const groups = [...form.querySelectorAll(":scope > fieldset.group, :scope > details.group")];
+  const titleOf = (g) => (g.querySelector(":scope > legend, :scope > summary")?.textContent || "").trim();
+  const stepOf = (g) => WIZARD_STEPS.findIndex(([, t]) => t.includes(titleOf(g)));
+  const submitBar = form.querySelector(":scope > .toolbar");
+  const err = form.querySelector(":scope > p.error");
+  const advanced = form.querySelector('textarea[name="advanced"]');
+  const steps = el("ol", { class: "wizard-steps", "aria-label": "Passos da nova rodada" }, ...WIZARD_STEPS.map(([l], i) => el("li", {}, text("span", String(i + 1), "n"), text("span", l))));
+  const sources = el("div", { class: "panel-like" });
+  const review = el("div", { class: "review-grid", "aria-live": "polite" });
+  const back = el("button", { type: "button" }, "Voltar");
+  const next = el("button", { type: "button", class: "primary" }, "Continuar");
+  const nav = el("div", { class: "wizard-nav" }, back, next);
+  let cur = 0;
+  const parseAdv = () => {
+    try {
+      return JSON.parse(advanced?.value || "{}");
+    } catch {
+      return null;
+    }
+  };
+  const renderSources = () => {
+    const adv = parseAdv();
+    sources.replaceChildren(
+      text("h3", "Fontes configuradas e limites"),
+      adv
+        ? el(
+            "ul",
+            { class: "plain-list" },
+            ...(adv.sources ?? []).map((x) => text("li", `${x.id} · ${x.kind ?? "tipo não informado"}${x.countries ? ` · ${x.countries.join(", ")}` : ""}${x.rateLimitPerMinute ? ` · até ${x.rateLimitPerMinute} consulta(s)/min` : ""}${x.maxAgeDays ? ` · reaproveita até ${x.maxAgeDays} dia(s)` : ""}`)),
+            (adv.sources ?? []).length ? null : text("li", "Nenhuma fonte: a rodada só recebe importação e pesquisa assistida."),
+          )
+        : text("p", "O bloco avançado não é um JSON válido; corrija antes de continuar.", "error"),
+      text("small", "Fontes, limites por minuto, validade do cache, segmentos e prioridades são editados no bloco Avançado abaixo. A cobertura real de cada fonte aparece na tela da rodada, antes de executar.", "muted"),
+    );
+  };
+  const renderReview = () => {
+    const v = Object.fromEntries(new FormData(form));
+    const adv = parseAdv() ?? {};
+    const box = (title, pairs) => el("div", {}, text("h3", title), el("dl", {}, ...pairs.filter(([, x]) => x !== undefined && x !== "").flatMap(([k, x]) => [text("dt", k), text("dd", x)])));
+    review.replaceChildren(
+      box("Objetivo e commodity", [["Nome", v.name], ["Commodity", [v.code, v.clabel && `(${v.clabel})`].filter(Boolean).join(" ")], ["Variedade", v.variety || "—"], ["Especificação", adv.spec ? JSON.stringify(adv.spec) : "—"]]),
+      box("Local e alcance", [["País", v.country], ["UF/região", v.region || "—"], ["Município", v.municipality || "—"], ["IBGE", v.municipalityCode || "—"], ["Coordenada", v.lat && v.lon ? `${v.lat}, ${v.lon}` : "—"], ["Raio", `${v.radius} ${v.unit}`], ["Perto do limite", v.nearKind === "fraction" ? `${v.nearValue}% do raio` : `${v.nearValue} ${v.unit}`]]),
+      box("Fontes e limites", [["Fontes", (adv.sources ?? []).map((x) => x.id).join(", ") || "nenhuma"], ["Segmentos", Object.keys(adv.segments ?? {}).join(", ") || "nenhum"], ["Idioma e fuso", `${v.language} · ${v.timezone}`], ["Compliance", v.scope || "—"], ["Pesquisa pública", v.researchPhase === "closed" ? "encerrada" : "aberta"]]),
+      el("div", {}, text("h3", "Depois de criar"), text("p", "Criar não executa nem faz contato. Na tela da rodada: conferir a área, registrar ciência das limitações, trazer candidatas e executar.", "muted")),
+    );
+  };
+  const show = (i) => {
+    cur = i;
+    for (const g of groups) g.hidden = stepOf(g) !== -1 && stepOf(g) !== i;
+    sources.hidden = i !== 2;
+    review.hidden = i !== 3;
+    submitBar.hidden = i !== 3;
+    next.hidden = i === 3;
+    back.disabled = i === 0;
+    [...steps.children].forEach((li, k) => {
+      li.className = k === i ? "current" : k < i ? "before" : "";
+      li.setAttribute("aria-current", k === i ? "step" : "false");
+    });
+    if (i === 2) renderSources();
+    if (i === 3) renderReview();
+  };
+  next.addEventListener("click", () => {
+    for (const g of groups.filter((x) => stepOf(x) === cur))
+      for (const c of g.querySelectorAll("input,select,textarea"))
+        if (!c.checkValidity()) {
+          if (g.tagName === "DETAILS") g.open = true;
+          c.reportValidity();
+          return;
+        }
+    if (cur === 2 && !parseAdv()) {
+      err.textContent = "O bloco avançado não é um JSON válido.";
+      err.hidden = false;
+      return;
+    }
+    err.hidden = true;
+    show(cur + 1);
+    steps.scrollIntoView({ block: "nearest" });
+  });
+  back.addEventListener("click", () => show(Math.max(0, cur - 1)));
+  // Enter num campo não cria a rodada antes do passo de revisão.
+  form.addEventListener("submit", (e) => {
+    if (cur < 3) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      next.click();
+    }
+  }, true);
+  const adv = groups.find((g) => titleOf(g) === "Avançado");
+  form.prepend(steps);
+  if (adv) adv.before(sources);
+  else form.insertBefore(sources, err);
+  form.insertBefore(review, err);
+  form.insertBefore(nav, err);
+  show(0);
+  return form;
 }
 
 async function rodadasView() {
@@ -4102,14 +4536,25 @@ async function rodadasView() {
   );
   if (writable())
     node.append(
-      details(
-        "Nova rodada",
-        roundConfigForm(roundConfigTemplate(), "", async (name, config) => {
-          const r = await api("/api/rounds", "POST", { name, config });
-          notice("Rodada criada. Confira a área e as limitações antes de executar.");
-          await showRound(r.id);
-        }, "Criar rodada"),
-      ),
+      (() => {
+        const box = details(
+          "Nova rodada",
+          wizardize(
+            roundConfigForm(roundConfigTemplate(), "", async (name, config) => {
+              const r = await api("/api/rounds", "POST", { name, config });
+              notice("Rodada criada. Confira a área e as limitações antes de executar.");
+              await showRound(r.id);
+            }, "Criar rodada"),
+          ),
+        );
+        box.classList.add("wizard-box");
+        if (state.openWizard) {
+          box.open = true;
+          state.openWizard = false;
+          setTimeout(() => box.scrollIntoView({ block: "start" }), 0);
+        }
+        return box;
+      })(),
     );
   return node;
 }
@@ -4152,6 +4597,31 @@ async function showRound(id) {
   const o = r.config.origin ?? {};
   const node = section(r.name, `${r.config.commodity?.label ?? r.config.commodity?.code}${r.config.commodity?.variety ? ` ${r.config.commodity.variety}` : ""} · origem ${o.municipality ? `${o.municipality}/${o.region ?? ""}` : `${o.lat}, ${o.lon}`} (${o.country}) · raio ${r.config.radius?.value} ${r.config.radius?.unit} · configuração revisão ${r.revision}`);
   const pf = r.preflight;
+  node.dataset.step = "0";
+  state.ctxRound = { id, name: r.name };
+  // Progresso da rodada (só leitura) e atalhos para cada parte da tela.
+  {
+    const res = r.results ?? [];
+    const lk = r.lastRun?.lookups;
+    const registered = res.filter((x) => x.registration).length;
+    const closed = res.find((x) => x.closure)?.closure.publicResearch === "closed";
+    const step = (k, v, why, cls) => el("li", { class: cls }, text("span", k, "k"), text("strong", v), why ? text("small", why) : null);
+    const ack = !pf.requiresAcknowledgement || r.acknowledged;
+    node.append(
+      el(
+        "ol",
+        { class: "progress", "aria-label": "Progresso da rodada" },
+        step("Configuração", `Revisão ${r.revision}`, r.status === "closed" ? "rodada encerrada" : r.status === "draft" ? "rascunho" : "ativa", "done"),
+        step("Limitações", ack ? "Ciência registrada" : "Ciência pendente", pf.overall === "supported" ? "tudo suportado" : "há itens parciais ou sem suporte", ack ? "done" : "todo"),
+        step("Candidatas", String(r.candidates.reduce((n, c) => n + c.n, 0)), `${r.candidates.length} origem(ns) de entrada`, r.candidates.length ? "done" : "todo"),
+        step("Execução", r.lastRun ? `${r.lastRun.total} estabelecimentos` : "Não executada", lk ? `reaproveitadas ${lk.cached} · adiadas ${lk.deferred} · falhas ${lk.failed}` : null, r.lastRun ? (lk?.deferred || lk?.failed ? "attention" : "done") : "todo"),
+        step("Conferência", r.lastRun ? `${r.lastRun.review} para conferir` : "—", r.lastRun ? `${r.lastRun.exceptions} exceção(ões)` : null, r.lastRun?.review ? "attention" : r.lastRun ? "done" : ""),
+        step("Cadastro", `${registered} cadastrada(s)`, "descoberta não é qualificação", registered ? "done" : ""),
+        step("Pesquisa pública", closed ? "Encerrada" : "Aberta", closed ? "não conclui a qualificação comercial" : null, closed ? "done" : ""),
+      ),
+      el("nav", { class: "anchors", "aria-label": "Partes da rodada" }, ...[["r-limites", "Limitações"], ["r-area", "Área"], ["r-candidatas", "Candidatas"], ["r-resultados", "Resultados e cadastro"], ["r-anotacoes", "Anotações"]].map(([h, l]) => el("a", { href: `#${h}`, onclick: (e) => { e.preventDefault(); document.getElementById(h)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); } }, l))),
+    );
+  }
 
   // 1. Limitações antes da execução
   node.append(
@@ -4446,6 +4916,12 @@ async function showRound(id) {
         }, "Salvar configuração"),
       ),
     );
+  const PANEL_ID = { "Antes de executar": "r-limites", "Área da rodada": "r-area", Candidatas: "r-candidatas", Resultados: "r-resultados", "Anotações complementares": "r-anotacoes" };
+  for (const p of node.querySelectorAll(":scope > .panel")) {
+    const h = p.querySelector(":scope > h2")?.textContent || "";
+    const k = Object.keys(PANEL_ID).find((x) => h.startsWith(x));
+    if (k) p.id = PANEL_ID[k];
+  }
   showScreen(node, "Rodadas", r.name);
 }
 
@@ -4457,6 +4933,7 @@ const views = {
   Empresas: companiesView,
   Abordagem: () => abordagemView("Fichas"),
   Configurações: settingsView,
+  "Compliance e auditoria": complianceView,
   Fichas: () => abordagemView("Fichas"),
   Envios: () => abordagemView("Envios"),
   Tarefas: () => abordagemView("Tarefas"),
@@ -4482,10 +4959,14 @@ async function start() {
     $("session").textContent =
       `${session.actor.display_name} · ${session.environment === "local" ? "Ambiente local" : "Produção"}`;
     $("navigation").replaceChildren(
-      ...MAIN_NAV.map((v) => {
-        const b = el("button", { type: "button", "data-view": v, onclick: () => navigate(v) }, v);
-        return v === "Configurações" ? [el("div", { class: "nav-sep" }), b] : b;
-      }).flat(),
+      ...NAV_GROUPS.map(([group, items]) =>
+        el(
+          "div",
+          { class: "nav-group" },
+          group ? text("span", group, "nav-label") : null,
+          ...items.map(([v, ic]) => el("button", { type: "button", "data-view": v, onclick: () => navigate(v) }, icon(ic), text("span", navLabel(v)))),
+        ),
+      ),
     );
     await navigate("Início");
   } catch (e) {

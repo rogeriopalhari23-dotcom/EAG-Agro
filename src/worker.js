@@ -85,7 +85,8 @@ async function route(request, env, rid) {
   if (path === "/api/mapa" && method === "GET") return mapInfo(env);
   if (path === "/api/mapa/brasil.pmtiles" && ["GET", "HEAD"].includes(method)) return mapTiles(request, env);
   if (path === "/api/dashboard" && method === "GET") {
-    const [pipeline, exceptions] = await env.DB.batch([
+    // Registros de teste interno (nome começando por "TESTE") ficam fora das contagens de prospects e são informados à parte.
+    const [pipeline, exceptions, prospects, tests] = await env.DB.batch([
       s(
         env,
         "SELECT pipeline_status,COUNT(*) total FROM companies WHERE tenant_id=? GROUP BY pipeline_status",
@@ -96,6 +97,8 @@ async function route(request, env, rid) {
         "SELECT exception_status,COUNT(*) total FROM companies WHERE tenant_id=? AND exception_status IS NOT NULL GROUP BY exception_status",
         actor.tenant_id,
       ),
+      s(env, "SELECT pipeline_status,COUNT(*) total FROM companies WHERE tenant_id=? AND upper(legal_name) NOT LIKE 'TESTE%' GROUP BY pipeline_status", actor.tenant_id),
+      s(env, "SELECT COUNT(*) total FROM companies WHERE tenant_id=? AND upper(legal_name) LIKE 'TESTE%'", actor.tenant_id),
     ]);
     return response({
       pipeline: Object.fromEntries(
@@ -104,6 +107,9 @@ async function route(request, env, rid) {
       exceptions: Object.fromEntries(
         exceptions.results.map((r) => [r.exception_status, r.total]),
       ),
+      // Contagem de prospects sem os registros de teste interno; o total acima continua igual ao de antes.
+      prospectPipeline: Object.fromEntries(prospects.results.map((r) => [r.pipeline_status, r.total])),
+      internalTests: { total: tests.results[0]?.total ?? 0, rule: "nome começando por TESTE" },
       generatedAt: new Date().toISOString(),
       sendingEnabled: false,
       // G1: lembrete da revisão anual da retenção A1 (só informa; nada expira).

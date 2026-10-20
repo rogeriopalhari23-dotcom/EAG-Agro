@@ -66,8 +66,9 @@ try {
     }),
     errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const MAIN = { Início: "Início", Hoje: "Início", Empresas: "Empresas", Radar: "Radar Nacional", "Radar Nacional": "Radar Nacional", Internacional: "Radar Internacional", "Radar Internacional": "Radar Internacional", Abordagem: "Abordagem", Configurações: "Configurações" };
-  const TABS = ["Fichas", "Envios", "Tarefas"];
+  // Redesign 2026-10: menu agrupado; Início aparece como "Visão geral" e Fichas/Tarefas/Envios são itens próprios.
+  const MAIN = { Início: "Visão geral", Hoje: "Visão geral", Empresas: "Empresas", Radar: "Radar Nacional", "Radar Nacional": "Radar Nacional", Internacional: "Radar Internacional", "Radar Internacional": "Radar Internacional", Abordagem: "Fichas", Fichas: "Fichas", Tarefas: "Tarefas", Envios: "Envios e respostas", Campanhas: "Campanhas", Configurações: "Configurações" };
+  const TABS = [];
   const clickNav = async (label) => {
     if (await page.getByRole("button", { name: "Menu" }).isVisible()) await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("navigation").getByRole("button", { name: label, exact: true }).click();
@@ -85,7 +86,7 @@ try {
     await page.locator(".settings-list button").filter({ has: page.locator("strong", { hasText: new RegExp(`^${label}$`) }) }).click();
   };
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  await page.getByRole("heading", { name: "Início", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Visão geral", exact: true }).waitFor();
   // G1: o Início mostra a próxima revisão anual da retenção A1 (decisão de 08/10/2026).
   await page.getByText(/^Retenção A1: próxima revisão anual até \d{4}-\d{2}-\d{2}/).waitFor({ timeout: 5000 });
   await mkdir("review-output", { recursive: true });
@@ -324,7 +325,7 @@ try {
   await page.getByRole("heading", { name: "Radar Internacional", exact: true }).waitFor();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Radar Internacional sem rolagem horizontal em 390 px");
   await nav("Início");
-  await page.getByRole("heading", { name: "Início", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Visão geral", exact: true }).waitFor();
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

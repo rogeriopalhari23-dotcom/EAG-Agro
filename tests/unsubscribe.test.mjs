@@ -79,7 +79,9 @@ check("P2-T12: token forjado ou alterado dá 404 genérico", async (ctx) => {
   const r = await ready(ctx);
   const [payload, sig] = r.token.split(".");
   const other = await unsubToken({ UNSUB_TOKEN_KEY: Buffer.alloc(32, 9).toString("base64") }, r.versionId, r.dm);
-  for (const bad of [`${payload}.${sig.slice(0, -2)}AA`, other, "abc", `${payload}`])
+  // Troca garantida: se a assinatura já termina em "AA", trocar por "AA" não altera o token (teste instável).
+  const tail = sig.endsWith("AA") ? "BB" : "AA";
+  for (const bad of [`${payload}.${sig.slice(0, -2)}${tail}`, other, "abc", `${payload}`])
     assert.equal((await call(ctx.env, bad, "POST", "")).status, 404, bad);
   assert.equal(suppressed(ctx.DB), 0);
 });

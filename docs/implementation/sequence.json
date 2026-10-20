@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-15T23:46:38.803Z",
+  "updatedAt": "2026-10-20T17:27:13.149Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -871,6 +871,25 @@
       "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": "Uso em produção depende de autorização para aplicar a migração 0044 e publicar; fontes externas reais (Overpass, publica.cnpj.ws, SIPEAGRO) não foram chamadas nesta etapa.",
       "next": "Com autorização: aplicar 0044 e publicar; primeira rodada real pelo painel. Lacunas parciais em FLUXO-RODADAS.md (fontes estrangeiras, fila automática para a Receita, prova de compra sempre assistida)."
+    },
+    {
+      "id": "REDESIGN-INTERFACE",
+      "title": "Redesign da interface: navegação agrupada, jornada em 6 etapas, Visão geral útil, assistente de rodada, resumo da empresa e compliance somente leitura",
+      "status": "implemented",
+      "dependsOn": [],
+      "plan": "docs/implementation/redesign/MATRIZ-PRESERVACAO.md",
+      "section": "todas",
+      "read": [
+        "public/app.js",
+        "public/app.css",
+        "public/index.html",
+        "tests/preview-server.mjs",
+        "docs/implementation/redesign/"
+      ],
+      "acceptance": "Todas as telas e ações anteriores acessíveis (matriz função → local); bloqueios do servidor inalterados; T11 aparece como bloqueio e não como contato pronto; testes internos fora das contagens; estados com texto; prefers-reduced-motion; sem rolagem horizontal em 390 e 1440 px; backend só leitura (prospectPipeline, internalTests, reader).",
+      "validation": "npm run check 507+2+37 (inclui tests/painel-redesign.test.mjs); tests/ui-rodadas.mjs (CDP) passando pelo assistente; capturas em docs/implementation/redesign/capturas com dados fictícios da prévia local",
+      "evidence": "docs/implementation/redesign/MATRIZ-PRESERVACAO.md",
+      "blockedBy": "Não publicado: publicação do novo visual depende da avaliação de Rogério da prévia local (node tests/preview-server.mjs). tests/ui-smoke.mjs (playwright opcional) ajustado ao menu novo, não executado nesta sessão."
     }
   ]
 }
