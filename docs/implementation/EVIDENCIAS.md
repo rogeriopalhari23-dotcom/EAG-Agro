@@ -3155,3 +3155,10 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Não é teste fictício (nome real de commodity e país; sem "TESTE").
   - A campanha não foi alterada, encerrada nem excluída.
 - **Não feito:** nova publicação; nenhuma alteração em fichas, T11, canais, campanhas ou envios.
+- **Cópia cifrada da entrada 2: não concluída.** Duas execuções do script aprovado (`gerar-copia-cifrada.ps1`), com a senha digitada por Rogério:
+  - `eagc-ri-20261020T1752Z.7z` (SHA-256 `fb28cdd9…9159`) e `eagc-ri-20261020T1755Z.7z` (SHA-256 `01c8d8cd…8387`), 3.791 bytes cada;
+  - nas duas, criar 0, testar 2 e recuperar 2: resultado "FALHA — não use esta cópia".
+  - **Diagnóstico sem a senha:** abrir o arquivo com uma senha errada proposital dá o mesmo código 2 ("Cannot open encrypted archive. Wrong password?"). O arquivo é reconhecido como cifrado. Isso é **compatível** com uma senha diferente no teste e na recuperação da que foi usada na criação, mas **não comprova** a causa.
+  - Originais intactos (registro `956c59c0…8914`, índice `e756a77f…e106`). A cópia verificada de 15/10 continua válida para a entrada 1.
+  - As duas cópias com falha ficaram na pasta, sem envio ao Drive; nada foi apagado.
+  - **Pendente de Rogério:** nova execução com a mesma senha nas quatro solicitações e envio da cópia verificada ao Drive.
