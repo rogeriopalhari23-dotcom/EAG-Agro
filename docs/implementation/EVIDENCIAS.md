@@ -3183,3 +3183,20 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
     - Claude conferiu o relatório e os hashes de forma independente, sem decifrar.
   - **Preservados:** documentos originais e a cópia de 15/10 (`409b7fca…b8be`). As duas cópias de 20/10 sem verificação continuam na pasta, sem uso; nada foi apagado nem enviado automaticamente.
   - **Pendente de Rogério:** envio de `eagc-ri-20261020T181214Z-4427e9.7z` ao Google Drive.
+- **Cópia no Drive conferida (2026-10-20, só leitura, sem decifrar):**
+  - Rogério informou o envio. No Drive: `eagc-ri-20261020T181214Z-4427e9.7z`, ID `1kxBF62j4wQa6Zt-EfediK8Dz1RAgJ0Sh`, criado no Drive às 18:18:36Z, 3.791 bytes, `application/x-7z-compressed`.
+  - Conteúdo baixado pelo conector: SHA-256 completo `76cc0af96c2d22b4cf9561e440d1ad9f3d4ca0aa09d1632305b5eeed4f20d276`, igual ao local; `cmp` idêntico byte a byte.
+  - Permissão só do dono (`rogeriopalhari23@gmail.com`); compartilhamento não alterado.
+  - Cópia temporária apagada; nenhuma cópia excluída; nada no Git.
+  - **Cópia cifrada da entrada 2: concluída** (local verificada pelo procedimento e Drive idêntico).
+- **Estado comprovado das pendências (2026-10-20, ~18:20Z):**
+  - **Revogação da sessão exposta: concluída com comprovação.**
+    - Resposta 202 do endpoint oficial;
+    - log de auditoria da conta: `access_revoke_application_tokens` às 17:49:44Z, sucesso, nenhuma outra alteração do Access no intervalo;
+    - token antigo recusado (302) às 17:50Z; sessão nova de Rogério ativa (200);
+    - token de serviço `eag-compass-ponte-windows` e aplicação/política da ponte sem alteração desde 30/09 (`updated_at`), último uso 18:19:11Z;
+    - ponte leu às 18:20:23Z.
+    - Lacuna mantida no registro: logs de acesso do Access entre 17:44Z e 17:49Z não revisados.
+  - **Campanha adicional: identificada; autoria não comprovada.**
+    - Comprovados: identificador, nome, criação em 16/10 às 18:05:18Z pela rota de seleção do Radar Internacional, sessão do Access de Rogério e canal declarado `panel`, sem alterações depois.
+    - **Não comprovado:** clique humano. O canal é declarado pelo cliente. A inferência de ação manual de Rogério no painel depende da confirmação dele.
