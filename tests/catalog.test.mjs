@@ -13,9 +13,9 @@ function check(name, fn) {
 const reason = "Ajuste revisado pelo administrador";
 const rev = async (api, id) => (await api(`/api/catalog/${id}`)).data.revision;
 
-check("P1-T7: catálogo inicial tem 28 itens e CSO com identidade pendente", async ({ api }) => {
+check("P1-T7: catálogo inicial tem 29 itens (28 + Farelo de milho, 0046) e CSO com identidade pendente", async ({ api }) => {
   const r = await api("/api/catalog");
-  assert.equal(r.data.products.length, 28);
+  assert.equal(r.data.products.length, 29);
   const cso = r.data.products.find((p) => p.commodity === "cso");
   assert.equal(cso.identity_status, "pending");
   assert.equal(cso.revision, 1);

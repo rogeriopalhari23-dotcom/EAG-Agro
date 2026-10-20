@@ -970,7 +970,7 @@ function productSelect(name = "productId", value) {
     name,
     state.products.map((p) => [
       p.id,
-      p.variant_name +
+      (p.display_name || p.variant_name) +
         (p.identity_status === "pending" ? " — identidade pendente" : ""),
     ]),
     value,
@@ -1051,7 +1051,7 @@ async function navigate(view = state.view) {
 function companyQuery() {
   const f = state.companyFilters || {};
   const q = new URLSearchParams({ q: state.search || "" });
-  for (const k of ["status", "country", "contact", "profile"]) if (f[k]) q.set(k, f[k]);
+  for (const k of ["status", "country", "contact", "profile", "decisor", "commodity", "uf"]) if (f[k]) q.set(k, f[k]);
   return q.toString();
 }
 async function companiesView() {
@@ -1061,16 +1061,19 @@ async function companiesView() {
     node = section("Empresas", "Fontes e confirmações ficam no histórico de cada empresa.");
   const apply = async (v) => {
     state.search = v.q || "";
-    state.companyFilters = { status: v.status, country: v.country, contact: v.contact, profile: v.profile };
+    state.companyFilters = { status: v.status, country: v.country, contact: v.contact, profile: v.profile, decisor: v.decisor, commodity: v.commodity, uf: v.uf };
     state.offset = 0;
     await navigate("Empresas");
   };
   const fields = [
-    input("Buscar empresa ou registro", "q", "search", state.search, false),
+    input("Buscar empresa, CNPJ, pessoa ou contato", "q", "search", state.search, false),
     select("Etapa", "status", [["", "Todas"], ...Object.keys(statusLabels).slice(0, 8).map((k) => [k, statusLabels[k]])], f.status || ""),
     select("País", "country", [["", "Todos"], ["BR", "Brasil"], ["exterior", "Exterior"]], f.country || ""),
     select("Contato", "contact", [["", "Todos"], ["com", "Com contato"], ["sem", "Sem contato"]], f.contact || ""),
     select("Perfil (ICP)", "profile", [["", "Todos"], ["in_icp", "No ICP"], ["pending_size", "Porte pendente"], ["out_trader", "Fora: trader"], ["out_small", "Fora: pequena"], ["out_giant", "Fora: gigante"], ["sem", "Sem perfil"]], f.profile || ""),
+    select("Decisor", "decisor", [["", "Todos"], ["confirmado", "Confirmado"], ["identificado", "Identificado"], ["a_validar", "A validar"], ["sem", "Ainda não identificado"]], f.decisor || ""),
+    select("Commodity", "commodity", [["", "Todas"], ...(state.commodities ?? []).map((c) => [c.code, c.label])], f.commodity || ""),
+    select("Estado", "uf", [["", "Todos"], ...Object.entries(UF_NAMES).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([k, v]) => [k, v])], f.uf || ""),
   ];
   const bar = el("form", { class: "filter-bar", role: "search", "aria-label": "Filtrar empresas" }, ...fields.map((x) => x.node));
   // Selecionar um filtro já aplica; a busca por texto aplica com Enter ou "Filtrar".
@@ -1140,7 +1143,8 @@ async function companiesView() {
                 c.icp_status ? text("span", ...ICP_TAG[c.icp_status]) : text("span", "Sem perfil", "tag warn"),
                 text("span", c.contacts_count ? `${c.contacts_count} contato(s)` : "Sem contato", c.contacts_count ? "tag" : "tag warn"),
               ),
-              text("small", `${c.country_code} · ${c.commodity || "Demanda pendente"} · ${c.market === "national" ? "Nacional" : c.market === "international" ? "Internacional" : "Mercado pendente"}${c.profile_class ? ` · ${lbl(c.profile_class)}` : ""}`),
+              text("small", `${c.country_code} · ${c.commodity ? commodityName(c.commodity) : "Demanda pendente"} · ${c.market === "national" ? "Nacional" : c.market === "international" ? "Internacional" : "Mercado pendente"}${c.profile_class ? ` · ${lbl(c.profile_class)}` : ""}`),
+              decisorLine(c.decisors),
             ),
             button("Abrir", () => openCompanyPanel(c.id, c.legal_name)),
           ),
@@ -1172,6 +1176,25 @@ function csvCell(value) {
   let v = String(value ?? "");
   if (/^[\s]*[=+\-@\t\r]/.test(v)) v = "'" + v;
   return '"' + v.replaceAll('"', '""') + '"';
+}
+// Decisor e canal da empresa: pessoa (situação e fonte) separada do canal geral, que nunca aparece como contato pessoal.
+const DECISOR_TAG = { confirmado: "ok", identificado: "", "a validar": "warn" };
+function personLine(p) {
+  const bits = [p.title || "cargo não informado", p.email, p.phone].filter(Boolean).join(" · ");
+  return el("li", { class: "person-line" }, tag(p.status, DECISOR_TAG[p.status] ?? ""), text("strong", p.name || "Nome não informado"), text("span", `${p.roleLabel}${bits ? ` · ${bits}` : ""}`), p.sourceUrl ? el("a", { href: p.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "fonte") : null);
+}
+function decisorLine(d) {
+  if (!d) return null;
+  const buyers = d.people.filter((x) => x.buyer);
+  const others = d.people.filter((x) => !x.buyer);
+  const channel = d.channels[0];
+  const box = el("div", { class: "decisor-box" });
+  if (!buyers.length) box.append(el("p", { class: "decisor-none" }, text("span", "Decisor ainda não identificado"), d.people.length ? text("small", ` · ${d.people.length} pessoa(s) sem papel de comprador`) : null));
+  else box.append(el("ul", { class: "plain-list person-list" }, personLine(buyers[0])));
+  const rest = [...buyers.slice(1), ...others];
+  if (rest.length) box.append(details(`Mais ${rest.length} pessoa(s)`, el("ul", { class: "plain-list person-list" }, ...rest.map(personLine))));
+  box.append(el("p", { class: "channel-line" }, channel ? el("span", {}, tag("canal geral da empresa", ""), ` ${[channel.email, channel.phone].filter(Boolean).join(" · ")}`, channel.sourceUrl ? el("a", { href: channel.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, " fonte") : null) : text("small", d.hasChannel ? "Canal pela pessoa acima" : "Sem canal de contato registrado")));
+  return box;
 }
 async function exportCompanies() {
   let offset = 0,
@@ -1536,6 +1559,15 @@ function proofState(evidence, key) {
   if (bad) return ["Refutado", "bad", `${bad} evidência(s) refutada(s)`];
   return ["Indício", "warn", `${rel.length} evidência(s) com validação pendente`];
 }
+// Bloco "Decisor e canal" do resumo da empresa (pessoas com situação e fonte; canal geral à parte).
+function decisorItem(companyId) {
+  const box = el("div", { class: "decisor-item" }, text("span", "Decisor e canal", "k"), text("small", "Carregando…"));
+  safe(async () => {
+    const d = (await api(`/api/companies/decisors?ids=${companyId}`)).items[companyId];
+    box.replaceChildren(text("span", "Decisor e canal", "k"), decisorLine(d) ?? text("strong", "Decisor ainda não identificado"));
+  });
+  return box;
+}
 function companySummary(data, goTab) {
   const c = data.company;
   const profile = (data.profiles || [])[0];
@@ -1584,7 +1616,7 @@ function companySummary(data, goTab) {
       whoItem, item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
       item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
       item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
-      item("Contato e responsável", contact),
+      decisorItem(c.id),
       item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`), proofBlock,
       el(
         "div",
@@ -1603,7 +1635,7 @@ function companySummary(data, goTab) {
     whoItem, item("Etapa", statusLabels[c.pipeline_status] || lbl(c.pipeline_status)),
     item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
     item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
-    item("Contato e responsável", contact),
+    decisorItem(c.id),
     item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`), proofBlock,
     el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), ...notices, button(action[0], () => (typeof action[1] === "function" ? (document.querySelector("dialog.drawer")?.close(), action[1]()) : goTab(action[1])), true)),
   );
@@ -1969,7 +2001,9 @@ const originLabels = {
 };
 const admin = () => state.actor?.role === "admin";
 async function reloadProducts() {
-  state.products = (await api("/api/catalog")).products;
+  const cat = await api("/api/catalog");
+  state.products = cat.products;
+  state.commodities = cat.commodities;
 }
 async function catalogView() {
   const node = section(
@@ -4363,13 +4397,10 @@ function roundConfigTemplate() {
   };
 }
 
-// Nomes de uso das commodities do catálogo (o código continua o do catálogo).
-const COMMODITY_PT = { soy: "Soja", corn: "Milho", coffee: "Café", sugar: "Açúcar", ethanol: "Etanol", industrial_alcohol: "Álcool industrial", wheat: "Trigo", sorghum: "Sorgo", soy_meal: "Farelo de soja", canola_meal: "Farelo de canola", cotton_meal: "Farelo de algodão", soy_oil: "Óleo de soja", canola_oil: "Óleo de canola", cotton_oil: "Óleo de algodão", palm_oil: "Óleo de palma", soy_lecithin: "Lecitina de soja", ddgs: "DDGS", cgf: "CGF", cgm: "CGM", uco: "UCO", cso: "CSO" };
-const commodityName = (code) => COMMODITY_PT[code] ?? code;
+// Commodities da lista única do catálogo (GET /api/catalog → commodities): nenhuma lista paralela no painel.
+const commodityName = (code) => (state.commodities ?? []).find((c) => c.code === code)?.label ?? code;
 function catalogCommodities() {
-  const map = new Map();
-  for (const p of state.products) if (p.active !== 0) (map.get(p.commodity) ?? map.set(p.commodity, []).get(p.commodity)).push(p);
-  return [...map.entries()].map(([code, products]) => ({ code, label: commodityName(code), products })).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  return (state.commodities ?? []).map((c) => ({ code: c.code, label: c.label, aliases: c.aliases, products: state.products.filter((p) => p.commodity === c.code && p.active !== 0) }));
 }
 const UF_NAMES = { AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará", DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás", MA: "Maranhão", MT: "Mato Grosso", MS: "Mato Grosso do Sul", MG: "Minas Gerais", PA: "Pará", PB: "Paraíba", PR: "Paraná", PE: "Pernambuco", PI: "Piauí", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte", RS: "Rio Grande do Sul", RO: "Rondônia", RR: "Roraima", SC: "Santa Catarina", SP: "São Paulo", SE: "Sergipe", TO: "Tocantins" };
 // Nomes de uso das fontes; o identificador técnico fica nos detalhes.
@@ -4380,6 +4411,10 @@ const SOURCE_PLAIN = {
   "import-file": ["Arquivo de candidatas", "Lista própria em CSV ou JSON, com a fonte de cada linha."],
   assisted: ["Pesquisa manual com fonte", "Você registra cada empresa com o endereço da página que comprova."],
   casadosdados: ["Casa dos Dados (serviço pago)", "Não é usada sem autorização de despesa."],
+  "company-site": ["Site da própria empresa", "CNPJ e e-mail geral publicados no site, respeitando o robots.txt."],
+  "abic-certificados": ["Torrefadoras certificadas (ABIC)", "Lista pública de produtos certificados: nome do industrializador e estado da fábrica. Sem CNPJ nem município."],
+  osm: ["Mapa colaborativo (OpenStreetMap)", "Procura estabelecimentos mapeados dentro do raio."],
+  abic: ["Torrefadoras certificadas (ABIC)", "Nome do industrializador e estado da fábrica."],
 };
 const sourceName = (id) => SOURCE_PLAIN[id]?.[0] ?? id;
 async function roundCatalogData() {
@@ -4431,13 +4466,10 @@ function roundForm(initial, roundName, onSubmit, label) {
   // Segmentos escolhidos (com as regras de busca que já tiverem).
   let segments = structuredClone(c.commodity?.segments ?? {});
 
-  // ---------- Passo 1: commodity (seleção pesquisável por nome) e produto, só se houver mais de um compatível ----------
+  // ---------- Passo 1: commodity (seleção pesquisável do catálogo) e produto, só se houver mais de um compatível ----------
   const known = commodities.find((x) => x.code === c.commodity?.code);
-  const commList = el("datalist", { id: `commodities-${Math.random().toString(36).slice(2, 8)}` }, ...commodities.map((x) => el("option", { value: x.label })));
-  const commodity = input("Commodity", "commodity", "text", known?.label ?? "", true);
-  commodity.control.setAttribute("list", commList.id);
-  commodity.control.setAttribute("autocomplete", "off");
-  commodity.control.placeholder = "Digite para buscar (ex.: café, milho)";
+  const commodity = comboBox({ label: "Commodity", name: "commodity", placeholder: "Digite para buscar (ex.: café, milho, farelo)", load: commodityItems, required: true });
+  if (known) commodity.set({ id: known.code, label: known.label }, true);
   const commNote = el("p", { class: "form-hint", "aria-live": "polite" });
   const productBox = el("div", { class: "form-grid" });
   let code = known?.code ?? "";
@@ -4448,7 +4480,7 @@ function roundForm(initial, roundName, onSubmit, label) {
     if (!list.some((p) => p.id === productId)) productId = list.length === 1 ? list[0].id : "";
     productBox.replaceChildren();
     if (list.length > 1) {
-      const sel = select("Produto", "configProductId", [["", "Escolha o produto"], ...list.map((p) => [p.id, p.variant_name])], productId);
+      const sel = select("Produto", "configProductId", [["", "Escolha o produto"], ...list.map((p) => [p.id, p.display_name ?? p.variant_name])], productId);
       sel.control.addEventListener("change", () => (productId = sel.control.value));
       productBox.append(sel.node);
     }
@@ -4460,17 +4492,14 @@ function roundForm(initial, roundName, onSubmit, label) {
         : !list.length
           ? "Sem produto no catálogo para esta commodity: cadastre-o no Catálogo antes de cadastrar empresas."
           : list.length === 1
-            ? `Produto: ${p.variant_name}.`
+            ? `Produto: ${p.display_name ?? p.variant_name}${p.identity_status !== "confirmed" ? " (identidade pendente: pesquisa sim, ficha só depois da confirmação)" : ""}.`
             : p
               ? `O cadastro usará ${p.variant_name}${varietyOf(p) ? `; a aceitação de ${varietyOf(p)} fica como pendência a confirmar com cada empresa` : ""}.`
               : "Escolha o produto: há mais de uma variedade desta commodity no catálogo.";
   };
-  commodity.control.addEventListener("change", () => {
-    const v = commodity.control.value.trim();
-    const hit = commodities.find((x) => normKey(x.label) === normKey(v) || x.code === v.toLowerCase());
+  commodity.onChange((it) => {
     const prev = code;
-    code = hit?.code ?? "";
-    if (hit) commodity.control.value = hit.label;
+    code = it?.id ?? "";
     if (prev !== code) {
       // Trocar de commodity não leva produto nem segmentos sugeridos da anterior (ex.: ração do milho numa rodada de café).
       const presets = state.roundCatalog?.segmentPresets?.[prev] ?? {};
@@ -4482,40 +4511,45 @@ function roundForm(initial, roundName, onSubmit, label) {
     renderProduct();
   });
   renderProduct();
-  const step1 = el("fieldset", { class: "group" }, el("legend", {}, "Commodity"), el("div", { class: "form-grid" }, commodity.node), commList, productBox, commNote);
+  const step1 = el("fieldset", { class: "group" }, el("legend", {}, "Commodity"), el("div", { class: "form-grid" }, commodity.node), productBox, commNote);
 
   // ---------- Passo 2: local e raio ----------
   const o = c.origin ?? {};
-  const countryList = el("datalist", { id: `paises-${Math.random().toString(36).slice(2, 8)}` });
-  const country = input("País", "countryName", "text", "", true);
-  country.control.setAttribute("list", countryList.id);
-  country.control.setAttribute("autocomplete", "off");
+  const country = comboBox({ label: "País", name: "country", placeholder: "Digite para buscar (ex.: Brasil, Argentina)", load: countryItems(false), required: true });
   const regionSel = select("Estado", "region", [["", "Escolha o estado"], ...Object.entries(UF_NAMES).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([k, v]) => [k, `${v} (${k})`])], String(o.region ?? "").toUpperCase());
   const regionTxt = input("Estado ou região", "regionText", "text", o.country !== "BR" ? o.region ?? "" : "", false);
-  const cityList = el("datalist", { id: `cidades-${Math.random().toString(36).slice(2, 8)}` });
-  const city = input("Cidade", "municipality", "text", o.municipality ?? "", false);
-  city.control.setAttribute("list", cityList.id);
-  city.control.setAttribute("autocomplete", "off");
+  const cityCombo = comboBox({ label: "Cidade", name: "municipality", placeholder: "Digite o nome da cidade", load: cityItems(() => regionSel.control.value), remote: true, minChars: 0 });
+  const city = { node: cityCombo.node, control: cityCombo.control };
+  const cityFree = input("Cidade", "municipalityFree", "text", o.country !== "BR" ? o.municipality ?? "" : "", false);
   const cityStatus = el("p", { class: "form-hint", "aria-live": "polite" });
   const radius = input("Raio", "radius", "number", c.radius?.value ?? 150);
   radius.control.min = "1";
   const unit = select("Unidade", "unit", [["km", "km"], ["mi", "milhas"]], c.radius?.unit ?? "km");
   const abroadNote = el("div", { class: "callout warn", hidden: "" });
   let iso = o.country ?? "BR";
-  let picked = o.municipalityCode ? { code: String(o.municipalityCode), name: o.municipality, uf: String(o.region ?? "").toUpperCase() } : null;
+  let picked = o.country === "BR" && o.municipalityCode ? { code: String(o.municipalityCode), name: o.municipality, uf: String(o.region ?? "").toUpperCase() } : null;
+  if (picked) cityCombo.set({ id: picked.code, label: picked.name, uf: picked.uf }, true);
+  else if (o.country === "BR" && o.municipality) cityCombo.control.value = o.municipality;
   const keepCoord = typeof o.lat === "number" && typeof o.lon === "number" ? { lat: o.lat, lon: o.lon, label: o.label, country: o.country, municipality: o.municipality ?? "" } : null;
+  const cityText = () => (iso === "BR" ? cityCombo.control.value : cityFree.control.value);
   const updateCityStatus = () => {
     if (iso !== "BR") return cityStatus.replaceChildren();
-    if (picked && normKey(picked.name) === normKey(city.control.value) && picked.uf === regionSel.control.value) cityStatus.replaceChildren(tag(`${picked.name}/${picked.uf}`, "ok"), " base oficial do IBGE");
+    if (picked && picked.uf === regionSel.control.value) cityStatus.replaceChildren(tag(`${picked.name}/${picked.uf}`, "ok"), " base oficial do IBGE");
     else cityStatus.textContent = regionSel.control.value ? "Digite e escolha a cidade na lista." : "Escolha o estado e depois a cidade.";
   };
+  cityCombo.onChange((it) => {
+    picked = it ? { code: it.id, name: it.label, uf: it.uf } : null;
+    updateCityStatus();
+  });
   const showCountry = () => {
     const br = iso === "BR";
     regionSel.node.hidden = !br;
     regionTxt.node.hidden = br;
-    abroadNote.hidden = br;
-    if (!br) {
-      const still = keepCoord && keepCoord.country === iso && (city.control.value || "") === keepCoord.municipality;
+    cityCombo.node.hidden = !br;
+    cityFree.node.hidden = br;
+    abroadNote.hidden = br || !iso;
+    if (!br && iso) {
+      const still = keepCoord && keepCoord.country === iso && (cityFree.control.value || "") === keepCoord.municipality;
       abroadNote.replaceChildren(
         text("strong", "Fora do Brasil. "),
         still ? "A localização registrada na versão anterior é mantida enquanto país e cidade não mudarem." : "O Compass ainda não localiza cidades pelo nome fora do Brasil: a rodada pode ser salva, mas área, busca no mapa e distâncias ficam indisponíveis.",
@@ -4523,47 +4557,25 @@ function roundForm(initial, roundName, onSubmit, label) {
     }
     updateCityStatus();
   };
-  let cityTimer;
-  const searchCities = () => {
-    clearTimeout(cityTimer);
-    cityTimer = setTimeout(() => safe(async () => {
-      if (iso !== "BR" || !regionSel.control.value) return;
-      const q = city.control.value.trim();
-      const res = await api(`/api/geo/municipalities?uf=${regionSel.control.value}&q=${encodeURIComponent(q)}`);
-      cityList.replaceChildren(...res.items.map((m) => el("option", { value: m.name }, `${m.name}/${m.uf}`)));
-      const exact = res.items.find((m) => normKey(m.name) === normKey(q));
-      if (exact) picked = exact;
-      updateCityStatus();
-    }), 180);
-  };
-  city.control.addEventListener("input", () => {
-    if (picked && normKey(picked.name) !== normKey(city.control.value)) picked = null;
-    searchCities();
-    if (iso !== "BR") showCountry();
-  });
   regionSel.control.addEventListener("change", () => {
     picked = null;
-    city.control.value = "";
-    cityList.replaceChildren();
-    searchCities();
+    cityCombo.clear();
     updateCityStatus();
   });
-  country.control.addEventListener("change", () => {
-    const v = country.control.value.trim();
-    const hit = (state.countries ?? []).find((x) => normKey(x.name_pt) === normKey(v) || normKey(x.name_en) === normKey(v) || x.iso2 === v.toUpperCase());
-    iso = hit?.iso2 ?? null;
-    if (hit) country.control.value = hit.name_pt;
+  cityFree.control.addEventListener("input", () => showCountry());
+  country.onChange((it) => {
+    iso = it?.id ?? null;
     picked = null;
+    if (iso === "BR") cityCombo.clear();
     showCountry();
   });
   safe(async () => {
     const list = await countriesData();
-    countryList.replaceChildren(...list.map((x) => el("option", { value: x.name_pt })));
-    country.control.value = list.find((x) => x.iso2 === iso)?.name_pt ?? iso ?? "";
+    const cur = list.find((x) => x.iso2 === iso);
+    if (cur) country.set({ id: cur.iso2, label: cur.name_pt }, true);
     showCountry();
-    if (iso === "BR" && regionSel.control.value) searchCities();
   });
-  const step2 = el("fieldset", { class: "group" }, el("legend", {}, "Local e raio"), el("div", { class: "form-grid" }, country.node, regionSel.node, regionTxt.node, el("div", { class: "city-field" }, city.node, cityStatus), radius.node, unit.node), countryList, cityList, abroadNote);
+  const step2 = el("fieldset", { class: "group" }, el("legend", {}, "Local e raio"), el("div", { class: "form-grid" }, country.node, regionSel.node, regionTxt.node, el("div", { class: "city-field" }, city.node, cityStatus), cityFree.node, radius.node, unit.node), abroadNote);
 
   // ---------- Passo 3: segmentos compradores (as fontes são calculadas por eles) ----------
   const segBox = el("div", { class: "seg-box" });
@@ -4613,12 +4625,12 @@ function roundForm(initial, roundName, onSubmit, label) {
     const origin = { country: iso };
     if (iso === "BR") {
       origin.region = regionSel.control.value;
-      origin.municipality = picked?.name ?? city.control.value.trim();
+      origin.municipality = picked?.name ?? cityText().trim();
       if (picked) origin.municipalityCode = picked.code;
     } else {
       if (regionTxt.control.value.trim()) origin.region = regionTxt.control.value.trim();
-      if (city.control.value.trim()) origin.municipality = city.control.value.trim();
-      if (keepCoord && keepCoord.country === iso && (city.control.value.trim() || "") === keepCoord.municipality) Object.assign(origin, { lat: keepCoord.lat, lon: keepCoord.lon, ...(keepCoord.label ? { label: keepCoord.label } : {}) });
+      if (cityText().trim()) origin.municipality = cityText().trim();
+      if (keepCoord && keepCoord.country === iso && (cityText().trim() || "") === keepCoord.municipality) Object.assign(origin, { lat: keepCoord.lat, lon: keepCoord.lon, ...(keepCoord.label ? { label: keepCoord.label } : {}) });
     }
     const sameCommodity = code === c.commodity?.code;
     // Mantém tudo o que já está registrado (especificação, regras, comprador, prioridades, evidência, faixa perto do limite,
@@ -4649,28 +4661,30 @@ function roundForm(initial, roundName, onSubmit, label) {
   };
   const autoName = () => {
     const p = state.products.find((x) => x.id === productId);
-    const where = iso === "BR" ? `${picked?.name ?? city.control.value.trim()}/${regionSel.control.value}` : [city.control.value.trim(), state.countries?.find((x) => x.iso2 === iso)?.name_pt].filter(Boolean).join(", ");
+    const where = iso === "BR" ? `${picked?.name ?? cityText().trim()}/${regionSel.control.value}` : [cityText().trim(), state.countries?.find((x) => x.iso2 === iso)?.name_pt].filter(Boolean).join(", ");
     return `${commodityName(code)}${varietyOf(p) ? ` ${varietyOf(p)}` : ""} — ${where}, ${radius.control.value} ${unit.control.value === "mi" ? "mi" : "km"}`;
   };
   // Validação de cada passo (no Brasil, a cidade precisa existir na base oficial no estado escolhido).
   const validate = async (i) => {
     if (i === 0) {
+      await commodity.resolve();
       if (!code) return fail("Escolha a commodity na lista.");
       if (!productId) return fail(commodities.find((x) => x.code === code)?.products.length ? "Escolha o produto." : "Sem produto no catálogo para esta commodity: cadastre-o no Catálogo antes.");
     }
     if (i === 1) {
+      await country.resolve();
       if (!iso) return fail("Escolha o país na lista.");
       if (!(Number(radius.control.value) > 0)) return fail("Informe o raio.");
       if (iso === "BR") {
         if (!regionSel.control.value) return fail("Escolha o estado.");
-        const q = city.control.value.trim();
+        const q = cityText().trim();
         if (!q) return fail("Escolha a cidade.");
         if (!picked || normKey(picked.name) !== normKey(q) || picked.uf !== regionSel.control.value) {
           const res = await api(`/api/geo/municipalities?uf=${regionSel.control.value}&q=${encodeURIComponent(q)}`);
           const exact = res.items.filter((m) => normKey(m.name) === normKey(q));
           if (exact.length !== 1) return fail(`"${q}" não foi encontrada em ${UF_NAMES[regionSel.control.value]}. Escolha a cidade na lista.`);
           picked = exact[0];
-          city.control.value = picked.name;
+          cityCombo.set({ id: picked.code, label: picked.name, uf: picked.uf }, true);
           updateCityStatus();
         }
       }
@@ -5256,6 +5270,180 @@ async function showRound(id) {
   showScreen(node, "Rodadas", r.name);
 }
 
+// ===== Seleção pesquisável (combobox) compartilhada: commodities, países e cidades (2026-10-20).
+// Abre ao clicar, filtra enquanto digita (sem diferença de maiúsculas e acentos), funciona por teclado (setas, Enter,
+// Esc) e por toque/mouse; um nome completo com correspondência única é reconhecido sem seleção invisível. O valor
+// guardado é o identificador interno (nunca exibido). Falha ao carregar mostra erro com "Tentar de novo".
+const fold = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+let comboSeq = 0;
+// opts: { label, name, placeholder, load: async (q) => [{ id, label, hint?, aliases? }], minChars = 0, value: { id, label }, required }
+function comboBox(opts) {
+  const id = `cb-${++comboSeq}`;
+  const input = el("input", { type: "text", id, name: `${opts.name}Text`, role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": `${id}-list`, autocomplete: "off", placeholder: opts.placeholder ?? "Digite para buscar", ...(opts.required ? { required: "" } : {}) });
+  const hidden = el("input", { type: "hidden", name: opts.name });
+  const list = el("ul", { class: "combo-list", role: "listbox", id: `${id}-list`, hidden: "" });
+  const status = el("p", { class: "combo-status", "aria-live": "polite" });
+  const wrap = el("div", { class: "combo" }, el("label", { for: id }, opts.label), el("div", { class: "combo-field" }, input, list), hidden, status);
+  let items = [], shown = [], active = -1, selected = null, loadError = null, loadedFor = null;
+  const listeners = [];
+  const emit = () => listeners.forEach((f) => f(selected));
+  const pick = (it, silent = false) => {
+    selected = it;
+    hidden.value = it?.id ?? "";
+    if (it) input.value = it.label;
+    status.textContent = "";
+    close();
+    if (!silent) emit();
+  };
+  const close = () => {
+    list.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+    active = -1;
+  };
+  const render = () => {
+    list.replaceChildren();
+    if (loadError) {
+      list.append(el("li", { class: "combo-error", role: "option", "aria-disabled": "true" }, text("span", loadError), el("button", { type: "button", class: "link-btn", onmousedown: (e) => e.preventDefault(), onclick: () => refresh(true) }, "Tentar de novo")));
+    } else if (!shown.length) list.append(el("li", { class: "combo-empty", role: "option", "aria-disabled": "true" }, input.value.trim().length < (opts.minChars ?? 0) ? `Digite ao menos ${opts.minChars} letras` : "Nenhuma opção com esse nome"));
+    shown.forEach((it, i) =>
+      list.append(
+        el(
+          "li",
+          { id: `${id}-o${i}`, role: "option", class: i === active ? "active" : "", "aria-selected": selected?.id === it.id ? "true" : "false", onmousedown: (e) => e.preventDefault(), onclick: () => pick(it) },
+          text("span", it.label),
+          it.hint ? text("small", it.hint) : null,
+        ),
+      ),
+    );
+    list.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+    if (active >= 0) {
+      input.setAttribute("aria-activedescendant", `${id}-o${active}`);
+      list.children[active]?.scrollIntoView({ block: "nearest" });
+    }
+  };
+  const filter = () => {
+    const q = fold(input.value);
+    const hits = items.filter((it) => !q || fold(it.label).includes(q) || (it.aliases ?? []).some((a) => fold(a).includes(q)));
+    hits.sort((a, b) => (fold(a.label).startsWith(q) ? 0 : 1) - (fold(b.label).startsWith(q) ? 0 : 1) || a.label.localeCompare(b.label, "pt-BR"));
+    // Lista local inteira (rolagem interna); só a remota (cidades) vem limitada pelo servidor.
+    shown = opts.remote ? hits.slice(0, 200) : hits;
+    active = shown.length ? 0 : -1;
+  };
+  let timer;
+  const refresh = async (force = false) => {
+    const q = input.value.trim();
+    if (q.length < (opts.minChars ?? 0)) {
+      items = [];
+      shown = [];
+      loadError = null;
+      return render();
+    }
+    const key = opts.remote ? q : "*";
+    if (force || loadedFor !== key) {
+      try {
+        loadError = null;
+        items = await opts.load(q);
+        loadedFor = key;
+      } catch (e) {
+        loadError = `Não foi possível carregar a lista (${e.message}).`;
+        items = [];
+      }
+    }
+    filter();
+    render();
+  };
+  // Nome completo digitado com correspondência única (nome ou apelido): reconhecido sem precisar clicar na opção.
+  const exact = () => {
+    const q = fold(input.value);
+    if (!q) return null;
+    const m = items.filter((it) => fold(it.label) === q || (it.aliases ?? []).some((a) => fold(a) === q));
+    return m.length === 1 ? m[0] : null;
+  };
+  input.addEventListener("focus", () => safe(() => refresh()));
+  input.addEventListener("click", () => safe(() => refresh()));
+  input.addEventListener("input", () => {
+    if (selected && fold(selected.label) !== fold(input.value)) {
+      selected = null;
+      hidden.value = "";
+      emit();
+    }
+    clearTimeout(timer);
+    timer = setTimeout(() => safe(() => refresh()), opts.remote ? 200 : 0);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (list.hidden) return safe(() => refresh());
+      if (!shown.length) return;
+      active = (active + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length;
+      render();
+    } else if (e.key === "Enter") {
+      if (!list.hidden && active >= 0 && shown[active]) {
+        e.preventDefault();
+        pick(shown[active]);
+      } else if (!selected) {
+        const m = exact();
+        if (m) (e.preventDefault(), pick(m));
+      }
+    } else if (e.key === "Escape") close();
+  });
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      close();
+      if (!selected) {
+        const m = exact();
+        if (m) pick(m);
+        else if (input.value.trim()) status.textContent = "Escolha uma opção da lista.";
+      }
+    }, 120);
+  });
+  return {
+    node: wrap,
+    control: input,
+    get value() {
+      return selected?.id ?? "";
+    },
+    get item() {
+      return selected;
+    },
+    // Resolve o texto digitado (nome completo com correspondência única) antes de validar o formulário.
+    async resolve() {
+      if (selected) return selected;
+      if (!items.length || opts.remote) await refresh(true).catch(() => {});
+      close();
+      const m = exact();
+      if (m) pick(m);
+      return selected;
+    },
+    set(it, silent = true) {
+      pick(it, silent);
+    },
+    clear() {
+      selected = null;
+      hidden.value = "";
+      input.value = "";
+      items = opts.remote ? [] : items;
+      loadedFor = opts.remote ? null : loadedFor;
+    },
+    onChange(f) {
+      listeners.push(f);
+    },
+    reload() {
+      loadedFor = null;
+    },
+  };
+}
+// Listas comuns (uma só fonte cada): commodities do catálogo, países da base e cidades oficiais do IBGE.
+const commodityItems = async () => (state.commodities ?? []).map((c) => ({ id: c.code, label: c.label, aliases: c.aliases, hint: c.identityPending ? "identidade do produto pendente: pesquisa sim, ficha só depois da confirmação" : null }));
+const countryItems = (excludeBR = false) => async () => (await countriesData()).filter((c) => !(excludeBR && c.iso2 === "BR")).map((c) => ({ id: c.iso2, iso3: c.iso3, label: c.name_pt, aliases: [c.name_en] }));
+const cityItems = (ufOf) => async (q) => {
+  const uf = ufOf();
+  if (!uf) throw new Error("escolha o estado primeiro");
+  return (await api(`/api/geo/municipalities?uf=${uf}&q=${encodeURIComponent(q)}`)).items.map((m) => ({ id: m.code, label: m.name, uf: m.uf, hint: m.uf }));
+};
+
 // ===== Prospecção automática (2026-10-20): componentes compartilhados pelo Radar Nacional, Radar Internacional e Rodadas.
 // A pessoa informa produto, mercado, local e alcance; o servidor executa o resto em segundo plano (com a política de
 // pesquisa vigente) e a tela só acompanha. Nada aqui faz contato, aprova ficha ou envia mensagem.
@@ -5279,11 +5467,7 @@ function prospectStart(fixedMarket = null) {
   const box = el("section", { class: "panel prospect-start" }, text("h2", "Iniciar prospecção"));
   const form = el("form", { class: "prospect-form", novalidate: "" });
   const error = el("p", { class: "error", hidden: "" });
-  const commList = el("datalist", { id: `pc-${Math.random().toString(36).slice(2, 8)}` }, ...commodities.map((x) => el("option", { value: x.label })));
-  const comm = input("Commodity", "commodity", "text", "", true);
-  comm.control.setAttribute("list", commList.id);
-  comm.control.setAttribute("autocomplete", "off");
-  comm.control.placeholder = "Digite para buscar (ex.: café, milho)";
+  const comm = comboBox({ label: "Commodity", name: "commodity", placeholder: "Digite para buscar (ex.: café, milho, farelo)", load: commodityItems, required: true });
   const prodBox = el("div", { class: "prospect-product" });
   let code = "", productId = "";
   const renderProduct = () => {
@@ -5291,56 +5475,55 @@ function prospectStart(fixedMarket = null) {
     if (!list.some((p) => p.id === productId)) productId = list.length === 1 ? list[0].id : "";
     prodBox.replaceChildren();
     if (list.length > 1) {
-      const sel = select("Produto", "productId", [["", "Escolha"], ...list.map((p) => [p.id, p.variant_name])], productId);
-      sel.control.addEventListener("change", () => (productId = sel.control.value));
+      const sel = select("Produto", "productId", [["", "Escolha"], ...list.map((p) => [p.id, p.display_name ?? p.variant_name])], productId);
+      sel.control.addEventListener("change", () => ((productId = sel.control.value), coverage()));
       prodBox.append(sel.node);
-    } else if (list.length === 1) prodBox.append(text("p", `Produto: ${list[0].variant_name}`, "form-hint"));
+    } else if (list.length === 1) prodBox.append(text("p", `Produto: ${list[0].display_name ?? list[0].variant_name}${list[0].identity_status !== "confirmed" ? " · identidade pendente (pesquisa sim; ficha só depois da confirmação)" : ""}`, "form-hint"));
   };
-  comm.control.addEventListener("change", () => {
-    const hit = commodities.find((x) => normKey(x.label) === normKey(comm.control.value));
-    code = hit?.code ?? "";
-    if (hit) comm.control.value = hit.label;
+  comm.onChange((it) => {
+    code = it?.id ?? "";
     productId = "";
     renderProduct();
+    coverage();
   });
   let market = fixedMarket ?? "national";
   const marketSel = fixedMarket ? null : select("Mercado", "market", [["national", "Nacional"], ["international", "Internacional"]], market);
   // Nacional: estado, cidade (base oficial) e raio.
   const region = select("Estado", "region", [["", "Escolha"], ...Object.entries(UF_NAMES).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([k, v]) => [k, `${v} (${k})`])], "");
-  const cityList = el("datalist", { id: `pci-${Math.random().toString(36).slice(2, 8)}` });
-  const city = input("Cidade", "municipality", "text", "", false);
-  city.control.setAttribute("list", cityList.id);
-  city.control.setAttribute("autocomplete", "off");
+  const city = comboBox({ label: "Cidade", name: "municipality", placeholder: "Digite o nome da cidade", load: cityItems(() => region.control.value), remote: true });
   const radius = input("Raio (km)", "radius", "number", 150);
   radius.control.min = "1";
-  let picked = null, t;
-  city.control.addEventListener("input", () => {
-    clearTimeout(t);
-    picked = null;
-    t = setTimeout(() => safe(async () => {
-      if (!region.control.value) return;
-      const r = await api(`/api/geo/municipalities?uf=${region.control.value}&q=${encodeURIComponent(city.control.value.trim())}`);
-      cityList.replaceChildren(...r.items.map((m) => el("option", { value: m.name })));
-      picked = r.items.find((m) => normKey(m.name) === normKey(city.control.value)) ?? null;
-    }), 180);
-  });
-  region.control.addEventListener("change", () => ((city.control.value = ""), (picked = null)));
-  const natBox = el("div", { class: "form-grid" }, region.node, el("div", {}, city.node, cityList), radius.node);
-  // Internacional: país (com os indicadores oficiais em Radar Internacional para orientar a escolha).
-  const countryList = el("datalist", { id: `pp-${Math.random().toString(36).slice(2, 8)}` });
-  const country = input("País", "country", "text", "", false);
-  country.control.setAttribute("list", countryList.id);
-  country.control.setAttribute("autocomplete", "off");
-  const intlBox = el("div", { class: "form-grid" }, el("div", {}, country.node, countryList), text("p", "Os indicadores oficiais de compra por país orientam a escolha (Radar Internacional → Indicadores por país); dado de comércio não prova que uma empresa importa do Brasil.", "form-hint"));
+  region.control.addEventListener("change", () => city.clear());
+  city.onChange(() => coverage());
+  const natBox = el("div", { class: "form-grid" }, region.node, city.node, radius.node);
+  // Internacional: país (todos os países da base; a cobertura das fontes aparece abaixo, sem esconder país).
+  const country = comboBox({ label: "País", name: "country", placeholder: "Digite para buscar (ex.: Argentina, Alemanha)", load: countryItems(true), required: true });
+  country.onChange(() => coverage());
+  const intlBox = el("div", { class: "form-grid" }, country.node, text("p", "Os indicadores oficiais de compra por país orientam a escolha (Radar Internacional → Indicadores por país); dado de comércio não prova que uma empresa importa do Brasil.", "form-hint"));
+  const cov = el("div", { class: "prospect-coverage", "aria-live": "polite" });
+  let covSeq = 0;
+  // Cobertura da pesquisa para a escolha atual: o que cada fonte cobre, o que fica pendente. Não esconde país nem produto.
+  const coverage = () => {
+    const seq = ++covSeq;
+    const pid = productId || commodities.find((x) => x.code === code)?.products?.[0]?.id;
+    if (!pid || (market === "international" && !country.item)) return cov.replaceChildren();
+    safe(async () => {
+      const q = market === "international" ? `market=international&productId=${pid}&iso2=${country.item.id}` : `market=national&productId=${pid}`;
+      const r = await api(`/api/prospect/coverage?${q}`);
+      if (seq !== covSeq) return;
+      cov.replaceChildren(
+        text("strong", "Cobertura desta pesquisa"),
+        el("ul", { class: "coverage-list" }, ...r.items.map((x) => el("li", {}, tag(x.available ? "coberta" : "sem cobertura", x.available ? "ok" : "warn"), text("span", x.label), x.note ? text("small", x.note) : null))),
+        r.partial ? text("p", r.partialNote, "form-hint") : null,
+      );
+    });
+  };
   const showMarket = () => {
     natBox.hidden = market !== "national";
     intlBox.hidden = market !== "international";
+    coverage();
   };
   marketSel?.control.addEventListener("change", () => ((market = marketSel.control.value), showMarket()));
-  safe(async () => {
-    const list = await countriesData();
-    countryList.replaceChildren(...list.filter((x) => x.iso2 !== "BR").map((x) => el("option", { value: x.name_pt })));
-  });
   // Perfil e política: resumo curto, com ajuste fora do percurso.
   const ctxLine = el("div", { class: "prospect-context" }, text("p", "Carregando perfil e política…", "muted"));
   safe(async () => {
@@ -5355,26 +5538,24 @@ function prospectStart(fixedMarket = null) {
     );
   });
   const submit = el("button", { type: "submit", class: "primary" }, "Iniciar prospecção");
-  form.append(el("div", { class: "form-grid" }, el("div", {}, comm.node, commList), prodBox, marketSel?.node ?? null), natBox, intlBox, ctxLine, error, el("div", { class: "toolbar" }, submit));
+  form.append(el("div", { class: "form-grid" }, comm.node, prodBox, marketSel?.node ?? null), natBox, intlBox, cov, ctxLine, error, el("div", { class: "toolbar" }, submit));
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     safe(async () => {
       error.hidden = true;
       const fail = (m) => ((error.textContent = m), (error.hidden = false));
+      await comm.resolve();
       if (!code) return fail("Escolha a commodity na lista.");
       if (!productId) return fail("Escolha o produto.");
       const body = { market, productId };
       if (market === "national") {
         if (!region.control.value) return fail("Escolha o estado.");
-        if (!picked) {
-          const r = await api(`/api/geo/municipalities?uf=${region.control.value}&q=${encodeURIComponent(city.control.value.trim())}`);
-          picked = r.items.find((m) => normKey(m.name) === normKey(city.control.value)) ?? null;
-        }
-        if (!picked) return fail("Escolha a cidade na lista (base oficial do IBGE).");
+        const c = await city.resolve();
+        if (!c) return fail("Escolha a cidade na lista (base oficial do IBGE).");
         if (!(Number(radius.control.value) > 0)) return fail("Informe o raio.");
-        Object.assign(body, { location: { region: picked.uf, municipality: picked.name, municipalityCode: picked.code }, radius: { value: Number(radius.control.value), unit: "km" } });
+        Object.assign(body, { location: { region: c.uf, municipality: c.label, municipalityCode: c.id }, radius: { value: Number(radius.control.value), unit: "km" } });
       } else {
-        const c = (state.countries ?? []).find((x) => normKey(x.name_pt) === normKey(country.control.value));
+        const c = await country.resolve();
         if (!c) return fail("Escolha o país na lista.");
         Object.assign(body, { location: { iso3: c.iso3 } });
       }
@@ -5474,11 +5655,23 @@ async function showJob(id) {
         `Empresas cadastradas em descoberta (${s.registered})`,
         text("p", s.notCommercial, "muted"),
         s.ranked.length
-          ? tbl(["Prioridade", "Empresa", s.market === "national" ? "Local e distância" : "Situação", "Porte", "Evidência", "Canal", "Sanções"], s.ranked, (x, i) =>
-              el("tr", {}, text("td", String(i + 1)), el("td", {}, x.companyId ? el("button", { type: "button", class: "link-btn", onclick: () => showCompany(x.companyId) }, x.name) : x.name), text("td", s.market === "national" ? [x.municipality, x.distance].filter(Boolean).join(" · ") || "—" : x.status), text("td", SIZE[x.size] ?? x.size), text("td", s.market === "national" ? `operação ${PROOF[x.operation] ?? "—"} · uso ${PROOF[x.use] ?? "—"} · compra ${PROOF[x.purchase] ?? "—"}` : `${x.ownEvidence} própria(s)`), text("td", x.channel ? "geral publicado" : x.note ?? "—"), text("td", x.screening ?? "—")),
+          ? tbl(["Prioridade", "Empresa", "Decisor", s.market === "national" ? "Local e distância" : "Situação", "Porte", "Evidência", "Canal", "Sanções"], s.ranked, (x, i) =>
+              el("tr", {}, text("td", String(i + 1)), el("td", {}, x.companyId ? el("button", { type: "button", class: "link-btn", onclick: () => showCompany(x.companyId) }, x.name) : x.name), el("td", { class: "dec-cell", "data-company": x.companyId ?? "" }, "…"), text("td", s.market === "national" ? [x.municipality, x.distance].filter(Boolean).join(" · ") || "—" : x.status), text("td", SIZE[x.size] ?? x.size), text("td", s.market === "national" ? `operação ${PROOF[x.operation] ?? "—"} · uso ${PROOF[x.use] ?? "—"} · compra ${PROOF[x.purchase] ?? "—"}` : `${x.ownEvidence} própria(s)`), text("td", x.channel ? "geral publicado" : x.note ?? "—"), text("td", x.screening ?? "—")),
             )
           : text("p", "Nenhuma empresa cadastrada nesta prospecção.", "empty"),
       ),
+      panel(
+        "Fontes consultadas",
+        s.partial ? el("div", { class: "callout warn" }, text("p", s.partialNote)) : text("p", "Todas as fontes previstas responderam.", "muted"),
+        el("ul", { class: "coverage-list" }, ...Object.entries(s.coverage ?? s.sources ?? {}).map(([k, v]) => el("li", {}, tag(typeof v === "string" ? v : { ok: "consultada", empty: "sem resultado nesta consulta", unavailable: "indisponível", partial: "parcial", not_applicable: "não se aplica" }[v.status] ?? v.status, typeof v === "string" ? "" : v.status === "ok" ? "ok" : v.status === "not_applicable" ? "" : "warn"), text("span", sourceName(k)), typeof v === "string" ? null : text("small", v.note ?? "")))),
+      ),
+      s.toIdentify?.length
+        ? panel(
+            `Compradores prováveis a identificar (${s.toIdentify.length})`,
+            text("p", "Torrefadoras com produto certificado pela ABIC nos estados da área. A lista pública não traz CNPJ nem município: sem CNPJ, nenhuma é cadastrada e a distância fica desconhecida.", "muted"),
+            el("ul", { class: "plain-list compact-list" }, ...s.toIdentify.map((x) => text("li", `${x.name}${x.region ? ` (${x.region})` : ""}`))),
+          )
+        : null,
       panel(
         `Pendências para análise (${s.exceptions})`,
         s.queue.length
@@ -5487,6 +5680,16 @@ async function showJob(id) {
       ),
     );
   }
+  // Decisores das empresas cadastradas (só leitura; mesma visibilidade do cadastro).
+  safe(async () => {
+    const ids = [...node.querySelectorAll(".dec-cell")].map((td) => td.dataset.company).filter(Boolean);
+    if (!ids.length) return;
+    const d = (await api(`/api/companies/decisors?ids=${ids.join(",")}`)).items;
+    for (const td of node.querySelectorAll(".dec-cell")) {
+      const x = d[td.dataset.company];
+      td.textContent = x?.summary ? `${x.summary.name ?? "nome não informado"} (${x.summary.title ?? x.summary.roleLabel}) · ${x.summary.status}` : "Decisor ainda não identificado";
+    }
+  });
   // Registro das etapas (rastreabilidade) e controles.
   const controls = el("div", { class: "toolbar" });
   if (writable()) {
@@ -5621,6 +5824,7 @@ async function start() {
     ]);
     state.actor = session.actor;
     state.products = catalog.products;
+    state.commodities = catalog.commodities;
     $("session").textContent =
       `${session.actor.display_name} · ${session.environment === "local" ? "Ambiente local" : "Produção"}`;
     $("navigation").replaceChildren(

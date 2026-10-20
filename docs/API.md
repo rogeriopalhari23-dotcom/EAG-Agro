@@ -7,7 +7,8 @@ Todas as rotas `/api/*`, exceto GET health, exigem identidade autenticada e usu�
 | GET /api/health | Liveness/versão, sem dados da operação. |
 | GET /api/session | Usuário, ambiente e capacidades implementadas. |
 | GET /api/dashboard | Contagens reais de pipeline e exceções. |
-| GET/POST /api/companies | Lista por q/status; cria com legalName, countryCode ISO2, sourceLabel; registro com tipo opcional. |
+| GET/POST /api/companies | Lista por q (nome, CNPJ, ou nome/e-mail/telefone de pessoa vinculada; canal geral só por e-mail/telefone), status, country, contact, profile, decisor (confirmado/identificado/a_validar/sem), commodity e uf; cada empresa traz `decisors` (pessoas com situação e fonte; canais gerais à parte). Cria com legalName, countryCode ISO2, sourceLabel; registro com tipo opcional. |
+| GET /api/companies/decisors?ids=a,b | Decisores e canais de até 100 empresas do próprio inquilino (resultados da prospecção). Só leitura; nada deduzido nem validado. |
 | GET /api/companies/:id | Coleções paginadas e contatos decriptados; campos de cada demanda da página. |
 | POST /api/companies/:id/evidence | Categoria/tipo/referência, consultedAt; prova empresarial exige productId e market, validationStatus; factDate opcional não pontua atualidade quando ausente. |
 | POST /api/companies/:id/contacts | fullName, sourceLabel; campos opcionais jobTitle/email/phone/linkedinUrl criptografados. |
@@ -17,7 +18,7 @@ Todas as rotas `/api/*`, exceto GET health, exigem identidade autenticada e usu�
 | POST /api/companies/:id/approvals | demandId, approvalType, status, reason; gestor/admin, decisão vinculada aos dados atuais. |
 | POST /api/companies/:id/scores/recalculate | demandId; resultados/gate atuais, scoresReused indica ausência de nova gravação igual. |
 | POST /api/companies/:id/qualify | demandId; gestor/admin; gate e revisões conferidos no commit. |
-| GET /api/catalog[/id] | Produtos; detalhe com códigos e características. Não existe edição de catálogo nesta entrega. |
+| GET /api/catalog[/id] | Produtos e `commodities` (lista única para radares, prospecção e rodadas: nome comercial, sigla como complemento, aliases sem sinônimos entre commodities); detalhe com códigos e características. Não existe edição de catálogo nesta entrega. |
 | GET /api/parameters | Valores atualmente vigentes por chave:escopo. |
 | PUT /api/parameters/:key | Admin, scope/value/reason. Apenas chaves explicitamente suportadas em operations.js. |
 | GET/POST /api/campaigns | Lista/criação: name, productId, market, localização, ICP obrigatório. |
@@ -30,6 +31,7 @@ Todas as rotas `/api/*`, exceto GET health, exigem identidade autenticada e usu�
 | GET /api/audit | Eventos paginados; filtro opcional entityId. |
 | GET/POST /api/prospect/profile | Perfil comprador padrão, versionado (POST: gestor/admin, com motivo e expectedVersion). |
 | GET/POST /api/prospect/policy, POST /api/prospect/policy/revoke | Política de pesquisa de rotina: concessão (gestor/admin, confirm + referência; fonte paga recusada) e revogação. |
+| GET /api/prospect/coverage | Cobertura da pesquisa para market + productId (+ iso2 no internacional): fontes cobertas e sem cobertura, com nota; `partial` quando alguma falta. Não esconde país. |
 | GET/POST /api/prospect/jobs | Prospecções; criar com market, productId e local (nacional: region, municipality, radius; internacional: iso3). Executa em segundo plano (fila e cron). |
 | GET /api/prospect/jobs/:id; POST …/pause, …/resume, …/cancel, …/skip-browser, …/browser-osm, …/run | Andamento, etapas e registro; controles da pessoa; resposta do mapa obtida pelo navegador; execução imediata (diagnóstico). |
 | GET /api/round-catalog | Fontes das rodadas (o que fazem, limites, regra por segmento) e segmentos sugeridos por commodity. Só leitura. |

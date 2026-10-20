@@ -2826,3 +2826,134 @@ details.complementary > summary {
 .prospect-form [hidden] {
   display: none !important;
 }
+/* Lista pesquisável (país, commodity, município): compacta, altura máxima com rolagem interna. */
+.combo {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.combo-field {
+  position: relative;
+}
+.combo-field input {
+  width: 100%;
+}
+.combo-list {
+  position: absolute;
+  z-index: 30;
+  inset-inline: 0;
+  top: calc(100% + 2px);
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  max-height: min(288px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgb(20 40 60 / 0.12);
+}
+.combo-list[hidden] {
+  display: none;
+}
+.combo-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 12px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.combo-list li small {
+  color: var(--muted);
+  margin-left: auto;
+}
+.combo-list li.active,
+.combo-list li:hover {
+  background: var(--teal-soft);
+}
+.combo-list li[aria-selected="true"] {
+  font-weight: 600;
+}
+.combo-list li.combo-empty,
+.combo-list li.combo-error {
+  cursor: default;
+  color: var(--muted);
+}
+.combo-list li.combo-error {
+  color: var(--warn-text);
+  justify-content: space-between;
+}
+.combo-status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.combo-status:empty {
+  display: none;
+}
+@media (pointer: coarse), (max-width: 640px) {
+  .combo-list li {
+    min-height: 44px;
+  }
+}
+/* Decisor e canal (lista de empresas, resumo e resultados da prospecção). */
+.decisor-box {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 0.9rem;
+}
+.decisor-box p,
+.decisor-box ul {
+  margin: 0;
+}
+.person-list {
+  display: grid;
+  gap: 2px;
+}
+.person-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.decisor-none {
+  color: var(--muted);
+}
+.channel-line {
+  color: var(--text-2);
+}
+.decisor-box details > summary {
+  cursor: pointer;
+  color: var(--text-2);
+}
+.decisor-item {
+  display: grid;
+  gap: 4px;
+}
+.dec-cell {
+  font-size: 0.88rem;
+}
+.coverage-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.coverage-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.coverage-list small {
+  color: var(--muted);
+}
+.compact-list {
+  max-height: 260px;
+  overflow-y: auto;
+}

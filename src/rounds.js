@@ -28,6 +28,8 @@ import { operationRecord, describeOperation } from "./provenance.js";
 // Fontes automáticas que o Worker consegue executar (o OSM sai pelo navegador; ver sources/osm.js).
 const WORKER_FETCHERS = { "br-cnpj-ws": (fetchImpl) => brCnpjWs({ fetchImpl }) };
 const BROWSER_SOURCES = ["osm-overpass"];
+// Fontes executadas pelo motor da prospecção automática (src/prospect/engine.js) e entregues pela rota de candidatas.
+const ENGINE_SOURCES = ["abic-certificados", "company-site"];
 const CHUNK = 40;
 const REF_MAX = 280; // trecho da referência exibido no fechamento
 
@@ -122,7 +124,7 @@ function validated(raw) {
   return v.config;
 }
 const preflightFor = (config) =>
-  preflight(config, { geography: config.origin.country === "BR" ? "national_official" : "none", implemented: [...Object.keys(WORKER_FETCHERS), ...BROWSER_SOURCES] });
+  preflight(config, { geography: config.origin.country === "BR" ? "national_official" : "none", implemented: [...Object.keys(WORKER_FETCHERS), ...BROWSER_SOURCES, ...ENGINE_SOURCES] });
 
 // Triagens de sanções das empresas cadastradas pela rodada (só leitura): última execução por empresa, ocorrências,
 // versões das listas usadas e validade pela mesma regra do Compass (sanctions_max_age_hours sobre o download de cada lista).
@@ -306,8 +308,21 @@ export async function addCandidates(request, env, actor, rid, id) {
   const at = now();
   let candidates = [], errors = [], skipped = null, source;
   if (intake === "automatic") {
-    source = oneOf(i.source, ["osm-overpass", "company-site"], "fonte automática");
-    if (source === "company-site") {
+    source = oneOf(i.source, ["osm-overpass", "company-site", "abic-certificados"], "fonte automática");
+    if (source === "abic-certificados") {
+      // Lista pública da ABIC: industrializador e estado da fábrica (sem CNPJ e sem município): candidata provisória.
+      if (!Array.isArray(i.candidates) || !i.candidates.length || i.candidates.length > 500) fail(422, "invalid_field", "Envie de 1 a 500 industrializadores.");
+      for (const x of i.candidates) {
+        const uf = String(x.uf ?? "").toUpperCase();
+        if (!/^[A-Z]{2}$/.test(uf) || !x.name) { errors.push("Industrializador sem nome ou estado ignorado."); continue; }
+        candidates.push({
+          country: "BR", name: str(x.name, "nome", 250), registrationId: null, municipality: null, region: uf,
+          hints: { segment: "roaster", abic: true },
+          sources: [{ id: "abic-certificados", mode: "automatic", ref: SOURCE_CATALOG["abic-certificados"].url, url: SOURCE_CATALOG["abic-certificados"].url, consultedAt: at }],
+          evidence: [{ kind: "commodity_use", strength: "directory", url: SOURCE_CATALOG["abic-certificados"].url, quote: `Torrefadora com produto certificado pela ABIC (fábrica em ${uf})${x.products?.length ? `: ${x.products.slice(0, 3).map((p) => String(p).slice(0, 60)).join(", ")}` : ""}`, date: at }],
+        });
+      }
+    } else if (source === "company-site") {
       // Site da própria empresa: só CNPJ com dígitos válidos, com a página como fonte própria; nada de nome de pessoa.
       if (!Array.isArray(i.candidates) || !i.candidates.length || i.candidates.length > 50) fail(422, "invalid_field", "Envie de 1 a 50 candidatas lidas do site.");
       for (const x of i.candidates) {

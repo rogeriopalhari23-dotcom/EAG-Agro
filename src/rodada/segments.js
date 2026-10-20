@@ -19,9 +19,9 @@ export const SEGMENT_PRESETS = {
     ethanol: { label: "etanol de grãos" },
   },
   coffee: {
-    roaster: { label: "torrefação", discovery: { osm: [["craft", "coffee_roaster"], ["craft", "roaster"]] } },
+    roaster: { label: "torrefação", discovery: { osm: [["craft", "coffee_roaster"], ["craft", "roaster"]], abic: true } },
   },
 };
 
 // Fontes que dependem de regra por segmento: sem regra, a fonte não sabe o que procurar.
-export const RULE_SOURCES = { "osm-overpass": "osm", "mapa-sipeagro": "sipeagro" };
+export const RULE_SOURCES = { "osm-overpass": "osm", "mapa-sipeagro": "sipeagro", "abic-certificados": "abic" };

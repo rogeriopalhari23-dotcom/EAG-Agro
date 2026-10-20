@@ -93,20 +93,27 @@ try {
   // Criar pelo percurso simplificado (2026-10-20): commodity por nome (seleção pesquisável), produto só quando há mais de
   // um compatível, estado e cidade escolhidos (sem código IBGE nem coordenada), raio, segmentos; nome na revisão.
   const fset = (n, v, ev = "change") => js(`(() => { const c = document.querySelector('.round-form [name="${n}"]'); c.value = ${JSON.stringify(v)}; c.dispatchEvent(new Event("input", { bubbles: true })); c.dispatchEvent(new Event("${ev}", { bubbles: true })); return true; })()`);
+  // Seleção pesquisável: digitar (como o teclado faria), esperar a lista e escolher a opção com o clique do mouse.
+  const combo = async (n, typed, label) => {
+    await js(`(() => { const c = document.querySelector('.round-form [name="${n}Text"]'); c.focus(); c.value = ${JSON.stringify(typed)}; c.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+    await until(`[...document.querySelectorAll(".round-form .combo-list:not([hidden]) li")].some((li) => li.firstChild?.textContent === ${JSON.stringify(label)})`, `opção ${label}`);
+    await js(`(() => { const li = [...document.querySelectorAll(".round-form .combo-list:not([hidden]) li")].find((x) => x.firstChild?.textContent === ${JSON.stringify(label)}); li.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true })); li.click(); return true; })()`);
+    await until(`document.querySelector('.round-form [name="${n}"]').value !== ""`, `${label} registrado`);
+  };
   const next = () => js(`(() => { [...document.querySelectorAll(".round-form button")].find((b) => b.textContent === "Continuar" && !b.hidden).click(); return true; })()`);
   const stepIs = (label) => until(`/${label}/.test(document.querySelector(".round-form .wizard-steps .current").textContent)`, label);
   await js(`(() => { const d = [...document.querySelectorAll("details")].find((x) => x.querySelector("summary").textContent === "Nova rodada"); d.open = true; return true; })()`);
   const form1 = await js(`document.querySelector(".round-form").innerText`);
   assert.ok(!/Código IBGE|Latitude|Longitude|JSON|Idioma|Fuso|compliance/i.test(form1), "percurso principal sem campos técnicos nem opcionais");
-  await fset("commodity", "Soja");
+  await combo("commodity", "soja", "Soja");
   assert.ok(await js(`!!document.querySelector('.round-form [name="configProductId"]')`), "soja tem duas variedades: produto pedido");
   await fset("configProductId", "product-01");
   // Enviar no passo 1 só avança (nunca cria antes da revisão).
   await js(`document.querySelector(".round-form").requestSubmit()`);
   await stepIs("Local e raio");
-  await until(`document.querySelector('.round-form [name="countryName"]').value === "Brasil"`, "país pelo nome");
+  await until(`document.querySelector('.round-form [name="countryText"]').value === "Brasil" && document.querySelector('.round-form [name="country"]').value === "BR"`, "país pelo nome");
   await fset("region", "GO");
-  await fset("municipality", "Rio Verde", "input");
+  await combo("municipality", "rio verde", "Rio Verde");
   await fset("radius", "150");
   await next();
   await stepIs("Segmentos");

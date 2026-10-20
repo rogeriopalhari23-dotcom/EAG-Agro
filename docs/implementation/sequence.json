@@ -928,12 +928,19 @@
         "migrations/0045_prospeccao_automatica.sql",
         "tests/prospeccao.test.mjs",
         "tests/helpers/simulated-world.mjs",
-        "docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md"
+        "docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md",
+        "src/adapters/abic.js",
+        "src/decisors.js",
+        "src/catalog-names.js",
+        "migrations/0046_catalogo_nomes_farelo_milho.sql",
+        "tests/decisores-catalogo.test.mjs",
+        "tests/ui-listas.mjs",
+        "docs/implementation/PLANO-CONSULTAS-FORA-DA-CLOUDFLARE.md"
       ],
-      "acceptance": "Pessoa informa produto, mercado, local e alcance; servidor executa descoberta, conciliação, consulta cadastral, deduplicação, evidências e canais, prioridade, triagem, cadastro em descoberta e relatório, com espera por limite, pausa, cancelamento e retomada; sem política, para em decisão; nada de contato, ficha, campanha, canal ou envio.",
-      "validation": "tests/prospeccao.test.mjs (8); npm run check 521+2+37; ui-rodadas; test:ui; roteiro da prévia (15 conferências)",
+      "acceptance": "Pessoa informa produto, mercado, local e alcance; servidor executa descoberta, conciliação, consulta cadastral, deduplicação, evidências e canais, prioridade, triagem, cadastro em descoberta e relatório, com espera por limite, pausa, cancelamento e retomada; sem política, para em decisão; nada de contato, ficha, campanha, canal ou envio. Correções de 20/10: lista comum de países, commodities e cidades, pesquisável sem acento, com teclado, toque e nova tentativa; Farelo de milho no catálogo (distinto de CGF, CGM e DDGS); decisores e canal geral separados junto às empresas, com busca por pessoa ou contato e filtros combinados; ABIC como fonte complementar de café; relatório com cobertura por fonte e marca de parcial.",
+      "validation": "tests/prospeccao.test.mjs (8) + tests/decisores-catalogo.test.mjs (6); npm run check; ui-rodadas; ui-listas; test:ui (ui-smoke)",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Não publicado. Depende de: emenda R12.7 (proposta); decisão sobre a alternativa ao mapa pelo servidor (ponte); cobertura do mapa para café no Brasil é nula (verificação real 20/10). Migração 0045 só local."
+      "blockedBy": "Não publicado. Depende de: emenda R12.7 (texto exato em EMENDA-PROSPECCAO-AUTOMATICA.md, proposta); decisão sobre consultas fora da Cloudflare (PLANO-CONSULTAS-FORA-DA-CLOUDFLARE.md, proposta; ponte não alterada); confirmação da oferta de Farelo de milho e do código HS 2302.10 pelo administrador. Sem busca de CNPJ por nome gratuita: torrefadoras da ABIC ficam a identificar. Migrações 0045 e 0046 só locais."
     }
   ]
 }

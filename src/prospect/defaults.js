@@ -25,7 +25,7 @@ export const DEFAULT_PROFILE = {
   segmentsByCommodity: {},
   // Fontes gratuitas que a prospecção pode usar por mercado (as pagas nunca entram sem orçamento autorizado).
   sources: {
-    national: ["br-cnpj-ws", "osm-overpass"],
+    national: ["br-cnpj-ws", "osm-overpass", "abic-certificados"],
     international: ["fr_registry", "no_registry", "de_coffee_assoc", "osm"],
   },
 };
@@ -47,6 +47,8 @@ export const POLICY_TEMPLATE = {
     "fonte br-cnpj-ws": "partial",
     "fonte osm-overpass": "partial",
     "segmentos × osm-overpass": "partial",
+    "fonte abic-certificados": "partial",
+    "segmentos × abic-certificados": "partial",
     "descoberta automática": "partial",
     "prova de uso e compra": "partial",
     "triagem de sanções": "partial",

@@ -126,8 +126,15 @@ test("mapa recusa o servidor: aguarda o navegador (dito como tal) ou segue sem; 
   await api(`/api/prospect/jobs/${k.id}/skip-browser`, "POST", {});
   j = await drive(k.id);
   assert.equal(j.status, "done");
+  // Sem o mapa, a ABIC (café) ainda traz as torrefadoras certificadas dos estados da área (MG e SP; a do PR fica fora),
+  // provisórias: sem CNPJ, nenhuma é cadastrada; pesquisa marcada como parcial, com a fonte do mapa não consultada.
   assert.equal(j.summary.registered, 0);
-  assert.equal(j.summary.candidates, 0);
+  assert.equal(j.summary.candidates, 3);
+  assert.equal(j.summary.toIdentify.length, 3);
+  assert.ok(!j.summary.toIdentify.some((x) => /PIONEIRO/.test(x.name)));
+  assert.equal(j.summary.partial, true);
+  assert.equal(j.summary.coverage["osm-overpass"].status, "unavailable");
+  assert.equal(j.summary.coverage["abic-certificados"].count, 3);
   // Pausa e cancelamento: o ciclo não executa uma prospecção pausada; cancelada não volta.
   const p = (await api("/api/prospect/jobs", "POST", { ...cafe, radius: { value: 120, unit: "km" } })).data;
   await api(`/api/prospect/jobs/${p.id}/pause`, "POST", {});

@@ -22,6 +22,7 @@ import {
   now,
 } from "./store.js";
 import { encryptPii, decryptPii, identifierHash } from "./crypto.js";
+import { decisorsFor, companiesMatchingPeople } from "./decisors.js";
 import { contactTargetFlag, listProfiles } from "./profiles.js";
 import { validTimezone } from "./parameter-registry.js";
 import { isSuppressed } from "./operations.js";
@@ -48,13 +49,32 @@ export async function listCompanies(request, env, actor) {
     where.push("EXISTS (SELECT 1 FROM buyer_profiles b WHERE b.tenant_id=c.tenant_id AND b.company_id=c.id AND b.icp_status=?)");
     args.push(oneOf(profile, ["in_icp", "out_small", "out_giant", "out_trader", "pending_size"], "perfil"));
   }
+  // Decisor: confirmado (identidade ou autoridade confirmada), identificado (contato com papel de comprador), a validar
+  // (pessoa encontrada e não aceita) ou sem decisor. Canal geral da empresa não conta como decisor.
+  const decisor = p.get("decisor");
+  if (decisor === "confirmado") where.push("EXISTS (SELECT 1 FROM contacts k JOIN contact_verifications v ON v.contact_id=k.id AND v.status='confirmed' AND v.verification_type IN ('identity','decision_authority') WHERE k.tenant_id=c.tenant_id AND k.company_id=c.id AND k.contact_kind='person')");
+  else if (decisor === "identificado") where.push("EXISTS (SELECT 1 FROM contacts k WHERE k.tenant_id=c.tenant_id AND k.company_id=c.id AND k.contact_kind='person' AND k.prospect_role IN ('decision_maker','provisional_decision_maker','influencer'))");
+  else if (decisor === "a_validar") where.push("EXISTS (SELECT 1 FROM person_candidates pc WHERE pc.tenant_id=c.tenant_id AND pc.company_id=c.id AND pc.status='to_validate')");
+  else if (decisor === "sem") where.push("NOT EXISTS (SELECT 1 FROM contacts k WHERE k.tenant_id=c.tenant_id AND k.company_id=c.id AND k.contact_kind='person') AND NOT EXISTS (SELECT 1 FROM person_candidates pc WHERE pc.tenant_id=c.tenant_id AND pc.company_id=c.id AND pc.status='to_validate')");
+  else if (decisor) oneOf(decisor, ["confirmado", "identificado", "a_validar", "sem"], "decisor");
+  // Commodity (perfil comprador ou demanda) e estado (unidade): EXISTS mantém uma linha por empresa.
+  const commodity = p.get("commodity");
+  if (commodity) {
+    where.push("(EXISTS (SELECT 1 FROM buyer_profiles b JOIN products pr ON pr.id=b.product_id WHERE b.tenant_id=c.tenant_id AND b.company_id=c.id AND pr.commodity=?) OR EXISTS (SELECT 1 FROM demands dm JOIN products pr ON pr.id=dm.product_id WHERE dm.tenant_id=c.tenant_id AND dm.company_id=c.id AND pr.commodity=?))");
+    args.push(str(commodity, "commodity", 60), str(commodity, "commodity", 60));
+  }
+  const uf = p.get("uf");
+  if (uf) {
+    where.push("EXISTS (SELECT 1 FROM company_units un WHERE un.tenant_id=c.tenant_id AND un.company_id=c.id AND un.uf=?)");
+    args.push(oneOf(uf.toUpperCase(), ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"], "estado"));
+  }
   if (p.get("q")) {
-    where.push(
-      "(c.legal_name LIKE ? ESCAPE '\\' OR c.registration_id LIKE ? ESCAPE '\\')",
-    );
-    const q =
-      "%" + str(p.get("q"), "busca", 200).replace(/[\\%_]/g, "\\$&") + "%";
-    args.push(q, q);
+    // Nome, CNPJ, ou nome/e-mail/telefone de pessoa vinculada (dados cifrados: decifrados no servidor, só para achar a empresa).
+    const raw = str(p.get("q"), "busca", 200);
+    const q = "%" + raw.replace(/[\\%_]/g, "\\$&") + "%";
+    const people = await companiesMatchingPeople(env, actor.tenant_id, raw);
+    where.push(`(c.legal_name LIKE ? ESCAPE '\\' OR c.trade_name LIKE ? ESCAPE '\\' OR c.registration_id LIKE ? ESCAPE '\\'${people.length ? ` OR c.id IN (${people.map(() => "?").join(",")})` : ""})`);
+    args.push(q, q, q, ...people);
   }
   const [rows, count] = await env.DB.batch([
     s(
@@ -70,8 +90,10 @@ export async function listCompanies(request, env, actor) {
       ...args,
     ),
   ]);
+  // Decisor e canal de cada empresa da página (mesma visibilidade do detalhe da empresa).
+  const dec = await decisorsFor(env, actor.tenant_id, rows.results.map((r) => r.id));
   return {
-    companies: rows.results,
+    companies: rows.results.map((r) => ({ ...r, decisors: dec.get(r.id) })),
     total: count.results[0].total,
     limit,
     offset,
@@ -740,4 +762,11 @@ export async function updateContact(request, env, actor, rid, contactId) {
     }),
   ]);
   return { id: contactId, prospectRole: next.prospect_role, relationshipNote: next.relationship_note, timezone: next.timezone };
+}
+
+// GET /api/companies/decisors?ids=a,b — decisores e canais de empresas (resultados da prospecção), até 100 por chamada.
+export async function decisorsOf(request, env, actor) {
+  const ids = String(new URL(request.url).searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 100);
+  const own = ids.length ? (await env.DB.prepare(`SELECT id FROM companies WHERE tenant_id=? AND id IN (${ids.map(() => "?").join(",")})`).bind(actor.tenant_id, ...ids).all()).results.map((r) => r.id) : [];
+  return { items: Object.fromEntries(await decisorsFor(env, actor.tenant_id, own)) };
 }

@@ -128,6 +128,7 @@ async function route(request, env, rid, internalActor = null) {
   }
   if (path === "/api/retention" && method === "GET") return response(await retention.retentionOverview(env, actor));
   if (path === "/api/retention/reviews" && method === "POST") return response(await retention.addRetentionReview(request, env, actor, rid), 201);
+  if (path === "/api/companies/decisors" && method === "GET") return response(await companies.decisorsOf(request, env, actor));
   if (path === "/api/companies") {
     if (method === "GET")
       return response(await companies.listCompanies(request, env, actor));
@@ -213,6 +214,7 @@ async function route(request, env, rid, internalActor = null) {
   if (path === "/api/prospect/policy" && method === "GET") return response(await prospect.getPolicy(env, actor));
   if (path === "/api/prospect/policy" && method === "POST") return response(await prospect.grantPolicy(request, env, actor, rid), 201);
   if (path === "/api/prospect/policy/revoke" && method === "POST") return response(await prospect.revokePolicy(request, env, actor, rid));
+  if (path === "/api/prospect/coverage" && method === "GET") return response(await prospect.coverage(request, env, actor));
   if (path === "/api/prospect/jobs" && method === "GET") return response(await prospect.listJobs(env, actor));
   if (path === "/api/prospect/jobs" && method === "POST") return response(await prospect.createJob(request, env, actor, rid), 201);
   const pjb = path.match(/^\/api\/prospect\/jobs\/([0-9a-f-]{36})(?:\/(pause|resume|cancel|skip-browser|browser-osm|run))?$/);

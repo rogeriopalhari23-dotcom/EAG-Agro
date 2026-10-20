@@ -9,7 +9,7 @@ test(
     const r = await runtime();
     t.after(r.close);
     await r.migrate();
-    assert.equal((await r.call("/api/catalog")).data.products.length, 28);
+    assert.equal((await r.call("/api/catalog")).data.products.length, 29); // 28 + Farelo de milho (0046)
     const company = await r.call("/api/companies", "POST", {
       legalName: "Runtime Test",
       countryCode: "BR",

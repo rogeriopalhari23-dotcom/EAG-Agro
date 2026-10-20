@@ -49,11 +49,13 @@ Branch `redesign-interface`. Não publicado. A migração `0045_prospeccao_autom
 1. **Mapa colaborativo pelo servidor:** o servidor público recusa a Cloudflare (521/522, registrado em 27/09). Em produção, a etapa ficaria "depende do navegador":
    - o painel faz a consulta quando a prospecção está aberta, e isso é dito na tela;
    - ou a pessoa escolhe "Seguir sem a busca no mapa".
-   - **Alternativa viável, não implementada:** a ponte de e-mail (computador de Rogério, já com token de serviço) executaria consultas do motor por uma fila própria. Isso exige versão nova da ponte e decisão sobre o uso dela para isso.
-2. **Cobertura real do mapa para café no Brasil:** verificação real em 20/10 (deste computador, não da Cloudflare):
-   - etiquetas de torrefação a 150 km de Guaxupé: **0 objetos**;
-   - busca por nome ("torrefa…"): a consulta passou de 90 s e não foi repetida, para respeitar o servidor público.
-   - Para café no Brasil, a descoberta automática gratuita hoje não encontra candidatas. Ficam importação, pesquisa assistida, ou um segmento com outra regra no perfil.
+   - **Alternativa proposta, não implementada:** fila própria de consultas executada pela ponte, separada do e-mail (`../PLANO-CONSULTAS-FORA-DA-CLOUDFLARE.md`). Exige versão nova da ponte e decisão.
+2. **Café no Brasil: o mapa não basta, mas a cobertura não é zero** (correção de 20/10; a conclusão anterior, "a descoberta gratuita não encontra candidatas", generalizava uma consulta só):
+   - verificação real em 20/10, deste computador (não da Cloudflare): etiqueta de torrefação no mapa a 150 km de Guaxupé deu **0 objetos**. A busca por nome ("torrefa…") **passou de 90 s** e não foi repetida, para respeitar o servidor público;
+   - isso mostra só a falta de candidatas **naquela consulta e naquela fonte**, mais um tempo esgotado. Não prova ausência de compradores;
+   - **fonte complementar implementada:** ABIC, produtos certificados (`src/adapters/abic.js`). É a lista pública na página de certificações: 312 industrializadores em 20/10 (MG 91, SP 62), com nome e estado da fábrica. O robots.txt permite;
+   - limite da ABIC: **sem CNPJ nem município**. Cada torrefadora entra como candidata provisória ("compradores prováveis a identificar"), com o estado. Sem CNPJ nada é cadastrado e a distância fica desconhecida;
+   - o relatório mostra o resultado e a situação de cada fonte (mapa, ABIC, site da empresa, Receita) e marca a pesquisa como **parcial** quando alguma etapa ou fonte falta.
 3. **Sem busca de CNPJ por nome gratuita:** Receita e publica.cnpj.ws só consultam o CNPJ. Candidata do mapa sem site, ou com site sem CNPJ publicado, fica na fila de exceções.
 4. **MAPA SIPEAGRO:** o portal recusou acesso automatizado (HTTP 403 em 20/10). Continua como importação manual.
 5. **Canais no Brasil:** só e-mail geral publicado no site da própria empresa. Telefone, LinkedIn e pessoas de compras no Brasil continuam pelos fluxos existentes.
@@ -63,6 +65,6 @@ Branch `redesign-interface`. Não publicado. A migração `0045_prospeccao_autom
    - o idioma e o fuso por país usam a tabela de países (fuso UTC quando não há base).
 7. **Testes:**
    - motor, interface e prévia usam fontes **simuladas** (`tests/helpers/simulated-world.mjs`);
-   - as únicas consultas reais foram as 2 ao Overpass descritas no item 2.
+   - consultas reais feitas deste computador: 2 ao Overpass (item 2), 5 à ABIC (página inicial duas vezes, associados, certificações, robots.txt) e 1 ao SIPEAGRO (403). Nenhuma consulta real à Receita.
    - O comportamento da Cloudflare (recusa do mapa) não pôde ser verificado sem publicar.
 8. **Emenda:** a seleção e a busca no exterior pela política dependem da emenda proposta da R12.7 (`EMENDA-PROSPECCAO-AUTOMATICA.md`).

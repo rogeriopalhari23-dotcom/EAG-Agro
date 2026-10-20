@@ -30,6 +30,13 @@ export const SOURCE_CATALOG = {
     provides: "empresas ativas por CNAE e município, com CNPJ",
     limits: "serviço pago: não roda sem autorização de despesa",
   },
+  "abic-certificados": {
+    label: "ABIC — torrefadoras com produto certificado (lista pública)", role: "discovery", mode: "automatic", countries: ["BR"], cost: "free",
+    provides: "industrializadores de café com produto certificado e o estado da fábrica",
+    limits: "só nome e estado da fábrica (sem CNPJ nem município): candidata provisória até a conciliação; só café",
+    needsSegmentRule: "abic",
+    url: "https://www.abic.com.br/certificacoes/",
+  },
   "company-site": {
     label: "Site da própria empresa (CNPJ e canal publicados)", role: "enrichment", mode: "automatic", countries: "*", cost: "free",
     provides: "CNPJ publicado (dígitos verificadores conferidos) e e-mail geral do próprio domínio, com a página como fonte",

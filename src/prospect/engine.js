@@ -11,6 +11,14 @@ import { SEGMENT_PRESETS } from "../rodada/segments.js";
 import { provenanceHeaders } from "../provenance.js";
 import { DEFAULT_PROFILE, POLICY_TEMPLATE, uncoveredLimitations } from "./defaults.js";
 import { readCompanySite } from "./site.js";
+import { commodityLabelOf } from "../catalog-names.js";
+import { fetchAbicRoasters } from "../adapters/abic.js";
+import { sourcesFor as foreignSourcesFor } from "../adapters/discovery.js";
+// Produto com o nome da commodity da lista única do catálogo.
+const productL = async (env, tenant, id) => {
+  const p = await product(env, tenant, id);
+  return { ...p, commodityLabel: await commodityLabelOf(env, tenant, p.commodity) };
+};
 
 export const EXECUTOR = "Compass — prospecção automática (segundo plano)";
 const LEASE_MS = 90_000;
@@ -43,8 +51,8 @@ const parse = (t, d = null) => { try { return t ? JSON.parse(t) : d; } catch { r
 const addMs = (iso, ms) => new Date(Date.parse(iso) + ms).toISOString();
 const slug = (x) => String(x).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 const varietyOf = (p) => (/n[ãa]o[- ]?gmo/i.test(p.variant_name) ? "não GMO" : /\bgmo\b/i.test(p.variant_name) ? "GMO" : undefined);
-const COMMODITY_PT = { soy: "Soja", corn: "Milho", coffee: "Café", sugar: "Açúcar", ethanol: "Etanol", wheat: "Trigo", sorghum: "Sorgo" };
-const commodityLabel = (p) => COMMODITY_PT[p.commodity] ?? p.group_name ?? p.commodity;
+// Nome da commodity: o mesmo da lista única do catálogo (src/catalog-names.js), guardado na criação da prospecção.
+const commodityLabel = (p) => p.commodityLabel ?? p.display_name ?? p.group_name ?? p.commodity;
 
 // ---------------------------------------------------------------- perfil comprador
 export async function currentProfile(env, tenant) {
@@ -165,7 +173,7 @@ export async function createJob(request, env, actor, rid, deps = {}) {
   requireRole(actor, WRITE_ROLES);
   const i = await bodyJson(request);
   const market = oneOf(i.market, ["national", "international"], "mercado");
-  const p = await product(env, actor.tenant_id, str(i.productId, "produto", 80));
+  const p = await productL(env, actor.tenant_id, str(i.productId, "produto", 80));
   if (!p.active) fail(422, "product_inactive", "Produto inativo.");
   const input = { productId: p.id, commodity: p.commodity, product: p.variant_name };
   if (market === "national") {
@@ -382,12 +390,13 @@ const NATIONAL = {
     const { input, profile, policy, state } = ctx;
     const radiusKm = input.radius.value * (input.radius.unit === "mi" ? 1.609344 : 1);
     if (radiusKm > policy.policy.maxRadiusKm) return { decision: { kind: "scope", message: `Raio de ${Math.round(radiusKm)} km acima do limite da política (${policy.policy.maxRadiusKm} km): mudança material de escopo, exige decisão.` } };
-    const p = await product(ctx.env, ctx.job.tenant_id, input.productId);
+    const p = await productL(ctx.env, ctx.job.tenant_id, input.productId);
     const segments = profile.segmentsByCommodity?.[p.commodity] ?? SEGMENT_PRESETS[p.commodity] ?? {};
     const allowed = profile.sources?.national ?? [];
     const sources = [];
     if (allowed.includes("br-cnpj-ws")) sources.push({ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 });
     if (allowed.includes("osm-overpass") && Object.values(segments).some((g) => g.discovery?.osm)) sources.push({ id: "osm-overpass", kind: "discovery" });
+    if (allowed.includes("abic-certificados") && Object.values(segments).some((g) => g.discovery?.abic)) sources.push({ id: "abic-certificados", kind: "discovery" });
     if (!state.roundId) {
       const config = {
         id: slug(`prospeccao-${p.commodity}-${input.location.municipality}-${input.radius.value}`),
@@ -424,10 +433,32 @@ const NATIONAL = {
   async discover(ctx) {
     const { state } = ctx;
     const r = await ctx.call(`/api/rounds/${state.roundId}`);
-    const hasOsm = (r.data.config.sources ?? []).some((x) => x.id === "osm-overpass");
+    const ids = (r.data.config.sources ?? []).map((x) => x.id);
+    state.coverage ??= {};
+    // ABIC (café): lista pública de torrefadoras certificadas, filtrada pelos estados da área da rodada.
+    if (ids.includes("abic-certificados") && !state.coverage["abic-certificados"]) {
+      try {
+        const area = await ctx.call(`/api/rounds/${state.roundId}/area`);
+        const ufs = new Set(area.data?.summary?.regions ?? []);
+        const all = await fetchAbicRoasters(ctx.fetch);
+        const inArea = all.filter((x) => ufs.has(x.uf));
+        if (inArea.length) {
+          const res = await ctx.call(`/api/rounds/${state.roundId}/candidates`, "POST", { intake: "automatic", source: "abic-certificados", candidates: inArea.map((x) => ({ name: x.name, uf: x.uf, products: x.products })) });
+          if (!ok(res)) throw new Error(errText(res));
+          state.discovered = (state.discovered ?? 0) + res.data.added;
+        }
+        state.abicNames = inArea.map((x) => x.name);
+        state.coverage["abic-certificados"] = { status: inArea.length ? "ok" : "empty", count: inArea.length, note: `${inArea.length} de ${all.length} torrefadoras certificadas estão nos estados da área (${[...ufs].join(", ")}); a lista traz só nome e estado: município e CNPJ a identificar` };
+        ctx.log("discover", inArea.length ? "ok" : "partial", `ABIC (lista pública de torrefadoras certificadas): ${state.coverage["abic-certificados"].note}.`);
+      } catch (e) {
+        state.coverage["abic-certificados"] = { status: "unavailable", count: 0, note: e.message };
+        ctx.log("discover", "pending", `ABIC indisponível: ${e.message}. Fonte pendente; as demais seguem.`);
+      }
+    }
+    const hasOsm = ids.includes("osm-overpass");
     if (!hasOsm) {
-      ctx.log("discover", "pending", "Nenhuma fonte de descoberta automática aplicável a esta commodity no Brasil (sem segmento com regra no mapa colaborativo). Candidatas por importação ou pesquisa assistida, fora do percurso principal.");
-      return { outcome: "pending" };
+      if (!ids.includes("abic-certificados")) ctx.log("discover", "pending", "Nenhuma fonte de descoberta automática aplicável a esta commodity no Brasil. Candidatas por importação ou pesquisa assistida, fora do percurso principal.");
+      return { outcome: ids.includes("abic-certificados") ? "partial" : "pending" };
     }
     if (["server", "browser", "skipped"].includes(state.osm)) return {};
     const q = await ctx.call(`/api/rounds/${state.roundId}/osm-query`);
@@ -459,7 +490,8 @@ const NATIONAL = {
       await flush();
       state.osm = "server";
       state.discovered = (state.discovered ?? 0) + added;
-      ctx.log("discover", "ok", `Mapa colaborativo (pelo servidor): ${els.length} objetos, ${added} candidatas novas, ${dup} já existentes. Indício: provisórias até a consulta cadastral.`);
+      state.coverage["osm-overpass"] = { status: els.length ? "ok" : "empty", count: els.length, note: els.length ? `${added} candidatas novas` : "nenhum estabelecimento com as etiquetas do segmento nesta consulta (não prova ausência de compradores)" };
+      ctx.log("discover", els.length ? "ok" : "partial", els.length ? `Mapa colaborativo (pelo servidor): ${els.length} objetos, ${added} candidatas novas, ${dup} já existentes. Indício: provisórias até a consulta cadastral.` : "Mapa colaborativo: nenhum estabelecimento com as etiquetas do segmento nesta consulta. Isso não prova que não há compradores; as outras fontes seguem.");
       return {};
     }
     // 429/504/rede: tenta de novo poucas vezes; recusa da Cloudflare (521/522/403) não adianta repetir pelo servidor.
@@ -468,6 +500,7 @@ const NATIONAL = {
       ctx.log("discover", "waiting", `Mapa colaborativo indisponível (${status}); nova tentativa automática em 2 minutos (${state.osmRetries}/${MAX_SOURCE_RETRIES}).`);
       return { waitFor: "source_retry", waitMs: 120_000 };
     }
+    state.coverage["osm-overpass"] = { status: "unavailable", count: 0, note: `recusou o servidor (${status}); depende do navegador` };
     ctx.log("discover", "pending", `O servidor público do mapa colaborativo recusou o servidor do Compass (${status}). Esta busca depende do navegador: ao abrir a prospecção, o painel faz a consulta e o restante continua no servidor. Também é possível seguir sem ela.`);
     return { waitFor: "browser_osm" };
   },
@@ -584,18 +617,32 @@ const NATIONAL = {
       })
       .sort((a, b) => (a.note ? 1 : 0) - (b.note ? 1 : 0) || sizeRank(ctx.profile, a.size) - sizeRank(ctx.profile, b.size) || (b.operation === "proved") - (a.operation === "proved") || (a.km ?? 1e9) - (b.km ?? 1e9));
     const lk = r.data.lastRun?.lookups ?? {};
+    const cov = ctx.state.coverage ?? {};
+    if (ctx.state.osm === "browser") cov["osm-overpass"] = { status: "ok", count: null, note: "consultado pelo navegador" };
+    if (ctx.state.osm === "skipped") cov["osm-overpass"] = { status: "unavailable", count: 0, note: "não consultado (decisão de seguir sem a busca no mapa)" };
+    const sitesRead = Object.values(ctx.state.sites ?? {});
+    cov["company-site"] = { status: sitesRead.length ? "ok" : "not_applicable", count: sitesRead.length, note: sitesRead.length ? `${sitesRead.filter((x) => x.cnpjs.length).length} de ${sitesRead.length} sites com CNPJ publicado` : "nenhuma candidata com site publicado" };
+    cov["br-cnpj-ws"] = { status: lk.failed ? "partial" : "ok", count: (lk.fetched ?? 0) + (lk.cached ?? 0), note: `consulta só por CNPJ (não busca por nome); adiadas ${lk.deferred ?? 0}, falhas ${lk.failed ?? 0}` };
+    const abicSet = new Set((ctx.state.abicNames ?? []).map((n) => n.toUpperCase()));
+    const toIdentify = queue.filter((x) => (x.names ?? []).some((n) => abicSet.has(String(n).toUpperCase())));
+    const queueRest = queue.filter((x) => !toIdentify.includes(x));
+    const partial = Object.values(cov).some((x) => ["unavailable", "partial", "empty"].includes(x.status)) || toIdentify.length > 0 || (lk.deferred ?? 0) > 0;
     const summary = {
       market: "national",
+      coverage: cov,
+      partial,
+      partialNote: partial ? "Pesquisa parcial: há fonte indisponível, sem resultado nesta consulta ou candidatas ainda sem CNPJ e município; o resultado não representa todos os compradores da área." : null,
+      toIdentify: toIdentify.slice(0, 200).map((x) => ({ name: x.names?.[0], region: x.region ?? null, reason: "torrefadora certificada (ABIC): município e CNPJ a identificar" })),
       candidates: r.data.candidates.reduce((n, c) => n + c.n, 0),
       establishments: res.length,
       registered: registered.length,
-      exceptions: queue.length,
+      exceptions: queueRest.length,
       pendingLookups: lk.deferred ?? 0,
       failedLookups: lk.failed ?? 0,
       ranked: ranked.slice(0, 50),
-      queue: queue.slice(0, 50).map((x) => ({ name: x.names?.[0], key: x.key, reasons: [...(x.reasons ?? []), ...(x.checks ?? [])].slice(0, 4) })),
+      queue: queueRest.slice(0, 50).map((x) => ({ name: x.names?.[0], key: x.key, reasons: [...(x.reasons ?? []), ...(x.checks ?? [])].slice(0, 4) })),
       notCommercial: "Descoberta não é qualificação comercial: nenhuma empresa foi qualificada, contatada nem liberada para ficha ou envio.",
-      nextAction: queue.length ? `Revisar ${queue.length} exceção(ões) na rodada (seção Conferir).` : registered.length ? "Qualificar as empresas cadastradas (evidência de compra e canal) antes de qualquer ficha." : "Nenhuma empresa cadastrada: ajustar segmentos ou trazer candidatas por importação ou pesquisa assistida.",
+      nextAction: toIdentify.length && !registered.length ? `Identificar CNPJ e município de ${toIdentify.length} torrefadora(s) certificada(s) nos estados da área; sem CNPJ, nenhuma é cadastrada.` : queue.length ? `Revisar ${queue.length} pendência(s) na rodada (seção Conferir).` : registered.length ? "Qualificar as empresas cadastradas (evidência de compra e canal) antes de qualquer ficha." : "Nenhuma empresa cadastrada: ajustar segmentos ou trazer candidatas por importação ou pesquisa assistida.",
       roundId: ctx.state.roundId,
     };
     ctx.log("report", "ok", `Relatório: ${summary.candidates} candidata(s), ${summary.registered} cadastrada(s) em descoberta, ${summary.exceptions} na fila de exceções. ${summary.nextAction}`);
@@ -624,7 +671,7 @@ const INTERNATIONAL = {
     }
     const a = await ctx.call(`/api/country-analyses/${state.analysisId}`);
     const rows = a.data.rows ?? a.data.items ?? [];
-    const p = await product(ctx.env, ctx.job.tenant_id, input.productId);
+    const p = await productL(ctx.env, ctx.job.tenant_id, input.productId);
     const codes = new Set((input.hs6 ?? []).map(String));
     const match = rows.filter((r) => codes.has(String(r.hs6)) || r.catalog?.confirmed?.some((c) => c.productId === p.id));
     if (!match.length) return { decision: { kind: "indicators", message: `A lista oficial do país não mostra compra identificada de ${commodityLabel(p)} com correspondência no catálogo: a busca de empresas não pode partir dela (R12.14). Indique o código HS do produto no catálogo ou escolha outro país.`, items: rows.slice(0, 8).map((r) => `${r.hs6} ${r.label ?? r.description ?? ""}`.trim()) } };
@@ -635,7 +682,7 @@ const INTERNATIONAL = {
   async select(ctx) {
     const { state, input } = ctx;
     if (state.campaignId) return {};
-    const p = await product(ctx.env, ctx.job.tenant_id, input.productId);
+    const p = await productL(ctx.env, ctx.job.tenant_id, input.productId);
     const sel = await ctx.call(`/api/country-analyses/${state.analysisId}/selections`, "POST", { items: [{ productId: p.id, label: commodityLabel(p), hs6: state.hs6 }] });
     if (!ok(sel)) return { decision: { kind: "selection", message: `Seleção recusada: ${errText(sel)}` } };
     state.campaignId = sel.data.campaigns[0].id;
@@ -758,3 +805,35 @@ const INTERNATIONAL = {
     return { summary };
   },
 };
+
+// GET /api/prospect/coverage — o que cada fonte cobre para a escolha atual (não esconde país nem produto).
+export async function coverage(request, env, actor) {
+  const u = new URL(request.url).searchParams;
+  const market = oneOf(u.get("market"), ["national", "international"], "mercado");
+  const p = await productL(env, actor.tenant_id, str(u.get("productId"), "produto", 80));
+  const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
+  if (market === "national") {
+    const segments = profile.segmentsByCommodity?.[p.commodity] ?? SEGMENT_PRESETS[p.commodity] ?? {};
+    const segs = Object.values(segments);
+    const items = [
+      { label: "Receita Federal (consulta por CNPJ)", available: true, note: "confirma situação, atividade e endereço de quem tem CNPJ; não busca empresas pelo nome" },
+      { label: "Site da própria empresa (CNPJ e canal publicados)", available: true, note: "lido quando a candidata tem site" },
+      { label: "Mapa colaborativo (OpenStreetMap)", available: segs.some((g) => g.discovery?.osm), note: segs.some((g) => g.discovery?.osm) ? "cobertura irregular; em produção depende do navegador (o servidor público recusa a Cloudflare)" : "sem regra de busca para os segmentos desta commodity" },
+      { label: "ABIC — torrefadoras certificadas", available: segs.some((g) => g.discovery?.abic), note: segs.some((g) => g.discovery?.abic) ? "nome e estado da fábrica; município e CNPJ a identificar" : "só para café" },
+      { label: "Registros do MAPA (SIPEAGRO)", available: false, note: "o portal recusou acesso automático; só por importação manual" },
+    ];
+    return { market, commodity: p.commodityLabel, segments: segs.map((g) => g.label), items, partial: true, partialNote: "As fontes gratuitas não cobrem todos os compradores; o relatório mostra o que cada fonte trouxe e o que ficou pendente." };
+  }
+  const iso2 = str(u.get("iso2"), "país", 2).toUpperCase();
+  const c = await s(env, "SELECT iso3,iso2,name_pt FROM countries WHERE iso2=?", iso2).first();
+  if (!c) fail(422, "country_not_found", "País não encontrado.");
+  const hs = (await s(env, "SELECT code FROM product_codes WHERE product_id=? AND code_system IN ('HS','NCM') ORDER BY status='confirmed' DESC", p.id).all()).results.map((x) => String(x.code).replace(/\D/g, ""));
+  const list = foreignSourcesFor(iso2, hs[0]?.slice(0, 4) ?? null);
+  const ind = await s(env, "SELECT COUNT(*) n FROM trade_list_current WHERE iso3=?", c.iso3).first().catch(() => ({ n: 0 }));
+  const items = [
+    { label: "Indicadores oficiais de compra do país (lista mensal)", available: (ind?.n ?? 0) > 0, note: (ind?.n ?? 0) > 0 ? "orientam a escolha; não provam que uma empresa importa do Brasil" : "lista mensal ainda sem dados deste país" },
+    ...list.map((x) => ({ label: x.label, available: x.available, note: x.available ? null : "não cobre este país ou esta commodity no Compass" })),
+    ...(hs.length ? [] : [{ label: "Código HS do produto no catálogo", available: false, note: "sem código HS: a análise do país não encontra a commodity" }]),
+  ];
+  return { market, country: c.name_pt, commodity: p.commodityLabel, items, partial: !items.every((x) => x.available), partialNote: "Etapas sem cobertura ficam pendentes no relatório; as demais seguem." };
+}

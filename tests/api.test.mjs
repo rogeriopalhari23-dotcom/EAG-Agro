@@ -79,13 +79,13 @@ check("Corpo maior que 64 KB bloqueado", async ({ api }) =>
   ),
 );
 check(
-  "Catálogo contém 28 produtos, CSO pendente e nenhum NCM inventado",
+  "Catálogo contém 29 produtos (Farelo de milho em 0046), CSO pendente e nenhum código confirmado sem o administrador",
   async ({ api, DB }) => {
     const r = await api("/api/catalog");
-    assert.equal(r.data.products.length, 28);
-    assert.equal(r.data.products.at(-1).identity_status, "pending");
+    assert.equal(r.data.products.length, 29);
+    assert.equal(r.data.products.find((p) => p.commodity === "cso").identity_status, "pending");
     assert.equal(
-      DB.raw.prepare("SELECT COUNT(*) n FROM product_codes").get().n,
+      DB.raw.prepare("SELECT COUNT(*) n FROM product_codes WHERE status='confirmed'").get().n,
       0,
     );
   },

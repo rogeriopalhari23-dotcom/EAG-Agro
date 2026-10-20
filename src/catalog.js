@@ -1,3 +1,4 @@
+import { commodityList } from "./catalog-names.js";
 import {
   bodyJson,
   fail,
@@ -36,15 +37,9 @@ export async function catalog(env, actor, id) {
       characteristics: characteristics.results,
     };
   }
-  return {
-    products: (
-      await s(
-        env,
-        "SELECT * FROM products WHERE tenant_id=? ORDER BY id",
-        actor.tenant_id,
-      ).all()
-    ).results,
-  };
+  const products = (await s(env, "SELECT * FROM products WHERE tenant_id=? ORDER BY id", actor.tenant_id).all()).results;
+  // Lista única de commodities para seleção (mesma em radares, prospecção e rodadas).
+  return { products, commodities: commodityList(products) };
 }
 
 function reasonOf(i) {

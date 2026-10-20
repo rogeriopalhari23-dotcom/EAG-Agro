@@ -45,3 +45,27 @@ Nenhum clique, decisão humana ou aprovação individual é simulado.
 ## Como desfazer
 
 Revogar a política (Configurações → Prospecção automática → Revogar). As prospecções param antes de pesquisar; o que já foi cadastrado continua com o rastreio.
+
+## Texto exato proposto (para aprovar ou recusar; nada foi alterado na Spec)
+
+**R12.7, redação atual** (`docs/eag-compass-spec.md`, linha 404):
+
+> **R12.7:** QUANDO o usuário selecionar uma ou mais commodities e autorizar a busca, o sistema DEVE registrar a seleção, o autor, a data e a análise que a fundamentou, e criar uma campanha por commodity (R16).
+
+**R12.7, redação proposta:**
+
+> **R12.7:** QUANDO o usuário selecionar uma ou mais commodities e autorizar a busca, o sistema DEVE registrar a seleção, o autor, a data e a análise que a fundamentou, e criar uma campanha por commodity (R16). A seleção e a autorização PODEM ser feitas pela política de pesquisa de rotina vigente, concedida por Administrador ou gestor comercial, quando a commodity tiver `compra identificada` no país (R12.14) e o país e o mercado estiverem no escopo da política. Nesse caso, o registro DEVE trazer a política (identificador, versão, quem concedeu e quando) como autorização e a pessoa que iniciou a prospecção como identidade autenticada. A campanha criada fica em rascunho, sem ficha, canal ou envio. A política NÃO DEVE autorizar fonte paga, consumo de créditos, contato nem envio.
+
+R12.8 e R12.14 ficam sem mudança. A busca continua exigindo a seleção registrada; a emenda só muda quem pode registrá-la.
+
+**Regra das rodadas, redação proposta** (`docs/implementation/rodadas/FLUXO-RODADAS.md`, ciência das limitações):
+
+> A ciência das limitações de uma revisão PODE ser dada pela política de pesquisa de rotina vigente, quando cada limitação da revisão constar da lista aceita pela política no mesmo nível ou em nível mais brando. Limitação nova ou mais grave DEVE pedir a ciência de uma pessoa. O registro DEVE indicar "ciência coberta pela política vN" e nunca o nome de uma pessoa que não a deu.
+
+**Aceite de candidata internacional, redação proposta** (Radar Internacional, `src/discovery.js`):
+
+> Sob a política vigente, entra em descoberta, sem aceite individual, só a candidata com identificador cadastral oficial ou site próprio publicado. Nome parecido com empresa já cadastrada vai para a fila de exceções; nada é fundido sem decisão da pessoa (P13).
+
+## Ponte (versão nova)
+
+O uso da ponte para consultas públicas fora da Cloudflare é uma **proposta separada**, também não aprovada: `PLANO-CONSULTAS-FORA-DA-CLOUDFLARE.md`. A ponte em uso não foi alterada.

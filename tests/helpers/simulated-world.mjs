@@ -81,6 +81,18 @@ export function simulatedWorld(opts = {}) {
       return Response.json({ razao_social: r.name, porte: { descricao: r.size }, estabelecimento: { situacao_cadastral: "Ativa", cidade: { nome: r.city ?? "Guaxupé" }, estado: { sigla: r.uf ?? "MG" }, tipo: "Matriz", atividade_principal: { subclasse: "1081-3/02", descricao: "Torrefação e moagem de café" } } });
     }
     if (/kaffeeverband|kaffee-netz|kaffee/.test(u.host)) return new Response("indisponível", { status: 503 });
+    // ABIC: mesma estrutura da página real (lista de produtos embutida), com industrializadores FICTÍCIOS.
+    if (u.host === "www.abic.com.br") {
+      if (opts.abicDown) return new Response("indisponível", { status: 503 });
+      const produtos = [
+        ["TORREFADORA MONTE ALEGRE LTDA (FICTÍCIA)", "MG", "CAFÉ MONTE ALEGRE"],
+        ["TORREFADORA MONTE ALEGRE LTDA (FICTÍCIA)", "MG", "CAFÉ MONTE ALEGRE GOURMET"],
+        ["INDÚSTRIA DE CAFÉ VALE DO SAPUCAÍ LTDA (FICTÍCIA)", "MG", "SAPUCAÍ TRADICIONAL"],
+        ["CAFÉ SERRA DA MANTIQUEIRA IND. LTDA (FICTÍCIA)", "SP", "MANTIQUEIRA EXTRAFORTE"],
+        ["CAFÉ NORTE PIONEIRO LTDA (FICTÍCIA)", "PR", "PIONEIRO"],
+      ].map(([t, uf, p]) => ({ no_torrefador: t, co_sigla_estado_fabrica: uf, no_produto: p, no_tipo_produto_abreviado: "TM", no_certificacao: "Pureza, Qualidade", no_tipo_simbolo: "Tradicional" }));
+      return new Response(`<html><body><div id="produtos"></div><script>jQuery(document).ready(function() { var dados = { produtos: ${JSON.stringify(produtos)}, total: ${produtos.length} }; });</script></body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+    }
     return null; // não tratado pelo mundo simulado
   };
   return { fetch: fetchImpl, registry, calls, cnpjFrom };

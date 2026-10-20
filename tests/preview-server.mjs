@@ -134,11 +134,17 @@ const cfg2 = JSON.parse(await readFile(new URL("../docs/implementation/rodadas/e
 await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/GO, 150 km (rascunho)", config: { ...cfg2, id: "previa-soja" } });
 
 // Indicadores oficiais SIMULADOS (lista mensal de teste) para a prospecção internacional; café com código HS 090111.
+// A lista simulada só cobre dois países; a tabela completa de países volta depois (a tela precisa de todos, inclusive os
+// que ainda não têm conector, como a Argentina).
+const snapshot = (t) => DB.raw.prepare(`SELECT * FROM ${t}`).all();
+const savedCountries = { countries: snapshot("countries"), country_mdic_codes: snapshot("country_mdic_codes") };
 keepCountries(DB, ["DEU", "CHN"]);
 await tradeParams(api, { period_default_months: 12 });
 const tradeDriver = driver(ctx.env, tradeSources(), { at: "2026-10-10T12:00:00.000Z" });
 await tradeDriver.start();
 await tradeDriver.drain();
+for (const [t, rows] of Object.entries(savedCountries))
+  for (const r of rows) DB.raw.prepare(`INSERT OR IGNORE INTO ${t} (${Object.keys(r).join(",")}) VALUES (${Object.keys(r).map(() => "?").join(",")})`).run(...Object.values(r));
 const coffee = (await api("/api/catalog/product-05")).data;
 await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: coffee.revision, reason: "Prévia local (fictício)" });
 // O cron da produção roda a cada 5 minutos; aqui, um ciclo a cada 3 segundos (mesmo código, mesmas regras).

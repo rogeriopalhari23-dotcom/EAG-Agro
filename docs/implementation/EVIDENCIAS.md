@@ -3345,3 +3345,39 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - SIPEAGRO: portal respondeu 403 a acesso automatizado.
   - Nenhuma consulta à Receita foi feita de verdade.
 - **Não feito:** publicação, migração remota, alteração de registros reais, fichas, T11, canais, campanhas ou envios. A política não foi concedida em produção.
+
+## 2026-10-20 — Correções da prospecção automática (listas, catálogo, decisores, cobertura)
+
+- **Lista de países ("argentina" não aparecia):** causa na prévia: `tests/preview-server.mjs` deixava só Alemanha e China na tabela de países (corte usado pela lista mensal simulada). Agora a tabela completa volta depois da lista simulada (250 países). Na interface, país, commodity e cidade usam uma só seleção pesquisável:
+  - abre no clique; filtra ao digitar, sem diferenciar maiúsculas nem acentos; aceita o nome em inglês;
+  - teclado (setas, Enter, Esc), mouse e toque, com opção de 44 px no celular;
+  - nome completo com correspondência única é reconhecido ao sair do campo; texto ambíguo pede escolha, sem seleção invisível;
+  - falha de carregamento mostra o erro e "Tentar de novo"; o código do país fica interno;
+  - lista inteira com altura máxima e rolagem interna; nenhum país escondido por falta de conector. A cobertura aparece abaixo do formulário (`GET /api/prospect/coverage`).
+- **Catálogo:** Farelo de milho (product-29, commodity `corn_bran`, migração 0046 local):
+  - identidade pendente; HS 2302.10 e característica de origem entram como sugestão a confirmar pelo administrador;
+  - CGF, CGM e DDGS seguem distintos, sem sinônimo cruzado; nomes comerciais por extenso, com a sigla como complemento;
+  - uma lista única (`src/catalog-names.js`, em `GET /api/catalog`) serve radares, prospecção e rodadas. O mapa de nomes duplicado no código foi removido.
+- **Decisores junto às empresas** (`src/decisors.js`):
+  - cada pessoa traz nome, cargo, e-mail, telefone, situação (confirmado, identificado ou a validar) e fonte;
+  - o canal geral da empresa fica à parte e nunca é contado como pessoa (o nome dele não entra na busca, só o e-mail e o telefone);
+  - a busca encontra a empresa por nome, e-mail ou telefone da pessoa; filtros de decisor, commodity e estado combinam sem duplicar;
+  - aparece na lista, no resumo da empresa ("Mais N pessoa(s)") e nos resultados da prospecção; sem decisor, mostra "Decisor ainda não identificado";
+  - nada deduzido, nenhum crédito de validação; o leitor vê, mas não cadastra.
+- **Correção da conclusão "cobertura de café no Brasil é zero":** era a falta de candidatas numa consulta e numa fonte (mapa), mais um tempo esgotado.
+  - Fonte complementar implementada: ABIC, produtos certificados (nome e estado da fábrica, sem CNPJ). As torrefadoras entram como "compradores prováveis a identificar".
+  - O relatório mostra a situação de cada fonte e marca a pesquisa como parcial (`MATRIZ-E-LIMITACOES.md`, item 2).
+- **Decisões pendentes (não aprovadas):** texto exato da emenda R12.7 em `EMENDA-PROSPECCAO-AUTOMATICA.md`; plano de consultas fora da Cloudflare pela ponte, com fila e diário próprios e o ciclo de e-mail intacto, em `PLANO-CONSULTAS-FORA-DA-CLOUDFLARE.md`. A ponte não foi alterada.
+- **Testes:**
+  - `tests/decisores-catalogo.test.mjs` (6) e `tests/ui-listas.mjs`, ambos ok;
+  - `tests/ui-listas.mjs` cobre: Argentina digitada e escolhida; Alemanha, Portugal, Japão ("japao"), México ("MEXICO") e Germany; falha com nova tentativa; Farelo de milho; troca de commodity sem herdar o produto; busca por pessoa; celular;
+  - `ui-rodadas` e `ui-smoke` ok; suíte completa ok;
+  - as contagens antigas de 28 produtos passaram a 29.
+- **Prévia** (fontes simuladas): 11 conferências ok pela interface:
+  - Argentina com cobertura;
+  - Farelo de milho;
+  - café em Guaxupé com 3 cadastradas, a ABIC trazendo 3 a identificar e o relatório parcial com as fontes;
+  - decisores;
+  - celular.
+- **Fontes reais consultadas** (deste computador): Overpass ×2 (0 objetos; uma consulta passou de 90 s), ABIC ×5 (página inicial ×2, associados, certificações, robots.txt) e SIPEAGRO ×1 (403). Nenhuma consulta real à Receita. Tudo o mais nos testes e na prévia foi **simulado** (`tests/helpers/simulated-world.mjs`).
+- **Não feito:** publicação, migração remota (0045 e 0046 só locais), atualização da ponte, contatos, fichas, T11, canais e campanhas.
