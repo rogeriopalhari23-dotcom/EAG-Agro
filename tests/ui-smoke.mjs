@@ -72,6 +72,14 @@ try {
   const clickNav = async (label) => {
     if (await page.getByRole("button", { name: "Menu" }).isVisible()) await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("navigation").getByRole("button", { name: label, exact: true }).click();
+    // Prospecção automática (2026-10-20): radares e rodadas começam pelo formulário de prospecção; o modo manual que este
+    // teste exercita fica em "Recursos complementares" (expansão aberta aqui).
+    if (["Radar Nacional", "Radar Internacional", "Rodadas"].includes(label)) {
+      await page.locator("form.prospect-form").waitFor();
+      const more = page.locator("details.complementary");
+      await more.waitFor();
+      if (!(await more.evaluate((d) => d.open))) await more.locator(":scope > summary").click();
+    }
   };
   // Vai para uma tela pelo caminho do usuário: item principal, aba de Abordagem ou cartão de Configurações.
   const nav = async (label) => {

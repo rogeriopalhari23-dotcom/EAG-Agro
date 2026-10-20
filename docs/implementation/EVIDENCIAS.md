@@ -3306,3 +3306,42 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Sem o token na variável de ambiente que ele esperava, o navegador não estava autenticado: as telas não carregaram e a criação não aconteceu.
   - Conferido no banco (`SELECT`): 2 rodadas, a mais recente de 18:28:36Z; 0 eventos de auditoria desde 19:00Z.
   - A conferência correta usou um arquivo de nome único, com bloqueio de gravação no próprio navegador.
+
+## Prospecção automática (2026-10-20, na branch, não publicada)
+
+- **Pedido de Rogério:** reestruturar o fluxo para a pessoa informar só produto, mercado, local e alcance e o Compass executar o resto em segundo plano, com política persistente de autorização, sem simular decisões humanas. Pediu também: não publicar, não aplicar migração remota, não alterar registros do piloto e não enviar mensagens.
+- **Implementado:**
+  - **Migração** `0045_prospeccao_automatica.sql` (só local): perfil versionado, política, prospecções e eventos.
+  - **Motor** `src/prospect/engine.js`: chama as rotas existentes com a identidade de quem iniciou e o canal `automation` + a política como autorização. A ciência é registrada como `policy:<id>@vN`.
+  - **Conciliação pelo site** `src/prospect/site.js`: CNPJ com dígitos válidos e e-mail geral do próprio domínio; respeita robots.txt.
+  - **Execução:** fila `prospect_job` e cron de 5 minutos.
+  - **Interface:** Prospecção, e os hubs em Radar Nacional, Radar Internacional e Rodadas, com o manual em "Recursos complementares"; Configurações → Prospecção automática.
+  - **Documentos:** `docs/implementation/prospeccao/MATRIZ-E-LIMITACOES.md` e `EMENDA-PROSPECCAO-AUTOMATICA.md` (R12.7, ciência por política e aceite internacional: **proposta, não aprovada**).
+- **Testes (fontes simuladas):**
+  - `tests/prospeccao.test.mjs`, 8 testes:
+    - política ausente e concedida;
+    - limite e 429 com espera;
+    - reaproveitamento sem duplicar;
+    - mapa recusado (navegador ou seguir sem);
+    - pausa, cancelamento e lease;
+    - escopo e revogação;
+    - milho GMO em Indiara;
+    - perfil v2;
+    - internacional com fonte pendente;
+    - cron.
+  - `npm run check`: 521 + 2 + 37, 0 falhas; `tests/ui-rodadas.mjs` e `npm run test:ui` passaram, adaptados à seção complementar.
+- **Roteiro pela interface na prévia local** (fontes simuladas, sem terminal entre as etapas), 15 conferências OK:
+  - formulário mínimo;
+  - parada por autorização e concessão pela tela;
+  - café em Guaxupé/MG, 150 km: 3 cadastradas em descoberta e 3 na fila (site fora do ar, sem CNPJ, sem site);
+  - milho GMO em Indiara/GO, 100 km, avançou com a interface fechada por 25 s, aguardando o limite da Receita compartilhado com a prospecção anterior;
+  - internacional café/Alemanha: o diretório alemão ficou pendente e o mapa seguiu;
+  - ciência pela política na rodada;
+  - celular;
+  - sem erro de JavaScript.
+- **Verificações reais** (deste computador, gratuitas):
+  - Overpass, etiquetas de torrefação a 150 km de Guaxupé: HTTP 200, **0 objetos**;
+  - busca por nome: estourou 90 s e não foi repetida;
+  - SIPEAGRO: portal respondeu 403 a acesso automatizado.
+  - Nenhuma consulta à Receita foi feita de verdade.
+- **Não feito:** publicação, migração remota, alteração de registros reais, fichas, T11, canais, campanhas ou envios. A política não foi concedida em produção.

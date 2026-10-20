@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-20T19:18:57.799Z",
+  "updatedAt": "2026-10-20T22:27:32.962Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -913,6 +913,27 @@
       "validation": "npm run check 513+2+37; tests/ui-rodadas.mjs; npm run test:ui; roteiro da prévia (18 conferências, 2 execuções); conferência em produção só leitura",
       "evidence": "docs/implementation/EVIDENCIAS.md",
       "blockedBy": "Publicado em 2026-10-20 com autorização de Rogério: Worker 4933fc92-71b6-4163-8b24-41035e0a88b3 (commits 2e15481, e58b7ed), sem migração; reversão: wrangler rollback 5c993fec-0c67-47b6-b59a-56250a6d6d72. Pendente de Rogério: corrigir a rodada real \"cafe\" (16261787…) em Editar configuração (commodity Café, Guaxupé/MG, segmento), gerando revisão 2 com nova ciência."
+    },
+    {
+      "id": "PROSPECCAO-AUTOMATICA",
+      "title": "Prospecção automática: perfil versionado, política de pesquisa de rotina e motor em segundo plano (nacional e internacional)",
+      "status": "implemented",
+      "dependsOn": [
+        "RODADAS-SIMPLIFICACAO"
+      ],
+      "plan": "docs/implementation/prospeccao/MATRIZ-E-LIMITACOES.md",
+      "section": "todas",
+      "read": [
+        "src/prospect/",
+        "migrations/0045_prospeccao_automatica.sql",
+        "tests/prospeccao.test.mjs",
+        "tests/helpers/simulated-world.mjs",
+        "docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md"
+      ],
+      "acceptance": "Pessoa informa produto, mercado, local e alcance; servidor executa descoberta, conciliação, consulta cadastral, deduplicação, evidências e canais, prioridade, triagem, cadastro em descoberta e relatório, com espera por limite, pausa, cancelamento e retomada; sem política, para em decisão; nada de contato, ficha, campanha, canal ou envio.",
+      "validation": "tests/prospeccao.test.mjs (8); npm run check 521+2+37; ui-rodadas; test:ui; roteiro da prévia (15 conferências)",
+      "evidence": "docs/implementation/EVIDENCIAS.md",
+      "blockedBy": "Não publicado. Depende de: emenda R12.7 (proposta); decisão sobre a alternativa ao mapa pelo servidor (ponte); cobertura do mapa para café no Brasil é nula (verificação real 20/10). Migração 0045 só local."
     }
   ]
 }

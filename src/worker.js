@@ -7,6 +7,8 @@ import {
   str,
   securityHeaders,
   page,
+  requireRole,
+  WRITE_ROLES,
 } from "./http.js";
 import { getActor } from "./auth.js";
 import { statement as s, parameters } from "./store.js";
@@ -41,15 +43,18 @@ import * as people from "./people.js";
 import * as decisionReview from "./decision-review.js";
 import * as integrations from "./integrations.js";
 import * as rounds from "./rounds.js";
+import * as prospect from "./prospect/engine.js";
 import { readProvenance } from "./provenance.js";
-import { handleQueue } from "./queue.js";
+import { handleQueue, handlers as queueHandlers } from "./queue.js";
 import { mapInfo, mapTiles } from "./map-tiles.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
 // Não exportar: o workerd trata toda exportação nomeada do módulo principal como entrypoint (falha no wrangler dev).
 const VERSION = "0.3.1-review.2";
-async function route(request, env, rid) {
+// internalActor: identidade já resolvida, só para chamadas internas (motor da prospecção e cadastro pela rodada); nunca
+// vem de fora. Sem ela, a identidade sai do Cloudflare Access como sempre.
+async function route(request, env, rid, internalActor = null) {
   const u = new URL(request.url),
     path = u.pathname,
     method = request.method;
@@ -66,10 +71,10 @@ async function route(request, env, rid) {
     return response({ status: "ok", service: "eag-compass", version: VERSION });
   // Ponte de e-mail: identidade própria (token de serviço do Access + assinatura HMAC), só nestas rotas.
   if (path.startsWith("/api/bridge/")) return handleBridge(request, env, path, rid);
-  const actor = await getActor(request, env);
+  const actor = internalActor ? { id: internalActor.id, tenant_id: internalActor.tenant_id, email: internalActor.email, display_name: internalActor.display_name, role: internalActor.role } : await getActor(request, env);
   // Procedência declarada (canal, executor, autorização): registrada com a operação; nunca prova ação humana.
   actor.provenance = readProvenance(request);
-  assertSameOrigin(request);
+  if (!internalActor) assertSameOrigin(request);
   if (path === "/api/session" && method === "GET")
     return response({
       actor,
@@ -202,6 +207,27 @@ async function route(request, env, rid) {
         await catalog.updateCharacteristic(request, env, actor, rid, id, subId),
       );
   }
+  // Prospecção automática: perfil comprador versionado, política de pesquisa de rotina e execução em segundo plano.
+  if (path === "/api/prospect/profile" && method === "GET") return response(await prospect.getProfile(env, actor));
+  if (path === "/api/prospect/profile" && method === "POST") return response(await prospect.saveProfile(request, env, actor, rid), 201);
+  if (path === "/api/prospect/policy" && method === "GET") return response(await prospect.getPolicy(env, actor));
+  if (path === "/api/prospect/policy" && method === "POST") return response(await prospect.grantPolicy(request, env, actor, rid), 201);
+  if (path === "/api/prospect/policy/revoke" && method === "POST") return response(await prospect.revokePolicy(request, env, actor, rid));
+  if (path === "/api/prospect/jobs" && method === "GET") return response(await prospect.listJobs(env, actor));
+  if (path === "/api/prospect/jobs" && method === "POST") return response(await prospect.createJob(request, env, actor, rid), 201);
+  const pjb = path.match(/^\/api\/prospect\/jobs\/([0-9a-f-]{36})(?:\/(pause|resume|cancel|skip-browser|browser-osm|run))?$/);
+  if (pjb) {
+    const [, jid, op] = pjb;
+    if (!op && method === "GET") return response(await prospect.getJob(env, actor, jid));
+    if (op === "browser-osm" && method === "POST") return response(await prospect.browserOsm(request, env, actor, rid, jid, internalCaller(env, rid)));
+    // Executar agora (diagnóstico): o mesmo ciclo do cron, para quem não quer esperar o próximo minuto.
+    if (op === "run" && method === "POST") {
+      requireRole(actor, WRITE_ROLES);
+      await prospect.runJob(env, jid, { call: internalCaller(env, rid) });
+      return response(await prospect.getJob(env, actor, jid));
+    }
+    if (op && method === "POST") return response(await prospect.controlJob(request, env, actor, rid, jid, op));
+  }
   // Rodadas de descoberta e qualificação (fluxo geral, configurado por rodada).
   if (path === "/api/rounds" && method === "GET") return response(await rounds.listRounds(env, actor));
   if (path === "/api/rounds" && method === "POST") return response(await rounds.createRound(request, env, actor, rid), 201);
@@ -228,7 +254,7 @@ async function route(request, env, rid) {
         headers.set("content-type", "application/json");
         headers.delete("content-length");
         try {
-          const res = await route(new Request(new URL(p, request.url), { method: m, headers, body: JSON.stringify(body) }), env, rid);
+          const res = await route(new Request(new URL(p, request.url), { method: m, headers, body: JSON.stringify(body) }), env, rid, actor);
           return { status: res.status, data: await res.json() };
         } catch (e) {
           if (e instanceof ApiException) return { status: e.status, data: { error: { code: e.code, message: e.message, details: e.details } } };
@@ -600,12 +626,14 @@ export default {
     return new Response(result.body, { status: result.status, headers });
   },
   async queue(batch, env) {
-    await handleQueue(batch, env);
+    await handleQueue(batch, env, { handlers: { ...queueHandlers, prospect_job: (e, body) => prospect.runJob(e, body.jobId, { call: internalCaller(e, crypto.randomUUID()) }) } });
   },
   // Cron só é configurado quando os adaptadores forem liberados (portão humano em scripts/validate-deploy.mjs).
   async scheduled(controller, env) {
     const tenant = env.DEFAULT_TENANT_ID;
     if (controller.cron === "*/5 * * * *") {
+      // Prospecções devidas (espera por limite de fonte vencida ou mensagem da fila perdida): retoma sem duplicar.
+      await prospect.tick(env, tenant, { call: internalCaller(env, crypto.randomUUID()) }).catch((e) => console.error("prospect_tick_failed", { message: String(e?.message ?? "").slice(0, 120) }));
       // Respostas primeiro: uma resposta recém-chegada pausa antes do próximo envio.
       // Com a ponte (SEND_TRANSPORT=bridge), leitura e envio acontecem pelas rotas /api/bridge/*; o cron não fala com a caixa.
       if (env.SEND_TRANSPORT !== "bridge") {
@@ -621,3 +649,25 @@ export default {
     else console.error("scheduled_unknown_cron", { cron: controller.cron });
   },
 };
+
+// Chamada interna às rotas do Compass com uma identidade já resolvida (motor da prospecção). Mesmas validações, bloqueios
+// e auditoria do uso pelo painel; o canal declarado vem nos cabeçalhos (automation).
+export function internalCaller(env, rid) {
+  return async (actor, path, method = "GET", body, headers = {}) => {
+    const req = new Request(new URL(path, "https://compass.internal"), {
+      method,
+      headers: { "content-type": "application/json", ...headers },
+      body: body === undefined || method === "GET" ? undefined : JSON.stringify(body),
+    });
+    try {
+      const res = await route(req, env, rid, actor);
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text.slice(0, 200) }; }
+      return { status: res.status, data };
+    } catch (e) {
+      if (e instanceof ApiException) return { status: e.status, data: { error: { code: e.code, message: e.message, details: e.details } } };
+      throw e;
+    }
+  };
+}

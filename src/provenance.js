@@ -7,10 +7,10 @@
 //   - autorização: referência, responsável e data da autorização — DECLARADAS; o Compass registra, não valida;
 //   - momento: instante em que o Compass executou a operação (servidor).
 // Cabeçalhos (valores com encodeURIComponent, para aceitar acentos):
-//   x-compass-channel: panel | script | api
+//   x-compass-channel: panel | script | api | automation (motor da prospecção automática, sob a política de pesquisa)
 //   x-compass-executor: texto livre (ex.: "Rogério (manual)", "Claude (automação, script r1.mjs)")
 //   x-compass-authorization-ref / -by / -at: referência, responsável e data (AAAA-MM-DD ou ISO) da autorização
-export const CHANNELS = ["panel", "script", "api"];
+export const CHANNELS = ["panel", "script", "api", "automation"];
 const MAX = { executor: 160, ref: 400, by: 160 };
 
 const header = (request, name, max) => {

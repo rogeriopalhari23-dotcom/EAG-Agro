@@ -18,7 +18,7 @@ const tolerant = (fn) => async (env, body) => {
     throw e;
   }
 };
-const handlers = {
+export const handlers = {
   search_partition: (env, body) => runPartition(env, body.partitionId),
   geocode_unit: tolerant((env, body) => geocodeUnit(env, body.unitId)),
   email_validation_poll: (env, body) => pollJob(env, body.jobId),

@@ -63,14 +63,25 @@ export function idMaskMatches(country, mask, id) {
 
 // Candidata provisória (sem identificador) com o mesmo nome e município de UMA unidade identificada é a mesma unidade:
 // junta nela e registra de onde veio. Mais de uma unidade possível → continua provisória, com as opções para conciliar.
+// Origem do site (sem www, http/https iguais) para ligar a candidata do mapa à identificada pelo CNPJ lido naquele site.
+const siteOrigin = (w) => {
+  if (!w) return null;
+  try {
+    return new URL(/^https?:\/\//i.test(w) ? w : `https://${w}`).host.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+};
 function conciliateProvisional(ests) {
   const identified = ests.filter((e) => !e.provisional);
   const out = [];
   for (const e of ests) {
     if (!e.provisional) { out.push(e); continue; }
     const names = new Set(e.names.map(nameKey).filter(Boolean)), muns = new Set(e.municipalities.map((m) => normalizeName(m)));
+    const site = siteOrigin(e.hints?.website);
     const matches = identified.filter((x) => x.country === e.country && (!e.region || !x.region || String(x.region).toUpperCase() === String(e.region).toUpperCase())
-      && x.municipalities.some((m) => muns.has(normalizeName(m))) && x.names.some((n) => names.has(nameKey(n))) && idMaskMatches(e.country, e.hints?.idMask, x.registrationId));
+      && ((x.municipalities.some((m) => muns.has(normalizeName(m))) && x.names.some((n) => names.has(nameKey(n)))) || (site && siteOrigin(x.hints?.website) === site && x.hints?.fromSite === true))
+      && idMaskMatches(e.country, e.hints?.idMask, x.registrationId));
     if (matches.length !== 1) {
       if (matches.length > 1) e.hints = { ...e.hints, conciliationOptions: matches.map((x) => x.key) };
       out.push(e);

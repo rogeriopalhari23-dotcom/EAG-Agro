@@ -2747,3 +2747,82 @@ table.audit td {
 .round-form .form-grid {
   align-items: start;
 }
+
+/* Prospecção automática (2026-10-20): formulário mínimo, andamento e etapas. */
+.prospect-start {
+  border-top: 4px solid var(--accent);
+}
+.prospect-form {
+  display: grid;
+  gap: 14px;
+}
+.prospect-form .form-grid {
+  align-items: start;
+}
+.prospect-context {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: var(--type-sm);
+}
+.job-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sunken);
+  overflow: hidden;
+  margin-top: 6px;
+  min-width: 120px;
+}
+.job-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--teal), var(--accent));
+  transition: width 0.4s var(--ease);
+}
+.company-summary .next .job-progress {
+  background: rgb(255 255 255 / 0.16);
+}
+.job-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: passo;
+}
+.job-steps li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  counter-increment: passo;
+}
+.job-steps li > span:first-child::before {
+  content: counter(passo) ". ";
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+.job-steps li.current {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+details.complementary > summary {
+  color: var(--text-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .job-progress > span {
+    transition: none;
+  }
+}
+.prospect-form [hidden] {
+  display: none !important;
+}

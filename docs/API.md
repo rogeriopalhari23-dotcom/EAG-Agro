@@ -28,6 +28,10 @@ Todas as rotas `/api/*`, exceto GET health, exigem identidade autenticada e usu�
 | GET/POST /api/pauses | Lista/escrita com scope/scopeRef/reason. Operação global exige gestor/admin. |
 | POST /api/pauses/:id/resume | Motivo obrigatório; operação global exige gestor/admin; segunda retomada dá 409. |
 | GET /api/audit | Eventos paginados; filtro opcional entityId. |
+| GET/POST /api/prospect/profile | Perfil comprador padrão, versionado (POST: gestor/admin, com motivo e expectedVersion). |
+| GET/POST /api/prospect/policy, POST /api/prospect/policy/revoke | Política de pesquisa de rotina: concessão (gestor/admin, confirm + referência; fonte paga recusada) e revogação. |
+| GET/POST /api/prospect/jobs | Prospecções; criar com market, productId e local (nacional: region, municipality, radius; internacional: iso3). Executa em segundo plano (fila e cron). |
+| GET /api/prospect/jobs/:id; POST …/pause, …/resume, …/cancel, …/skip-browser, …/browser-osm, …/run | Andamento, etapas e registro; controles da pessoa; resposta do mapa obtida pelo navegador; execução imediata (diagnóstico). |
 | GET /api/round-catalog | Fontes das rodadas (o que fazem, limites, regra por segmento) e segmentos sugeridos por commodity. Só leitura. |
 | GET /api/geo/regions?country= | Estados com municípios na base oficial (só BR); fora do Brasil, `supported:false` e a limitação em texto. |
 | GET /api/geo/municipalities?uf=&q= | Municípios oficiais (código IBGE, nome, UF) por estado e trecho do nome; sem estado, exige 3 letras. Só leitura. |

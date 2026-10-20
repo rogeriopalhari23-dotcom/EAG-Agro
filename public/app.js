@@ -156,6 +156,7 @@ const ICONS = {
   arrow: "M5 12h14M13 6l6 6-6 6",
   back: "M19 12H5M11 6l-6 6 6 6",
   plus: "M12 5v14M5 12h14",
+  play: "M7 4.5v15l12-7.5z",
 };
 function icon(name, cls = "icon") {
   const ns = "http://www.w3.org/2000/svg";
@@ -172,7 +173,7 @@ function icon(name, cls = "icon") {
 // Navegação agrupada. As chaves continuam sendo os nomes das telas (navigate() e atalhos internos não mudam).
 const NAV_GROUPS = [
   [null, [["Início", "home"]]],
-  ["Descoberta", [["Rodadas", "layers"], ["Radar Nacional", "radar"], ["Radar Internacional", "globe"]]],
+  ["Descoberta", [["Prospecção", "play"], ["Rodadas", "layers"], ["Radar Nacional", "radar"], ["Radar Internacional", "globe"]]],
   ["Organização", [["Empresas", "building"]]],
   ["Abordagem", [["Fichas", "file"], ["Tarefas", "check"], ["Envios", "send"], ["Campanhas", "target"]]],
   ["Administração", [["Configurações", "gear"], ["Compliance e auditoria", "shield"]]],
@@ -193,6 +194,7 @@ const PARENT = {
   Supressão: "Configurações",
   Pausas: "Configurações",
   "Setores e CNAE": "Configurações",
+  "Prospecção automática": "Configurações",
 };
 const GROUP_OF = Object.fromEntries(NAV_GROUPS.flatMap(([g, items]) => items.map(([k]) => [k, g])));
 
@@ -205,7 +207,7 @@ const JOURNEY = [
   { label: "Abordar", hint: "Envios e campanhas, só com aprovação individual", go: () => navigate("Envios") },
   { label: "Acompanhar", hint: "Respostas, retornos e tarefas", go: () => navigate("Tarefas") },
 ];
-const STEP_OF = { Início: -1, Hoje: -1, Rodadas: 0, "Radar Nacional": 0, Radar: 0, "Radar Internacional": 0, Internacional: 0, "Lista mensal": 0, Fichas: 3, Abordagem: 3, Envios: 4, Campanhas: 4, Tarefas: 5 };
+const STEP_OF = { Início: -1, Hoje: -1, Prospecção: 0, Rodadas: 0, "Radar Nacional": 0, Radar: 0, "Radar Internacional": 0, Internacional: 0, "Lista mensal": 0, Fichas: 3, Abordagem: 3, Envios: 4, Campanhas: 4, Tarefas: 5 };
 function stepOfView(view) {
   if (view === "Empresas") return state.companyFilters?.profile === "in_icp" ? 2 : 1;
   return STEP_OF[view] ?? null;
@@ -609,6 +611,7 @@ async function settingsView() {
       ["Campanhas", "Commodity, cidade de origem e cliente ideal de cada busca; ativação."],
       ["Catálogo", "Produtos, identidade e códigos NCM/HS."],
       ["Setores e CNAE", "Setores usuários ligados às subclasses CNAE da busca nacional."],
+      ["Prospecção automática", "Perfil comprador padrão (versionado) e política de pesquisa de rotina."],
     ]),
     group("Controles e administração", "Mudanças aqui afetam toda a operação; cada uma pede motivo e fica no histórico.", [
       ["Pausas", "Pausas de empresa, campanha, commodity ou da operação."],
@@ -4840,7 +4843,7 @@ async function showRound(id) {
       notCovered.some((x) => x.level === "partial") ? text("p", `Parciais: ${notCovered.filter((x) => x.level === "partial").map((x) => plainArea(x.area)).join(", ")}.`, "muted") : null,
       details("Ver detalhes das limitações", el("div", {}, rows(notCovered, (x) => el("div", { class: "row" }, el("div", {}, text("strong", plainArea(x.area)), text("small", plainMessage(x))), tag(...LEVEL_TAG[x.level]))), details(`Texto técnico dos ${pf.items.length} itens`, rows(pf.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", x.area), text("small", x.message)), tag(...LEVEL_TAG[x.level])))))),
       r.acknowledged
-        ? text("small", `Ciência registrada por ${r.acknowledged.by} em ${fmtDate(r.acknowledged.at)} (revisão ${r.revision}).`, "muted")
+        ? text("small", String(r.acknowledged.by).startsWith("policy:") ? `Ciência coberta pela política de pesquisa de rotina (${r.acknowledged.by.replace("policy:", "")}) em ${fmtDate(r.acknowledged.at)} (revisão ${r.revision}); automação autorizada, não clique.` : `Ciência registrada por ${r.acknowledged.by} em ${fmtDate(r.acknowledged.at)} (revisão ${r.revision}).`, "muted")
         : writable() && pf.requiresAcknowledgement
           ? button("Registrar ciência das limitações", async () => {
               await api(`${base}/preflight-ack`, "POST", { revision: r.revision });
@@ -5253,11 +5256,345 @@ async function showRound(id) {
   showScreen(node, "Rodadas", r.name);
 }
 
+// ===== Prospecção automática (2026-10-20): componentes compartilhados pelo Radar Nacional, Radar Internacional e Rodadas.
+// A pessoa informa produto, mercado, local e alcance; o servidor executa o resto em segundo plano (com a política de
+// pesquisa vigente) e a tela só acompanha. Nada aqui faz contato, aprova ficha ou envia mensagem.
+const JOB_STATUS = {
+  queued: ["Na fila", ""],
+  running: ["Em andamento", "ok"],
+  waiting: ["Aguardando", ""],
+  needs_decision: ["Precisa de decisão", "warn"],
+  paused: ["Pausada", ""],
+  cancelled: ["Cancelada", ""],
+  done: ["Concluída", "ok"],
+  failed: ["Falhou", "bad"],
+};
+const STEP_STATE = { done: ["concluída", "ok"], partial: ["parcial", "warn"], pending: ["pendente", "warn"], skipped: ["sem itens", ""], waiting: ["aguardando", ""], decision: ["decisão", "warn"], failed: ["falhou", "bad"], todo: ["a fazer", ""] };
+const WAITING_TEXT = { rate_limit: "aguardando o limite por minuto da Receita; retoma sozinha", source_retry: "fonte indisponível; nova tentativa automática", browser_osm: "a busca no mapa precisa deste navegador", sites: "lendo os sites das empresas" };
+const jobActive = (j) => ["queued", "running", "waiting"].includes(j.status);
+
+// Formulário mínimo. market: "national" | "international" | null (pergunta).
+function prospectStart(fixedMarket = null) {
+  const commodities = catalogCommodities();
+  const box = el("section", { class: "panel prospect-start" }, text("h2", "Iniciar prospecção"));
+  const form = el("form", { class: "prospect-form", novalidate: "" });
+  const error = el("p", { class: "error", hidden: "" });
+  const commList = el("datalist", { id: `pc-${Math.random().toString(36).slice(2, 8)}` }, ...commodities.map((x) => el("option", { value: x.label })));
+  const comm = input("Commodity", "commodity", "text", "", true);
+  comm.control.setAttribute("list", commList.id);
+  comm.control.setAttribute("autocomplete", "off");
+  comm.control.placeholder = "Digite para buscar (ex.: café, milho)";
+  const prodBox = el("div", { class: "prospect-product" });
+  let code = "", productId = "";
+  const renderProduct = () => {
+    const list = commodities.find((x) => x.code === code)?.products ?? [];
+    if (!list.some((p) => p.id === productId)) productId = list.length === 1 ? list[0].id : "";
+    prodBox.replaceChildren();
+    if (list.length > 1) {
+      const sel = select("Produto", "productId", [["", "Escolha"], ...list.map((p) => [p.id, p.variant_name])], productId);
+      sel.control.addEventListener("change", () => (productId = sel.control.value));
+      prodBox.append(sel.node);
+    } else if (list.length === 1) prodBox.append(text("p", `Produto: ${list[0].variant_name}`, "form-hint"));
+  };
+  comm.control.addEventListener("change", () => {
+    const hit = commodities.find((x) => normKey(x.label) === normKey(comm.control.value));
+    code = hit?.code ?? "";
+    if (hit) comm.control.value = hit.label;
+    productId = "";
+    renderProduct();
+  });
+  let market = fixedMarket ?? "national";
+  const marketSel = fixedMarket ? null : select("Mercado", "market", [["national", "Nacional"], ["international", "Internacional"]], market);
+  // Nacional: estado, cidade (base oficial) e raio.
+  const region = select("Estado", "region", [["", "Escolha"], ...Object.entries(UF_NAMES).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([k, v]) => [k, `${v} (${k})`])], "");
+  const cityList = el("datalist", { id: `pci-${Math.random().toString(36).slice(2, 8)}` });
+  const city = input("Cidade", "municipality", "text", "", false);
+  city.control.setAttribute("list", cityList.id);
+  city.control.setAttribute("autocomplete", "off");
+  const radius = input("Raio (km)", "radius", "number", 150);
+  radius.control.min = "1";
+  let picked = null, t;
+  city.control.addEventListener("input", () => {
+    clearTimeout(t);
+    picked = null;
+    t = setTimeout(() => safe(async () => {
+      if (!region.control.value) return;
+      const r = await api(`/api/geo/municipalities?uf=${region.control.value}&q=${encodeURIComponent(city.control.value.trim())}`);
+      cityList.replaceChildren(...r.items.map((m) => el("option", { value: m.name })));
+      picked = r.items.find((m) => normKey(m.name) === normKey(city.control.value)) ?? null;
+    }), 180);
+  });
+  region.control.addEventListener("change", () => ((city.control.value = ""), (picked = null)));
+  const natBox = el("div", { class: "form-grid" }, region.node, el("div", {}, city.node, cityList), radius.node);
+  // Internacional: país (com os indicadores oficiais em Radar Internacional para orientar a escolha).
+  const countryList = el("datalist", { id: `pp-${Math.random().toString(36).slice(2, 8)}` });
+  const country = input("País", "country", "text", "", false);
+  country.control.setAttribute("list", countryList.id);
+  country.control.setAttribute("autocomplete", "off");
+  const intlBox = el("div", { class: "form-grid" }, el("div", {}, country.node, countryList), text("p", "Os indicadores oficiais de compra por país orientam a escolha (Radar Internacional → Indicadores por país); dado de comércio não prova que uma empresa importa do Brasil.", "form-hint"));
+  const showMarket = () => {
+    natBox.hidden = market !== "national";
+    intlBox.hidden = market !== "international";
+  };
+  marketSel?.control.addEventListener("change", () => ((market = marketSel.control.value), showMarket()));
+  safe(async () => {
+    const list = await countriesData();
+    countryList.replaceChildren(...list.filter((x) => x.iso2 !== "BR").map((x) => el("option", { value: x.name_pt })));
+  });
+  // Perfil e política: resumo curto, com ajuste fora do percurso.
+  const ctxLine = el("div", { class: "prospect-context" }, text("p", "Carregando perfil e política…", "muted"));
+  safe(async () => {
+    const [pr, po] = await Promise.all([api("/api/prospect/profile"), api("/api/prospect/policy")]);
+    const p = pr.current.profile;
+    const order = (p.sizes?.order ?? []).map((x) => ({ medium: "médias", small: "pequenas", large: "grandes com canal", micro: "micro", unknown: "porte desconhecido" })[x] ?? x).slice(0, 3).join(" > ");
+    ctxLine.replaceChildren(
+      el("p", {}, text("strong", "Perfil comprador: "), `${(p.roles?.priority ?? []).map((r) => p.roles.labels?.[r] ?? r).join(", ")}; ${order}; distribuidor e trader à parte. `, el("button", { type: "button", class: "link-btn", onclick: () => navigate("Prospecção automática") }, "Ajustar")),
+      po.current
+        ? el("p", {}, text("strong", "Autorização: "), `política de pesquisa de rotina v${po.current.version} — descoberta, consulta cadastral, triagem e cadastro em descoberta, sem contato.`)
+        : el("div", { class: "callout warn" }, text("p", "Sem política de pesquisa de rotina: a prospecção começa, mas para em \"precisa de decisão\" até a política ser concedida (Configurações → Prospecção automática)."), approver() ? button("Ver a política", () => navigate("Prospecção automática")) : null),
+    );
+  });
+  const submit = el("button", { type: "submit", class: "primary" }, "Iniciar prospecção");
+  form.append(el("div", { class: "form-grid" }, el("div", {}, comm.node, commList), prodBox, marketSel?.node ?? null), natBox, intlBox, ctxLine, error, el("div", { class: "toolbar" }, submit));
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    safe(async () => {
+      error.hidden = true;
+      const fail = (m) => ((error.textContent = m), (error.hidden = false));
+      if (!code) return fail("Escolha a commodity na lista.");
+      if (!productId) return fail("Escolha o produto.");
+      const body = { market, productId };
+      if (market === "national") {
+        if (!region.control.value) return fail("Escolha o estado.");
+        if (!picked) {
+          const r = await api(`/api/geo/municipalities?uf=${region.control.value}&q=${encodeURIComponent(city.control.value.trim())}`);
+          picked = r.items.find((m) => normKey(m.name) === normKey(city.control.value)) ?? null;
+        }
+        if (!picked) return fail("Escolha a cidade na lista (base oficial do IBGE).");
+        if (!(Number(radius.control.value) > 0)) return fail("Informe o raio.");
+        Object.assign(body, { location: { region: picked.uf, municipality: picked.name, municipalityCode: picked.code }, radius: { value: Number(radius.control.value), unit: "km" } });
+      } else {
+        const c = (state.countries ?? []).find((x) => normKey(x.name_pt) === normKey(country.control.value));
+        if (!c) return fail("Escolha o país na lista.");
+        Object.assign(body, { location: { iso3: c.iso3 } });
+      }
+      submit.disabled = true;
+      try {
+        const job = await api("/api/prospect/jobs", "POST", body);
+        notice("Prospecção iniciada. Ela segue no servidor mesmo com esta aba fechada.");
+        await showJob(job.id);
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  });
+  showMarket();
+  box.append(form);
+  return box;
+}
+
+function jobProgress(j) {
+  const done = j.steps.filter((s) => ["done", "partial", "skipped", "pending"].includes(s.state)).length;
+  return el("div", { class: "job-progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(j.steps.length), "aria-valuenow": String(done), "aria-label": `Etapas concluídas: ${done} de ${j.steps.length}` }, el("span", { style: `width:${Math.round((done / j.steps.length) * 100)}%` }));
+}
+async function prospectList(market) {
+  const d = await api("/api/prospect/jobs");
+  const items = d.items.filter((j) => !market || j.market === market);
+  const box = panel("Prospecções");
+  box.append(
+    items.length
+      ? rows(items, (j) =>
+          el(
+            "div",
+            { class: "row" },
+            el("div", {}, text("strong", j.name), text("small", `${j.market === "national" ? "Nacional" : "Internacional"} · ${j.stepLabel}${j.waitingFor ? ` · ${WAITING_TEXT[j.waitingFor] ?? j.waitingFor}` : ""}${j.summary ? ` · ${j.summary.registered} cadastrada(s), ${j.summary.exceptions} exceção(ões)` : ""} · ${fmtDate(j.updatedAt)}`), jobProgress(j)),
+            tag(...(JOB_STATUS[j.status] ?? [j.status, ""])),
+            button("Abrir", () => showJob(j.id)),
+          ),
+        )
+      : text("p", "Nenhuma prospecção ainda.", "empty"),
+  );
+  return box;
+}
+
+// Prospecção aberta: andamento, resultados, fila de exceções, conclusão e próxima ação. Atualiza sozinha enquanto roda.
+let jobTimer = null;
+async function showJob(id) {
+  clearTimeout(jobTimer);
+  const j = await api(`/api/prospect/jobs/${id}`);
+  const node = section(j.name, `${j.market === "national" ? "Prospecção nacional" : "Prospecção internacional"} · iniciada em ${fmtDate(j.createdAt)}`);
+  node.dataset.step = "0";
+  const [st, cls] = JOB_STATUS[j.status] ?? [j.status, ""];
+  const s = j.summary;
+  const item = (k, v, extra) => el("div", {}, text("span", k, "k"), v instanceof Node ? v : text("strong", v), extra ? text("small", extra) : null);
+  const head = el(
+    "div",
+    { class: "company-summary round-summary" },
+    item("Andamento", el("span", {}, tag(st, cls), " ", j.stepLabel), j.waitingFor ? WAITING_TEXT[j.waitingFor] ?? j.waitingFor : jobActive(j) ? "segue no servidor, mesmo com esta aba fechada" : null),
+    item("Candidatas encontradas", s ? String(s.candidates) : "—", s?.establishments != null ? `${s.establishments} estabelecimento(s) após deduplicação` : null),
+    item("Empresas cadastradas", s ? String(s.registered) : "—", "em descoberta: não é qualificação comercial"),
+    item("Pendências para análise", s ? String(s.exceptions) : "—", s?.pendingLookups ? `${s.pendingLookups} consulta(s) adiada(s)` : null),
+    el("div", { class: "next" }, el("p", {}, text("strong", "Próxima ação: "), j.decision ? j.decision.message : s ? s.nextAction : jobActive(j) ? "Aguardar: a prospecção avança sozinha." : "—"), jobProgress(j)),
+  );
+  node.append(head);
+  // Decisão pendente: o que falta e como seguir.
+  if (j.decision) {
+    const dec = el("div", { class: "callout warn" }, el("p", {}, text("strong", "Decisão necessária. "), j.decision.message));
+    if (j.decision.items?.length) dec.append(el("ul", {}, ...j.decision.items.map((x) => text("li", x))));
+    if (j.decision.kind === "authorization" && approver()) dec.append(button("Ver a política de pesquisa", () => navigate("Prospecção automática")));
+    if (writable()) dec.append(button("Retomar depois de resolver", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id)), true));
+    node.append(dec);
+  }
+  // Dependência do navegador (mapa colaborativo recusa o servidor): feita aqui, automaticamente, e dita como tal.
+  if (j.waitingFor === "browser_osm" && writable() && j.roundId) {
+    const bw = el("div", { class: "callout" }, el("p", {}, text("strong", "Busca no mapa por este navegador. "), "O servidor público do mapa colaborativo recusa o servidor do Compass; esta etapa é feita pelo navegador enquanto a prospecção está aberta. O restante segue no servidor."));
+    bw.append(el("div", { class: "toolbar" }, button("Seguir sem a busca no mapa", async () => (await api(`/api/prospect/jobs/${id}/skip-browser`, "POST", {}), await showJob(id)))));
+    node.append(bw);
+    if (!state.browserOsmDone?.[id]) {
+      (state.browserOsmDone ??= {})[id] = true;
+      safe(async () => {
+        const q = await api(`/api/rounds/${j.roundId}/osm-query`);
+        const res = await fetch(q.endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: `data=${encodeURIComponent(q.query)}` });
+        if (!res.ok) throw new Error(`O mapa colaborativo respondeu ${res.status} também pelo navegador. Tente mais tarde ou siga sem a busca no mapa.`);
+        const data = await res.json();
+        const els = (data.elements ?? []).map((e) => ({ type: e.type, id: e.id, lat: e.lat, lon: e.lon, center: e.center, tags: e.tags }));
+        await api(`/api/prospect/jobs/${id}/browser-osm`, "POST", { elements: els, final: true });
+        notice(`Busca no mapa feita por este navegador: ${els.length} objetos enviados; a prospecção segue no servidor.`);
+        await showJob(id);
+      });
+    }
+  }
+  // Resultados: cadastradas com prioridade e evidência; fila de exceções.
+  if (s) {
+    const tbl = (cols, list, row) => el("div", { class: "table-wrap" }, el("table", { class: "trade" }, el("thead", {}, el("tr", {}, ...cols.map((c) => el("th", { scope: "col" }, c)))), el("tbody", {}, ...list.map(row))));
+    const PROOF = { proved: "comprovado", indication: "indício", none: "sem evidência" };
+    const SIZE = { medium: "média", small: "pequena", large: "grande", micro: "micro", unknown: "desconhecido" };
+    node.append(
+      panel(
+        `Empresas cadastradas em descoberta (${s.registered})`,
+        text("p", s.notCommercial, "muted"),
+        s.ranked.length
+          ? tbl(["Prioridade", "Empresa", s.market === "national" ? "Local e distância" : "Situação", "Porte", "Evidência", "Canal", "Sanções"], s.ranked, (x, i) =>
+              el("tr", {}, text("td", String(i + 1)), el("td", {}, x.companyId ? el("button", { type: "button", class: "link-btn", onclick: () => showCompany(x.companyId) }, x.name) : x.name), text("td", s.market === "national" ? [x.municipality, x.distance].filter(Boolean).join(" · ") || "—" : x.status), text("td", SIZE[x.size] ?? x.size), text("td", s.market === "national" ? `operação ${PROOF[x.operation] ?? "—"} · uso ${PROOF[x.use] ?? "—"} · compra ${PROOF[x.purchase] ?? "—"}` : `${x.ownEvidence} própria(s)`), text("td", x.channel ? "geral publicado" : x.note ?? "—"), text("td", x.screening ?? "—")),
+            )
+          : text("p", "Nenhuma empresa cadastrada nesta prospecção.", "empty"),
+      ),
+      panel(
+        `Pendências para análise (${s.exceptions})`,
+        s.queue.length
+          ? el("div", {}, el("ul", { class: "plain-list" }, ...s.queue.map((q) => text("li", `${q.name}: ${(q.reasons ?? [q.reason]).filter(Boolean).join("; ")}`))), el("div", { class: "toolbar" }, s.roundId ? button("Revisar na rodada", () => ((state.roundTab = null), showRound(s.roundId))) : null, s.searchId ? button("Revisar na busca do país", () => showForeignSearch(s.searchId)) : null))
+          : text("p", "Nenhuma exceção: tudo o que cumpriu as regras foi cadastrado.", "empty"),
+      ),
+    );
+  }
+  // Registro das etapas (rastreabilidade) e controles.
+  const controls = el("div", { class: "toolbar" });
+  if (writable()) {
+    if (jobActive(j)) controls.append(button("Pausar", async () => (await api(`/api/prospect/jobs/${id}/pause`, "POST", {}), await showJob(id))));
+    if (["paused", "waiting"].includes(j.status)) controls.append(button("Retomar agora", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id)), true));
+    if (!["done", "cancelled", "failed"].includes(j.status)) controls.append(button("Cancelar", async () => (await api(`/api/prospect/jobs/${id}/cancel`, "POST", {}), await showJob(id))));
+    if (j.roundId) controls.append(button("Abrir a rodada", () => showRound(j.roundId)));
+  }
+  node.append(
+    panel(
+      "Etapas",
+      el("ol", { class: "job-steps" }, ...j.steps.map((x) => el("li", { class: x.key === j.step && jobActive(j) ? "current" : "" }, text("span", x.label), tag(...(STEP_STATE[x.state] ?? [x.state, ""]))))),
+      details(`Registro das etapas (${j.events.length})`, el("ul", { class: "plain-list" }, ...j.events.map((e) => text("li", `${fmtDate(e.at)} · ${e.stepLabel} · ${STEP_STATE[e.outcome]?.[0] ?? e.outcome}: ${e.message}`)))),
+      controls,
+    ),
+  );
+  showScreen(node, "Prospecção", j.name);
+  if (jobActive(j) && j.waitingFor !== "browser_osm")
+    jobTimer = setTimeout(() => {
+      if (document.visibilityState === "visible" && document.querySelector(".page-head h1")?.textContent === j.name) safe(() => showJob(id));
+    }, 4000);
+}
+
+// Hub de prospecção em cada contexto: formulário + prospecções; o modo manual fica em "Recursos complementares".
+async function prospectHub(title, subtitle, market, manual, manualTitle) {
+  const node = section(title, subtitle);
+  node.append(prospectStart(market), await prospectList(market));
+  if (manual) {
+    const m = await manual();
+    m.querySelector(":scope > .page-head")?.remove();
+    node.append(el("details", { class: "complementary" }, el("summary", {}, manualTitle), m));
+  }
+  return node;
+}
+async function prospectView() {
+  return prospectHub("Prospecção", "Escolha o produto, o mercado e o local; o Compass faz a pesquisa e o cadastro em descoberta em segundo plano.", null, null);
+}
+
+// Configurações → Prospecção automática: perfil comprador (versionado) e política de pesquisa de rotina.
+async function prospectSettingsView() {
+  const [pr, po] = await Promise.all([api("/api/prospect/profile"), api("/api/prospect/policy")]);
+  const node = section("Prospecção automática", "Perfil comprador usado como padrão e autorização persistente para a pesquisa de rotina. Contato, fichas, campanhas, canais e envios ficam fora.");
+  const p = pr.current.profile;
+  const prof = panel(`Perfil comprador${pr.current.version ? ` v${pr.current.version}` : " (padrão, ainda não registrado)"}`);
+  prof.append(
+    kv([
+      ["Perfis compradores", (p.roles?.priority ?? []).map((r) => p.roles.labels?.[r] ?? r).join(", ")],
+      ["Separados", (p.roles?.separate ?? []).map((r) => p.roles.labels?.[r] ?? r).join(", ")],
+      ["Porte", (p.sizes?.order ?? []).join(" > ") + (p.sizes?.largeRequiresChannel ? " (grande só com canal adequado)" : "")],
+      ["Evidência que confirma", (p.evidence?.confirming ?? []).join(", ")],
+      ["Fontes nacionais", (p.sources?.national ?? []).map(sourceName).join(", ")],
+      ["Fontes internacionais", (p.sources?.international ?? []).join(", ")],
+    ]),
+    el("ul", { class: "plain-list" }, ...(p.distinctions ?? []).map((x) => text("li", x))),
+  );
+  if (approver()) {
+    const json = input("Perfil (JSON)", "profile", "textarea", JSON.stringify(p, null, 2));
+    json.control.rows = 18;
+    json.control.maxLength = 20000;
+    prof.append(details("Ajustar o perfil (nova versão)", makeForm([json, input("Motivo da alteração", "reason")], async (v) => {
+      let x;
+      try { x = JSON.parse(v.profile); } catch { throw new Error("O perfil não é um JSON válido."); }
+      await api("/api/prospect/profile", "POST", { profile: x, reason: v.reason, expectedVersion: pr.current.version });
+      notice("Perfil salvo como nova versão.");
+      await navigate("Prospecção automática");
+    }, "Salvar nova versão")));
+  }
+  if (pr.history.length) prof.append(details("Versões anteriores", el("ul", { class: "plain-list" }, ...pr.history.map((h) => text("li", `v${h.version} · ${fmtDate(h.created_at)} · ${h.created_by}: ${h.reason}`)))));
+  const t = po.template;
+  const pol = panel(po.current ? `Política de pesquisa de rotina v${po.current.version}` : "Política de pesquisa de rotina: não concedida");
+  pol.append(
+    po.current ? text("p", `Concedida por ${po.current.grantedBy} em ${fmtDate(po.current.grantedAt)}. Referência: ${po.current.reference}`) : el("div", { class: "callout warn" }, text("p", "Sem política, cada prospecção para em \"precisa de decisão\" antes de pesquisar.")),
+    kv([
+      ["Cobre", t.covers.join("; ")],
+      ["Não cobre", t.excludes.join("; ")],
+      ["Raio máximo sem nova decisão", `${(po.current?.policy ?? t).maxRadiusKm} km`],
+      ["Limitações aceitas uma vez", Object.keys(t.acceptedLimitations).map((k) => plainArea(k)).join(", ")],
+    ]),
+    text("p", "Limitação nova, raio maior, fonte paga, fusão de empresas parecidas e exceções continuam pedindo decisão. A seleção de commodity e a busca no exterior pela política dependem da emenda da R12.7 (docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md).", "muted"),
+  );
+  if (approver()) {
+    const conf = el("input", { type: "checkbox", name: "confirm" });
+    if (!po.current)
+      pol.append(details("Conceder a política", makeForm([input("Referência da decisão (onde e quando foi decidida)", "reference"), input("Raio máximo (km)", "maxRadiusKm", "number", t.maxRadiusKm), { node: el("label", { class: "check" }, conf, " Confirmo a autorização da pesquisa de rotina nestes termos") }], async (v) => {
+        if (!conf.checked) throw new Error("Confirme a autorização.");
+        await api("/api/prospect/policy", "POST", { confirm: true, reference: v.reference, maxRadiusKm: Number(v.maxRadiusKm) });
+        notice("Política concedida.");
+        await navigate("Prospecção automática");
+      }, "Conceder")));
+    else
+      pol.append(details("Revogar a política", makeForm([input("Motivo", "reason")], async (v) => {
+        await api("/api/prospect/policy/revoke", "POST", { reason: v.reason });
+        notice("Política revogada: as prospecções param antes de pesquisar.");
+        await navigate("Prospecção automática");
+      }, "Revogar")));
+  }
+  if (po.history.length) pol.append(details("Histórico da política", el("ul", { class: "plain-list" }, ...po.history.map((h) => text("li", `v${h.version} · concedida em ${fmtDate(h.granted_at)} por ${h.granted_by}${h.revoked_at ? ` · revogada em ${fmtDate(h.revoked_at)}: ${h.revoke_reason}` : ""}`)))));
+  node.append(prof, pol);
+  return node;
+}
+
 const views = {
   Início: home,
-  "Radar Nacional": radarView,
-  "Radar Internacional": () => internacionalView(),
-  Rodadas: rodadasView,
+  "Radar Nacional": () => prospectHub("Radar Nacional", "Compradores perto da cidade do fornecedor: escolha o produto, a cidade e o raio e inicie a prospecção.", "national", radarView, "Recursos complementares: busca por campanha (Casa dos Dados, serviço pago) e mapa"),
+  "Radar Internacional": () => prospectHub("Radar Internacional", "Compradores no exterior: escolha o produto e o país e inicie a prospecção. Os indicadores oficiais por país orientam a escolha.", "international", () => internacionalView(), "Indicadores por país, análises, buscas e lista mensal"),
+  Rodadas: () => prospectHub("Rodadas", "Cada prospecção nacional cria e executa uma rodada sozinha. A configuração manual continua disponível abaixo.", "national", rodadasView, "Rodadas: lista, configuração manual, importação e pesquisa assistida"),
+  Prospecção: prospectView,
+  "Prospecção automática": prospectSettingsView,
   Empresas: companiesView,
   Abordagem: () => abordagemView("Fichas"),
   Configurações: settingsView,
@@ -5273,8 +5610,8 @@ const views = {
   Supressão: suppressionView,
   Pausas: pausesView,
   Hoje: home,
-  Radar: radarView,
-  Internacional: () => internacionalView(),
+  Radar: () => views["Radar Nacional"](),
+  Internacional: () => views["Radar Internacional"](),
 };
 async function start() {
   try {

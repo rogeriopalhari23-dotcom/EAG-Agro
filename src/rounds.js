@@ -13,6 +13,9 @@ import { municipalityIndex, resolveOrigin } from "./rodada/distance.js";
 import { roundArea, fromIbgeRow, areaBox } from "./rodada/area.js";
 import { preflight, SOURCE_CATALOG } from "./rodada/sources/catalog.js";
 import { SEGMENT_PRESETS, RULE_SOURCES } from "./rodada/segments.js";
+import { currentPolicy } from "./prospect/engine.js";
+import { validCnpj } from "./prospect/site.js";
+import { uncoveredLimitations } from "./prospect/defaults.js";
 import { runRound } from "./rodada/batch.js";
 import { buildRegistrationBatch } from "./rodada/acceptance.js";
 import { brCnpjWs } from "./rodada/sources/br-cnpj-ws.js";
@@ -232,10 +235,20 @@ export async function acknowledgePreflight(request, env, actor, rid, id) {
   const r = await roundOf(env, actor, id);
   const i = await bodyJson(request);
   if (i.revision !== r.config_revision) fail(409, "revision_conflict", "As limitações mostradas são de outra versão da configuração.");
+  // Ciência pela política de pesquisa de rotina (prospecção automática): só vale se a política está vigente e cobre todas
+  // as limitações desta configuração; fica registrada como da política, nunca como de uma pessoa.
+  let by = actor.id, policy = null;
+  if (i.policyId != null) {
+    policy = await currentPolicy(env, actor.tenant_id);
+    if (!policy || policy.id !== i.policyId) fail(409, "policy_not_current", "A política de pesquisa informada não está vigente.");
+    const uncovered = uncoveredLimitations(parse(r.preflight_json), policy.policy);
+    if (uncovered.length) fail(409, "limitations_not_covered", "A política de pesquisa não cobre todas as limitações desta configuração.", { items: uncovered.map((x) => x.area) });
+    by = `policy:${policy.id}@v${policy.version}`;
+  }
   const at = now();
   await commit(env, [
-    s(env, "UPDATE discovery_rounds SET preflight_ack_by=?,preflight_ack_at=?,preflight_ack_revision=?,status=CASE WHEN status='draft' THEN 'active' ELSE status END,updated_at=? WHERE id=?", actor.id, at, r.config_revision, at, id),
-    auditStatement(env, actor, rid, "round.preflight_acknowledged", "discovery_round", id, { revision: r.config_revision, overall: parse(r.preflight_json)?.overall }),
+    s(env, "UPDATE discovery_rounds SET preflight_ack_by=?,preflight_ack_at=?,preflight_ack_revision=?,status=CASE WHEN status='draft' THEN 'active' ELSE status END,updated_at=? WHERE id=?", by, at, r.config_revision, at, id),
+    auditStatement(env, actor, rid, "round.preflight_acknowledged", "discovery_round", id, { revision: r.config_revision, overall: parse(r.preflight_json)?.overall, ...(policy ? { byPolicy: { id: policy.id, version: policy.version } } : {}) }),
   ]);
   return { acknowledgedAt: at, revision: r.config_revision };
 }
@@ -293,9 +306,24 @@ export async function addCandidates(request, env, actor, rid, id) {
   const at = now();
   let candidates = [], errors = [], skipped = null, source;
   if (intake === "automatic") {
-    source = oneOf(i.source, ["osm-overpass"], "fonte automática pelo navegador");
-    if (!Array.isArray(i.elements)) fail(422, "invalid_field", "Envie elements da resposta do OpenStreetMap.");
-    candidates = osmToCandidates({ elements: i.elements }, config, { consultedAt: at });
+    source = oneOf(i.source, ["osm-overpass", "company-site"], "fonte automática");
+    if (source === "company-site") {
+      // Site da própria empresa: só CNPJ com dígitos válidos, com a página como fonte própria; nada de nome de pessoa.
+      if (!Array.isArray(i.candidates) || !i.candidates.length || i.candidates.length > 50) fail(422, "invalid_field", "Envie de 1 a 50 candidatas lidas do site.");
+      for (const x of i.candidates) {
+        if (!validCnpj(x.registrationId)) { errors.push(`CNPJ inválido ignorado (${String(x.name ?? "").slice(0, 60)}).`); continue; }
+        if (!/^https?:\/\//.test(x.sourceUrl ?? "")) { errors.push("Página de origem ausente."); continue; }
+        candidates.push({
+          country: config.origin.country, name: str(x.name, "nome", 250), registrationId: String(x.registrationId).replace(/\D/g, ""), municipality: null, region: null,
+          hints: { website: x.website, fromSite: true },
+          sources: [{ id: "company-site", mode: "automatic", ref: x.sourceUrl, url: x.sourceUrl, consultedAt: at }],
+          evidence: [{ kind: "operation", strength: "own_source", url: x.sourceUrl, quote: `CNPJ ${String(x.registrationId).replace(/\D/g, "")} publicado no site da empresa`, date: at }],
+        });
+      }
+    } else {
+      if (!Array.isArray(i.elements)) fail(422, "invalid_field", "Envie elements da resposta do OpenStreetMap.");
+      candidates = osmToCandidates({ elements: i.elements }, config, { consultedAt: at });
+    }
   } else if (intake === "import") {
     source = oneOf(i.source, ["mapa-sipeagro", "import-file"], "fonte de importação");
     const text = str(i.text, "arquivo", 65000);

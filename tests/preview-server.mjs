@@ -11,6 +11,10 @@ import { setup } from "./helpers/db.mjs";
 import worker from "../src/worker.js";
 import { securityHeaders } from "../src/http.js";
 import { provenanceHeaders } from "../src/provenance.js";
+import { internalCaller } from "../src/worker.js";
+import { tick } from "../src/prospect/engine.js";
+import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.mjs";
+import { sources as tradeSources, keepCountries, tradeParams, driver } from "./helpers/trade.mjs";
 
 const PORT = Number(process.env.PREVIEW_PORT || 8790);
 const ctx = setup();
@@ -39,8 +43,13 @@ const FAKE_REG = {
   "64444444000104": ["Ativa", "Caturaí", "1066-0/00 Fabricação de alimentos para animais", "Empresa de Pequeno Porte"],
   "65555555000105": ["Suspensa", "Palmeiras de Goiás", "1066-0/00 Fabricação de alimentos para animais", null],
 };
+// Mundo simulado da prospecção automática (mapa, sites, Receita, diretório alemão), com PREVIEW_OSM_RECUSA=1 para o mapa
+// recusar o servidor como faz com a Cloudflare.
+const world = simulatedWorld({ cityAt: nearestMunicipality(DB), refuseOsm: process.env.PREVIEW_OSM_RECUSA === "1" });
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
+  const sim = await world.fetch(url, init).catch(() => null);
+  if (sim) return sim;
   const m = /publica\.cnpj\.ws\/cnpj\/(\d{14})/.exec(String(url));
   if (m) {
     const r = FAKE_REG[m[1]];
@@ -123,6 +132,28 @@ await api(`${rb}/annotations`, "POST", { kind: "complement", text: "Anotação f
 // Segunda rodada, só configurada (para "continuar" no Início).
 const cfg2 = JSON.parse(await readFile(new URL("../docs/implementation/rodadas/exemplos/soja-rio-verde-150km.json", import.meta.url), "utf8"));
 await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/GO, 150 km (rascunho)", config: { ...cfg2, id: "previa-soja" } });
+
+// Indicadores oficiais SIMULADOS (lista mensal de teste) para a prospecção internacional; café com código HS 090111.
+keepCountries(DB, ["DEU", "CHN"]);
+await tradeParams(api, { period_default_months: 12 });
+const tradeDriver = driver(ctx.env, tradeSources(), { at: "2026-10-10T12:00:00.000Z" });
+await tradeDriver.start();
+await tradeDriver.drain();
+const coffee = (await api("/api/catalog/product-05")).data;
+await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: coffee.revision, reason: "Prévia local (fictício)" });
+// O cron da produção roda a cada 5 minutos; aqui, um ciclo a cada 3 segundos (mesmo código, mesmas regras).
+let ticking = false;
+setInterval(async () => {
+  if (ticking) return;
+  ticking = true;
+  try {
+    await tick(ctx.env, "eag-internal", { call: internalCaller(ctx.env, "previa-cron") });
+  } catch (e) {
+    console.error("ciclo da prospecção:", e.message);
+  } finally {
+    ticking = false;
+  }
+}, 3000);
 
 const server = createServer(async (req, res) => {
   const chunks = [];

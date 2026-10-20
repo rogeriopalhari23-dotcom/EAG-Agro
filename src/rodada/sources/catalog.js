@@ -30,6 +30,11 @@ export const SOURCE_CATALOG = {
     provides: "empresas ativas por CNAE e município, com CNPJ",
     limits: "serviço pago: não roda sem autorização de despesa",
   },
+  "company-site": {
+    label: "Site da própria empresa (CNPJ e canal publicados)", role: "enrichment", mode: "automatic", countries: "*", cost: "free",
+    provides: "CNPJ publicado (dígitos verificadores conferidos) e e-mail geral do próprio domínio, com a página como fonte",
+    limits: "só páginas públicas (inicial e contato), respeita robots.txt; sem CNPJ publicado a candidata segue provisória",
+  },
   "import-file": {
     label: "Importação de arquivo (JSON ou CSV de candidatas)", role: "discovery", mode: "import", countries: "*", cost: "free",
     provides: "candidatas de qualquer origem, com fonte por linha", limits: "a qualidade depende do arquivo; sem fonte por linha, vira indício",

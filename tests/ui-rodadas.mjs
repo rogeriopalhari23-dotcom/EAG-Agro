@@ -84,7 +84,11 @@ try {
   await send("Page.navigate", { url: origin + "/" });
   await until(`!!document.querySelector('#navigation button[data-view="Rodadas"]')`, "navegação");
   await click("Rodadas");
-  await until(`/Nova rodada/.test(document.body.innerText)`, "tela Rodadas");
+  // Prospecção automática (2026-10-20): a tela começa pelo formulário de prospecção; a configuração manual de rodada,
+  // que este teste exercita, fica em "Recursos complementares".
+  await until(`!!document.querySelector("details.complementary")`, "tela Rodadas");
+  await js(`(() => { document.querySelector("details.complementary").open = true; return true; })()`);
+  await until(`/Nova rodada/.test(document.body.innerText)`, "configuração manual");
 
   // Criar pelo percurso simplificado (2026-10-20): commodity por nome (seleção pesquisável), produto só quando há mais de
   // um compatível, estado e cidade escolhidos (sem código IBGE nem coordenada), raio, segmentos; nome na revisão.
