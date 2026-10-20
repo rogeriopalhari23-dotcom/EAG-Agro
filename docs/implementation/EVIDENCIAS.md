@@ -3286,3 +3286,23 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - `tests/ui-rodadas.mjs`, `npm run test:ui` e `validate-deploy` passaram;
   - roteiro da prévia com 18 conferências OK (2 execuções): seleção de commodity, dependências milho → café, troca de rodadas, reabertura sem perda, internacional sem suporte, celular, sem erro de JavaScript.
 - **Antes de publicar:** Worker vigente `5c993fec-0c67-47b6-b59a-56250a6d6d72`; nenhuma migração pendente; o publicado (`683e6db`) está contido na branch.
+- **Publicado (autorizado por Rogério: "Conclua os testes e a publicação já autorizada somente depois desses ajustes"):**
+  - Worker **`4933fc92-71b6-4163-8b24-41035e0a88b3`** (2026-10-20T19:14:31Z), código do commit `e58b7ed` (inclui `2e15481`); sem migração.
+  - **Reversão:** `npx wrangler rollback 5c993fec-0c67-47b6-b59a-56250a6d6d72` (versão anterior: redesign sem a simplificação). Nunca `64808403`.
+  - As rotas novas são só leitura. Rodadas criadas com a versão nova continuam válidas na anterior (`commodity.productId` é ignorado lá).
+- **Conferência em produção (só leitura; Chrome sem interface com gravações bloqueadas no navegador, 0 tentativas):**
+  - **Rodada real "cafe":** mostra "Commodity \"cafe\" sem correspondência no catálogo" e "Nenhum segmento comprador escolhido".
+    - Área calculada: 209 municípios (MG, SP).
+    - No cadastro: sem seletor de produto e com o aviso para definir a commodity; Soja GMO não aparece.
+    - No formulário de edição (aberto, não salvo): commodity vazia com o aviso, sem campos técnicos, lista por nome.
+  - **Rodada 1:** as 4 seções e os detalhes; o cadastro oferece só Milho GMO e Milho não GMO; anotação complementar visível.
+  - Celular sem rolagem horizontal; nenhum erro de página nem HTTP ≥ 400.
+  - **Estado:**
+    - canais `planned`; campanhas 3 `draft` + 1 `ended`;
+    - 0 validações T11; 0 fichas aprovadas; `send_outbox` 28 (sem novos); cópia `{"enabled":false}`;
+    - 2 rodadas.
+  - **Ponte:** leitura bem-sucedida às 19:18:04Z, depois da publicação.
+- **Incidente operacional, sem efeito:** durante a conferência, um script antigo de 16/10 com o mesmo nome do novo foi executado por engano (a gravação do novo arquivo foi recusada). Ele tentava criar um rascunho de rodada em produção.
+  - Sem o token na variável de ambiente que ele esperava, o navegador não estava autenticado: as telas não carregaram e a criação não aconteceu.
+  - Conferido no banco (`SELECT`): 2 rodadas, a mais recente de 18:28:36Z; 0 eventos de auditoria desde 19:00Z.
+  - A conferência correta usou um arquivo de nome único, com bloqueio de gravação no próprio navegador.

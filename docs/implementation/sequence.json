@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-20T18:53:54.315Z",
+  "updatedAt": "2026-10-20T19:18:57.799Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -910,9 +910,9 @@
         "tests/ui-rodadas.mjs"
       ],
       "acceptance": "Sem Código IBGE, latitude ou longitude na tela; cidade escolhida na base oficial com estado (homônimos recusados sem estado); fora do Brasil sem fonte, limitação explicada sem pedir coordenada; produto do cadastro só da commodity da rodada (servidor recusa outro); segmentos sugeridos por commodity sem herança; tela com resumo e seções; mesmos bloqueios.",
-      "validation": "npm run check 513+2+37; tests/ui-rodadas.mjs; npm run test:ui; roteiro da prévia local (café Guaxupé/MG 150 km, 15 conferências)",
+      "validation": "npm run check 513+2+37; tests/ui-rodadas.mjs; npm run test:ui; roteiro da prévia (18 conferências, 2 execuções); conferência em produção só leitura",
       "evidence": "docs/implementation/EVIDENCIAS.md",
-      "blockedBy": "Não publicado: aguarda avaliação de Rogério na prévia. Depois da publicação, a rodada real 'cafe' (16261787…) precisa ser corrigida por Rogério em 'Editar configuração' (commodity Café/product-05, Guaxupé/MG, segmento), gerando revisão 2 com nova ciência."
+      "blockedBy": "Publicado em 2026-10-20 com autorização de Rogério: Worker 4933fc92-71b6-4163-8b24-41035e0a88b3 (commits 2e15481, e58b7ed), sem migração; reversão: wrangler rollback 5c993fec-0c67-47b6-b59a-56250a6d6d72. Pendente de Rogério: corrigir a rodada real \"cafe\" (16261787…) em Editar configuração (commodity Café, Guaxupé/MG, segmento), gerando revisão 2 com nova ciência."
     }
   ]
 }
