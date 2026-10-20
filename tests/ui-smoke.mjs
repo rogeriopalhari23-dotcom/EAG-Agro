@@ -337,7 +337,7 @@ try {
   });
   assert.deepEqual(errors, []);
   console.log(
-    "UI smoke OK (redesign): navegação em 6 itens + Configurações e abas de Abordagem; cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar Nacional, Fichas, Envios, Tarefas, Radar Internacional (países, resumo, seleção, busca e cartão compacto), Lista mensal, 390 px com menu, sem erros JS.",
+    "UI smoke OK (redesign 2026-10): menu agrupado (Visão geral, Descoberta, Organização, Abordagem, Administração); cadastro, demanda, gate, catálogo, parâmetros, ICP, Radar Nacional, Fichas, Envios, Tarefas, Radar Internacional (países, resumo, seleção, busca e cartão compacto), Lista mensal, 390 px com menu, sem erros JS.",
   );
 } finally {
   await browser.close();
