@@ -4392,11 +4392,29 @@ async function countriesData() {
 }
 const slugKey = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
 
-// Configuração da rodada em 4 passos (criação e edição usam o mesmo formulário): objetivo e commodity → local e alcance →
-// fontes e segmentos → revisar. Código IBGE e coordenadas não são digitados: no Brasil vêm do município escolhido na base
-// oficial; uma coordenada de versão anterior é preservada enquanto a origem não muda. O bloco técnico (JSON) guarda
-// segmentos com regras, fontes com limites, especificação, comprador, prioridades e evidência.
+// Variedade com efeito na qualificação (aceitação da variedade fica pendente): vem do produto escolhido, nunca de um
+// padrão. "não GMO" antes de "GMO" para não confundir.
+const varietyOf = (p) => (!p ? undefined : /n[ãa]o[- ]?gmo/i.test(p.variant_name) ? "não GMO" : /\bgmo\b/i.test(p.variant_name) ? "GMO" : undefined);
+// Dados calculáveis da rodada, a partir do país (só para rodada nova; a edição mantém o que já está registrado).
+const localeFor = (iso) => (iso === "BR" ? { language: "pt-BR", timezone: "America/Sao_Paulo" } : { language: state.countries?.find((x) => x.iso2 === iso)?.default_language ?? "en", timezone: "UTC" });
+const scopeFor = (iso) => `${String(iso).toLowerCase()}_email_automatic`;
+// Fontes calculadas pelos segmentos: Receita no Brasil; mapa colaborativo e registros do MAPA só se algum segmento tem a
+// regra. Na edição, nenhuma fonte já registrada é retirada sozinha (só se acrescenta a que um segmento novo pede).
+function sourcesFor(iso, segments, existing) {
+  const segs = Object.values(segments ?? {});
+  const need = [];
+  if (iso === "BR") need.push({ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 });
+  if (segs.some((g) => g.discovery?.osm)) need.push({ id: "osm-overpass", kind: "discovery" });
+  if (iso === "BR" && segs.some((g) => g.discovery?.sipeagro)) need.push({ id: "mapa-sipeagro", kind: "discovery" });
+  if (!existing) return need;
+  return [...existing, ...need.filter((n) => !existing.some((e) => e.id === n.id))];
+}
+
+// Configuração da rodada em 4 passos (criação e edição usam o mesmo percurso): commodity → local e raio → segmentos →
+// revisar. Só o indispensável aparece; o que é calculável é preenchido internamente e o que já estava registrado é
+// preservado (campos fora da tela nunca são apagados). Ajustes opcionais ficam na própria rodada, fora deste percurso.
 function roundForm(initial, roundName, onSubmit, label) {
+  const editing = !!roundName;
   const c = structuredClone(initial);
   const commodities = catalogCommodities();
   const form = el("form", { class: "wizard round-form", novalidate: "" });
@@ -4407,70 +4425,70 @@ function roundForm(initial, roundName, onSubmit, label) {
     error.scrollIntoView({ block: "nearest" });
     return false;
   };
-  const adv = (() => {
-    const f = input("Detalhes técnicos da configuração (JSON)", "advanced", "textarea", JSON.stringify({ spec: c.commodity?.spec, segments: c.commodity?.segments ?? {}, nameHints: c.commodity?.nameHints ?? [], restrictionHints: c.commodity?.restrictionHints ?? [], buyer: c.buyer, sources: c.sources ?? [], priorities: c.priorities, evidence: c.evidence }, null, 2), false);
-    f.control.rows = 14;
-    f.control.maxLength = 20000;
-    return f;
-  })();
-  const readAdv = () => {
-    try {
-      return JSON.parse(adv.control.value || "{}");
-    } catch {
-      return null;
-    }
-  };
-  const writeAdv = (patch) => {
-    const a = readAdv() ?? {};
-    adv.control.value = JSON.stringify({ ...a, ...patch }, null, 2);
-  };
+  // Segmentos escolhidos (com as regras de busca que já tiverem).
+  let segments = structuredClone(c.commodity?.segments ?? {});
 
-  // ---------- Passo 1: objetivo e commodity ----------
-  const name = input("Nome da rodada", "name", "text", roundName ?? "");
-  const known = commodities.some((x) => x.code === c.commodity?.code);
-  const commodity = select("Commodity", "code", [["", "Escolha a commodity"], ...commodities.map((x) => [x.code, x.label]), ...(c.commodity?.code && !known ? [[c.commodity.code, `${c.commodity.code} (sem correspondência no catálogo)`]] : [])], c.commodity?.code ?? "");
-  const productSel = select("Produto do catálogo que esta rodada cadastra", "configProductId", [], "");
-  const productHint = text("p", "", "form-hint");
-  const variety = input("Variedade ou especificação (opcional, ex.: GMO)", "variety", "text", c.commodity?.variety ?? "", false);
-  const fillProducts = (keep) => {
-    const list = commodities.find((x) => x.code === commodity.control.value)?.products ?? [];
-    productSel.control.replaceChildren(...(list.length === 1 ? [] : [el("option", { value: "" }, list.length ? "Escolha o produto" : "Nenhum produto desta commodity no catálogo")]), ...list.map((p) => el("option", { value: p.id }, p.variant_name + (p.identity_status === "pending" ? " — identidade pendente" : ""))));
-    productSel.control.value = list.some((p) => p.id === keep) ? keep : list.length === 1 ? list[0].id : "";
-    productSel.control.disabled = !list.length;
-    productHint.textContent = !commodity.control.value
-      ? ""
-      : !known && commodity.control.value === c.commodity?.code
-        ? `A commodity "${c.commodity.code}" foi digitada livremente e não corresponde ao catálogo. Escolha a commodity do catálogo para poder cadastrar empresas.`
-        : list.length
-          ? "O cadastro usará este produto; trocar depois exige editar a configuração."
-          : "Sem produto no catálogo para esta commodity: cadastre-o no Catálogo antes de cadastrar empresas pela rodada.";
+  // ---------- Passo 1: commodity (seleção pesquisável por nome) e produto, só se houver mais de um compatível ----------
+  const known = commodities.find((x) => x.code === c.commodity?.code);
+  const commList = el("datalist", { id: `commodities-${Math.random().toString(36).slice(2, 8)}` }, ...commodities.map((x) => el("option", { value: x.label })));
+  const commodity = input("Commodity", "commodity", "text", known?.label ?? "", true);
+  commodity.control.setAttribute("list", commList.id);
+  commodity.control.setAttribute("autocomplete", "off");
+  commodity.control.placeholder = "Digite para buscar (ex.: café, milho)";
+  const commNote = el("p", { class: "form-hint", "aria-live": "polite" });
+  const productBox = el("div", { class: "form-grid" });
+  let code = known?.code ?? "";
+  let productId = c.commodity?.productId ?? "";
+  const legacyCode = c.commodity?.code && !known ? c.commodity.code : null;
+  const renderProduct = () => {
+    const list = commodities.find((x) => x.code === code)?.products ?? [];
+    if (!list.some((p) => p.id === productId)) productId = list.length === 1 ? list[0].id : "";
+    productBox.replaceChildren();
+    if (list.length > 1) {
+      const sel = select("Produto", "configProductId", [["", "Escolha o produto"], ...list.map((p) => [p.id, p.variant_name])], productId);
+      sel.control.addEventListener("change", () => (productId = sel.control.value));
+      productBox.append(sel.node);
+    }
+    const p = list.find((x) => x.id === productId);
+    commNote.textContent = legacyCode && !code
+      ? `A configuração registrada tem a commodity "${legacyCode}", que não corresponde ao catálogo. Escolha a commodity do catálogo para poder cadastrar empresas.`
+      : !code
+        ? ""
+        : !list.length
+          ? "Sem produto no catálogo para esta commodity: cadastre-o no Catálogo antes de cadastrar empresas."
+          : list.length === 1
+            ? `Produto: ${p.variant_name}.`
+            : p
+              ? `O cadastro usará ${p.variant_name}${varietyOf(p) ? `; a aceitação de ${varietyOf(p)} fica como pendência a confirmar com cada empresa` : ""}.`
+              : "Escolha o produto: há mais de uma variedade desta commodity no catálogo.";
   };
-  let lastCommodity = commodity.control.value;
   commodity.control.addEventListener("change", () => {
-    fillProducts("");
-    // Trocar de commodity não leva segmentos sugeridos da anterior (ex.: ração do milho numa rodada de café).
-    const presets = state.roundCatalog?.segmentPresets ?? {};
-    const prev = presets[lastCommodity] ?? {};
-    const a = readAdv();
-    if (a && lastCommodity !== commodity.control.value) {
-      const kept = Object.fromEntries(Object.entries(a.segments ?? {}).filter(([k]) => !(k in prev)));
-      const removed = Object.keys(a.segments ?? {}).filter((k) => k in prev);
-      writeAdv({ segments: kept });
-      if (removed.length) notice(`Segmentos de ${commodityName(lastCommodity)} retirados (${removed.map((k) => prev[k].label).join(", ")}); escolha os da nova commodity no passo 3.`);
+    const v = commodity.control.value.trim();
+    const hit = commodities.find((x) => normKey(x.label) === normKey(v) || x.code === v.toLowerCase());
+    const prev = code;
+    code = hit?.code ?? "";
+    if (hit) commodity.control.value = hit.label;
+    if (prev !== code) {
+      // Trocar de commodity não leva produto nem segmentos sugeridos da anterior (ex.: ração do milho numa rodada de café).
+      const presets = state.roundCatalog?.segmentPresets?.[prev] ?? {};
+      const removed = Object.keys(segments).filter((k) => k in presets);
+      segments = Object.fromEntries(Object.entries(segments).filter(([k]) => !(k in presets)));
+      productId = "";
+      if (removed.length) notice(`Segmentos de ${commodityName(prev)} retirados; escolha os de ${commodityName(code) || "nova commodity"} no passo 3.`);
     }
-    lastCommodity = commodity.control.value;
+    renderProduct();
   });
-  fillProducts(c.commodity?.productId ?? "");
-  const step1 = el("fieldset", { class: "group" }, el("legend", {}, "Objetivo e commodity"), el("div", { class: "form-grid" }, name.node, commodity.node, productSel.node, variety.node), productHint);
+  renderProduct();
+  const step1 = el("fieldset", { class: "group" }, el("legend", {}, "Commodity"), el("div", { class: "form-grid" }, commodity.node), commList, productBox, commNote);
 
-  // ---------- Passo 2: local e alcance ----------
+  // ---------- Passo 2: local e raio ----------
   const o = c.origin ?? {};
   const countryList = el("datalist", { id: `paises-${Math.random().toString(36).slice(2, 8)}` });
   const country = input("País", "countryName", "text", "", true);
   country.control.setAttribute("list", countryList.id);
   country.control.setAttribute("autocomplete", "off");
   const regionSel = select("Estado", "region", [["", "Escolha o estado"], ...Object.entries(UF_NAMES).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")).map(([k, v]) => [k, `${v} (${k})`])], String(o.region ?? "").toUpperCase());
-  const regionTxt = input("Estado ou região (opcional)", "regionText", "text", o.country !== "BR" ? o.region ?? "" : "", false);
+  const regionTxt = input("Estado ou região", "regionText", "text", o.country !== "BR" ? o.region ?? "" : "", false);
   const cityList = el("datalist", { id: `cidades-${Math.random().toString(36).slice(2, 8)}` });
   const city = input("Cidade", "municipality", "text", o.municipality ?? "", false);
   city.control.setAttribute("list", cityList.id);
@@ -4479,13 +4497,15 @@ function roundForm(initial, roundName, onSubmit, label) {
   const radius = input("Raio", "radius", "number", c.radius?.value ?? 150);
   radius.control.min = "1";
   const unit = select("Unidade", "unit", [["km", "km"], ["mi", "milhas"]], c.radius?.unit ?? "km");
-  const nearKind = select("Perto do limite", "nearKind", [["fraction", "Proporcional ao raio (%)"], ["distance", "Margem fixa (na unidade do raio)"]], c.nearLimit?.distance != null ? "distance" : "fraction");
-  const nearValue = input("Valor (% do raio ou margem)", "nearValue", "number", c.nearLimit?.distance ?? Math.round((c.nearLimit?.fraction ?? 0.1) * 100));
   const abroadNote = el("div", { class: "callout warn", hidden: "" });
   let iso = o.country ?? "BR";
   let picked = o.municipalityCode ? { code: String(o.municipalityCode), name: o.municipality, uf: String(o.region ?? "").toUpperCase() } : null;
   const keepCoord = typeof o.lat === "number" && typeof o.lon === "number" ? { lat: o.lat, lon: o.lon, label: o.label, country: o.country, municipality: o.municipality ?? "" } : null;
-  let cityOptions = [];
+  const updateCityStatus = () => {
+    if (iso !== "BR") return cityStatus.replaceChildren();
+    if (picked && normKey(picked.name) === normKey(city.control.value) && picked.uf === regionSel.control.value) cityStatus.replaceChildren(tag(`${picked.name}/${picked.uf}`, "ok"), " base oficial do IBGE");
+    else cityStatus.textContent = regionSel.control.value ? "Digite e escolha a cidade na lista." : "Escolha o estado e depois a cidade.";
+  };
   const showCountry = () => {
     const br = iso === "BR";
     regionSel.node.hidden = !br;
@@ -4494,18 +4514,11 @@ function roundForm(initial, roundName, onSubmit, label) {
     if (!br) {
       const still = keepCoord && keepCoord.country === iso && (city.control.value || "") === keepCoord.municipality;
       abroadNote.replaceChildren(
-        text("strong", "Localização fora do Brasil. "),
-        still
-          ? "Esta configuração já tem a localização registrada na versão anterior; ela é mantida enquanto país e cidade não mudarem."
-          : "O Compass ainda não tem fonte para localizar cidades pelo nome fora do Brasil. A rodada pode ser salva, mas a área, a busca no mapa e o cálculo de distâncias não ficam disponíveis; candidatas entram por arquivo ou pesquisa manual, com a distância desconhecida.",
+        text("strong", "Fora do Brasil. "),
+        still ? "A localização registrada na versão anterior é mantida enquanto país e cidade não mudarem." : "O Compass ainda não localiza cidades pelo nome fora do Brasil: a rodada pode ser salva, mas área, busca no mapa e distâncias ficam indisponíveis.",
       );
     }
     updateCityStatus();
-  };
-  const updateCityStatus = () => {
-    if (iso !== "BR") return cityStatus.replaceChildren();
-    if (picked && normKey(picked.name) === normKey(city.control.value) && picked.uf === regionSel.control.value) cityStatus.replaceChildren(tag(`${picked.name}/${picked.uf}`, "ok"), " base oficial do IBGE; área calculada a partir desta cidade.");
-    else cityStatus.textContent = regionSel.control.value ? "Digite e escolha a cidade na lista." : "Escolha o estado e depois a cidade.";
   };
   let cityTimer;
   const searchCities = () => {
@@ -4514,7 +4527,6 @@ function roundForm(initial, roundName, onSubmit, label) {
       if (iso !== "BR" || !regionSel.control.value) return;
       const q = city.control.value.trim();
       const res = await api(`/api/geo/municipalities?uf=${regionSel.control.value}&q=${encodeURIComponent(q)}`);
-      cityOptions = res.items;
       cityList.replaceChildren(...res.items.map((m) => el("option", { value: m.name }, `${m.name}/${m.uf}`)));
       const exact = res.items.find((m) => normKey(m.name) === normKey(q));
       if (exact) picked = exact;
@@ -4536,10 +4548,8 @@ function roundForm(initial, roundName, onSubmit, label) {
   country.control.addEventListener("change", () => {
     const v = country.control.value.trim();
     const hit = (state.countries ?? []).find((x) => normKey(x.name_pt) === normKey(v) || normKey(x.name_en) === normKey(v) || x.iso2 === v.toUpperCase());
-    if (hit) {
-      iso = hit.iso2;
-      country.control.value = hit.name_pt;
-    } else iso = null;
+    iso = hit?.iso2 ?? null;
+    if (hit) country.control.value = hit.name_pt;
     picked = null;
     showCountry();
   });
@@ -4550,118 +4560,53 @@ function roundForm(initial, roundName, onSubmit, label) {
     showCountry();
     if (iso === "BR" && regionSel.control.value) searchCities();
   });
-  const nearBox = el("details", { class: "group" }, el("summary", {}, "Faixa perto do limite do raio"), text("p", "Empresas nessa faixa pedem conferência da localização; ninguém é excluído por isso.", "form-hint"), el("div", { class: "form-grid" }, nearKind.node, nearValue.node));
-  const step2 = el("fieldset", { class: "group" }, el("legend", {}, "Local e alcance"), el("div", { class: "form-grid" }, country.node, regionSel.node, regionTxt.node, el("div", { class: "city-field" }, city.node, cityStatus), radius.node, unit.node), countryList, cityList, abroadNote, nearBox);
+  const step2 = el("fieldset", { class: "group" }, el("legend", {}, "Local e raio"), el("div", { class: "form-grid" }, country.node, regionSel.node, regionTxt.node, el("div", { class: "city-field" }, city.node, cityStatus), radius.node, unit.node), countryList, cityList, abroadNote);
 
-  // ---------- Passo 3: fontes e segmentos ----------
+  // ---------- Passo 3: segmentos compradores (as fontes são calculadas por eles) ----------
   const segBox = el("div", { class: "seg-box" });
-  const srcBox = el("div", { class: "seg-box" });
-  const research = select("Pesquisa pública", "researchPhase", [["open", "Aberta"], ["closed", "Encerrada: o que seguir desconhecido vira pendência de contato futuro"]], c.research?.publicPhase ?? "open");
-  const language = input("Idioma", "language", "text", c.locale?.language ?? "pt-BR");
-  const timezone = input("Fuso", "timezone", "text", c.locale?.timezone ?? "America/Sao_Paulo");
-  const scope = input("Escopo de compliance", "scope", "text", c.compliance?.scope ?? "");
   const renderStep3 = () => {
     const cat = state.roundCatalog;
-    const a = readAdv();
-    if (!cat || !a) {
-      segBox.replaceChildren(text("p", a ? "Carregando…" : "Os detalhes técnicos não são um JSON válido; corrija-os abaixo.", a ? "muted" : "error"));
-      return;
-    }
-    const code = commodity.control.value;
+    if (!cat) return segBox.replaceChildren(text("p", "Carregando…", "muted"));
     const presets = cat.segmentPresets[code] ?? {};
-    const chosen = a.segments ?? {};
-    const all = { ...presets, ...chosen };
-    const ruleText = (seg) => {
-      const rules = Object.keys(seg.discovery ?? {});
-      return rules.length ? `busca automática em: ${rules.map((r) => (r === "osm" ? "mapa colaborativo" : r === "sipeagro" ? "registros do MAPA" : r)).join(", ")}` : "sem regra de busca automática: só arquivo e pesquisa manual";
-    };
-    const toggle = (k, on) => {
-      const x = readAdv() ?? {};
-      const segs = { ...(x.segments ?? {}) };
-      if (on) segs[k] = chosen[k] ?? presets[k];
-      else delete segs[k];
-      writeAdv({ segments: segs });
+    const all = { ...presets, ...segments };
+    const ruleText = (seg) => (seg.discovery?.osm || seg.discovery?.sipeagro ? `busca automática${seg.discovery?.osm ? " no mapa colaborativo" : ""}${seg.discovery?.sipeagro ? `${seg.discovery?.osm ? " e" : ""} nos registros do MAPA` : ""}` : "sem busca automática: arquivo e pesquisa manual");
+    const custom = input("Nome do segmento", "customSegment", "text", "", false);
+    const addBox = el("details", { class: "inline-add" }, el("summary", {}, "Adicionar outro segmento"), el("div", { class: "toolbar" }, custom.node, button("Adicionar", () => {
+      const lbl = custom.control.value.trim();
+      if (!lbl) throw new Error("Escreva o nome do segmento.");
+      segments = { ...segments, [slugKey(lbl) || "segmento"]: { label: lbl } };
       renderStep3();
-    };
-    const custom = input("Outro segmento comprador (nome)", "customSegment", "text", "", false);
+    })));
+    const srcs = sourcesFor(iso, segments, editing ? c.sources ?? [] : null);
     segBox.replaceChildren(...[
-      text("h3", `Segmentos compradores de ${commodityName(code) || "—"}`),
+      text("h3", `Quem compra ${commodityName(code)}?`),
       Object.keys(all).length
-        ? el("div", { class: "pick-list" }, ...Object.entries(all).map(([k, seg]) => el("label", {}, el("input", { type: "checkbox", ...(k in chosen ? { checked: "" } : {}), onchange: (e) => toggle(k, e.target.checked) }), el("span", {}, text("strong", seg.label ?? k), text("small", ruleText(seg))))))
+        ? el("div", { class: "pick-list" }, ...Object.entries(all).map(([k, seg]) => el("label", {}, el("input", { type: "checkbox", ...(k in segments ? { checked: "" } : {}), onchange: (e) => { if (e.target.checked) segments = { ...segments, [k]: segments[k] ?? presets[k] }; else { const { [k]: _, ...rest } = segments; segments = rest; } renderStep3(); } }), el("span", {}, text("strong", seg.label ?? k), text("small", ruleText(seg))))))
         : null,
-      !Object.keys(presets).length
-        ? el("div", { class: "callout warn" }, text("p", `Não há segmentos sugeridos para ${commodityName(code) || "esta commodity"} no Compass. Nenhum segmento de outra commodity é aplicado. Informe abaixo quem compra (ex.: torrefação, indústria de solúvel); sem regra de busca, essas empresas entram por arquivo ou pesquisa manual.`))
-        : null,
-      !Object.keys(chosen).length ? el("div", { class: "callout warn" }, text("p", "Nenhum segmento escolhido: a busca automática não terá o que procurar. Escolha ao menos um segmento ou siga só com arquivo e pesquisa manual.")) : null,
-      el("div", { class: "toolbar" }, custom.node, button("Adicionar segmento", () => {
-        const label = custom.control.value.trim();
-        if (!label) throw new Error("Escreva o nome do segmento.");
-        const x = readAdv() ?? {};
-        writeAdv({ segments: { ...(x.segments ?? {}), [slugKey(label) || "segmento"]: { label } } });
-        renderStep3();
-      })),
+      !Object.keys(presets).length ? el("div", { class: "callout warn" }, text("p", `O Compass não tem segmentos sugeridos para ${commodityName(code) || "esta commodity"}; nenhum de outra commodity é aplicado. Adicione quem compra (ex.: torrefação); sem regra de busca, as empresas entram por arquivo ou pesquisa manual.`)) : null,
+      !Object.keys(segments).length ? el("div", { class: "callout warn" }, text("p", "Escolha ao menos um segmento para a busca automática ter o que procurar.")) : null,
+      addBox,
+      text("p", `Fontes: ${srcs.map((x) => sourceName(x.id)).join(", ") || "só arquivo e pesquisa manual"}. Arquivo e pesquisa manual com fonte ficam sempre disponíveis.`, "form-hint"),
     ].filter(Boolean));
-    const sources = a.sources ?? [];
-    const chosenSegs = Object.values(chosen);
-    const br = iso === "BR";
-    const srcRow = (id) => {
-      const info = cat.sources[id];
-      if (!info) return null;
-      const on = sources.some((s) => s.id === id);
-      const covers = info.countries === "*" || (Array.isArray(info.countries) && info.countries.includes(iso));
-      const rule = info.segmentRule;
-      const withRule = rule ? chosenSegs.filter((s) => s.discovery?.[rule]).length : null;
-      const status = !covers ? `não cobre ${state.countries?.find((x) => x.iso2 === iso)?.name_pt ?? iso}` : info.cost === "paid" ? "serviço pago: não roda sem autorização de despesa" : rule && !withRule ? "nenhum segmento escolhido tem regra para esta fonte: ela não sabe o que procurar" : rule ? `${withRule} de ${chosenSegs.length} segmento(s) com regra` : "";
-      return el(
-        "label",
-        {},
-        el("input", {
-          type: "checkbox",
-          ...(on ? { checked: "" } : {}),
-          ...(!covers || info.cost === "paid" ? { disabled: "" } : {}),
-          onchange: (e) => {
-            const x = readAdv() ?? {};
-            const list = (x.sources ?? []).filter((s) => s.id !== id);
-            if (e.target.checked) list.push(id === "br-cnpj-ws" ? { id, kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 } : { id, kind: info.role === "registry" ? "registry" : "discovery" });
-            writeAdv({ sources: list });
-            renderStep3();
-          },
-        }),
-        el("span", {}, text("strong", sourceName(id)), text("small", SOURCE_PLAIN[id]?.[1] ?? info.provides), status ? text("small", status, rule && !withRule ? "warn-text" : "muted") : null),
-      );
-    };
-    srcBox.replaceChildren(
-      text("h3", "Fontes"),
-      el("div", { class: "pick-list" }, ...["br-cnpj-ws", "osm-overpass", "mapa-sipeagro"].map(srcRow)),
-      text("small", `Arquivo de candidatas e pesquisa manual com fonte ficam sempre disponíveis.${br ? "" : " Fora do Brasil, a Receita Federal e os registros do MAPA não se aplicam."}`, "muted"),
-    );
   };
-  const step3 = el(
-    "fieldset",
-    { class: "group" },
-    el("legend", {}, "Fontes e limites"),
-    segBox,
-    srcBox,
-    el("div", { class: "form-grid" }, research.node),
-    el("details", { class: "group" }, el("summary", {}, "Idioma, fuso e compliance"), el("div", { class: "form-grid" }, language.node, timezone.node, scope.node)),
-    el("details", { class: "group" }, el("summary", {}, "Detalhes técnicos (JSON)"), text("p", "Regras de busca por segmento, limites das fontes, especificação, comprador, prioridades e critérios de evidência. As escolhas acima atualizam este bloco.", "form-hint"), adv.node),
-  );
-  adv.control.addEventListener("change", () => renderStep3());
+  const step3 = el("fieldset", { class: "group" }, el("legend", {}, "Segmentos compradores"), segBox);
 
   // ---------- Passo 4: revisar ----------
+  const nameIn = input("Nome da rodada", "name", "text", roundName ?? "");
+  let nameTouched = editing;
+  nameIn.control.addEventListener("input", () => (nameTouched = true));
   const review = el("div", { class: "review-grid", "aria-live": "polite" });
-  const steps = [step1, step2, step3, review];
-  const names = ["Objetivo e commodity", "Local e alcance", "Fontes e limites", "Revisar e salvar"];
+  const step4 = el("fieldset", { class: "group" }, el("legend", {}, "Revisar"), editing ? null : el("div", { class: "form-grid" }, nameIn.node), review);
+  const steps = [step1, step2, step3, step4];
+  const names = ["Commodity", "Local e raio", "Segmentos", "Revisar"];
   const stepList = el("ol", { class: "wizard-steps", "aria-label": "Passos da configuração" }, ...names.map((l, i) => el("li", {}, text("span", String(i + 1), "n"), text("span", l))));
   const back = el("button", { type: "button" }, "Voltar");
   const next = el("button", { type: "button", class: "primary" }, "Continuar");
   const submit = el("button", { type: "submit", class: "primary" }, label);
   let cur = 0;
   const buildConfig = () => {
-    const a = readAdv();
-    if (!a) throw new Error("Os detalhes técnicos não são um JSON válido.");
     const num = (x) => (x === "" || x == null ? undefined : Number(String(x).replace(",", ".")));
-    const code = commodity.control.value;
+    const p = state.products.find((x) => x.id === productId);
     const origin = { country: iso };
     if (iso === "BR") {
       origin.region = regionSel.control.value;
@@ -4672,35 +4617,47 @@ function roundForm(initial, roundName, onSubmit, label) {
       if (city.control.value.trim()) origin.municipality = city.control.value.trim();
       if (keepCoord && keepCoord.country === iso && (city.control.value.trim() || "") === keepCoord.municipality) Object.assign(origin, { lat: keepCoord.lat, lon: keepCoord.lon, ...(keepCoord.label ? { label: keepCoord.label } : {}) });
     }
-    const slug = (name.control.value || "rodada").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-    return {
+    const sameCommodity = code === c.commodity?.code;
+    // Mantém tudo o que já está registrado (especificação, regras, comprador, prioridades, evidência, faixa perto do limite,
+    // idioma, fuso, compliance, fase da pesquisa); só muda o que esta tela controla.
+    const out = {
       ...c,
-      id: c.id && c.id !== "nova-rodada" ? c.id : slug || "rodada",
-      commodity: { ...(c.commodity ?? {}), code, label: commodityName(code), productId: productSel.control.value || undefined, variety: variety.control.value.trim() || undefined, spec: a.spec, segments: a.segments ?? {}, nameHints: a.nameHints ?? [], restrictionHints: a.restrictionHints ?? [] },
-      buyer: a.buyer ?? c.buyer,
-      sources: a.sources ?? [],
-      priorities: a.priorities ?? { size: [], segments: [] },
-      evidence: a.evidence ?? c.evidence,
+      commodity: {
+        ...(sameCommodity ? c.commodity : { nameHints: [], restrictionHints: [] }),
+        code,
+        label: sameCommodity && c.commodity?.label ? c.commodity.label : commodityName(code),
+        productId: productId || undefined,
+        variety: sameCommodity && c.commodity?.variety && (!p || !varietyOf(p) || varietyOf(p) === c.commodity.variety) ? c.commodity.variety : varietyOf(p),
+        segments,
+      },
+      sources: sourcesFor(iso, segments, editing ? c.sources ?? [] : null),
       origin,
-      radius: { value: num(radius.control.value), unit: unit.control.value, method: "haversine" },
-      nearLimit: nearKind.control.value === "fraction" ? { fraction: num(nearValue.control.value) / 100 } : { distance: num(nearValue.control.value) },
-      locale: { language: language.control.value.trim(), timezone: timezone.control.value.trim() },
-      compliance: { ...(c.compliance ?? {}), scope: scope.control.value.trim() },
-      research: { ...(c.research ?? {}), publicPhase: research.control.value },
+      radius: { ...(c.radius ?? {}), value: num(radius.control.value), unit: unit.control.value, method: c.radius?.method ?? "haversine" },
+      locale: editing && c.locale?.language && c.locale?.timezone ? c.locale : localeFor(iso),
+      compliance: editing && c.compliance?.scope ? c.compliance : { ...(c.compliance ?? {}), scope: scopeFor(iso) },
     };
+    if (!sameCommodity) delete out.commodity.spec;
+    if (out.commodity.variety === undefined) delete out.commodity.variety;
+    if (!editing) {
+      const slug = (nameIn.control.value || "rodada").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+      out.id = slug || "rodada";
+    }
+    return out;
   };
-  // Validação de cada passo (no Brasil, a cidade precisa existir na base oficial no estado escolhido; homônimo de outro
-  // estado nunca é aceito por aproximação).
+  const autoName = () => {
+    const p = state.products.find((x) => x.id === productId);
+    const where = iso === "BR" ? `${picked?.name ?? city.control.value.trim()}/${regionSel.control.value}` : [city.control.value.trim(), state.countries?.find((x) => x.iso2 === iso)?.name_pt].filter(Boolean).join(", ");
+    return `${commodityName(code)}${varietyOf(p) ? ` ${varietyOf(p)}` : ""} — ${where}, ${radius.control.value} ${unit.control.value === "mi" ? "mi" : "km"}`;
+  };
+  // Validação de cada passo (no Brasil, a cidade precisa existir na base oficial no estado escolhido).
   const validate = async (i) => {
     if (i === 0) {
-      if (!name.control.value.trim()) return fail("Dê um nome à rodada.");
-      if (!commodities.some((x) => x.code === commodity.control.value)) return fail("Escolha a commodity do catálogo.");
-      if (!productSel.control.value) return fail("Escolha o produto do catálogo que esta rodada cadastra.");
+      if (!code) return fail("Escolha a commodity na lista.");
+      if (!productId) return fail(commodities.find((x) => x.code === code)?.products.length ? "Escolha o produto." : "Sem produto no catálogo para esta commodity: cadastre-o no Catálogo antes.");
     }
     if (i === 1) {
       if (!iso) return fail("Escolha o país na lista.");
       if (!(Number(radius.control.value) > 0)) return fail("Informe o raio.");
-      if (!(Number(nearValue.control.value) > 0)) return fail("Informe a faixa perto do limite.");
       if (iso === "BR") {
         if (!regionSel.control.value) return fail("Escolha o estado.");
         const q = city.control.value.trim();
@@ -4715,27 +4672,22 @@ function roundForm(initial, roundName, onSubmit, label) {
         }
       }
     }
-    if (i === 2 && !readAdv()) return fail("Os detalhes técnicos não são um JSON válido.");
+    if (i === 3 && !editing && !nameIn.control.value.trim()) return fail("Dê um nome à rodada.");
     return true;
   };
   const renderReview = () => {
+    if (!editing && !nameTouched) nameIn.control.value = autoName();
     const v = buildConfig();
     const prod = state.products.find((p) => p.id === v.commodity.productId);
     const where = v.origin.country === "BR" ? `${v.origin.municipality}/${v.origin.region}` : [v.origin.municipality, v.origin.region, state.countries?.find((x) => x.iso2 === v.origin.country)?.name_pt ?? v.origin.country].filter(Boolean).join(", ");
     const segs = Object.values(v.commodity.segments ?? {});
     const box = (title, pairs) => el("div", {}, text("h3", title), el("dl", {}, ...pairs.flatMap(([k, x]) => [text("dt", k), text("dd", x)])));
     const warns = [];
-    if (!segs.length) warns.push("Nenhum segmento escolhido: a busca automática não terá o que procurar; candidatas por arquivo ou pesquisa manual.");
-    for (const s of v.sources) {
-      const rule = state.roundCatalog?.sources[s.id]?.segmentRule;
-      if (rule && !segs.some((g) => g.discovery?.[rule])) warns.push(`${sourceName(s.id)} está escolhida, mas nenhum segmento tem regra para ela: não encontrará nada.`);
-    }
+    if (!segs.length) warns.push("Sem segmento escolhido: a busca automática não terá o que procurar.");
     if (v.origin.country !== "BR" && typeof v.origin.lat !== "number") warns.push("Fora do Brasil sem localização confirmada: área e distâncias não serão calculadas.");
     review.replaceChildren(
-      box("Objetivo e commodity", [["Nome", name.control.value.trim()], ["Commodity", commodityName(v.commodity.code)], ["Produto", prod?.variant_name ?? "—"], ["Variedade", v.commodity.variety ?? "—"]]),
-      box("Local e alcance", [["Origem", where], ["Raio", `${v.radius.value} ${v.radius.unit === "mi" ? "milhas" : "km"}`], ["Perto do limite", v.nearLimit.fraction != null ? `últimos ${Math.round(v.nearLimit.fraction * 100)}% do raio` : `últimos ${v.nearLimit.distance} ${v.radius.unit}`]]),
-      box("Fontes e segmentos", [["Segmentos", segs.map((s) => s.label).join(", ") || "nenhum"], ["Fontes", v.sources.map((s) => sourceName(s.id)).join(", ") || "só arquivo e pesquisa manual"], ["Pesquisa pública", v.research.publicPhase === "closed" ? "encerrada" : "aberta"]]),
-      el("div", {}, text("h3", "Antes de executar"), text("p", "Salvar não executa nem faz contato. Na rodada: conferir a área, registrar ciência das limitações, trazer candidatas e executar.", "muted"), ...warns.map((w) => text("p", w, "warn-text"))),
+      box("Objetivo", [["Commodity", commodityName(v.commodity.code)], ["Produto", prod?.variant_name ?? "—"], ["Origem", where], ["Raio", `${v.radius.value} ${v.radius.unit === "mi" ? "milhas" : "km"}`], ["Segmentos", segs.map((s) => s.label).join(", ") || "nenhum"]]),
+      el("div", {}, text("h3", "Depois de salvar"), text("p", "Salvar não executa nem faz contato. Na rodada: conferir as limitações, registrar ciência, trazer candidatas e executar.", "muted"), ...warns.map((w) => text("p", w, "warn-text"))),
     );
   };
   const show = (i) => {
@@ -4769,17 +4721,32 @@ function roundForm(initial, roundName, onSubmit, label) {
     submit.disabled = true;
     error.hidden = true;
     try {
-      for (const k of [0, 1, 2]) if (!(await validate(k))) return show(k);
-      await onSubmit(name.control.value.trim(), buildConfig());
+      for (const k of [0, 1, 2, 3]) if (!(await validate(k))) return show(k);
+      await onSubmit(editing ? roundName : nameIn.control.value.trim(), buildConfig());
     } catch (err) {
       fail(err.message);
     } finally {
       submit.disabled = false;
     }
   });
+  safe(roundCatalogData);
   form.append(stepList, ...steps, error, el("div", { class: "wizard-nav" }, back, next, submit));
   show(0);
   return form;
+}
+
+// Ajustes opcionais de uma rodada existente, fora do percurso principal: cada um grava uma revisão nova da configuração
+// (a ciência das limitações precisa ser registrada de novo), sem tocar no resto do que está registrado.
+function roundAdjust(r, title, hint, fields, apply) {
+  return details(
+    title,
+    makeForm([{ group: title, hint, fields }], async (v) => {
+      const config = apply(structuredClone(r.config), v);
+      await api(`/api/rounds/${r.id}`, "PUT", { expectedRevision: r.revision, config });
+      notice("Configuração salva (nova revisão). Registre ciência das limitações de novo antes de executar.");
+      await showRound(r.id);
+    }, "Salvar"),
+  );
 }
 
 async function rodadasView() {
@@ -4869,8 +4836,9 @@ async function showRound(id) {
   const limPanel = panel(
       "Antes de executar: limitações desta configuração",
       el("div", { class: pf.overall === "supported" ? "callout" : "callout warn" }, text("p", pf.overall === "supported" ? "Tudo coberto por esta configuração." : `${lvlN("supported")} coberto(s), ${lvlN("partial")} parcial(is), ${lvlN("unsupported")} sem suporte. O que é parcial ou sem suporte não é tratado como completo: registre ciência antes de executar.`)),
-      notCovered.length ? rows(notCovered, (x) => el("div", { class: "row" }, el("div", {}, text("strong", plainArea(x.area)), text("small", plainMessage(x))), tag(...LEVEL_TAG[x.level]))) : null,
-      details(`Ver todos os ${pf.items.length} itens, com o texto técnico`, rows(pf.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", x.area), text("small", x.message)), tag(...LEVEL_TAG[x.level])))),
+      notCovered.filter((x) => x.level === "unsupported").length ? rows(notCovered.filter((x) => x.level === "unsupported"), (x) => el("div", { class: "row" }, el("div", {}, text("strong", plainArea(x.area)), text("small", plainMessage(x))), tag(...LEVEL_TAG[x.level]))) : null,
+      notCovered.some((x) => x.level === "partial") ? text("p", `Parciais: ${notCovered.filter((x) => x.level === "partial").map((x) => plainArea(x.area)).join(", ")}.`, "muted") : null,
+      details("Ver detalhes das limitações", el("div", {}, rows(notCovered, (x) => el("div", { class: "row" }, el("div", {}, text("strong", plainArea(x.area)), text("small", plainMessage(x))), tag(...LEVEL_TAG[x.level]))), details(`Texto técnico dos ${pf.items.length} itens`, rows(pf.items, (x) => el("div", { class: "row" }, el("div", {}, text("strong", x.area), text("small", x.message)), tag(...LEVEL_TAG[x.level])))))),
       r.acknowledged
         ? text("small", `Ciência registrada por ${r.acknowledged.by} em ${fmtDate(r.acknowledged.at)} (revisão ${r.revision}).`, "muted")
         : writable() && pf.requiresAcknowledgement
@@ -4892,18 +4860,23 @@ async function showRound(id) {
     .then((a) => {
       areaSummary.textContent = `${a.summary.municipalities} municípios (${a.summary.regions.join(", ") || "—"})`;
       areaBody.replaceChildren(
-        kv([
-          ["Base", a.dataset ? "Municípios oficiais do IBGE" : "sem base de municípios: a distância só sai pela coordenada da unidade"],
-          ["Raio", `${a.radiusKm} km`],
-          ["Perto do limite", a.criterion],
-          ["Municípios", `${a.summary.municipalities} (inteiros ${a.summary.full}, parciais ${a.summary.partial}, a conferir ${a.summary.review})`],
-          ["UFs", a.summary.regions.join(", ") || "—"],
-        ]),
+        text("p", `${a.summary.municipalities} municípios (${a.summary.regions.join(", ") || "—"}) até ${r.config.radius?.value} ${r.config.radius?.unit === "mi" ? "milhas" : "km"} de ${o.municipality ?? "origem"}${a.dataset ? ", pela base oficial do IBGE" : ""}. Perto do limite: ${a.criterion}.`),
         details(
-          "Ver municípios",
-          el("div", { class: "rows" }, ...a.municipalities.map((m) => el("div", { class: "row" }, el("div", {}, text("strong", `${m.name}/${m.region}`), text("small", `centroide ${m.centroidKm} km (estimativa) · alcance ${m.minKm}–${m.maxKm} km`)), m.review ? tag("conferir", "warn") : tag(m.coverage === "full" ? "inteiro" : "parcial")))),
+          "Ver detalhes e municípios",
+          el(
+            "div",
+            {},
+            kv([
+              ["Base", a.dataset ? "Municípios oficiais do IBGE" : "sem base de municípios: a distância só sai pela coordenada da unidade"],
+              ["Raio", `${a.radiusKm} km`],
+              ["Perto do limite", a.criterion],
+              ["Municípios", `${a.summary.municipalities} (inteiros ${a.summary.full}, parciais ${a.summary.partial}, a conferir ${a.summary.review})`],
+              ["UFs", a.summary.regions.join(", ") || "—"],
+            ]),
+            el("div", { class: "rows" }, ...a.municipalities.map((m) => el("div", { class: "row" }, el("div", {}, text("strong", `${m.name}/${m.region}`), text("small", `centroide ${m.centroidKm} km (estimativa) · alcance ${m.minKm}–${m.maxKm} km`)), m.review ? tag("conferir", "warn") : tag(m.coverage === "full" ? "inteiro" : "parcial")))),
+            a.dataset ? text("small", `Base técnica: ${a.dataset}. Distância por haversine a partir do centroide do município de origem.`, "muted") : null,
+          ),
         ),
-        ...(a.dataset ? [details("Detalhes técnicos da área", text("p", `Base: ${a.dataset}. Distância por haversine a partir do centroide do município de origem.`, "muted"))] : []),
       );
     })
     .catch((e) => {
@@ -5124,7 +5097,7 @@ async function showRound(id) {
         { class: "toolbar part-cadastrar" },
         prod.node,
         mode.node,
-        authRef.node,
+        el("details", { class: "inline-add" }, el("summary", {}, "Citar autorização (opcional)"), authRef.node),
         el("label", {}, screen, " Rodar a triagem de sanções logo após o cadastro"),
         button("Cadastrar no Compass", async () => {
           if (!prod.control.value) throw new Error("Escolha o produto do catálogo desta rodada.");
@@ -5241,10 +5214,37 @@ async function showRound(id) {
     details("Fontes configuradas", rows(r.config.sources ?? [], (x) => el("div", { class: "row" }, el("div", {}, text("strong", `${sourceName(x.id)} (${x.id})`), text("small", [r.sources[x.id]?.label, x.rateLimitPerMinute ? `${x.rateLimitPerMinute}/min` : null, x.maxAgeDays ? `reaproveita até ${x.maxAgeDays} dias` : null].filter(Boolean).join(" · ")))))),
     details("Configuração completa (JSON)", el("pre", { class: "message" }, JSON.stringify(r.config, null, 2))),
   );
-  panels.config = el("div", { class: "tab-panel", role: "tabpanel" }, limPanel, areaPanel, editBox);
-  panels.buscar = el("div", { class: "tab-panel", role: "tabpanel" }, cand);
-  panels.conferir = el("div", { class: "tab-panel", role: "tabpanel" }, resPanel);
+  const canEdit = writable() && r.status !== "closed";
+  const nl = r.config.nearLimit ?? { fraction: 0.1 };
+  const adjNear = canEdit ? roundAdjust(r, "Ajustar a faixa perto do limite", "Empresas nessa faixa pedem conferência da localização; ninguém é excluído por isso.", [
+    select("Critério", "nearKind", [["fraction", "Proporcional ao raio (%)"], ["distance", "Margem fixa (na unidade do raio)"]], nl.distance != null ? "distance" : "fraction"),
+    input("Valor (% do raio ou margem)", "nearValue", "number", nl.distance ?? Math.round((nl.fraction ?? 0.1) * 100)),
+  ], (cfg, v) => ({ ...cfg, nearLimit: v.nearKind === "fraction" ? { fraction: Number(v.nearValue) / 100 } : { distance: Number(v.nearValue) } })) : null;
+  const adjResearch = canEdit ? roundAdjust(r, "Fase da pesquisa pública", "Encerrada: nenhuma confirmação campo a campo; o que seguir desconhecido vira pendência de contato futuro. Encerrar não conclui a qualificação comercial.", [
+    select("Pesquisa pública", "researchPhase", [["open", "Aberta"], ["closed", "Encerrada"]], r.config.research?.publicPhase ?? "open"),
+  ], (cfg, v) => ({ ...cfg, research: { ...(cfg.research ?? {}), publicPhase: v.researchPhase } })) : null;
+  const adjLocale = canEdit ? roundAdjust(r, "Idioma, fuso e escopo de compliance", "Calculados pelo país na criação. O escopo de compliance indica qual validação T11 vale para a rodada; mudar aqui não valida nem libera nada.", [
+    input("Idioma", "language", "text", r.config.locale?.language ?? ""),
+    input("Fuso", "timezone", "text", r.config.locale?.timezone ?? ""),
+    input("Escopo de compliance", "scope", "text", r.config.compliance?.scope ?? ""),
+  ], (cfg, v) => ({ ...cfg, locale: { language: v.language.trim(), timezone: v.timezone.trim() }, compliance: { ...(cfg.compliance ?? {}), scope: v.scope.trim() } })) : null;
+  const techJson = (() => {
+    const t = input("Configuração técnica (JSON)", "technical", "textarea", JSON.stringify({ spec: cfgC.spec, nameHints: cfgC.nameHints ?? [], restrictionHints: cfgC.restrictionHints ?? [], segments: cfgC.segments ?? {}, sources: r.config.sources ?? [], buyer: r.config.buyer, priorities: r.config.priorities, evidence: r.config.evidence }, null, 2), false);
+    t.control.rows = 16;
+    t.control.maxLength = 20000;
+    return t;
+  })();
+  const adjTech = canEdit ? roundAdjust(r, "Editar a configuração técnica (JSON)", "Especificação, indícios por nome, regras de busca por segmento, limites das fontes, comprador, prioridades e evidência.", [techJson], (cfg, v) => {
+    let x;
+    try { x = JSON.parse(v.technical); } catch { throw new Error("O texto não é um JSON válido."); }
+    return { ...cfg, commodity: { ...cfg.commodity, spec: x.spec, nameHints: x.nameHints ?? [], restrictionHints: x.restrictionHints ?? [], segments: x.segments ?? {} }, sources: x.sources ?? [], buyer: x.buyer ?? cfg.buyer, priorities: x.priorities ?? cfg.priorities, evidence: x.evidence ?? cfg.evidence };
+  }) : null;
+  const nextBtn = (k, lbl) => el("div", { class: "toolbar section-next" }, button(`Próximo: ${lbl}`, () => go(k)));
+  panels.config = el("div", { class: "tab-panel", role: "tabpanel" }, limPanel, areaPanel, editBox, adjNear, ack ? nextBtn("buscar", "buscar ou importar candidatas") : null);
+  panels.buscar = el("div", { class: "tab-panel", role: "tabpanel" }, cand, r.lastRun ? nextBtn("conferir", "conferir resultados") : null);
+  panels.conferir = el("div", { class: "tab-panel", role: "tabpanel" }, resPanel, adjResearch, r.lastRun ? nextBtn("cadastrar", "cadastrar") : null);
   panels.cadastrar = el("div", { class: "tab-panel", role: "tabpanel" }, cadPanel);
+  techPanel.append(...[adjLocale, adjTech].filter(Boolean));
   panels.detalhes = el("div", { class: "tab-panel", role: "tabpanel" }, notePanel, techPanel);
   for (const [k, l] of SECTIONS) tabBar.append(el("button", { type: "button", role: "tab", "data-tab": k, onclick: () => go(k) }, l));
   const head = node.querySelector(".page-head");

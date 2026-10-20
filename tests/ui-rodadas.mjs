@@ -86,42 +86,42 @@ try {
   await click("Rodadas");
   await until(`/Nova rodada/.test(document.body.innerText)`, "tela Rodadas");
 
-  // Criar pelo formulário em 4 passos (2026-10-20): commodity e produto do catálogo, país pelo nome, estado e cidade
-  // escolhidos (sem código IBGE nem coordenada), raio; segmentos e fontes no passo 3; revisar e criar.
+  // Criar pelo percurso simplificado (2026-10-20): commodity por nome (seleção pesquisável), produto só quando há mais de
+  // um compatível, estado e cidade escolhidos (sem código IBGE nem coordenada), raio, segmentos; nome na revisão.
   const fset = (n, v, ev = "change") => js(`(() => { const c = document.querySelector('.round-form [name="${n}"]'); c.value = ${JSON.stringify(v)}; c.dispatchEvent(new Event("input", { bubbles: true })); c.dispatchEvent(new Event("${ev}", { bubbles: true })); return true; })()`);
   const next = () => js(`(() => { [...document.querySelectorAll(".round-form button")].find((b) => b.textContent === "Continuar" && !b.hidden).click(); return true; })()`);
   const stepIs = (label) => until(`/${label}/.test(document.querySelector(".round-form .wizard-steps .current").textContent)`, label);
   await js(`(() => { const d = [...document.querySelectorAll("details")].find((x) => x.querySelector("summary").textContent === "Nova rodada"); d.open = true; return true; })()`);
-  assert.ok(!/Código IBGE|Latitude|Longitude/.test(await js(`document.querySelector(".round-form").innerText`)), "sem campos técnicos de localização");
-  await fset("name", "Soja Rio Verde (teste de tela)");
-  await fset("code", "soy");
+  const form1 = await js(`document.querySelector(".round-form").innerText`);
+  assert.ok(!/Código IBGE|Latitude|Longitude|JSON|Idioma|Fuso|compliance/i.test(form1), "percurso principal sem campos técnicos nem opcionais");
+  await fset("commodity", "Soja");
+  assert.ok(await js(`!!document.querySelector('.round-form [name="configProductId"]')`), "soja tem duas variedades: produto pedido");
   await fset("configProductId", "product-01");
   // Enviar no passo 1 só avança (nunca cria antes da revisão).
   await js(`document.querySelector(".round-form").requestSubmit()`);
-  await stepIs("Local e alcance");
+  await stepIs("Local e raio");
   await until(`document.querySelector('.round-form [name="countryName"]').value === "Brasil"`, "país pelo nome");
   await fset("region", "GO");
   await fset("municipality", "Rio Verde", "input");
   await fset("radius", "150");
   await next();
-  await stepIs("Fontes e limites");
-  await until(`/Segmentos compradores de Soja/.test(document.querySelector(".round-form").innerText)`, "segmentos da soja");
-  await js(`(() => {
-    const t = document.querySelector('.round-form [name="advanced"]'); const adv = JSON.parse(t.value);
-    adv.segments = { feed_mill: { label: "fábrica de ração", discovery: { sipeagro: { activity: ["FABRICANTE"] } } }, crusher: { label: "esmagadora" } };
-    adv.sources = [{ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 }, { id: "osm-overpass", kind: "discovery" }, { id: "mapa-sipeagro", kind: "discovery" }];
-    t.value = JSON.stringify(adv); t.dispatchEvent(new Event("change")); return true; })()`);
-  await fset("scope", "br_email_automatic");
+  await stepIs("Segmentos");
+  await until(`/Quem compra Soja/.test(document.querySelector(".round-form").innerText)`, "segmentos da soja");
+  for (const seg of ["esmagadora", "fábrica de ração"]) // cada marcação redesenha a lista: uma por vez
+    await js(`(() => { [...document.querySelectorAll(".round-form .seg-box .pick-list label")].find((l) => l.textContent.includes("${seg}")).querySelector("input").click(); return true; })()`);
+  await until(`/Fontes: Receita Federal[^.]*Mapa colaborativo[^.]*Registros do MAPA/.test(document.querySelector(".round-form").innerText)`, "fontes calculadas pelos segmentos");
   await next();
-  await stepIs("Revisar e salvar");
+  await stepIs("Revisar");
+  await fset("name", "Soja Rio Verde (teste de tela)", "input");
   assert.match(await js(`document.querySelector(".round-form").innerText`), /Rio Verde\/GO/);
   await js(`document.querySelector(".round-form").requestSubmit()`);
   await until(`/Antes de executar/.test(document.body.innerText)`, "rodada criada");
-  await until(`/Municípios/.test(document.body.innerText) && !/Calculando a área/.test(document.body.innerText)`, "área calculada");
+  await until(`/\\d+ municípios \\(/.test(document.body.innerText) && !/Calculando a área/.test(document.body.innerText)`, "área calculada");
   const areaText = await js(`document.body.innerText`);
   assert.match(areaText, /IBGE/);
   assert.match(areaText, /proporcional: últimos 10% do raio \(de 135 a 150 km\)/);
-  assert.match(areaText, /Sem suporte|Parcial/, "limitações visíveis antes da execução");
+  assert.match(areaText, /sem suporte|parcia/i, "limitações visíveis antes da execução (resumo)");
+  assert.match(areaText, /Antes de executar: limitações desta configuração[\s\S]*registre ciência/, "ciência exigida visível");
 
   // Executar sem ciência é recusado; registrar ciência.
   await click("Executar rodada");

@@ -3248,3 +3248,41 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
     - celular sem rolagem horizontal;
     - sem erro de JavaScript.
 - **Não feito:** publicação, migração remota (não há migração nova), alteração de registros ou liberações de produção.
+- **Ajustes antes da publicação (2026-10-20, pedido de Rogério):**
+  - **Commodity:** seleção pesquisável por nome, com as commodities do catálogo (sem código nem digitação livre).
+    - O produto só é pedido quando há mais de um compatível (milho e soja); com um só (café), é resolvido.
+    - Trocar de commodity descarta produto, especificação e segmentos sugeridos da anterior.
+  - **Saíram do percurso principal:**
+    - código IBGE, latitude e longitude;
+    - "Variedade ou especificação";
+    - faixa perto do limite;
+    - fase da pesquisa pública;
+    - idioma, fuso e escopo de compliance;
+    - escolha de fontes (caixas);
+    - bloco JSON;
+    - nome da rodada nos passos iniciais (vai para a revisão, calculado e editável).
+  - **Resolvidos internamente:**
+    - código IBGE, nome e UF oficiais da cidade;
+    - variedade pelo produto escolhido (GMO / não GMO; café sem variedade);
+    - idioma e fuso: no Brasil, pt-BR e America/Sao_Paulo; fora dele, o idioma do país e UTC;
+    - escopo de compliance: `br_email_automatic` no Brasil (o mesmo padrão anterior); fora dele, `<país>_email_automatic`. Não valida nem libera nada;
+    - fontes pelos segmentos: Receita no Brasil, mapa colaborativo e registros do MAPA só quando algum segmento tem regra. Na edição, nenhuma fonte já registrada é retirada;
+    - faixa perto do limite: padrão de 10% só em rodada nova;
+    - nome da rodada calculado na revisão.
+  - **Continuam acessíveis na própria rodada, fora do percurso, cada um gravando uma nova revisão** (com nova ciência):
+    - "Ajustar a faixa perto do limite" (Configuração);
+    - "Fase da pesquisa pública" (Conferir);
+    - "Idioma, fuso e escopo de compliance" e "Editar a configuração técnica (JSON)" (Detalhes técnicos);
+    - "Citar autorização (opcional)" no cadastro;
+    - "Adicionar outro segmento".
+  - **Nenhuma escolha com efeito comercial é adotada sozinha:**
+    - produto com variantes exige escolha;
+    - triagem após o cadastro continua opcional e explícita;
+    - modo de cadastro continua escolhido.
+  - **Tela da rodada:** área numa frase, com uma expansão; limitações resumidas (sem suporte em destaque, parciais numa linha), com uma expansão; "Próximo:" ao fim de cada seção.
+  - **Sem perda de dados:** configuração antiga de milho (variedade, especificação, indícios, faixa perto do limite e pesquisa encerrada) reaberta e salva sem mudanças. Configuração idêntica, exceto o produto escolhido; revisão 2 → 3.
+- **Verificações finais:**
+  - `npm run check`: 513 + 2 + 37, 0 falhas;
+  - `tests/ui-rodadas.mjs`, `npm run test:ui` e `validate-deploy` passaram;
+  - roteiro da prévia com 18 conferências OK (2 execuções): seleção de commodity, dependências milho → café, troca de rodadas, reabertura sem perda, internacional sem suporte, celular, sem erro de JavaScript.
+- **Antes de publicar:** Worker vigente `5c993fec-0c67-47b6-b59a-56250a6d6d72`; nenhuma migração pendente; o publicado (`683e6db`) está contido na branch.
