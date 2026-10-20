@@ -3162,3 +3162,24 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Originais intactos (registro `956c59c0…8914`, índice `e756a77f…e106`). A cópia verificada de 15/10 continua válida para a entrada 1.
   - As duas cópias com falha ficaram na pasta, sem envio ao Drive; nada foi apagado.
   - **Pendente de Rogério:** nova execução com a mesma senha nas quatro solicitações e envio da cópia verificada ao Drive.
+- **Correção do script da cópia cifrada e cópia da entrada 2 verificada (2026-10-20):**
+  - **Causa comprovada** com dados e senha fictícios, num console real:
+    - no 7-Zip 26.04, `t -p` e `x -p` com `-p` vazio significam senha vazia: não pedem a senha e terminam em cerca de 60 ms com código 2;
+    - sem `-p`, pedem a senha e funcionam;
+    - a criação gravou a senha correta.
+    - Não foi erro de digitação.
+  - Agravantes no script antigo: pedidos do 7-Zip ocultos (`| Out-Null`); instrução de 4 senhas para 3 pedidos; códigos de saída não interrompiam o procedimento. O histórico do PowerShell não foi alterado nas tentativas (última modificação às 17:11Z; conteúdo não lido).
+  - **Script corrigido:** `C:\Users\Roger\eag-compass-registros\gerar-copia-cifrada.ps1`, fora do Git; o original está preservado em `gerar-copia-cifrada.anterior-20261020.ps1`, SHA-256 `b357e38e…520e`.
+    - teste e recuperação sem `-p`, pedidos visíveis, entrada pendente descartada antes de cada pedido;
+    - a senha só no pedido mascarado do 7-Zip, nunca em argumento, variável, log ou relatório;
+    - qualquer falha interrompe;
+    - nomes únicos (segundos e sufixo aleatório) e recusa se o nome já existir;
+    - instrução de envio só depois da recuperação e dos hashes conferidos.
+  - **Laboratório** (dados e senha fictícios): sucesso verificado; senha errada no teste interrompe com FALHA antes da recuperação e sem instrução de envio; senha fictícia ausente dos relatórios.
+  - **Cópia real** (senha digitada por Rogério):
+    - arquivo `eagc-ri-20261020T181214Z-4427e9.7z`, 3.791 bytes, SHA-256 `76cc0af96c2d22b4cf9561e440d1ad9f3d4ca0aa09d1632305b5eeed4f20d276`;
+    - criar, testar e recuperar com código 0, "CÓPIA VERIFICADA";
+    - recuperados iguais aos originais antes e depois (registro `956c59c0…8914`, índice `e756a77f…e106`).
+    - Claude conferiu o relatório e os hashes de forma independente, sem decifrar.
+  - **Preservados:** documentos originais e a cópia de 15/10 (`409b7fca…b8be`). As duas cópias de 20/10 sem verificação continuam na pasta, sem uso; nada foi apagado nem enviado automaticamente.
+  - **Pendente de Rogério:** envio de `eagc-ri-20261020T181214Z-4427e9.7z` ao Google Drive.
