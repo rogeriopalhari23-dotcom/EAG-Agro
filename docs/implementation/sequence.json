@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": "0.3.1-review.2",
-  "updatedAt": "2026-10-20T17:27:13.149Z",
+  "updatedAt": "2026-10-20T17:46:03.674Z",
   "scope": "42 tarefas: 12 fundação, 18 nacional, 12 internacional rev. 2",
   "instructions": "implemented comprova código local, não liberação externa. Atualizar somente com evidências; npm run next não executa ações.",
   "tasks": [
@@ -887,9 +887,9 @@
         "docs/implementation/redesign/"
       ],
       "acceptance": "Todas as telas e ações anteriores acessíveis (matriz função → local); bloqueios do servidor inalterados; T11 aparece como bloqueio e não como contato pronto; testes internos fora das contagens; estados com texto; prefers-reduced-motion; sem rolagem horizontal em 390 e 1440 px; backend só leitura (prospectPipeline, internalTests, reader).",
-      "validation": "npm run check 507+2+37 (inclui tests/painel-redesign.test.mjs); tests/ui-rodadas.mjs (CDP) passando pelo assistente; capturas em docs/implementation/redesign/capturas com dados fictícios da prévia local",
+      "validation": "npm run check 507+2+37 (inclui tests/painel-redesign.test.mjs); npm run test:ui (Playwright 1.63.0 externo + Chrome do sistema) passou; tests/ui-rodadas.mjs passou pelo assistente; validate-deploy",
       "evidence": "docs/implementation/redesign/MATRIZ-PRESERVACAO.md",
-      "blockedBy": "Não publicado: publicação do novo visual depende da avaliação de Rogério da prévia local (node tests/preview-server.mjs). tests/ui-smoke.mjs (playwright opcional) ajustado ao menu novo, não executado nesta sessão."
+      "blockedBy": "Publicado em 2026-10-20 com autorização de Rogério: Worker 5c993fec-0c67-47b6-b59a-56250a6d6d72 (commits c3fe727, 683e6db), sem migração; reversão: wrangler rollback 23b985fd-3dbc-4a6b-9cfc-e48a90418da3. Conferência em produção só leitura em EVIDENCIAS.md."
     }
   ]
 }

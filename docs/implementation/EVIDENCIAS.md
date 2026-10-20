@@ -3084,3 +3084,45 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - T11 com 0 validações; canais `planned`; campanhas 2 `draft` + 1 `ended`; cópia `{"enabled":false}`;
   - `send_outbox` 28, o último de 14/10, nenhum envio novo.
   - **Ponte:** leitura bem-sucedida às 17:23:42 UTC, depois da publicação.
+
+## Publicação do redesign da interface (2026-10-20, autorizada por Rogério)
+
+- **Autorização:** Rogério aprovou o visual e a organização da prévia (branch `redesign-interface`, commit `c3fe727`) e autorizou concluir as verificações e publicar ("Aprovo o visual e a organização demonstrados…"). A aprovação é da interface: nenhuma ficha aprovada, nenhuma validação T11, nenhuma campanha ativada, cópia não habilitada, nenhum envio.
+- **Compatibilidade:** o código em produção (`c456b74`, documentado em `87e47c9`, Worker `23b985fd`) está contido na branch; `origin/main` e `origin/redesign-ui` não têm commits fora dela. Diferença para produção:
+  - `public/` (visual);
+  - 11 linhas somente leitura em `src/worker.js` (`prospectPipeline`, `internalTests`) e `src/sending.js` (`reader`).
+  - Sem migração (remoto: "No migrations to apply"), sem mudança em `wrangler.jsonc` nem em regra de negócio.
+- **Verificações antes de publicar:**
+  - `npm run check`: 507 testes da suíte principal, 2 do Worker e 37 da ponte, 0 falhas; inclui `tests/painel-redesign.test.mjs`.
+  - Um teste antigo instável (`P2-T12: token forjado…`, que falhava quando a assinatura já terminava em "AA") foi tornado determinístico no commit `c3fe727`.
+  - `npm run test:ui` (`tests/ui-smoke.mjs`) **passou**, com Playwright 1.63.0 instalado fora do projeto e o Chrome do sistema, dados fictícios. Não precisou de correção de comportamento; só a mensagem final foi atualizada (`683e6db`).
+  - `tests/ui-rodadas.mjs` (CDP) passou pelo assistente de 4 passos.
+  - `validate-deploy` passou.
+  - Matriz de preservação conferida (`docs/implementation/redesign/MATRIZ-PRESERVACAO.md`).
+- **Worker vigente antes:** `23b985fd-3dbc-4a6b-9cfc-e48a90418da3`.
+- **Publicado:** Worker **`5c993fec-0c67-47b6-b59a-56250a6d6d72`** (2026-10-20T17:42:59Z), código do commit `683e6db`.
+- **Reversão:** `npx wrangler rollback 23b985fd-3dbc-4a6b-9cfc-e48a90418da3`.
+  - O código anterior não usa os campos novos de leitura; não há dado a desfazer.
+  - Nunca `64808403`.
+  - No repositório: `git revert 683e6db c3fe727`, ou `git checkout 87e47c9 -- public/`.
+- **Conferência em produção (só leitura, Chrome sem interface com a sessão do Access; 0 requisições de gravação registradas):**
+  - **Visão geral:**
+    - menu agrupado e jornada em 6 etapas;
+    - canal "Planejado";
+    - T11 em "Bloqueado", com "Não são contatos prontos";
+    - testes internos separados;
+    - ponte "Em dia".
+  - **Rodadas:** lista e assistente presentes. Na Rodada 1:
+    - faixa de progresso ("Pesquisa pública: Encerrada", 10 cadastradas);
+    - anotação complementar visível.
+  - **Empresas:** 37 cadastradas; o resumo mostra a unidade e "O que está comprovado".
+  - **Fichas:** carregaram sem erro; 0 fichas aprovadas.
+  - **Tarefas:** "Bloqueadas (13)".
+  - **Compliance e auditoria:** T11 pendente, canais, listas de sanções, 30 eventos na primeira página.
+  - Nenhum erro de página nem resposta HTTP ≥ 400.
+- **Estado depois:**
+  - T11 `pending`; canais e-mail, LinkedIn e WhatsApp `planned`; cópia `enabled:false`; 0 fichas aprovadas;
+  - fila de envio vazia; 0 envios hoje; sem parada automática.
+  - Campanhas: 3 `draft` + 1 `ended`. A contagem de 16/10 era 2 `draft` + 1 `ended`; esta publicação e as conferências não criaram campanha (só leitura).
+- **Ponte:** leitura bem-sucedida às 17:45:06 UTC, depois da publicação.
+- **Incidente de exposição, sem efeito em dados:** ao renovar a sessão com `cloudflared access login`, o token do Access (aplicação do Compass, validade de 24 h) apareceu na saída do terminal desta sessão de trabalho. Não foi gravado em Git, documento ou serviço externo; o arquivo temporário foi apagado. Recomendação: revogar as sessões do Access do Compass no painel Zero Trust.

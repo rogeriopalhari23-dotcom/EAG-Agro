@@ -1,6 +1,6 @@
 # Redesign da interface (2026-10): matriz de preservação
 
-Branch `redesign-interface`, criada a partir de `87e47c9`. Nada foi publicado. Produção segue com os canais `planned`, as campanhas inativas, a cópia interna desligada e a T11 pendente.
+Branch `redesign-interface`, criada a partir de `87e47c9`. **Publicado em 2026-10-20** (Worker `5c993fec-0c67-47b6-b59a-56250a6d6d72`, commits `c3fe727` e `683e6db`; reversão `npx wrangler rollback 23b985fd-3dbc-4a6b-9cfc-e48a90418da3`). Produção segue com os canais `planned`, as campanhas inativas, a cópia interna desligada e a T11 pendente. Testes: `npm run check` 507+2+37 e `npm run test:ui` passaram (ver EVIDENCIAS.md).
 
 ## O que mudou
 
