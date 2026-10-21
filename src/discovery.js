@@ -67,7 +67,7 @@ export async function getDiscovery(env, actor, id) {
     searchId: x.id, country, proposal: proposalFor(hs6), mapVersion: MAP_VERSION,
     // Consulta pronta para o navegador executar no servidor público do OSM (que recusa a Cloudflare).
     osmQuery: proposalFor(hs6)?.processors.osm.length ? overpassQuery(country.iso2, proposalFor(hs6).processors.osm) : null,
-    sources: sourcesFor(country.iso2, hs6[0]?.slice(0, 4)),
+    sources: sourcesFor(country.iso2, hs6),
     stage: "empresa encontrada",
     notice: "Candidato encontrado por atividade no cadastro ou no mapa: indício de uso da commodity, não prova de compra nem de importação. EORI ativo (aduana da UE) é sinal próprio de comércio exterior — não prova importação da commodity nem origem Brasil. O dado do país (MDIC/Comtrade) nunca confirma empresa.",
     counts: {
@@ -88,7 +88,7 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
   const i = await bodyJson(request);
   const source = oneOf(i.source, ["osm", "fr_registry", "no_registry", "de_coffee_assoc"], "fonte");
   const role = oneOf(i.role ?? "processor", ["processor", "trader"], "grupo");
-  if (!sourcesFor(country.iso2, hs6[0]?.slice(0, 4)).find((z) => z.key === source)?.available) fail(422, "source_not_available", "Fonte não cobre este país ou esta commodity.");
+  if (!sourcesFor(country.iso2, hs6).find((z) => z.key === source)?.available) fail(422, "source_not_available", "Fonte não cobre este país ou esta commodity.");
   if (source === "de_coffee_assoc") return discoverKaffeeverband(env, actor, rid, x, deps);
   const proposal = proposalFor(hs6);
   const nace = i.nace ?? proposal?.[role === "trader" ? "traders" : "processors"]?.nace;

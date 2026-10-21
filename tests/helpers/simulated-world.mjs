@@ -2,7 +2,8 @@
 //   - mapa colaborativo (Overpass): estabelecimentos fictícios perto da origem, conforme as etiquetas pedidas;
 //   - sites das empresas (*.previa.invalid): CNPJ fictício válido e e-mail geral; um site fora do ar, um sem CNPJ;
 //   - Receita (publica.cnpj.ws): responde pelos CNPJs fictícios; opcionalmente 429 na primeira consulta de alguns;
-//   - diretório alemão do café: indisponível (fonte pendente, as demais seguem).
+//   - diretório alemão do café: indisponível (fonte pendente, as demais seguem);
+//   - registro francês e EORI (Comissão Europeia): empresas fictícias, para a prospecção internacional na França.
 // opts: { refuseOsm: true → 522 (como a Cloudflare recebe), receita429: Set(cnpj), cityAt(lat, lon) → { name, uf } (município
 // oficial mais próximo, para a Receita simulada responder um município coerente com o ponto do mapa) }
 export function nearestMunicipality(DB) {
@@ -81,6 +82,22 @@ export function simulatedWorld(opts = {}) {
       return Response.json({ razao_social: r.name, porte: { descricao: r.size }, estabelecimento: { situacao_cadastral: "Ativa", cidade: { nome: r.city ?? "Guaxupé" }, estado: { sigla: r.uf ?? "MG" }, tipo: "Matriz", atividade_principal: { subclasse: "1081-3/02", descricao: "Torrefação e moagem de café" } } });
     }
     if (/kaffeeverband|kaffee-netz|kaffee/.test(u.host)) return new Response("indisponível", { status: 503 });
+    // Registro francês (Recherche d'entreprises) e validação EORI: empresas FICTÍCIAS, uma sem site nem registro válido.
+    if (u.host === "recherche-entreprises.api.gouv.fr") {
+      if (opts.frDown) return new Response("indisponible", { status: 503 });
+      const naf = u.searchParams.get("activite_principale") ?? "";
+      const base = [
+        ["912345671", "PROVENDE DU VAL (FICTIVE)", "Rennes", "21"],
+        ["912345672", "AMIDONNERIE DU NORD (FICTIVE)", "Lille", "22"],
+        ["912345673", "MOULIN DES PLAINES (FICTIVE)", "Orléans", "12"],
+      ];
+      const results = (u.searchParams.get("page") ?? "1") === "1" ? base.map(([siren, nom, ville, tranche]) => ({ siren, nom_complet: nom, nom_raison_sociale: nom, activite_principale: naf.split(",")[0], tranche_effectif_salarie: tranche, annee_tranche_effectif_salarie: "2023", categorie_entreprise: "PME", siege: { libelle_commune: ville, siret: `${siren}00011` } })) : [];
+      return Response.json({ results, total_results: 3, total_pages: 1 });
+    }
+    if (u.host === "ec.europa.eu") {
+      const eoris = [...String(init.body ?? "").matchAll(/<ev:eori>([^<]+)<\/ev:eori>/g)].map((m) => m[1]);
+      return new Response(`<soap:Envelope><soap:Body>${eoris.map((e, i) => `<result><eori>${e}</eori><status>${i === 0 ? "0" : "1"}</status></result>`).join("")}</soap:Body></soap:Envelope>`, { status: 200, headers: { "content-type": "text/xml" } });
+    }
     // ABIC: mesma estrutura da página real (lista de produtos embutida), com industrializadores FICTÍCIOS.
     if (u.host === "www.abic.com.br") {
       if (opts.abicDown) return new Response("indisponível", { status: 503 });

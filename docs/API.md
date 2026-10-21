@@ -31,7 +31,10 @@ Todas as rotas `/api/*`, exceto GET health, exigem identidade autenticada e usu�
 | GET /api/audit | Eventos paginados; filtro opcional entityId. |
 | GET/POST /api/prospect/profile | Perfil comprador padrão, versionado (POST: gestor/admin, com motivo e expectedVersion). |
 | GET/POST /api/prospect/policy, POST /api/prospect/policy/revoke | Política de pesquisa de rotina: concessão (gestor/admin, confirm + referência; fonte paga recusada) e revogação. |
-| GET /api/prospect/coverage | Cobertura da pesquisa para market + productId (+ iso2 no internacional): fontes cobertas e sem cobertura, com nota; `partial` quando alguma falta. Não esconde país. |
+| POST /api/prospect/jobs/:id/act | { action } — a pessoa executa a ação concreta da pendência (select_authorize, accept_candidates, ack_limitations, request_indicators, retry), com a própria identidade e canal do painel; perfil exigido por ação (Administrador, aprovador ou escrita). |
+| GET /api/prospect/connectors | Inventário completo dos conectores e quando cada um se aplica (só Administrador). |
+| POST /api/sources/applicable | Fontes aplicáveis: { market: "national", segments } → items e config da rodada; { market: "international", iso2, productId } → items. Mesma regra do motor e das telas. |
+| GET /api/prospect/coverage | Fontes aplicáveis à escolha (market + productId, + iso2 no internacional): só as do país, da commodity e dos segmentos; pertinente sem condição de rodar vem `pending` com nota; inclui a situação dos indicadores do país (pronto, vencido, aguardando geração, processando, aguardando limite, falha, sem fonte, não gerado). Não esconde país. |
 | GET/POST /api/prospect/jobs | Prospecções; criar com market, productId e local (nacional: region, municipality, radius; internacional: iso3). Executa em segundo plano (fila e cron). |
 | GET /api/prospect/jobs/:id; POST …/pause, …/resume, …/cancel, …/skip-browser, …/browser-osm, …/run | Andamento, etapas e registro; controles da pessoa; resposta do mapa obtida pelo navegador; execução imediata (diagnóstico). |
 | GET /api/round-catalog | Fontes das rodadas (o que fazem, limites, regra por segmento) e segmentos sugeridos por commodity. Só leitura. |

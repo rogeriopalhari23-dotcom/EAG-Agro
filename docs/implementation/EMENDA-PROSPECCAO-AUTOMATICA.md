@@ -1,6 +1,6 @@
 # Emenda proposta: prospecção automática sob política de pesquisa de rotina (2026-10-20)
 
-**Estado:** proposta para decisão de Rogério Palhari. **Não aprovada.** O código da branch `redesign-interface` implementa a política, mas nenhuma prospecção pesquisa sem uma política concedida. Em produção não há política, e a versão nova não foi publicada.
+**Estado:** proposta para decisão de Rogério Palhari. **Não aprovada.** Desde 2026-10-20 o código respeita isso: com `AMENDMENT.approved = false` (`src/prospect/defaults.js`), a seleção R12.7, a ciência das limitações e o aceite internacional param numa ação concreta da pessoa, mesmo com a política vigente. O código da branch `redesign-interface` implementa a política, mas nenhuma prospecção pesquisa sem uma política concedida. Em produção não há política, e a versão nova não foi publicada.
 
 ## O que muda na prática
 

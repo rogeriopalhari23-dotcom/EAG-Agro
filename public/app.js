@@ -3899,7 +3899,7 @@ async function discoveryPanel(x) {
             }, true)
           : null,
       ),
-      unavailable.length ? text("small", `Fora da cobertura deste país: ${unavailable.map((s) => s.label).join("; ")}.`) : null,
+      unavailable.length ? text("small", `Fontes pertinentes pendentes: ${unavailable.map((s) => `${s.label} (${s.note})`).join("; ")}.`) : null,
     );
   wrap.append(
     text("p", d.notice, "muted"),
@@ -4438,12 +4438,21 @@ const localeFor = (iso) => (iso === "BR" ? { language: "pt-BR", timezone: "Ameri
 const scopeFor = (iso) => `${String(iso).toLowerCase()}_email_automatic`;
 // Fontes calculadas pelos segmentos: Receita no Brasil; mapa colaborativo e registros do MAPA só se algum segmento tem a
 // regra. Na edição, nenhuma fonte já registrada é retirada sozinha (só se acrescenta a que um segmento novo pede).
+// A regra é a do servidor (POST /api/sources/applicable, src/sources-applicable.js), guardada por conjunto de segmentos;
+// fora do Brasil não há fonte cadastral nem regra de identificador (só o mapa, se algum segmento tiver a regra).
+const applicableCache = new Map();
+async function loadApplicable(segments) {
+  const key = JSON.stringify(segments ?? {});
+  if (!applicableCache.has(key)) applicableCache.set(key, await api("/api/sources/applicable", "POST", { market: "national", segments: segments ?? {} }));
+  return applicableCache.get(key);
+}
 function sourcesFor(iso, segments, existing) {
+  const key = JSON.stringify(segments ?? {});
+  const known = applicableCache.get(key);
   const segs = Object.values(segments ?? {});
-  const need = [];
-  if (iso === "BR") need.push({ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 });
-  if (segs.some((g) => g.discovery?.osm)) need.push({ id: "osm-overpass", kind: "discovery" });
-  if (iso === "BR" && segs.some((g) => g.discovery?.sipeagro)) need.push({ id: "mapa-sipeagro", kind: "discovery" });
+  const need = known
+    ? known.config.filter((x) => iso === "BR" || x.id === "osm-overpass")
+    : [...(iso === "BR" ? [{ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 }] : []), ...(segs.some((g) => g.discovery?.osm) ? [{ id: "osm-overpass", kind: "discovery" }] : [])];
   if (!existing) return need;
   return [...existing, ...need.filter((n) => !existing.some((e) => e.id === n.id))];
 }
@@ -4603,6 +4612,9 @@ function roundForm(initial, roundName, onSubmit, label) {
       addBox,
       text("p", `Fontes: ${srcs.map((x) => sourceName(x.id)).join(", ") || "só arquivo e pesquisa manual"}. Arquivo e pesquisa manual com fonte ficam sempre disponíveis.`, "form-hint"),
     ].filter(Boolean));
+    // Fontes pela regra do servidor: carrega uma vez por conjunto de segmentos e redesenha só se a escolha não mudou.
+    const segKey = JSON.stringify(segments);
+    if (!applicableCache.has(segKey)) safe(async () => { await loadApplicable(segments); if (JSON.stringify(segments) === segKey) renderStep3(); });
   };
   const step3 = el("fieldset", { class: "group" }, el("legend", {}, "Segmentos compradores"), segBox);
 
@@ -4739,6 +4751,7 @@ function roundForm(initial, roundName, onSubmit, label) {
     error.hidden = true;
     try {
       for (const k of [0, 1, 2, 3]) if (!(await validate(k))) return show(k);
+      await loadApplicable(segments);
       await onSubmit(editing ? roundName : nameIn.control.value.trim(), buildConfig());
     } catch (err) {
       fail(err.message);
@@ -5458,7 +5471,34 @@ const JOB_STATUS = {
   failed: ["Falhou", "bad"],
 };
 const STEP_STATE = { done: ["concluída", "ok"], partial: ["parcial", "warn"], pending: ["pendente", "warn"], skipped: ["sem itens", ""], waiting: ["aguardando", ""], decision: ["decisão", "warn"], failed: ["falhou", "bad"], todo: ["a fazer", ""] };
-const WAITING_TEXT = { rate_limit: "aguardando o limite por minuto da Receita; retoma sozinha", source_retry: "fonte indisponível; nova tentativa automática", browser_osm: "a busca no mapa precisa deste navegador", sites: "lendo os sites das empresas" };
+const WAITING_TEXT = {
+  rate_limit: "aguardando o limite por minuto da Receita; retoma sozinha",
+  source_retry: "fonte indisponível; nova tentativa automática",
+  browser_osm: "a busca no mapa precisa deste navegador",
+  sites: "lendo os sites das empresas",
+  indicators_queued: "indicadores do país aguardando geração na lista mensal; retoma sozinha",
+  indicators_processing: "indicadores do país em processamento; retoma sozinha",
+  indicators_limit: "aguardando o limite da fonte de indicadores (uma geração por país por dia ou orçamento diário); retoma sozinha",
+};
+// Pendência da prospecção: técnica (o sistema ou o Administrador resolve), regra vigente (pede uma pessoa) ou decisão.
+const DECISION_HEAD = { technical: "Pendência técnica. ", rule: "A regra vigente pede a ação de uma pessoa. " };
+function decisionActions(j, id) {
+  const a = j.decision.action;
+  const can = (r) => (r === "admin" ? admin() : r === "approver" ? approver() : writable());
+  const bar = el("div", { class: "toolbar" });
+  if (a) {
+    if (a.id === "open_catalog") bar.append(button(a.label, () => navigate("Catálogo")));
+    else if (a.id === "open_trade_list") bar.append(button(a.label, () => navigate("Lista mensal")));
+    else if (can(a.roles)) bar.append(button(a.label, async () => (await api(`/api/prospect/jobs/${id}/act`, "POST", { action: a.id }), await showJob(id)), true));
+    else bar.append(text("small", a.roles === "admin" ? "Ação de um Administrador." : a.roles === "approver" ? "Ação de um Administrador ou gestor comercial." : "Seu perfil não executa esta ação."));
+    // Depois de resolver fora daqui (catálogo, lista mensal): conferir de novo.
+    if (["open_catalog", "open_trade_list"].includes(a.id) && writable()) bar.append(button("Conferir de novo e continuar", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id))));
+  } else if (j.decision.kind === "authorization" || j.decision.kind === "scope") {
+    if (approver()) bar.append(button("Ver a política de pesquisa", () => navigate("Prospecção automática")));
+    if (writable()) bar.append(button("Conferir a política de novo e continuar", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id))));
+  } else if (writable()) bar.append(button("Conferir de novo e continuar", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id))));
+  return bar;
+}
 const jobActive = (j) => ["queued", "running", "waiting"].includes(j.status);
 
 // Formulário mínimo. market: "national" | "international" | null (pergunta).
@@ -5505,18 +5545,23 @@ function prospectStart(fixedMarket = null) {
   // Cobertura da pesquisa para a escolha atual: o que cada fonte cobre, o que fica pendente. Não esconde país nem produto.
   const coverage = () => {
     const seq = ++covSeq;
+    // A informação da escolha anterior sai na hora; a resposta atrasada de outra escolha é descartada.
+    cov.replaceChildren();
     const pid = productId || commodities.find((x) => x.code === code)?.products?.[0]?.id;
-    if (!pid || (market === "international" && !country.item)) return cov.replaceChildren();
+    if (!pid || (market === "international" && !country.item)) return;
+    const want = { pid, market, iso2: country.item?.id ?? null };
+    cov.append(text("p", "Conferindo as fontes desta pesquisa…", "muted"));
     safe(async () => {
-      const q = market === "international" ? `market=international&productId=${pid}&iso2=${country.item.id}` : `market=national&productId=${pid}`;
+      const q = want.market === "international" ? `market=international&productId=${want.pid}&iso2=${want.iso2}` : `market=national&productId=${want.pid}`;
       const r = await api(`/api/prospect/coverage?${q}`);
       if (seq !== covSeq) return;
+      cov.dataset.for = q;
       cov.replaceChildren(
-        text("strong", "Cobertura desta pesquisa"),
-        el("ul", { class: "coverage-list" }, ...r.items.map((x) => el("li", {}, tag(x.available ? "coberta" : "sem cobertura", x.available ? "ok" : "warn"), text("span", x.label), x.note ? text("small", x.note) : null))),
+        text("strong", `Fontes desta pesquisa${r.country ? ` · ${r.commodity} em ${r.country}` : ` · ${r.commodity}`}`),
+        r.items.length ? el("ul", { class: "coverage-list" }, ...r.items.map((x) => el("li", {}, tag(x.available ? "coberta" : "pendente", x.available ? "ok" : "warn"), text("span", x.label), x.note ? text("small", x.note) : null))) : text("p", "Nenhuma fonte de empresas cobre esta combinação no Compass.", "muted"),
         r.partial ? text("p", r.partialNote, "form-hint") : null,
       );
-    });
+    }).catch?.(() => {});
   };
   const showMarket = () => {
     natBox.hidden = market !== "national";
@@ -5602,7 +5647,10 @@ async function prospectList(market) {
 let jobTimer = null;
 async function showJob(id) {
   clearTimeout(jobTimer);
+  // Resposta atrasada de outra tela (ou de outra prospecção) não preenche a atual.
+  const generation = ++state.generation;
   const j = await api(`/api/prospect/jobs/${id}`);
+  if (generation !== state.generation) return;
   const node = section(j.name, `${j.market === "national" ? "Prospecção nacional" : "Prospecção internacional"} · iniciada em ${fmtDate(j.createdAt)}`);
   node.dataset.step = "0";
   const [st, cls] = JOB_STATUS[j.status] ?? [j.status, ""];
@@ -5615,15 +5663,14 @@ async function showJob(id) {
     item("Candidatas encontradas", s ? String(s.candidates) : "—", s?.establishments != null ? `${s.establishments} estabelecimento(s) após deduplicação` : null),
     item("Empresas cadastradas", s ? String(s.registered) : "—", "em descoberta: não é qualificação comercial"),
     item("Pendências para análise", s ? String(s.exceptions) : "—", s?.pendingLookups ? `${s.pendingLookups} consulta(s) adiada(s)` : null),
-    el("div", { class: "next" }, el("p", {}, text("strong", "Próxima ação: "), j.decision ? j.decision.message : s ? s.nextAction : jobActive(j) ? "Aguardar: a prospecção avança sozinha." : "—"), jobProgress(j)),
+    el("div", { class: "next" }, el("p", {}, text("strong", "Próxima ação: "), j.decision ? (j.decision.action ? `${j.decision.action.label} (${j.decision.category === "technical" ? "pendência técnica" : j.decision.category === "rule" ? "ação de uma pessoa pela regra vigente" : "decisão"}; detalhes abaixo).` : j.decision.message) : s ? s.nextAction : jobActive(j) ? "Aguardar: a prospecção avança sozinha." : "—"), jobProgress(j)),
   );
   node.append(head);
   // Decisão pendente: o que falta e como seguir.
   if (j.decision) {
-    const dec = el("div", { class: "callout warn" }, el("p", {}, text("strong", "Decisão necessária. "), j.decision.message));
-    if (j.decision.items?.length) dec.append(el("ul", {}, ...j.decision.items.map((x) => text("li", x))));
-    if (j.decision.kind === "authorization" && approver()) dec.append(button("Ver a política de pesquisa", () => navigate("Prospecção automática")));
-    if (writable()) dec.append(button("Retomar depois de resolver", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id)), true));
+    const dec = el("div", { class: `callout decision-box ${j.decision.category === "technical" ? "" : "warn"}`.trim() }, el("p", {}, text("strong", DECISION_HEAD[j.decision.category] ?? "Decisão necessária. "), j.decision.message));
+    if (j.decision.items?.length) dec.append(el("ul", { class: "plain-list compact-list" }, ...j.decision.items.map((x) => text("li", x))));
+    dec.append(decisionActions(j, id));
     node.append(dec);
   }
   // Dependência do navegador (mapa colaborativo recusa o servidor): feita aqui, automaticamente, e dita como tal.
@@ -5663,7 +5710,7 @@ async function showJob(id) {
       panel(
         "Fontes consultadas",
         s.partial ? el("div", { class: "callout warn" }, text("p", s.partialNote)) : text("p", "Todas as fontes previstas responderam.", "muted"),
-        el("ul", { class: "coverage-list" }, ...Object.entries(s.coverage ?? s.sources ?? {}).map(([k, v]) => el("li", {}, tag(typeof v === "string" ? v : { ok: "consultada", empty: "sem resultado nesta consulta", unavailable: "indisponível", partial: "parcial", not_applicable: "não se aplica" }[v.status] ?? v.status, typeof v === "string" ? "" : v.status === "ok" ? "ok" : v.status === "not_applicable" ? "" : "warn"), text("span", sourceName(k)), typeof v === "string" ? null : text("small", v.note ?? "")))),
+        el("ul", { class: "coverage-list" }, ...Object.entries(s.coverage ?? s.sources ?? {}).map(([k, v]) => el("li", {}, tag(typeof v === "string" ? v : { ok: "consultada", empty: "sem resultado nesta consulta", unavailable: "pendente", partial: "parcial", not_applicable: "não consultada" }[v.status] ?? v.status, typeof v === "string" ? "" : v.status === "ok" ? "ok" : v.status === "not_applicable" ? "" : "warn"), text("span", s.sourceLabels?.[k] ?? sourceName(k)), typeof v === "string" ? null : text("small", v.note ?? "")))),
       ),
       s.toIdentify?.length
         ? panel(
@@ -5788,6 +5835,18 @@ async function prospectSettingsView() {
   }
   if (po.history.length) pol.append(details("Histórico da política", el("ul", { class: "plain-list" }, ...po.history.map((h) => text("li", `v${h.version} · concedida em ${fmtDate(h.granted_at)} por ${h.granted_by}${h.revoked_at ? ` · revogada em ${fmtDate(h.revoked_at)}: ${h.revoke_reason}` : ""}`)))));
   node.append(prof, pol);
+  if (admin()) {
+    const inv = await api("/api/prospect/connectors").catch(() => null);
+    if (inv)
+      node.append(
+        panel(
+          "Conectores de fontes (inventário)",
+          text("p", "Todos os conectores do Compass e quando cada um se aplica. Nas pesquisas aparecem só os aplicáveis ao país, à commodity e aos segmentos.", "muted"),
+          details(`Brasil (${inv.national.length})`, el("ul", { class: "plain-list" }, ...inv.national.map((x) => el("li", {}, text("strong", x.label), text("small", ` · ${x.appliesWhen}`))))),
+          details(`Exterior (${inv.international.length})`, el("ul", { class: "plain-list" }, ...inv.international.map((x) => el("li", {}, text("strong", x.label), text("small", ` · ${x.appliesWhen}`))))),
+        ),
+      );
+  }
   return node;
 }
 

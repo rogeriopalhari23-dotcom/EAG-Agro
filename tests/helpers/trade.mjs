@@ -42,7 +42,7 @@ export const MDIC_ROWS = {
 const NCM_CSV =
   '"CO_NCM";"CO_UNID";"CO_SH6";"NO_NCM_POR";"NO_NCM_ING"\n"09011110";"10";"090111";"Café não torrado";"Coffee, not roasted"\n"17011400";"10";"170114";"Outros açúcares de cana";"Other cane sugar"\n"12019000";"10";"120190";"Soja";"Soya beans"\n';
 
-const rec = (code, hs6, year, partner, value, extra = {}) => ({
+export const rec = (code, hs6, year, partner, value, extra = {}) => ({
   refYear: year, reporterCode: code, flowCode: "M", partnerCode: partner, partner2Code: 0, customsCode: "C00", motCode: 0,
   cmdCode: hs6, cifvalue: value, primaryValue: value, netWgt: value * 2, isNetWgtEstimated: false, qty: value * 2, qtyUnitCode: 8, ...extra,
 });
@@ -55,6 +55,9 @@ export const COMTRADE = {
 const HS = { results: ["010121", "090111", "090112", "120190", "170114", "170199"].map((id) => ({ id, aggrLevel: 6, text: `${id} - item ${id}` })) };
 
 export function sources(opts = {}) {
+  // opts.comtrade: declarantes extras { código: { years, rows } }; opts.hs: códigos SH6 extras da tabela da Comtrade.
+  const CT = { ...COMTRADE, ...(opts.comtrade ?? {}) };
+  const HSX = opts.hs ? { results: [...HS.results, ...opts.hs.map((id) => ({ id, aggrLevel: 6, text: `${id} - item ${id}` }))] } : HS;
   const calls = { comtrade: 0, data: 0, mdicGets: 0, log: [] };
   const etags = { 2026: '"a1"', 2025: '"b1"', ...(opts.etags || {}) };
   const file = (y) => new TextEncoder().encode([HEADER, ...(opts.mdicRows?.[y] ?? MDIC_ROWS[y])].join("\n") + "\n");
@@ -76,14 +79,14 @@ export function sources(opts = {}) {
     }
     if (u.host === "comtrade.test") {
       calls.comtrade++;
-      if (u.pathname.endsWith("/HS.json")) return Response.json(HS);
+      if (u.pathname.endsWith("/HS.json")) return Response.json(HSX);
       const code = Number(u.searchParams.get("reporterCode"));
-      if (u.pathname.includes("/getDA/")) return Response.json({ count: 0, data: (COMTRADE[code]?.years ?? []).map((period) => ({ period, reporterCode: code, freqCode: "A" })), error: "" });
+      if (u.pathname.includes("/getDA/")) return Response.json({ count: 0, data: (CT[code]?.years ?? []).map((period) => ({ period, reporterCode: code, freqCode: "A" })), error: "" });
       calls.data++;
       if (opts.failData?.(code)) return new Response("falhou", { status: opts.failStatus ?? 400 });
       const years = u.searchParams.get("period").split(",").map(Number);
       const block = new Set(u.searchParams.get("cmdCode").split(","));
-      const data = (COMTRADE[code]?.rows ?? []).filter((r) => years.includes(r.refYear) && block.has(r.cmdCode));
+      const data = (CT[code]?.rows ?? []).filter((r) => years.includes(r.refYear) && block.has(r.cmdCode));
       return Response.json({ count: data.length, data, error: "" });
     }
     throw new Error("host inesperado " + u.host);

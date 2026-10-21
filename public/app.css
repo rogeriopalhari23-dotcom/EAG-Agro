@@ -2957,3 +2957,17 @@ details.complementary > summary {
   max-height: 260px;
   overflow-y: auto;
 }
+/* Pendência da prospecção: texto, itens e ação empilhados (não lado a lado). */
+.callout.decision-box {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+}
+.decision-box .plain-list {
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.decision-box .toolbar {
+  margin: 0;
+}

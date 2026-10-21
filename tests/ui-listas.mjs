@@ -83,6 +83,12 @@ const noticeText = () => js(`document.getElementById("notice").innerText`);
   await ctx.api("/api/companies", "POST", { legalName: "Rações Beta Ltda (fictícia)", countryCode: "BR", sourceLabel: "Teste de tela (fictício)" });
 }
 
+// Classificação SH confirmada no catálogo (como pelo Administrador) para o café e o álcool industrial.
+for (const [pid, code] of [["product-05", "090111"], ["product-11", "220710"]]) {
+  const p = (await ctx.api(`/api/catalog/${pid}`)).data;
+  await ctx.api(`/api/catalog/${pid}/codes`, "POST", { codeSystem: "HS", code, status: "confirmed", classificationVersion: "HS2022", sourceRef: "Teste de tela (fictício)", expectedRevision: p.revision, reason: "Teste de tela" });
+}
+
 const S = ".prospect-form";
 const q = (n) => `document.querySelector('${S} [name="${n}Text"]')`;
 const listOf = (n) => `${q(n)}.closest(".combo").querySelector(".combo-list")`;
@@ -152,7 +158,7 @@ try {
   await pickMouse("country", "Argentina");
   assert.equal(await hiddenVal("country"), "AR");
   assert.equal(await js(`${q("country")}.value`), "Argentina");
-  await until(`/Cobertura desta pesquisa/.test(document.querySelector("${S}").innerText)`, "cobertura informada para a Argentina");
+  await until(`/Fontes desta pesquisa/.test(document.querySelector("${S}").innerText)`, "cobertura informada para a Argentina");
   for (const [typed, iso, label] of [["Alemanha", "DE", "Alemanha"], ["portugal", "PT", "Portugal"], ["japao", "JP", "Japão"], ["MEXICO", "MX", "México"], ["Germany", "DE", "Alemanha"]]) {
     await typeIn("country", typed);
     await sleep(60);
@@ -166,6 +172,29 @@ try {
   await until(`/Escolha uma opção da lista/.test(${q("country")}.closest(".combo").innerText)`, "nome ambíguo pede escolha");
   assert.equal(await hiddenVal("country"), "", "nenhuma seleção invisível em texto ambíguo");
   assert.ok(!/\b(BRA|ARG|DEU)\b/.test(await js(`document.querySelector("${S}").innerText`)), "código do país fica interno");
+
+  // Troca rápida: a resposta atrasada da pesquisa anterior (café × Alemanha) não preenche a atual (álcool × Alemanha).
+  await js(`(() => { const f = window.fetch; window.fetch = (u, i) => (String(u).includes("/api/prospect/coverage") && String(u).includes("product-05") ? new Promise((r) => setTimeout(() => r(f(u, i)), 1500)) : f(u, i)); return true; })()`);
+  await typeIn("country", "Alemanha");
+  await sleep(60);
+  await blur("country");
+  await until(`document.querySelector('${S} [name="country"]').value === "DE"`, "Alemanha");
+  await typeIn("commodity", "álcool industrial");
+  await hasOption("commodity", "Álcool industrial");
+  await pickMouse("commodity", "Álcool industrial");
+  await sleep(2200);
+  const cov = await js(`document.querySelector("${S} .prospect-coverage").innerText`);
+  assert.match(cov, /Álcool industrial em Alemanha/, cov);
+  assert.doesNotMatch(cov, /Kaffeeverband|torrefação|Noruega|França/, "nada de café, Noruega ou França na pesquisa de álcool");
+  assert.match(await js(`document.querySelector("${S} .prospect-coverage").dataset.for`), /product-1[123]/);
+  // Café × Alemanha: diretório do café e mapa de torrefação; nada da França nem da Noruega.
+  await typeIn("commodity", "cafe");
+  await hasOption("commodity", "Café");
+  await pickMouse("commodity", "Café");
+  await until(`/Café em Alemanha/.test(document.querySelector("${S} .prospect-coverage").innerText)`, "cobertura do café", 6000);
+  const covCafe = await js(`document.querySelector("${S} .prospect-coverage").innerText`);
+  assert.match(covCafe, /Kaffeeverband/);
+  assert.doesNotMatch(covCafe, /França|Noruega/);
 
   // Brasil (origem nacional) na mesma lista comum: Rodadas → configuração manual.
   await nav("Rodadas");

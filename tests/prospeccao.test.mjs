@@ -21,7 +21,10 @@ async function world(t, opts = {}) {
     await ctx.api(`/api/sanctions/versions/${v.data.id}/entries`, "POST", { entries: [{ primaryName: "Nome Sem Relação (fictício)" }] });
     await ctx.api(`/api/sanctions/versions/${v.data.id}/finish`, "POST", {});
   }
-  const deps = { call: internalCaller(ctx.env, "rid-teste"), fetch: globalThis.fetch };
+  const deps = { call: internalCaller(ctx.env, "rid-teste"), fetch: globalThis.fetch, ...(opts.amendmentApproved ? { amendmentApproved: true } : {}) };
+  // Ações concretas que a regra vigente pede de uma pessoa (emenda não aprovada): o teste faz o papel da pessoa, pela rota.
+  const PERSON = new Set(opts.personActions ?? ["ack_limitations", "select_authorize", "accept_candidates"]);
+  const actions = [];
   // Avança o relógio da prospecção e "passa um minuto" para o limite por fonte (desloca as chamadas registradas).
   let clock = Date.now();
   const drive = async (id, max = 40) => {
@@ -32,17 +35,23 @@ async function world(t, opts = {}) {
       ctx.DB.raw.prepare("UPDATE round_source_calls SET called_at=strftime('%Y-%m-%dT%H:%M:%fZ', called_at)").run();
       last = await runJob(ctx.env, id, { ...deps, now: () => new Date(clock).toISOString() });
       const j = (await ctx.api(`/api/prospect/jobs/${id}`)).data;
+      if (j.status === "needs_decision" && PERSON.has(j.decision?.action?.id)) {
+        actions.push(j.decision.action.id);
+        const r = await ctx.api(`/api/prospect/jobs/${id}/act`, "POST", { action: j.decision.action.id });
+        if (r.status !== 200) throw new Error(JSON.stringify(r.data));
+        continue;
+      }
       if (["done", "failed", "needs_decision", "paused", "cancelled"].includes(j.status) || j.waitingFor === "browser_osm") return j;
     }
     return (await ctx.api(`/api/prospect/jobs/${id}`)).data;
   };
   const grant = (body = {}) => ctx.api("/api/prospect/policy", "POST", { confirm: true, reference: "Decisão de teste (fictícia)", ...body });
-  return { ...ctx, w, deps, drive, grant };
+  return { ...ctx, w, deps, drive, grant, actions };
 }
 const cafe = { market: "national", productId: "product-05", location: { region: "MG", municipality: "Guaxupé" }, radius: { value: 150, unit: "km" } };
 
 test("sem política, a prospecção para em decisão; concedida, segue sozinha até o relatório e cadastra em descoberta com rastreio", async (t) => {
-  const { api, DB, drive, grant } = await world(t);
+  const { api, DB, drive, grant, actions } = await world(t);
   const job = (await api("/api/prospect/jobs", "POST", cafe)).data;
   assert.equal(job.name, "Café — Guaxupé/MG, 150 km");
   let j = await drive(job.id);
@@ -58,9 +67,10 @@ test("sem política, a prospecção para em decisão; concedida, segue sozinha a
   assert.equal(s.registered, 3);
   assert.equal(s.exceptions, 3);
   assert.match(s.notCommercial, /não é qualificação comercial/);
-  // Ciência pela política, nunca como de pessoa; procedência "automation" com a política como autorização.
+  // Emenda não aprovada: a ciência das limitações é da pessoa (ação concreta), nunca atribuída à política.
+  assert.deepEqual(actions, ["ack_limitations"]);
   const round = (await api(`/api/rounds/${j.roundId}`)).data;
-  assert.match(round.acknowledged.by, /^policy:/);
+  assert.doesNotMatch(round.acknowledged.by, /^policy:/);
   assert.equal(round.config.commodity.productId, "product-05");
   assert.deepEqual(Object.keys(round.config.commodity.segments), ["roaster"], "segmentos do café, sem ração");
   const reg = DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='round.registered'").get();
@@ -195,9 +205,9 @@ test("perfil versionado: nova versão vale para as próximas prospecções; perf
   assert.ok(j.decision.items.some((x) => /descoberta automática/.test(x)));
 });
 
-test("internacional: indicadores → seleção e busca pela política → descoberta com fonte pendente → cadastro → relatório", async (t) => {
+test("internacional: indicadores → seleção e busca pela pessoa (R12.7) → descoberta com fonte pendente → aceite → relatório", async (t) => {
   const ctx = await world(t);
-  const { api, DB, drive, grant, env } = ctx;
+  const { api, DB, drive, grant, env, actions } = ctx;
   keepCountries(DB, ["DEU", "CHN"]);
   await tradeParams(api, { period_default_months: 12 });
   const d = driver(env, sources(), { at: "2026-10-10T12:00:00.000Z" });
@@ -212,13 +222,16 @@ test("internacional: indicadores → seleção e busca pela política → descob
   assert.ok(j.summary.registered >= 1);
   assert.ok(j.summary.exceptions >= 1, "sem identificador nem site: fila de exceções");
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM campaigns WHERE status='active'").get().n, 0, "campanha nasce em rascunho");
+  // R12.7 vigente: seleção e autorização feitas pela pessoa (canal do painel); aceite das candidatas também.
+  assert.deepEqual(actions, ["select_authorize", "accept_candidates"]);
   const auth = DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='foreign_search.authorized'").get();
-  assert.equal(JSON.parse(auth.new_value_json)._operation.channel, "automation");
+  assert.equal(JSON.parse(auth.new_value_json)._operation.channel, "panel");
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM companies WHERE country_code='DE' AND registration_id_type='CNPJ'").get().n, 0, "sem CNPJ no exterior");
   // Sem compra identificada do produto no país: decisão, nunca busca de empresas (R12.14).
   const k = await drive((await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-14", location: { iso3: "CHN" } })).data.id);
   assert.equal(k.status, "needs_decision");
-  assert.equal(k.decision.kind, "indicators");
+  assert.equal(k.decision.kind, "classification", "produto sem código SH confirmado: pendência técnica do catálogo");
+  assert.equal(k.decision.category, "technical");
 });
 
 test("cron: tick executa as prospecções devidas e ignora as que não venceram", async (t) => {
@@ -229,4 +242,13 @@ test("cron: tick executa as prospecções devidas e ignora as que não venceram"
   assert.ok(out.length >= 1);
   const j = (await api(`/api/prospect/jobs/${job.id}`)).data;
   assert.notEqual(j.status, "queued");
+});
+
+test("emenda aprovada (só se aprovada): a política registra a ciência das limitações como dela, nunca como clique", async (t) => {
+  const { api, drive, grant, actions } = await world(t, { amendmentApproved: true });
+  await grant();
+  const j = await drive((await api("/api/prospect/jobs", "POST", cafe)).data.id);
+  assert.equal(j.status, "done", JSON.stringify(j.events.slice(-3)));
+  assert.deepEqual(actions, [], "nenhuma ação de pessoa com a emenda aprovada");
+  assert.match((await api(`/api/rounds/${j.roundId}`)).data.acknowledged.by, /^policy:/);
 });

@@ -4,6 +4,7 @@
 // Termos conferidos em 2026-09-27 (docs/implementation/FONTES-EMPRESAS-EXTERIOR.md).
 import { AdapterError, httpError, fetchJson } from "./errors.js";
 import { nafCodes, sn2007Codes, bandFromEmployees } from "../discovery-map.js";
+import { foreignSources } from "../sources-applicable.js";
 
 const UA = "EAG-Compass/0.3 (+uso interno EAG Agro)";
 const TIMEOUT = 60000;
@@ -131,14 +132,10 @@ export async function gleifLookup({ name, iso2, base = "https://api.gleif.org/ap
   }));
 }
 
-// Fontes disponíveis por país (as demais aparecem como pendentes de chave ou pagas no documento de fontes).
-export function sourcesFor(iso2, hs4 = null) {
-  return [
-    { key: "de_coffee_assoc", label: "Deutscher Kaffeeverband — Kaffeekontakte (diretório de membros)", available: iso2 === "DE" && hs4 === "0901" },
-    { key: "osm", label: "OpenStreetMap (fábricas e torrefações mapeadas)", available: true },
-    { key: "fr_registry", label: "Registro oficial da França (atividade e porte)", available: iso2 === "FR" },
-    { key: "no_registry", label: "Registro oficial da Noruega (atividade, porte e site)", available: iso2 === "NO" },
-  ];
+// Fontes aplicáveis ao país e à commodity (regra única em src/sources-applicable.js). Fonte de outro país ou de outra
+// commodity não aparece; pertinente sem condição de rodar vem como pendente (available=false), com o motivo.
+export function sourcesFor(iso2, hs6 = []) {
+  return foreignSources(iso2, Array.isArray(hs6) ? hs6 : [hs6].filter(Boolean)).map((x) => ({ ...x, available: x.status === "available" }));
 }
 
 // ---------- UE — validação EORI (Comissão Europeia, serviço público EOS, sem chave) ----------

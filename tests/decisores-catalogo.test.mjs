@@ -126,12 +126,14 @@ test("empresas: leitor vê decisores e filtra, mas não cadastra contato", async
   assert.equal((await ctx.api(`/api/companies/${ctx.a}/contacts`, "POST", { fullName: "Outra Pessoa", sourceLabel: "x" })).status, 403);
 });
 
-test("cobertura: nacional lista as fontes e a indisponível; internacional exige país da lista e informa lacunas", async (t) => {
+test("cobertura: nacional lista só as fontes aplicáveis (pendente com motivo); internacional exige país da lista e informa lacunas", async (t) => {
   const { api, close } = setup();
   t.after(close);
   const n = (await api("/api/prospect/coverage?market=national&productId=product-05")).data;
   assert.ok(n.items.find((x) => /ABIC/.test(x.label)).available, "café: ABIC entra");
-  assert.equal(n.items.find((x) => /SIPEAGRO/.test(x.label)).available, false);
+  assert.ok(!n.items.some((x) => /SIPEAGRO/.test(x.label)), "café: SIPEAGRO não se aplica (nenhum segmento com a regra)");
+  const milho = (await api("/api/prospect/coverage?market=national&productId=product-03")).data;
+  assert.equal(milho.items.find((x) => /SIPEAGRO/.test(x.label)).available, false, "milho (ração): SIPEAGRO pertinente e pendente");
   assert.equal(n.partial, true, "pesquisa gratuita nunca é apresentada como completa");
   const ar = await api("/api/prospect/coverage?market=international&productId=product-05&iso2=AR");
   assert.equal(ar.status, 200, "Argentina está na lista mesmo sem conector próprio");

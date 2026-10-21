@@ -215,13 +215,16 @@ async function route(request, env, rid, internalActor = null) {
   if (path === "/api/prospect/policy" && method === "POST") return response(await prospect.grantPolicy(request, env, actor, rid), 201);
   if (path === "/api/prospect/policy/revoke" && method === "POST") return response(await prospect.revokePolicy(request, env, actor, rid));
   if (path === "/api/prospect/coverage" && method === "GET") return response(await prospect.coverage(request, env, actor));
+  if (path === "/api/prospect/connectors" && method === "GET") return response(await prospect.connectors(request, env, actor));
+  if (path === "/api/sources/applicable" && method === "POST") return response(await prospect.applicableRoute(request, env, actor));
   if (path === "/api/prospect/jobs" && method === "GET") return response(await prospect.listJobs(env, actor));
   if (path === "/api/prospect/jobs" && method === "POST") return response(await prospect.createJob(request, env, actor, rid), 201);
-  const pjb = path.match(/^\/api\/prospect\/jobs\/([0-9a-f-]{36})(?:\/(pause|resume|cancel|skip-browser|browser-osm|run))?$/);
+  const pjb = path.match(/^\/api\/prospect\/jobs\/([0-9a-f-]{36})(?:\/(pause|resume|cancel|skip-browser|browser-osm|run|act))?$/);
   if (pjb) {
     const [, jid, op] = pjb;
     if (!op && method === "GET") return response(await prospect.getJob(env, actor, jid));
     if (op === "browser-osm" && method === "POST") return response(await prospect.browserOsm(request, env, actor, rid, jid, internalCaller(env, rid)));
+    if (op === "act" && method === "POST") return response(await prospect.actOnJob(request, env, actor, rid, jid, internalCaller(env, rid)));
     // Executar agora (diagnóstico): o mesmo ciclo do cron, para quem não quer esperar o próximo minuto.
     if (op === "run" && method === "POST") {
       requireRole(actor, WRITE_ROLES);

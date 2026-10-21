@@ -589,6 +589,41 @@ export async function listVersions(env) {
   return { items: out, comtradeBudget: budget ?? null };
 }
 
+// Atualização de um país fora do ciclo mensal (R12.15): no máximo uma por dia por país, com motivo. Usada pela pessoa
+// (manualRefresh, Administrador) e pela prospecção automática sob política concedida por Administrador. Pedido repetido no
+// mesmo dia reaproveita a versão já pedida (nunca gera duas).
+async function countryVersion(env, tenant, country, { requestedBy, reason, audit, deps = {} }) {
+  const at = deps.now?.() ?? clock();
+  const params = await routineParams(env, tenant);
+  if (!env.FILES) fail(503, "r2_missing", "Armazenamento R2 não configurado.");
+  const today = await s(env, "SELECT version_id FROM trade_list_manual_refresh WHERE iso3=? AND day=?", country.iso3, utcDay(at)).first();
+  if (today) return { versionId: today.version_id, reused: true };
+  const { month } = spMonthDay(at);
+  const vid = `${month}-manual-${country.iso3}-${crypto.randomUUID().slice(0, 8)}`;
+  const stmts = [
+    s(env, "INSERT INTO trade_list_versions(id,kind,iso3,reference_month,classification_json,params_json,started_at) VALUES (?,'manual',?,?,?,?,?)", vid, country.iso3, month, JSON.stringify(params.classification), JSON.stringify(params), at),
+    s(env, "INSERT INTO trade_list_manual_refresh(iso3,day,version_id,requested_by,reason) VALUES (?,?,?,?,?)", country.iso3, utcDay(at), vid, requestedBy, reason),
+    ...(mdicExternal(env) ? [] : [s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'mdic','pending',?)", vid, country.iso3, at)]),
+    country.comtrade_code == null
+      ? s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,error,updated_at) VALUES (?,?,'comtrade','data_unavailable','país sem código nesta fonte',?)", vid, country.iso3, at)
+      : s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'comtrade','pending',?)", vid, country.iso3, at),
+    ...baseJobs(env, vid, params, at, country.iso3).map((j) => insertJob(env, j)),
+    audit(vid),
+  ];
+  try {
+    await env.DB.batch(stmts);
+  } catch (e) {
+    if (!/UNIQUE|PRIMARY/.test(String(e?.message))) throw e;
+    // Pedido simultâneo no mesmo dia: vale o que entrou primeiro.
+    const won = await s(env, "SELECT version_id FROM trade_list_manual_refresh WHERE iso3=? AND day=?", country.iso3, utcDay(at)).first();
+    if (!won) throw e;
+    return { versionId: won.version_id, reused: true };
+  }
+  await advance(env, vid, deps);
+  await sweep(env, deps);
+  return { versionId: vid, reused: false };
+}
+
 // Atualização manual de um país (R12.15): admin, 1 por dia por país, motivo obrigatório.
 export async function manualRefresh(request, env, actor, rid, iso3, deps = {}) {
   requireRole(actor, ADMIN);
@@ -597,30 +632,61 @@ export async function manualRefresh(request, env, actor, rid, iso3, deps = {}) {
   if (reason.length < 10) fail(422, "reason_required", "Descreva o motivo (mínimo 10 caracteres).");
   const country = await s(env, "SELECT * FROM countries WHERE iso3=?", String(iso3).toUpperCase()).first();
   if (!country) fail(404, "country_not_found", "País não encontrado.");
+  const r = await countryVersion(env, actor.tenant_id, country, { requestedBy: actor.id, reason, deps, audit: (vid) => auditStatement(env, actor, rid, "trade_list.manual_refresh", "country", country.iso3, { versionId: vid, reason }) });
+  if (r.reused) fail(409, "refresh_already_today", "Este país já foi atualizado manualmente hoje.");
+  return { versionId: r.versionId };
+}
+
+// Pedido da prospecção (país sem lista ou com falha): mesmo fluxo e mesmo limite diário da atualização manual.
+// requestedBy identifica a política (ou a pessoa que clicou na ação); a auditoria diz quem pediu e por quê.
+export async function requestCountryList(env, tenant, iso3, { requestedBy, reason, actor, rid, deps = {} }) {
+  const country = await s(env, "SELECT * FROM countries WHERE iso3=?", String(iso3).toUpperCase()).first();
+  if (!country) fail(404, "country_not_found", "País não encontrado.");
+  return countryVersion(env, tenant, country, { requestedBy, reason, deps, audit: (vid) => auditStatement(env, actor ?? SYSTEM(tenant), rid ?? "prospect", "trade_list.requested_for_prospect", "country", country.iso3, { versionId: vid, reason, requestedBy }) });
+}
+
+const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00.000Z`) + n * 86400000).toISOString().slice(0, 10);
+// Situação dos indicadores oficiais de um país (R12.6): pronto, vencido, em fila, processando, aguardando limite da
+// fonte, falha na consulta, sem fonte ou não gerado. Indisponível nunca vira "nenhum registro".
+export async function countryIndicators(env, iso3, deps = {}) {
   const at = deps.now?.() ?? clock();
-  const params = await routineParams(env, actor.tenant_id);
-  if (!env.FILES) fail(503, "r2_missing", "Armazenamento R2 não configurado.");
-  const { month } = spMonthDay(at);
-  const vid = `${month}-manual-${country.iso3}-${crypto.randomUUID().slice(0, 8)}`;
-  const stmts = [
-    s(env, "INSERT INTO trade_list_versions(id,kind,iso3,reference_month,classification_json,params_json,started_at) VALUES (?,'manual',?,?,?,?,?)", vid, country.iso3, month, JSON.stringify(params.classification), JSON.stringify(params), at),
-    s(env, "INSERT INTO trade_list_manual_refresh(iso3,day,version_id,requested_by,reason) VALUES (?,?,?,?,?)", country.iso3, utcDay(at), vid, actor.id, reason),
-    ...(mdicExternal(env) ? [] : [s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'mdic','pending',?)", vid, country.iso3, at)]),
-    country.comtrade_code == null
-      ? s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,error,updated_at) VALUES (?,?,'comtrade','data_unavailable','país sem código nesta fonte',?)", vid, country.iso3, at)
-      : s(env, "INSERT INTO trade_list_status(version_id,iso3,source,state,updated_at) VALUES (?,?,'comtrade','pending',?)", vid, country.iso3, at),
-    ...baseJobs(env, vid, params, at, country.iso3).map((j) => insertJob(env, j)),
-    auditStatement(env, actor, rid, "trade_list.manual_refresh", "country", country.iso3, { versionId: vid, reason }),
-  ];
-  try {
-    await env.DB.batch(stmts);
-  } catch (e) {
-    if (/UNIQUE|PRIMARY/.test(String(e?.message))) fail(409, "refresh_already_today", "Este país já foi atualizado manualmente hoje.");
-    throw e;
+  const nextDay = `${addDays(utcDay(at), 1)}T00:05:00.000Z`;
+  const running = (await s(env, "SELECT v.id,v.kind,v.comtrade_blocked,v.params_json,st.source FROM trade_list_versions v JOIN trade_list_status st ON st.version_id=v.id AND st.iso3=? WHERE v.status='running' AND st.state='pending' ORDER BY v.started_at DESC", iso3).all()).results;
+  if (running.length) {
+    const v = running[0];
+    const blocked = running.find((r) => r.source === "comtrade" && r.comtrade_blocked);
+    if (blocked) return { state: "failed", retryable: false, versionId: v.id, message: `consulta à Comtrade parada (${blocked.comtrade_blocked === "no_key" ? "chave não configurada" : "chave recusada"}): correção do Administrador na lista mensal` };
+    const jobs = (await s(env, "SELECT kind,status,COUNT(*) n FROM trade_list_jobs WHERE version_id=? GROUP BY kind,status", v.id).all()).results;
+    const open = jobs.filter((j) => ["pending", "leased"].includes(j.status));
+    const used = (await s(env, "SELECT used FROM provider_budget WHERE provider='comtrade' AND day=?", utcDay(at)).first())?.used ?? 0;
+    const perDay = JSON.parse(v.params_json).callsPerDay;
+    if (open.some((j) => COMTRADE_KINDS.has(j.kind) && j.status === "pending") && used >= perDay)
+      return { state: "waiting_limit", versionId: v.id, retryAt: nextDay, message: `limite diário de consultas à Comtrade atingido (${used} de ${perDay}); continua no próximo dia (UTC)` };
+    const started = jobs.some((j) => j.status === "done" || j.status === "leased");
+    return { state: started ? "processing" : "queued", versionId: v.id, monthly: v.kind === "monthly" };
   }
-  await advance(env, vid, deps);
-  await sweep(env, deps);
-  return { versionId: vid };
+  const cur = (await s(env, "SELECT c.source,c.version_id,st.state,st.last_period FROM trade_list_current c LEFT JOIN trade_list_status st ON st.version_id=c.version_id AND st.iso3=c.iso3 AND st.source=c.source WHERE c.iso3=?", iso3).all()).results;
+  const last = (await s(env, "SELECT st.source,st.state,st.error,st.last_period,v.id FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id WHERE st.iso3=? AND v.status<>'running' ORDER BY v.started_at DESC LIMIT 6", iso3).all()).results;
+  const today = await s(env, "SELECT version_id FROM trade_list_manual_refresh WHERE iso3=? AND day=?", iso3, utcDay(at)).first();
+  // Situação de cada fonte: a do ponteiro vigente; sem ponteiro, a da última versão fechada.
+  const bySource = {};
+  for (const src of ["comtrade", "mdic"]) {
+    const c = cur.find((x) => x.source === src);
+    const l = last.find((x) => x.source === src);
+    if (c) bySource[src] = { state: c.state ?? "purchase_identified", lastPeriod: c.last_period ?? null, version: c.version_id };
+    else if (l) bySource[src] = { state: l.state, error: l.error, lastPeriod: l.last_period ?? null, version: l.id };
+  }
+  const ct = bySource.comtrade;
+  const comtradeUnavailable = ct && !cur.some((x) => x.source === "comtrade") && ct.error !== "país sem código nesta fonte" ? ct.error || "sem resposta utilizável" : null;
+  if (cur.length) {
+    const latest = await s(env, "SELECT reference_month FROM trade_list_versions WHERE kind='monthly' AND status<>'running' ORDER BY started_at DESC LIMIT 1").first();
+    const stale = !!latest && cur.every((c) => c.version_id < latest.reference_month && !c.version_id.startsWith(latest.reference_month));
+    return { state: stale ? "stale" : "ready", bySource, comtradeUnavailable, triedToday: !!today, retryAt: nextDay, versions: cur.map((c) => c.version_id), message: stale ? `dados de ${cur.map((c) => c.version_id.slice(0, 7)).sort().at(-1)}; a rotina de ${latest.reference_month} não atualizou este país` : null };
+  }
+  if (!last.length) return { state: "not_generated" };
+  if (last.every((x) => x.state === "data_unavailable" && x.error === "país sem código nesta fonte"))
+    return { state: "no_source", message: "o país não tem código nas fontes oficiais de comércio (MDIC e Comtrade): sem indicadores, o que não indica ausência de importações nem de compradores" };
+  return { state: "failed", retryable: true, versionId: last[0].id, triedToday: !!today, retryAt: nextDay, message: [...new Set(last.map((x) => x.error).filter(Boolean))].join("; ") || "consulta sem resultado utilizável" };
 }
 
 // Início manual da rotina do mês (T12 passo 5): mesmo código do cron.

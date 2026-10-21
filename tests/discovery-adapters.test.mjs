@@ -15,8 +15,11 @@ test("Descoberta: mapa commodity → atividades que usam a commodity (proposta v
   assert.deepEqual(nafCodes(["10.83", "10.13"]), ["10.83Z", "10.13A", "10.13B"]);
   assert.deepEqual(sn2007Codes(["10.83"]), ["10.830"]);
   assert.deepEqual([bandFromEmployees(3), bandFromEmployees(10), bandFromEmployees(49), bandFromEmployees(50), bandFromEmployees(250), bandFromEmployees(null)], ["micro", "small", "small", "medium", "medium_plus", null]);
-  assert.deepEqual(sourcesFor("DE").filter((s) => s.available).map((s) => s.key), ["osm"]);
-  assert.deepEqual(sourcesFor("FR").filter((s) => s.available).map((s) => s.key), ["osm", "fr_registry"]);
+  // Fontes aplicáveis (2026-10-20): só as do país e da commodity; sem código SH, nada é alegado como coberto.
+  assert.deepEqual(sourcesFor("DE", []).filter((s) => s.available).map((s) => s.key), []);
+  assert.deepEqual(sourcesFor("DE", ["090111"]).filter((s) => s.available).map((s) => s.key), ["de_coffee_assoc", "osm"]);
+  assert.deepEqual(sourcesFor("FR", ["090111"]).filter((s) => s.available).map((s) => s.key), ["fr_registry", "osm"]);
+  assert.deepEqual(sourcesFor("FR", []).map((s) => [s.key, s.available]), [["fr_registry", false]], "registro da França pertinente, pendente sem classificação");
 });
 
 test("Descoberta/OSM: consulta por país e etiquetas; loja e café fora; servidor sobrecarregado é erro, nunca lista vazia", async () => {

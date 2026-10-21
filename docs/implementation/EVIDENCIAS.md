@@ -3381,3 +3381,38 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - celular.
 - **Fontes reais consultadas** (deste computador): Overpass ×2 (0 objetos; uma consulta passou de 90 s), ABIC ×5 (página inicial ×2, associados, certificações, robots.txt) e SIPEAGRO ×1 (403). Nenhuma consulta real à Receita. Tudo o mais nos testes e na prévia foi **simulado** (`tests/helpers/simulated-world.mjs`).
 - **Não feito:** publicação, migração remota (0045 e 0046 só locais), atualização da ponte, contatos, fichas, T11, canais e campanhas.
+
+## 2026-10-20 — Pesquisa restrita ao contexto e indicadores do país resolvidos pelo Compass
+
+- **Fontes aplicáveis (regra única, `src/sources-applicable.js`):** a mesma regra serve ao planejamento do motor, à rota de descoberta, à cobertura (`/api/prospect/coverage`), à configuração manual de rodada (`/api/sources/applicable`) e às telas.
+  - Fonte de outro país ou de outra commodity não aparece nem é consultada. Na França ficam o registro francês e o mapa com a regra do produto; o diretório alemão do café só aparece em Alemanha × café.
+  - O mapa colaborativo só conta quando a commodity tem regra de etiquetas. O rótulo traz a regra (ex.: "química, bebidas destiladas…" para o álcool), e uma regra só pela etiqueta de produto é dita "muito irregular".
+  - Fonte pertinente sem condição de rodar vira pendência com motivo: produto sem SH confirmado no catálogo, commodity sem atividades mapeadas, SIPEAGRO recusando acesso.
+  - O inventário completo de conectores fica em Configurações → Prospecção automática (Administrador).
+  - Ao trocar país ou commodity, o painel limpa a informação anterior na hora e descarta a resposta atrasada (teste com atraso proposital de 1,5 s). A página da prospecção também descarta resposta de outra tela.
+- **"A lista mensal deste país ainda não foi gerada" (Milho GMO — França):**
+  - **Causa:** o motor tratava o 409 `trade_list_missing` da análise do país como decisão genérica do usuário, sem acionar o fluxo de indicadores. Na prévia, a França ficava sem lista porque a rotina simulada só gera Alemanha e China.
+  - **O que o motor faz agora:** consulta a situação dos indicadores (`countryIndicators`): pronto, vencido, em fila, processando, aguardando limite da fonte, falha na consulta, sem fonte ou não gerado.
+  - **Pedido automático:** sem lista, ou com falha da fonte do importador, ele pede a geração pelo fluxo existente de atualização por país (R12.15). O pedido é feito sob a política concedida por Administrador, acompanhado e retomado sozinho.
+  - **Sem duplicidade:** uma geração por país por dia; uma segunda prospecção do mesmo país reaproveita a versão.
+  - **Falhas e limites:** falha de hoje espera o dia seguinte; depois de 2 falhas, vira pendência técnica com a ação "Pedir a geração de novo" (Administrador). O orçamento diário da Comtrade esgotado aparece como "aguardando limite da fonte".
+  - **Indisponível nunca vira ausência:** com a fonte do importador indisponível e só os dados do Brasil, o motor pede nova geração em vez de concluir "nenhum registro". "Nenhum registro no período" só aparece quando a fonte respondeu.
+  - **Política de gestor:** concedida por gestor, a política não inclui o pedido (R12.15 é do Administrador). Aparece a ação "Gerar os indicadores de <país>", só para o Administrador.
+- **Emenda R12.7 não considerada aprovada (`AMENDMENT.approved = false` em `src/prospect/defaults.js`):**
+  - Seleção e autorização da busca no exterior (R12.7), aceite das candidatas internacionais e ciência das limitações da rodada passaram a parar numa ação concreta da pessoa, executada com a identidade dela e o canal do painel. Antes, o código da branch fazia esses passos pela política, sem a emenda aprovada.
+  - A política nova já não lista a seleção R12.7 entre o que cobre.
+  - O botão genérico "Retomar depois de resolver" saiu. Cada pendência diz se é técnica (sistema ou Administrador resolve) ou da regra vigente (pessoa) e traz a ação.
+- **Correção encontrada na prévia:** o aceite internacional procurava `registryId`, mas a candidata traz `registry.id`. Empresas de registro oficial (SIREN) não entravam na lista de aceite; agora entram.
+- **Testes:**
+  - `tests/prospeccao-contexto.test.mjs` (6): álcool × França, café × Alemanha, mercado sem cobertura, milho × França sem lista (pedido, acompanhamento, retomada, sem duplicidade, R12.7), falha com nova tentativa diária, e limite da fonte com política de gestor;
+  - `tests/prospeccao.test.mjs` (9): ações da pessoa e caso com a emenda aprovada;
+  - `tests/ui-listas.mjs`: troca rápida e café × Alemanha;
+  - `discovery-adapters` atualizado.
+- **Prévia** (Edge; fontes simuladas: lista mensal da França, registro francês, EORI, mapa e sites fictícios): 19 conferências ok:
+  - inventário de conectores;
+  - álcool × França só com fontes da França;
+  - lista pedida, processada e retomada sozinha;
+  - milho × França reaproveitando a lista, R12.7 com ação concreta e aceite pela pessoa;
+  - sem texto cortado nem rolagem horizontal no celular, sem erro de JavaScript.
+- **Respostas reais nesta etapa:** nenhuma. Todas as respostas de fontes nos testes e na prévia foram simuladas (`tests/helpers/simulated-world.mjs`, `tests/helpers/trade.mjs`).
+- **Não feito:** publicação, migração remota, ponte, fichas, T11, canais, campanhas e mensagens.

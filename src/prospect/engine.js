@@ -9,11 +9,13 @@ import { bodyJson, fail, str, oneOf, number, requireRole, WRITE_ROLES, APPROVER_
 import { statement as s, commit, auditStatement, now, product } from "../store.js";
 import { SEGMENT_PRESETS } from "../rodada/segments.js";
 import { provenanceHeaders } from "../provenance.js";
-import { DEFAULT_PROFILE, POLICY_TEMPLATE, uncoveredLimitations } from "./defaults.js";
+import { DEFAULT_PROFILE, POLICY_TEMPLATE, uncoveredLimitations, AMENDMENT } from "./defaults.js";
 import { readCompanySite } from "./site.js";
 import { commodityLabelOf } from "../catalog-names.js";
 import { fetchAbicRoasters } from "../adapters/abic.js";
-import { sourcesFor as foreignSourcesFor } from "../adapters/discovery.js";
+import { nationalSources, foreignSources, inventory } from "../sources-applicable.js";
+import { countryIndicators, requestCountryList } from "../trade-list.js";
+const ADMIN_ROLES = new Set(["admin"]);
 // Produto com o nome da commodity da lista única do catálogo.
 const productL = async (env, tenant, id) => {
   const p = await product(env, tenant, id);
@@ -34,9 +36,9 @@ const STEP_LABELS = {
   conciliate: "Conciliação pelo site da empresa (CNPJ e canal publicados)",
   lookup: "Consulta cadastral (Receita), deduplicação e reaproveitamento",
   analysis: "Indicadores oficiais do país",
-  select: "Seleção da commodity (R12.7, pela política)",
-  authorize: "Busca de empresas autorizada pela política",
-  accept: "Candidatas com identificação suficiente",
+  select: "Seleção da commodity e autorização da busca (R12.7)",
+  authorize: "Busca de empresas no país",
+  accept: "Aceite das candidatas com identificação suficiente",
   register: "Triagem de sanções e cadastro em descoberta",
   evidence: "Evidências e canais publicados",
   priority: "Compatibilidade e prioridade",
@@ -114,7 +116,17 @@ export async function grantPolicy(request, env, actor, rid) {
   if (i.confirm !== true) fail(422, "confirmation_required", "Confirme a concessão da política de pesquisa de rotina.");
   const reference = str(i.reference, "referência da decisão", 400);
   const t = POLICY_TEMPLATE;
-  const policy = { ...t, maxRadiusKm: i.maxRadiusKm != null ? number(i.maxRadiusKm, "raio máximo", 1, 5000) : t.maxRadiusKm, markets: i.markets ? i.markets.map((m) => oneOf(m, ["national", "international"], "mercado")) : t.markets, paidSources: [] };
+  const admin = actor.role === "admin";
+  const policy = {
+    ...t,
+    maxRadiusKm: i.maxRadiusKm != null ? number(i.maxRadiusKm, "raio máximo", 1, 5000) : t.maxRadiusKm,
+    markets: i.markets ? i.markets.map((m) => oneOf(m, ["national", "international"], "mercado")) : t.markets,
+    paidSources: [],
+    // R12.15: o pedido de indicadores fora do ciclo é do Administrador; concedida por gestor, a política não o inclui.
+    indicators: admin && t.indicators === true,
+    grantedByRole: actor.role,
+    covers: [...t.covers, ...(admin && t.indicators ? ["pedido dos indicadores oficiais de país sem lista mensal (R12.15; gratuito, no orçamento diário, um por país por dia)"] : [])],
+  };
   if (Array.isArray(i.paidSources) && i.paidSources.length) fail(422, "paid_not_allowed", "Fontes pagas não entram na política de rotina: exigem orçamento autorizado à parte.");
   const last = await s(env, "SELECT MAX(version) v FROM research_policies WHERE tenant_id=?", actor.tenant_id).first();
   const id = crypto.randomUUID(), version = (last?.v ?? 0) + 1, at = now();
@@ -246,6 +258,70 @@ export async function controlJob(request, env, actor, rid, id, action) {
   return getJob(env, actor, id);
 }
 
+// POST /api/prospect/jobs/:id/act { action } — a pessoa executa a ação concreta indicada na pendência (seleção e
+// autorização R12.7, ciência das limitações, aceite das candidatas, pedido dos indicadores ou nova verificação). Cada
+// chamada usa a identidade da pessoa e o canal do painel; nada é atribuído à política. Depois, a prospecção retoma.
+export async function actOnJob(request, env, actor, rid, id, call) {
+  requireRole(actor, WRITE_ROLES);
+  const j = await jobOf(env, actor.tenant_id, id);
+  const state = parse(j.state_json, {});
+  const i = await bodyJson(request);
+  const act = state.decision?.action;
+  if (j.status !== "needs_decision" || !act || act.id !== i.action) fail(409, "action_not_pending", "Esta ação não está pendente nesta prospecção.");
+  const need = { approver: APPROVER_ROLES, admin: ADMIN_ROLES, write: WRITE_ROLES }[act.roles] ?? WRITE_ROLES;
+  requireRole(actor, need);
+  const input = parse(j.input_json, {});
+  const panel = provenanceHeaders({ channel: "panel", executor: `${actor.display_name ?? actor.email ?? actor.id} (ação na prospecção)` });
+  const must = (res, what) => {
+    if (res.status >= 300) fail(res.status, res.data?.error?.code ?? "action_failed", `${what}: ${res.data?.error?.message ?? `HTTP ${res.status}`}`);
+    return res.data;
+  };
+  let note;
+  if (act.id === "select_authorize") {
+    if (!state.campaignId) {
+      const p = await productL(env, actor.tenant_id, input.productId);
+      const sel = must(await call(actor, `/api/country-analyses/${state.analysisId}/selections`, "POST", { items: [{ productId: p.id, label: commodityLabel(p), hs6: state.hs6 }] }, panel), "Seleção recusada");
+      state.campaignId = sel.campaigns[0].id;
+    }
+    if (!state.searchId) {
+      const prof = (await s(env, "SELECT profile_json FROM prospect_profiles WHERE id=?", j.profile_id).first())?.profile_json;
+      const sizes = (parse(prof, DEFAULT_PROFILE).sizes?.order ?? []).filter((x) => ["small", "medium"].includes(x));
+      const a = must(await call(actor, `/api/campaigns/${state.campaignId}/foreign-search`, "POST", { confirm: true, targetSizes: sizes.length ? sizes : ["small", "medium"], note: "Autorizada pela pessoa na prospecção (R12.7)." }, panel), "Busca não autorizada");
+      state.searchId = a.id;
+    }
+    state.refs = { ...(state.refs ?? {}), campaignId: state.campaignId, searchId: state.searchId };
+    state.steps = { ...state.steps, select: "done", authorize: "done" };
+    note = "Seleção da commodity e autorização da busca registradas pela pessoa (R12.7).";
+  } else if (act.id === "accept_candidates") {
+    const ids = (act.ids ?? []).slice(0, 500);
+    let accepted = 0;
+    for (let k = 0; k < ids.length; k += 100) accepted += must(await call(actor, `/api/foreign-searches/${state.searchId}/discovery/accept`, "POST", { ids: ids.slice(k, k + 100) }, panel), "Cadastro recusado").accepted ?? 0;
+    note = `${accepted} candidata(s) aceita(s) pela pessoa e cadastrada(s) em descoberta.`;
+  } else if (act.id === "ack_limitations") {
+    const r = must(await call(actor, `/api/rounds/${j.round_id}`, "GET", undefined, panel), "Rodada");
+    must(await call(actor, `/api/rounds/${j.round_id}/preflight-ack`, "POST", { revision: r.revision }, panel), "Ciência recusada");
+    note = "Ciência das limitações registrada pela pessoa.";
+  } else if (act.id === "request_indicators") {
+    const r = await requestCountryList(env, actor.tenant_id, input.location.iso3, { requestedBy: actor.id, reason: `Pedido na prospecção "${j.name}": país sem lista mensal ou com falha`, actor, rid });
+    state.indicatorRequests = (state.indicatorRequests ?? 0) + (r.reused ? 0 : 1);
+    delete state.indicators;
+    note = r.reused ? "Geração dos indicadores já pedida hoje: acompanhando a mesma versão." : "Geração dos indicadores pedida pela pessoa (R12.15).";
+  } else if (act.id === "retry") {
+    note = "Nova verificação pedida pela pessoa.";
+  } else fail(422, "action_not_supported", "Ação sem execução pelo servidor (abra a tela indicada).");
+  delete state.decision;
+  const at = now();
+  const policy = await currentPolicy(env, actor.tenant_id);
+  const nextStep = act.id === "select_authorize" ? "discover" : j.step;
+  await commit(env, [
+    s(env, "UPDATE prospect_jobs SET status='queued',step=?,next_run_at=?,state_json=?,policy_id=?,updated_at=? WHERE id=?", nextStep, at, JSON.stringify(state), policy?.id ?? j.policy_id, at, id),
+    event(env, id, at, j.step, "decision", `${note} (${act.label})`),
+    auditStatement(env, actor, rid, "prospect_job.action", "prospect_job", id, { action: act.id, step: j.step }),
+  ]);
+  await enqueue(env, id);
+  return getJob(env, actor, id);
+}
+
 // POST /api/prospect/jobs/:id/browser-osm — resposta do OpenStreetMap obtida pelo navegador (o servidor público recusa a
 // Cloudflare). Entra pela rota de candidatas da rodada, com canal "panel": foi o navegador que consultou.
 export async function browserOsm(request, env, actor, rid, id, call) {
@@ -296,7 +372,7 @@ export async function runJob(env, jobId, deps = {}) {
     const profile = (await s(env, "SELECT * FROM prospect_profiles WHERE id=?", j.profile_id).first()) ?? null;
     const ctx = {
       env, job: j, input: parse(j.input_json, {}), state, policy, profile: profile ? parse(profile.profile_json) : DEFAULT_PROFILE, profileVersion: profile?.version ?? 0,
-      fetch: deps.fetch ?? fetch, now: () => deps.now?.() ?? now(), log, actor,
+      fetch: deps.fetch ?? fetch, now: () => deps.now?.() ?? now(), log, actor, deps, amendmentApproved: deps.amendmentApproved ?? AMENDMENT.approved,
       call: (path, method = "GET", body, extra = {}) => deps.call({ ...actor }, path, method, body, { ...provenanceHeaders({ channel: "automation", executor: EXECUTOR, authorization: policyAuth(policy) }), ...extra }),
     };
     const flow = FLOW[j.market];
@@ -328,6 +404,11 @@ export async function runJob(env, jobId, deps = {}) {
         delete state.waitingFor; // a espera terminou: a etapa avançou
         state.steps[step] = r.outcome ?? "done";
         if (r.summary) summary = r.summary;
+        if (r.jumpTo) {
+          for (const k of flow.slice(flow.indexOf(step) + 1, flow.indexOf(r.jumpTo))) state.steps[k] ??= "skipped";
+          step = r.jumpTo;
+          continue;
+        }
         const idx = flow.indexOf(step);
         if (idx === flow.length - 1) {
           status = "done";
@@ -371,6 +452,18 @@ export async function tick(env, tenant, deps = {}) {
 // ---------------------------------------------------------------- etapas comuns
 const ok = (res) => res.status < 300;
 const errText = (res) => res.data?.error?.message ?? `HTTP ${res.status}`;
+// Códigos SH6 confirmados do produto no catálogo (NCM de 8 dígitos vira o SH6 correspondente). Nada é inventado.
+async function confirmedHs(env, productId) {
+  const rows = (await s(env, "SELECT code FROM product_codes WHERE product_id=? AND status='confirmed' AND code_system IN ('HS','NCM')", productId).all()).results;
+  return [...new Set(rows.map((r) => String(r.code).replace(/\D/g, "").slice(0, 6)).filter((c) => c.length === 6))];
+}
+// Pedido automático dos indicadores (R12.15: atualização fora do ciclo é do Administrador): só sob política concedida
+// por Administrador que inclui esse pedido.
+const indicatorsAllowed = (policy) => policy?.policy?.indicators === true && policy?.policy?.grantedByRole === "admin";
+// Emenda da prospecção automática (R12.7, ciência e aceite pela política): proposta, não aprovada. Enquanto não for, cada
+// um desses passos para numa ação concreta de uma pessoa.
+const amendmentOn = (ctx) => ctx.amendmentApproved === true;
+const INDICATOR_WAIT = { queued: "indicators_queued", processing: "indicators_processing", waiting_limit: "indicators_limit" };
 function needsPolicy(ctx, market) {
   if (!ctx.policy) return { decision: { kind: "authorization", message: "Sem política de pesquisa de rotina vigente: conceda a política (Configurações → Prospecção automática) e retome. Sem ela, a pesquisa segue pelos passos manuais." } };
   if (!ctx.policy.policy.markets.includes(market)) return { decision: { kind: "scope", message: `A política vigente não cobre o mercado ${market === "national" ? "nacional" : "internacional"}.` } };
@@ -393,10 +486,9 @@ const NATIONAL = {
     const p = await productL(ctx.env, ctx.job.tenant_id, input.productId);
     const segments = profile.segmentsByCommodity?.[p.commodity] ?? SEGMENT_PRESETS[p.commodity] ?? {};
     const allowed = profile.sources?.national ?? [];
-    const sources = [];
-    if (allowed.includes("br-cnpj-ws")) sources.push({ id: "br-cnpj-ws", kind: "registry", countries: ["BR"], rateLimitPerMinute: 3, maxAgeDays: 30 });
-    if (allowed.includes("osm-overpass") && Object.values(segments).some((g) => g.discovery?.osm)) sources.push({ id: "osm-overpass", kind: "discovery" });
-    if (allowed.includes("abic-certificados") && Object.values(segments).some((g) => g.discovery?.abic)) sources.push({ id: "abic-certificados", kind: "discovery" });
+    // Fontes aplicáveis aos segmentos desta commodity (src/sources-applicable.js); o perfil pode só restringir.
+    const applicable = nationalSources(segments);
+    const sources = applicable.config.filter((x) => allowed.includes(x.id));
     if (!state.roundId) {
       const config = {
         id: slug(`prospeccao-${p.commodity}-${input.location.municipality}-${input.radius.value}`),
@@ -416,11 +508,14 @@ const NATIONAL = {
       state.roundId = res.data.id;
       state.refs = { ...(state.refs ?? {}), roundId: res.data.id };
       await commit(ctx.env, [s(ctx.env, "UPDATE prospect_jobs SET round_id=? WHERE id=?", res.data.id, ctx.job.id)]);
-      ctx.log("plan", "ok", `Segmentos: ${Object.values(segments).map((g) => g.label).join(", ") || "nenhum sugerido"}. Fontes: ${sources.map((x) => x.id).join(", ") || "nenhuma automática"}.`, { segments: Object.keys(segments), sources: sources.map((x) => x.id) });
+      ctx.log("plan", "ok", `Segmentos: ${Object.values(segments).map((g) => g.label).join(", ") || "nenhum sugerido"}. Fontes aplicáveis: ${applicable.items.filter((x) => x.status === "available").map((x) => x.label).join("; ") || "nenhuma automática"}.${applicable.items.some((x) => x.status === "pending") ? ` Pendentes: ${applicable.items.filter((x) => x.status === "pending").map((x) => `${x.label} (${x.note})`).join("; ")}.` : ""}`, { segments: Object.keys(segments), sources: sources.map((x) => x.id) });
       if (!Object.keys(segments).length) ctx.log("plan", "pending", `Não há segmentos compradores sugeridos para ${commodityLabel(p)}: a busca automática não tem o que procurar. Ajuste o perfil comprador (segmentos por commodity) ou use importação e pesquisa assistida (recursos complementares).`);
     }
-    // Limitações: a política cobre as já aceitas; limitação nova pede decisão. A ciência fica registrada como da política.
+    // Limitações. Com a emenda aprovada, a política cobre as já aceitas (ciência registrada como da política). Sem ela, a
+    // regra vigente das rodadas pede a ciência de uma pessoa: para numa ação concreta.
     const r = await ctx.call(`/api/rounds/${state.roundId}`);
+    if (!amendmentOn(ctx) && r.data.preflight.requiresAcknowledgement && !r.data.acknowledged)
+      return { decision: { kind: "limitations_ack", category: "rule", message: "Antes de executar, a regra vigente das rodadas pede a ciência de uma pessoa sobre as limitações desta configuração. A ciência pela política depende da emenda proposta, ainda não aprovada.", items: (r.data.preflight.items ?? []).filter((x) => x.level !== "supported").map((x) => `${x.area}: ${x.message}`), action: { id: "ack_limitations", label: "Registrar ciência das limitações e continuar", roles: "write" } } };
     const uncovered = uncoveredLimitations(r.data.preflight, policy.policy);
     if (uncovered.length) return { decision: { kind: "limitations", message: "A configuração tem limitações que a política de pesquisa não cobre: exigem ciência da pessoa.", items: uncovered.map((x) => `${x.area}: ${x.message}`) } };
     if (r.data.preflight.requiresAcknowledgement && !r.data.acknowledged) {
@@ -651,30 +746,90 @@ const NATIONAL = {
 };
 
 // ---------------------------------------------------------------- internacional (análise, seleção, busca, descoberta)
+const waitUntil = (ctx, at) => (at ? Math.min(6 * 3600_000, Math.max(60_000, Date.parse(at) - Date.parse(ctx.now()))) : 60_000);
+// País sem lista ou com falha: pede a geração (política de Administrador) ou para numa ação concreta. Uma por país por
+// dia (R12.15); depois de 2 pedidos sem sucesso, para como pendência técnica.
+async function askIndicators(ctx, ind) {
+  const { state, input, env } = ctx;
+  if (ind.state === "failed" && ind.triedToday) {
+    state.indicators = "waiting_limit";
+    ctx.log("analysis", "waiting", `Geração de hoje sem sucesso (${ind.message}); nova tentativa automática amanhã (uma por país por dia, R12.15).`);
+    return { waitFor: "indicators_limit", waitMs: waitUntil(ctx, ind.retryAt) };
+  }
+  if (ind.state === "failed" && (state.indicatorRequests ?? 0) >= 2)
+    return { decision: { kind: "indicators_failed", category: "technical", message: `Pendência técnica: a geração dos indicadores de ${input.location.country} falhou ${state.indicatorRequests} vezes (${ind.message}). Não indica ausência de importações.`, action: { id: "request_indicators", label: `Pedir a geração dos indicadores de ${input.location.country} de novo`, roles: "admin" } } };
+  if (!indicatorsAllowed(ctx.policy))
+    return { decision: { kind: "indicators_request", category: "technical", message: `Pendência técnica: ${ind.state === "failed" ? `a consulta dos indicadores de ${input.location.country} falhou (${ind.message})` : `a lista mensal de ${input.location.country} ainda não foi gerada`}. O pedido fora do ciclo mensal é do Administrador (R12.15); a política vigente não inclui esse pedido.`, action: { id: "request_indicators", label: `Gerar os indicadores de ${input.location.country}`, roles: "admin" } } };
+  const r = await requestCountryList(env, ctx.job.tenant_id, input.location.iso3, { requestedBy: `policy:${ctx.policy.id}@v${ctx.policy.version}`, reason: `Prospecção automática "${ctx.job.name}": ${ind.state === "failed" ? "nova tentativa após falha" : "país sem lista mensal"}`, rid: `prospect:${ctx.job.id}`, deps: ctx.deps.trade ?? {} });
+  state.indicatorRequests = (state.indicatorRequests ?? 0) + (r.reused ? 0 : 1);
+  state.indicators = "queued";
+  ctx.log("analysis", "waiting", r.reused ? "Geração dos indicadores já pedida hoje para este país: acompanhando a mesma versão (sem pedido duplicado)." : `Geração dos indicadores de ${input.location.country} pedida pelo fluxo da lista mensal (R12.15), sob a política de pesquisa v${ctx.policy.version} concedida por Administrador. A pesquisa retoma sozinha quando os dados estiverem prontos.`, { versionId: r.versionId });
+  return { waitFor: "indicators_queued", waitMs: 30_000 };
+}
+
 const INTERNATIONAL = {
   async plan(ctx) {
     const gate = needsPolicy(ctx, "international");
     if (gate) return gate;
-    ctx.log("plan", "ok", `País: ${ctx.input.location.country}. Fontes previstas pelo perfil: ${(ctx.profile.sources?.international ?? []).join(", ")}; a cobertura real por país aparece na etapa de descoberta.`);
+    const { input, env } = ctx;
+    const hs = input.hs6?.length ? input.hs6 : await confirmedHs(env, input.productId);
+    const list = foreignSources(input.location.iso2, hs).filter((x) => (ctx.profile.sources?.international ?? []).includes(x.key));
+    ctx.state.applicable = list;
+    ctx.log("plan", "ok", `País: ${input.location.country}. Fontes aplicáveis a este país e a esta commodity: ${list.filter((x) => x.status === "available").map((x) => x.label).join("; ") || "nenhuma"}${list.some((x) => x.status === "pending") ? `; pendentes: ${list.filter((x) => x.status === "pending").map((x) => `${x.label} (${x.note})`).join("; ")}` : ""}.`);
     return {};
   },
+  // Indicadores oficiais do país (lista mensal). Sem lista, ou com a fonte do importador falhando, o próprio Compass pede
+  // a geração pelo fluxo existente (R12.15), acompanha e retoma; indisponibilidade nunca vira ausência de importações.
   async analysis(ctx) {
-    const { state, input } = ctx;
+    const { state, input, env } = ctx;
+    const p = await productL(env, ctx.job.tenant_id, input.productId);
+    const hs = input.hs6?.length ? input.hs6 : await confirmedHs(env, p.id);
+    if (!hs.length)
+      return { decision: { kind: "classification", category: "technical", message: `Pendência técnica do catálogo: ${commodityLabel(p)} ainda não tem código SH confirmado. Sem ele, a lista oficial do país não pode ser cruzada com o produto (R12.14). A confirmação é do Administrador, no Catálogo, com fonte.`, action: { id: "open_catalog", label: "Abrir o produto no Catálogo", roles: "admin", productId: p.id } } };
+    const ind = await countryIndicators(env, input.location.iso3, { now: ctx.now });
     if (!state.analysisId) {
-      const a = await ctx.call("/api/country-analyses", "POST", { iso3: input.location.iso3 });
-      if (!ok(a)) {
-        ctx.log("analysis", "pending", `Indicadores oficiais indisponíveis para ${input.location.country}: ${errText(a)}. A busca de empresas exige compra identificada da commodity no país (R12.14).`);
-        return { decision: { kind: "indicators", message: `Sem indicadores oficiais para ${input.location.country}: ${errText(a)}` } };
+      if (state.indicators !== ind.state) {
+        const say = {
+          ready: `Indicadores oficiais disponíveis (dados válidos reaproveitados)${ind.comtradeUnavailable ? `; fonte do importador indisponível: ${ind.comtradeUnavailable}` : ""}.`,
+          stale: `Indicadores oficiais disponíveis, mas vencidos: ${ind.message}. Usados com a data indicada.`,
+          queued: "Indicadores aguardando geração na lista mensal.",
+          processing: "Indicadores em processamento na lista mensal.",
+          waiting_limit: `Aguardando limite da fonte: ${ind.message}.`,
+          failed: `Falha na consulta dos indicadores: ${ind.message}.`,
+          no_source: `Sem fonte de indicadores: ${ind.message}.`,
+          not_generated: "A lista mensal deste país ainda não foi gerada.",
+        }[ind.state];
+        ctx.log("analysis", ["ready", "stale"].includes(ind.state) ? "ok" : ["failed", "no_source"].includes(ind.state) ? "pending" : "waiting", say, { indicators: ind.state, versionId: ind.versionId ?? null });
       }
+      state.indicators = ind.state;
+      if (INDICATOR_WAIT[ind.state]) return { waitFor: INDICATOR_WAIT[ind.state], waitMs: waitUntil(ctx, ind.retryAt) };
+      if (ind.state === "no_source") {
+        state.blocked = { kind: "no_source", message: ind.message };
+        return { outcome: "pending", jumpTo: "report" };
+      }
+      if (ind.state === "failed" && !ind.retryable)
+        return { decision: { kind: "indicators_failed", category: "technical", message: `Pendência técnica: ${ind.message}. Não indica ausência de importações.`, action: { id: "open_trade_list", label: "Abrir a lista mensal", roles: "admin" } } };
+      if (ind.state === "not_generated" || ind.state === "failed") return askIndicators(ctx, ind);
+      const a = await ctx.call("/api/country-analyses", "POST", { iso3: input.location.iso3 });
+      if (!ok(a)) return { decision: { kind: "indicators", category: "technical", message: `Pendência técnica nos indicadores de ${input.location.country}: ${errText(a)}`, action: { id: "retry", label: "Verificar de novo e continuar", roles: "write" } } };
       state.analysisId = a.data.id;
       state.refs = { ...(state.refs ?? {}), analysisId: a.data.id };
     }
     const a = await ctx.call(`/api/country-analyses/${state.analysisId}`);
     const rows = a.data.rows ?? a.data.items ?? [];
-    const p = await productL(ctx.env, ctx.job.tenant_id, input.productId);
-    const codes = new Set((input.hs6 ?? []).map(String));
-    const match = rows.filter((r) => codes.has(String(r.hs6)) || r.catalog?.confirmed?.some((c) => c.productId === p.id));
-    if (!match.length) return { decision: { kind: "indicators", message: `A lista oficial do país não mostra compra identificada de ${commodityLabel(p)} com correspondência no catálogo: a busca de empresas não pode partir dela (R12.14). Indique o código HS do produto no catálogo ou escolha outro país.`, items: rows.slice(0, 8).map((r) => `${r.hs6} ${r.label ?? r.description ?? ""}`.trim()) } };
+    const codes = new Set(hs.map(String));
+    const match = rows.filter((r) => r.purchaseIdentified && (codes.has(String(r.hs6)) || r.catalog?.confirmed?.some((c) => c.productId === p.id)));
+    if (!match.length) {
+      // Sem compra do produto: só é "nenhum registro" se a fonte do importador respondeu; indisponível pede nova geração.
+      if (ind.comtradeUnavailable) {
+        delete state.analysisId;
+        return askIndicators(ctx, { state: "failed", retryable: true, triedToday: ind.triedToday, retryAt: ind.retryAt, message: `fonte do importador indisponível (${ind.comtradeUnavailable}); com os dados do Brasil não há compra registrada` });
+      }
+      const declared = ind.bySource?.comtrade?.state === "not_declared";
+      state.blocked = { kind: "no_record", message: declared ? `${input.location.country} não declarou à fonte do importador o período pedido (sem declaração desde ${ind.bySource.comtrade.lastPeriod ?? "—"}): sem compra identificada de ${commodityLabel(p)}. Isso não prova que não há compradores.` : `As fontes oficiais consultadas não registram compra de ${commodityLabel(p)} (SH ${[...codes].join(", ")}) por ${input.location.country} no período. A busca de empresas parte só de compra identificada (R12.14). Isso não prova que não há compradores.` };
+      ctx.log("analysis", "pending", state.blocked.message);
+      return { outcome: "pending", jumpTo: "report" };
+    }
     state.hs6 = [...new Set(match.map((r) => String(r.hs6)))].slice(0, 6);
     ctx.log("analysis", "ok", `Indicadores oficiais: compra identificada em ${state.hs6.join(", ")}. Dado de comércio entre países orienta a escolha, mas não prova que alguma empresa importa do Brasil.`, { hs6: state.hs6 });
     return {};
@@ -683,16 +838,20 @@ const INTERNATIONAL = {
     const { state, input } = ctx;
     if (state.campaignId) return {};
     const p = await productL(ctx.env, ctx.job.tenant_id, input.productId);
+    // R12.7 vigente: seleção e autorização são de uma pessoa. A política só faria isso com a emenda aprovada.
+    if (!amendmentOn(ctx))
+      return { decision: { kind: "r12_7", category: "rule", message: `R12.7 (vigente): a seleção de ${commodityLabel(p)} para ${input.location.country} e a autorização da busca de empresas são feitas por uma pessoa (Administrador ou gestor), com autor e data. A emenda que permitiria à política fazê-lo está proposta e não foi aprovada.`, items: [`Indicadores oficiais: compra identificada em ${state.hs6.join(", ")}`], action: { id: "select_authorize", label: `Selecionar ${commodityLabel(p)} e autorizar a busca em ${input.location.country}`, roles: "approver" } } };
     const sel = await ctx.call(`/api/country-analyses/${state.analysisId}/selections`, "POST", { items: [{ productId: p.id, label: commodityLabel(p), hs6: state.hs6 }] });
     if (!ok(sel)) return { decision: { kind: "selection", message: `Seleção recusada: ${errText(sel)}` } };
     state.campaignId = sel.data.campaigns[0].id;
     state.refs = { ...(state.refs ?? {}), campaignId: state.campaignId };
-    ctx.log("select", "ok", `Seleção registrada pela política de pesquisa v${ctx.policy.version} (R12.7, emenda proposta). Campanha em rascunho criada pela regra da seleção; nada é ativado.`);
+    ctx.log("select", "ok", `Seleção registrada pela política de pesquisa v${ctx.policy.version} (R12.7 com a emenda aprovada). Campanha em rascunho criada pela regra da seleção; nada é ativado.`);
     return {};
   },
   async authorize(ctx) {
     const { state, profile } = ctx;
     if (state.searchId) return {};
+    if (!amendmentOn(ctx)) return { decision: { kind: "r12_7", category: "rule", message: "R12.7 (vigente): a autorização da busca de empresas é de uma pessoa.", action: { id: "select_authorize", label: "Autorizar a busca de empresas", roles: "approver" } } };
     const sizes = (profile.sizes?.order ?? []).filter((x) => ["small", "medium"].includes(x));
     const a = await ctx.call(`/api/campaigns/${state.campaignId}/foreign-search`, "POST", { confirm: true, targetSizes: sizes.length ? sizes : ["small", "medium"], note: `Autorizada pela política de pesquisa de rotina v${ctx.policy.version}.` });
     if (!ok(a)) return { decision: { kind: "authorization", message: `Busca de empresas não autorizada: ${errText(a)}${a.status === 403 ? " (a política só vale para quem pode aprovar; peça a um Administrador ou gestor)" : ""}` } };
@@ -706,10 +865,10 @@ const INTERNATIONAL = {
     const d = await ctx.call(`/api/foreign-searches/${state.searchId}/discovery`);
     const allowed = new Set(profile.sources?.international ?? []);
     const available = (d.data.sources ?? []).filter((x) => x.available && allowed.has(x.key));
-    const unsupported = (d.data.sources ?? []).filter((x) => !x.available).map((x) => x.label ?? x.key);
+    const unsupported = (d.data.sources ?? []).filter((x) => !x.available && allowed.has(x.key)).map((x) => `${x.label ?? x.key}: ${x.note}`);
     state.sourceRuns ??= {};
     if (!available.length) {
-      ctx.log("discover", "pending", `Nenhuma fonte gratuita de empresas cobre ${ctx.input.location.country} para esta commodity no Compass${unsupported.length ? ` (sem suporte: ${unsupported.join(", ")})` : ""}. Etapa pendente; o restante segue.`);
+      ctx.log("discover", "pending", `Nenhuma fonte gratuita de empresas cobre ${ctx.input.location.country} para esta commodity no Compass${unsupported.length ? ` (pendentes: ${unsupported.join("; ")})` : ""}. Etapa pendente; o restante segue.`);
       return { outcome: "pending" };
     }
     let waiting = false;
@@ -738,8 +897,10 @@ const INTERNATIONAL = {
     const d = await ctx.call(`/api/foreign-searches/${state.searchId}/discovery`);
     const fresh = [...(d.data.processors ?? []), ...(d.data.traders ?? [])].filter((c) => c.status === "new");
     const rule = new Set(policy.policy.international?.acceptCandidatesWith ?? ["registry_id", "website"]);
-    const okC = fresh.filter((c) => (rule.has("registry_id") && c.registryId) || (rule.has("website") && c.website));
+    const okC = fresh.filter((c) => (rule.has("registry_id") && (c.registryId ?? c.registry?.id)) || (rule.has("website") && c.website));
     const rest = fresh.filter((c) => !okC.includes(c));
+    if (!amendmentOn(ctx) && okC.length)
+      return { decision: { kind: "acceptance", category: "rule", message: `Regra vigente da descoberta internacional: nada entra no cadastro sem a pessoa aceitar. ${okC.length} candidata(s) têm identificador cadastral ou site publicado; as demais ficam na fila de exceções.`, items: okC.slice(0, 25).map((c) => `${c.name}${(c.registryId ?? c.registry?.id) ? ` · registro ${(c.registryId ?? c.registry?.id)}` : ""}${c.website ? ` · ${c.website}` : ""}`), action: { id: "accept_candidates", label: `Cadastrar em descoberta as ${okC.length} candidata(s) listada(s)`, roles: "write", ids: okC.map((c) => c.id) } } };
     let accepted = 0;
     const exceptions = rest.map((c) => ({ name: c.name, reason: "sem identificador cadastral nem site publicado: conferir antes de cadastrar" }));
     for (let k = 0; k < okC.length; k += 100) {
@@ -782,6 +943,12 @@ const INTERNATIONAL = {
     return {};
   },
   async report(ctx) {
+    if (!ctx.state.searchId) {
+      const b = ctx.state.blocked ?? { message: "A busca de empresas não foi aberta." };
+      const summary = { market: "international", country: ctx.input.location.country, candidates: 0, registered: 0, exceptions: 0, ranked: [], queue: [], partial: true, partialNote: b.message, coverage: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, { status: "not_applicable", note: "não consultada: a busca de empresas não foi aberta" }])), sourceLabels: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, x.label])), notCommercial: "Nenhuma empresa foi buscada, cadastrada, qualificada ou contatada.", nextAction: b.kind === "no_record" ? "Escolher outro país com compra identificada da commodity, ou outro produto." : "Aguardar a fonte de indicadores; nada foi concluído sobre compradores.", analysisId: ctx.state.analysisId ?? null };
+      ctx.log("report", "ok", `Relatório: ${b.message}`);
+      return { summary };
+    }
     const sx = await ctx.call(`/api/foreign-searches/${ctx.state.searchId}`);
     const groups = sx.data.groups ?? {};
     const cards = Object.values(groups).flat();
@@ -796,7 +963,10 @@ const INTERNATIONAL = {
       exceptions: (ctx.state.exceptions ?? []).length,
       ranked: ranked.slice(0, 50),
       queue: (ctx.state.exceptions ?? []).slice(0, 50),
-      sources: Object.fromEntries(Object.entries(ctx.state.sourceRuns ?? {}).map(([k, v]) => [k, v.failed ? `pendente: ${v.failed}` : "consultada"])),
+      coverage: Object.fromEntries((ctx.state.applicable ?? []).map((x) => { const v = ctx.state.sourceRuns?.[x.key]; return [x.key, v ? (v.failed ? { status: "unavailable", note: v.failed } : { status: "ok", note: x.rule ?? "" }) : { status: x.status === "pending" ? "unavailable" : "not_applicable", note: x.note ?? "" }]; })),
+      sourceLabels: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, x.label])),
+      partial: (ctx.state.applicable ?? []).some((x) => x.status === "pending") || Object.values(ctx.state.sourceRuns ?? {}).some((v) => v.failed),
+      partialNote: "Pesquisa parcial: há fonte pertinente pendente ou indisponível; o resultado não representa todos os compradores do país.",
       notCommercial: "Descoberta não é qualificação comercial nem prova de importação do Brasil: nenhuma empresa foi qualificada, contatada nem liberada para ficha ou envio.",
       nextAction: cards.length ? "Validar a compra de cada empresa (evidência própria) na busca do país antes de qualquer ficha." : "Nenhuma empresa encontrada nas fontes gratuitas cobertas: tente outro país ou pesquisa assistida.",
       searchId: ctx.state.searchId, campaignId: ctx.state.campaignId, analysisId: ctx.state.analysisId,
@@ -806,34 +976,50 @@ const INTERNATIONAL = {
   },
 };
 
-// GET /api/prospect/coverage — o que cada fonte cobre para a escolha atual (não esconde país nem produto).
+// GET /api/prospect/coverage — fontes aplicáveis à escolha atual (mesma regra do motor); incompatíveis não aparecem.
+const IND_TEXT = { ready: "disponíveis", stale: "disponíveis, vencidos", queued: "aguardando geração", processing: "em processamento", waiting_limit: "aguardando limite da fonte", failed: "falha na consulta", no_source: "sem fonte para o país", not_generated: "lista mensal ainda não gerada" };
 export async function coverage(request, env, actor) {
   const u = new URL(request.url).searchParams;
   const market = oneOf(u.get("market"), ["national", "international"], "mercado");
   const p = await productL(env, actor.tenant_id, str(u.get("productId"), "produto", 80));
   const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
+  const policy = await currentPolicy(env, actor.tenant_id);
   if (market === "national") {
     const segments = profile.segmentsByCommodity?.[p.commodity] ?? SEGMENT_PRESETS[p.commodity] ?? {};
-    const segs = Object.values(segments);
-    const items = [
-      { label: "Receita Federal (consulta por CNPJ)", available: true, note: "confirma situação, atividade e endereço de quem tem CNPJ; não busca empresas pelo nome" },
-      { label: "Site da própria empresa (CNPJ e canal publicados)", available: true, note: "lido quando a candidata tem site" },
-      { label: "Mapa colaborativo (OpenStreetMap)", available: segs.some((g) => g.discovery?.osm), note: segs.some((g) => g.discovery?.osm) ? "cobertura irregular; em produção depende do navegador (o servidor público recusa a Cloudflare)" : "sem regra de busca para os segmentos desta commodity" },
-      { label: "ABIC — torrefadoras certificadas", available: segs.some((g) => g.discovery?.abic), note: segs.some((g) => g.discovery?.abic) ? "nome e estado da fábrica; município e CNPJ a identificar" : "só para café" },
-      { label: "Registros do MAPA (SIPEAGRO)", available: false, note: "o portal recusou acesso automático; só por importação manual" },
-    ];
-    return { market, commodity: p.commodityLabel, segments: segs.map((g) => g.label), items, partial: true, partialNote: "As fontes gratuitas não cobrem todos os compradores; o relatório mostra o que cada fonte trouxe e o que ficou pendente." };
+    const items = nationalSources(segments).items.map((x) => ({ ...x, available: x.status === "available" }));
+    return { market, commodity: p.commodityLabel, segments: Object.values(segments).map((g) => g.label), items, partial: true, partialNote: "As fontes gratuitas não cobrem todos os compradores; o relatório mostra o que cada fonte trouxe e o que ficou pendente." };
   }
   const iso2 = str(u.get("iso2"), "país", 2).toUpperCase();
   const c = await s(env, "SELECT iso3,iso2,name_pt FROM countries WHERE iso2=?", iso2).first();
   if (!c) fail(422, "country_not_found", "País não encontrado.");
-  const hs = (await s(env, "SELECT code FROM product_codes WHERE product_id=? AND code_system IN ('HS','NCM') ORDER BY status='confirmed' DESC", p.id).all()).results.map((x) => String(x.code).replace(/\D/g, ""));
-  const list = foreignSourcesFor(iso2, hs[0]?.slice(0, 4) ?? null);
-  const ind = await s(env, "SELECT COUNT(*) n FROM trade_list_current WHERE iso3=?", c.iso3).first().catch(() => ({ n: 0 }));
+  const hs = await confirmedHs(env, p.id);
+  const ind = await countryIndicators(env, c.iso3);
+  const auto = indicatorsAllowed(policy);
   const items = [
-    { label: "Indicadores oficiais de compra do país (lista mensal)", available: (ind?.n ?? 0) > 0, note: (ind?.n ?? 0) > 0 ? "orientam a escolha; não provam que uma empresa importa do Brasil" : "lista mensal ainda sem dados deste país" },
-    ...list.map((x) => ({ label: x.label, available: x.available, note: x.available ? null : "não cobre este país ou esta commodity no Compass" })),
-    ...(hs.length ? [] : [{ label: "Código HS do produto no catálogo", available: false, note: "sem código HS: a análise do país não encontra a commodity" }]),
-  ];
-  return { market, country: c.name_pt, commodity: p.commodityLabel, items, partial: !items.every((x) => x.available), partialNote: "Etapas sem cobertura ficam pendentes no relatório; as demais seguem." };
+    { key: "indicators", label: "Indicadores oficiais de compra do país (lista mensal)", status: ["ready", "stale"].includes(ind.state) ? "available" : "pending", note: `${IND_TEXT[ind.state]}${ind.message ? `: ${ind.message}` : ""}${["not_generated", "failed"].includes(ind.state) ? (auto ? "; a prospecção pede a geração sozinha" : "; geração pelo Administrador (R12.15)") : ""}` },
+    ...(hs.length ? [] : [{ key: "classification", label: "Classificação do produto no catálogo (código SH)", status: "pending", note: "ainda não confirmada: sem ela, a lista do país não é cruzada com o produto (Administrador, Catálogo)" }]),
+    ...foreignSources(c.iso2, hs).filter((x) => (profile.sources?.international ?? []).includes(x.key)),
+  ].map((x) => ({ ...x, available: x.status === "available" }));
+  return { market, country: c.name_pt, commodity: p.commodityLabel, indicators: ind.state, items, partial: !items.every((x) => x.available), partialNote: "Etapas sem cobertura ficam pendentes no relatório; as demais seguem." };
+}
+
+// GET /api/prospect/connectors — inventário completo de conectores (administração), com quando cada um se aplica.
+export async function connectors(request, env, actor) {
+  requireRole(actor, ADMIN_ROLES);
+  return inventory();
+}
+
+// POST /api/sources/applicable — a mesma regra para a configuração manual de rodada (segmentos escolhidos pela pessoa) e
+// para o Radar Internacional: { market: "national", segments } ou { market: "international", iso2, productId }.
+export async function applicableRoute(request, env, actor) {
+  requireRole(actor, WRITE_ROLES);
+  const i = await bodyJson(request);
+  const market = oneOf(i.market, ["national", "international"], "mercado");
+  if (market === "national") {
+    const segs = i.segments && typeof i.segments === "object" && !Array.isArray(i.segments) ? i.segments : {};
+    if (Object.keys(segs).length > 40) fail(422, "too_many_segments", "Segmentos demais.");
+    return nationalSources(segs);
+  }
+  const p = await productL(env, actor.tenant_id, str(i.productId, "produto", 80));
+  return { items: foreignSources(str(i.iso2, "país", 2).toUpperCase(), await confirmedHs(env, p.id)) };
 }

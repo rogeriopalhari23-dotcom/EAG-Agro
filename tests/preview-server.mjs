@@ -14,7 +14,7 @@ import { provenanceHeaders } from "../src/provenance.js";
 import { internalCaller } from "../src/worker.js";
 import { tick } from "../src/prospect/engine.js";
 import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.mjs";
-import { sources as tradeSources, keepCountries, tradeParams, driver } from "./helpers/trade.mjs";
+import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec } from "./helpers/trade.mjs";
 
 const PORT = Number(process.env.PREVIEW_PORT || 8790);
 const ctx = setup();
@@ -139,21 +139,33 @@ await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/G
 const snapshot = (t) => DB.raw.prepare(`SELECT * FROM ${t}`).all();
 const savedCountries = { countries: snapshot("countries"), country_mdic_codes: snapshot("country_mdic_codes") };
 keepCountries(DB, ["DEU", "CHN"]);
-await tradeParams(api, { period_default_months: 12 });
-const tradeDriver = driver(ctx.env, tradeSources(), { at: "2026-10-10T12:00:00.000Z" });
+await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "22"].sort() } });
+// França (FICTÍCIO): a Comtrade simulada responde milho (1005.90) e álcool etílico (2207.10), mas o país fica SEM lista
+// mensal até a prospecção pedir a geração (o caso "Milho GMO — França").
+const tclock = { at: "2026-10-10T12:00:00.000Z" };
+const tradeDriver = driver(ctx.env, tradeSources({ hs: ["100590", "220710"], comtrade: { 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] } } }), tclock);
 await tradeDriver.start();
 await tradeDriver.drain();
+Object.defineProperty(tclock, "at", { get: () => new Date().toISOString() }); // depois da rotina inicial, relógio real
 for (const [t, rows] of Object.entries(savedCountries))
   for (const r of rows) DB.raw.prepare(`INSERT OR IGNORE INTO ${t} (${Object.keys(r).join(",")}) VALUES (${Object.keys(r).map(() => "?").join(",")})`).run(...Object.values(r));
 const coffee = (await api("/api/catalog/product-05")).data;
 await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: coffee.revision, reason: "Prévia local (fictício)" });
+// Classificação SH só da PRÉVIA (fictícia, como se confirmada pelo Administrador): milho GMO e álcool etílico neutro.
+for (const [pid, code] of [["product-03", "100590"], ["product-11", "220710"]]) {
+  const p = (await api(`/api/catalog/${pid}`)).data;
+  await api(`/api/catalog/${pid}/codes`, "POST", { codeSystem: "HS", code, status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: p.revision, reason: "Prévia local (fictício)" });
+}
 // O cron da produção roda a cada 5 minutos; aqui, um ciclo a cada 3 segundos (mesmo código, mesmas regras).
 let ticking = false;
 setInterval(async () => {
   if (ticking) return;
   ticking = true;
   try {
-    await tick(ctx.env, "eag-internal", { call: internalCaller(ctx.env, "previa-cron") });
+    await tick(ctx.env, "eag-internal", { call: internalCaller(ctx.env, "previa-cron"), trade: tradeDriver.deps });
+    // Fila da lista mensal (na produção, a fila assíncrona da Cloudflare): pedidos da prospecção avançam aqui.
+    await tradeDriver.sweep();
+    await tradeDriver.drain();
   } catch (e) {
     console.error("ciclo da prospecção:", e.message);
   } finally {

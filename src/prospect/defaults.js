@@ -33,7 +33,12 @@ export const DEFAULT_PROFILE = {
 // Modelo da política de pesquisa de rotina. Só vale depois de concedida (POST /api/prospect/policy), com responsável,
 // data e referência da decisão. A política cobre a pesquisa; contato, fichas, campanhas, canais e envios ficam fora.
 export const POLICY_TEMPLATE = {
-  covers: ["descoberta de candidatas", "consulta cadastral", "conciliação e deduplicação", "triagem de sanções", "cadastro em descoberta (sem decisão comercial)", "seleção de commodity e busca de empresas no exterior (R12.7) para commodity com compra identificada no país"],
+  // A seleção (R12.7), a ciência das limitações e o aceite internacional pela política dependem da emenda proposta
+  // (AMENDMENT): enquanto ela não for aprovada, esses passos pedem a ação de uma pessoa, mesmo com a política vigente.
+  covers: ["descoberta de candidatas", "consulta cadastral", "conciliação e deduplicação", "triagem de sanções", "cadastro em descoberta (sem decisão comercial)"],
+  // Pedido dos indicadores oficiais de um país sem lista (R12.15, fluxo da lista mensal, fontes gratuitas dentro do
+  // orçamento diário configurado, um por país por dia). Só entra quando quem concede é Administrador.
+  indicators: true,
   excludes: ["contato de qualquer tipo", "aprovação de fichas", "ativação de campanhas", "liberação de canais", "envio de mensagens", "fontes pagas ou consumo de créditos", "fusão de empresas parecidas"],
   markets: ["national", "international"],
   paidSources: [],
@@ -55,6 +60,10 @@ export const POLICY_TEMPLATE = {
   },
   international: { acceptCandidatesWith: ["registry_id", "website"] },
 };
+
+// Emenda da prospecção automática (docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md): PROPOSTA, não aprovada.
+// Só muda para approved: true por commit depois da aprovação registrada de Rogério Palhari; nenhuma tela ou rota muda isso.
+export const AMENDMENT = { id: "EMENDA-PROSPECCAO-AUTOMATICA", approved: false };
 
 const LEVEL = { supported: 0, partial: 1, unsupported: 2 };
 // Itens da verificação prévia que a política não cobre (nova limitação ou nível mais grave que o aceito).
