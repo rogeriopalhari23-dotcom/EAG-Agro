@@ -5,6 +5,7 @@
 // Supressões, exclusões, pausas e restrições continuam valendo pelo próprio alcance (são aplicadas no contato:
 // src/restrictions.js); a nova relação só as informa, nunca as remove nem as contorna.
 import { statement as s } from "./store.js";
+import { normalizeName } from "./geo.js";
 
 const norm = (x) => String(x ?? "").trim().toLowerCase();
 
@@ -14,16 +15,12 @@ export async function complementCompany(env, tenant, dispatch, { companyId, prod
   if (!company) return { ok: false, reason: "empresa não encontrada" };
   const out = { unit: null, evidence: { added: 0, reused: 0 }, channels: { added: 0, reused: 0 }, profile: "reused", otherProducts: [], restrictions: [] };
   // Unidade: outro estabelecimento da mesma empresa (mesma raiz de CNPJ) entra como unidade, nunca como empresa nova.
+  // Relação com a empresa inteira quando o CNPJ é o do próprio cadastro; com a unidade quando é outro estabelecimento.
   let unitKey = "";
-  if (unit?.cnpj && /^\d{14}$/.test(unit.cnpj) && unit.cnpj !== company.registration_id) {
-    const u = await s(env, "SELECT id,company_id FROM company_units WHERE tenant_id=? AND cnpj=?", tenant, unit.cnpj).first();
-    if (u && u.company_id === companyId) (unitKey = u.id), (out.unit = "reused");
-    else if (!u) {
-      const id = crypto.randomUUID();
-      await s(env, "INSERT INTO company_units(id,tenant_id,company_id,cnpj,unit_role,municipality_name,uf,source_label,source_ref,consulted_at) VALUES (?,?,?,?,'unknown',?,?,?,?,?)", id, tenant, companyId, unit.cnpj, unit.municipality ?? null, unit.uf ?? null, unit.sourceLabel ?? "Rodada de descoberta", unit.sourceRef ?? null, at).run();
-      unitKey = id;
-      out.unit = "added";
-    }
+  if (unit?.cnpj && /^\d{14}$/.test(unit.cnpj)) {
+    const u = await ensureUnit(env, tenant, companyId, unit, at);
+    if (u.id && unit.cnpj !== company.registration_id) unitKey = u.id;
+    out.unit = unit.cnpj !== company.registration_id ? u.outcome : null;
   }
   // Evidências da relação com este produto: a mesma (tipo + referência ou fonte) não se repete.
   const prev = (await s(env, "SELECT evidence_type,reference,source_url FROM evidence WHERE tenant_id=? AND company_id=? AND product_id=?", tenant, companyId, productId).all()).results;
@@ -38,6 +35,7 @@ export async function complementCompany(env, tenant, dispatch, { companyId, prod
     }
     const r = await dispatch(`/api/companies/${companyId}/evidence`, "POST", { ...ev, productId });
     if (r.status < 300) out.evidence.added++;
+    else (out.evidence.failed = (out.evidence.failed ?? 0) + 1), (out.evidence.error = r.data?.error?.message ?? `HTTP ${r.status}`);
   }
   for (const ch of channels) {
     const r = await dispatch(`/api/companies/${companyId}/channels`, "POST", ch);
@@ -53,6 +51,31 @@ export async function complementCompany(env, tenant, dispatch, { companyId, prod
   out.otherProducts = (await s(env, "SELECT DISTINCT product_id FROM buyer_profiles WHERE tenant_id=? AND company_id=? AND product_id<>?", tenant, companyId, productId).all()).results.map((x) => x.product_id);
   out.restrictions = await standingRestrictions(env, tenant, companyId);
   return { ok: true, ...out };
+}
+
+// Unidade (estabelecimento) pelo CNPJ: cadastro único; a existente é reaproveitada e só ganha o que faltava (município,
+// coordenada do município e atividade registrada). CNPJ de outra empresa nunca é movido. → { id, outcome }
+export async function ensureUnit(env, tenant, companyId, unit, at) {
+  if (!unit?.cnpj || !/^\d{14}$/.test(unit.cnpj)) return { id: null, outcome: null };
+  const cnae = (x) => String(x ?? "").match(/^\s*([\d./-]{7,10})/)?.[1]?.replace(/\D/g, "") || null;
+  const primary = cnae(unit.activity);
+  const secondary = JSON.stringify((unit.secondary ?? []).map(cnae).filter((x) => x?.length === 7));
+  const m = unit.municipality && unit.uf ? await s(env, "SELECT ibge_code,lat,lon,source_version FROM municipalities WHERE uf=? AND name_normalized=?", String(unit.uf).toUpperCase(), normalizeName(unit.municipality)).first() : null;
+  const u = await s(env, "SELECT id,company_id,primary_cnae,lat FROM company_units WHERE tenant_id=? AND cnpj=?", tenant, unit.cnpj).first();
+  if (u && u.company_id !== companyId) return { id: null, outcome: "other_company" };
+  const geoSource = m ? `IBGE centroide ${m.source_version}` : null;
+  if (u) {
+    if ((!u.primary_cnae && primary) || (u.lat == null && m))
+      await s(env, `UPDATE company_units SET secondary_cnaes_json=CASE WHEN primary_cnae IS NULL AND ? IS NOT NULL THEN ? ELSE secondary_cnaes_json END, primary_cnae=COALESCE(primary_cnae,?),
+        geo_precision=CASE WHEN lat IS NULL AND ? IS NOT NULL THEN 'municipality_centroid' ELSE geo_precision END, geo_source=CASE WHEN lat IS NULL AND ? IS NOT NULL THEN ? ELSE geo_source END,
+        municipality_ibge=COALESCE(municipality_ibge,?), lon=CASE WHEN lat IS NULL THEN ? ELSE lon END, lat=COALESCE(lat,?), updated_at=? WHERE id=?`,
+        primary, secondary, primary, m?.lat ?? null, m?.lat ?? null, geoSource, m?.ibge_code ?? null, m?.lon ?? null, m?.lat ?? null, at, u.id).run();
+    return { id: u.id, outcome: "reused" };
+  }
+  const id = crypto.randomUUID();
+  await s(env, "INSERT INTO company_units(id,tenant_id,company_id,cnpj,unit_role,municipality_ibge,municipality_name,uf,lat,lon,geo_precision,geo_source,primary_cnae,secondary_cnaes_json,source_label,source_ref,consulted_at) VALUES (?,?,?,?,'unknown',?,?,?,?,?,?,?,?,?,?,?,?)",
+    id, tenant, companyId, unit.cnpj, m?.ibge_code ?? null, unit.municipality ?? null, unit.uf ?? null, m?.lat ?? null, m?.lon ?? null, m ? "municipality_centroid" : "unknown", geoSource, primary, secondary, unit.sourceLabel ?? "Rodada de descoberta", unit.sourceRef ?? null, at).run();
+  return { id, outcome: "added" };
 }
 
 // Restrições já vigentes para a empresa (informativas na relação nova; o bloqueio é feito no contato, pelo alcance de cada uma).

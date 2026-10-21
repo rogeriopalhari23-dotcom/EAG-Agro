@@ -1568,6 +1568,20 @@ function decisorItem(companyId) {
   });
   return box;
 }
+// Relações por produto: cada commodity com situação, base e decisor próprios (nada passa de uma para outra).
+function relationsItem(companyId, profiles) {
+  if (!(profiles ?? []).length) return null;
+  const list = el("ul", { class: "plain-list compact-list relations-list" });
+  for (const p of profiles) {
+    const dec = text("small", "decisor: carregando…");
+    list.append(el("li", {}, text("strong", p.product_label ?? p.product_id), text("span", ` — ${lbl(p.profile_class)} · ${lbl(p.icp_status)}`), text("small", p.basis ? ` (${p.basis.slice(0, 160)}${p.basis.length > 160 ? "…" : ""})` : ""), el("br"), dec));
+    safe(async () => {
+      const d = (await api(`/api/companies/decisors?ids=${companyId}&productId=${encodeURIComponent(p.product_id)}`)).items[companyId];
+      dec.textContent = d?.summary ? `decisor deste produto: ${d.summary.name ?? "nome não informado"} (${d.summary.roleLabel}) · ${d.summary.status}` : "decisor deste produto: não identificado";
+    });
+  }
+  return el("div", { class: "relations-item" }, text("span", `Relações por produto (${profiles.length})`, "k"), list);
+}
 function companySummary(data, goTab) {
   const c = data.company;
   const profile = (data.profiles || [])[0];
@@ -1617,6 +1631,7 @@ function companySummary(data, goTab) {
       item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
       item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
       decisorItem(c.id),
+      relationsItem(c.id, data.profiles),
       item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`), proofBlock,
       el(
         "div",
@@ -1636,6 +1651,7 @@ function companySummary(data, goTab) {
     item("Por que pode comprar", why, profile ? lbl(profile.icp_status) : null),
     item("Porte", size, unit?.size_label ? null : "Pendência pesquisável; não impede a busca"),
     decisorItem(c.id),
+    relationsItem(c.id, data.profiles),
     item("Evidências", evidence ? `${evidence} registrada(s)` : "Nenhuma registrada", `Fonte do cadastro: ${c.source_label}`), proofBlock,
     el("div", { class: "next" }, el("p", {}, text("strong", "Pendência principal: "), pending), ...notices, button(action[0], () => (typeof action[1] === "function" ? (document.querySelector("dialog.drawer")?.close(), action[1]()) : goTab(action[1])), true)),
   );
@@ -5271,7 +5287,18 @@ async function showRound(id) {
   }) : null;
   const nextBtn = (k, lbl) => el("div", { class: "toolbar section-next" }, button(`Próximo: ${lbl}`, () => go(k)));
   panels.config = el("div", { class: "tab-panel", role: "tabpanel" }, limPanel, areaPanel, editBox, adjNear, ack ? nextBtn("buscar", "buscar ou importar candidatas") : null);
-  panels.buscar = el("div", { class: "tab-panel", role: "tabpanel" }, cand, r.lastRun ? nextBtn("conferir", "conferir resultados") : null);
+  // Já cadastradas com atividade compatível (só leitura): consideradas antes de trazer só candidatas novas.
+  const existingBox = el("div", { class: "round-existing" });
+  safe(async () => {
+    const ex = await api(`/api/rounds/${id}/existing`);
+    if (!ex.items?.length) return existingBox.append(text("p", ex.reason ?? "Nenhuma empresa já cadastrada com atividade compatível dentro do raio.", "muted"));
+    existingBox.append(panel(
+      `Empresas já cadastradas com atividade compatível (${ex.items.length})`,
+      text("p", "Ainda sem relação com este produto. Atividade compatível é motivo para investigar, não prova de compra; decisor e compra de outra commodity não valem para esta. A relação entra pela prospecção (automação sob a política) ou pelo cadastro da rodada.", "muted"),
+      el("ul", { class: "plain-list compact-list" }, ...ex.items.slice(0, 50).map((x) => el("li", {}, el("button", { type: "button", class: "link-btn", onclick: () => showCompany(x.companyId) }, x.name), text("span", `${x.km != null ? ` · ${x.km} km` : ""}${x.trader ? " · trader/distribuidor (separado)" : ""} — ${x.reasons.join("; ")}${x.otherProducts?.length ? `. Outras commodities: ${x.otherProducts.join(", ")}` : ""}${x.restrictions?.length ? `. Restrições: ${x.restrictions.join("; ")}` : ""}`)))),
+    ));
+  });
+  panels.buscar = el("div", { class: "tab-panel", role: "tabpanel" }, existingBox, cand, r.lastRun ? nextBtn("conferir", "conferir resultados") : null);
   panels.conferir = el("div", { class: "tab-panel", role: "tabpanel" }, resPanel, adjResearch, r.lastRun ? nextBtn("cadastrar", "cadastrar") : null);
   panels.cadastrar = el("div", { class: "tab-panel", role: "tabpanel" }, cadPanel);
   techPanel.append(...[adjLocale, adjTech].filter(Boolean));
@@ -5673,7 +5700,7 @@ async function showJob(id) {
     el("div", { class: "next" }, el("p", {}, text("strong", "Próxima ação: "), j.decision ? (j.decision.action ? `${j.decision.action.label} (${j.decision.category === "technical" ? "pendência técnica" : j.decision.category === "rule" ? "ação de uma pessoa pela regra vigente" : j.decision.category === "product" ? "característica do produto" : "decisão"}; detalhes abaixo).` : j.decision.message) : s ? s.nextAction : jobActive(j) ? "Aguardar: a prospecção avança sozinha." : "—"), jobProgress(j)),
   );
   node.append(head);
-  if (j.choice) node.append(el("div", { class: "callout choice-note" }, el("p", {}, text("strong", "Por que esta pesquisa: "), j.choice.reason)));
+  if (j.choice) node.append(el("div", { class: "callout choice-note" }, el("p", {}, text("strong", "Por que esta pesquisa: "), j.choice.reason), j.choice.coverageGaps ? text("p", `Limitação de cobertura: ${j.choice.coverageGaps} outro(s) mercado(s) com comércio oficial registrado com o Brasil não têm fonte de empresas coberta. Continuam listados na pesquisa automática; não é ausência de compradores.`) : null, j.choice.gaps?.length ? details(`Mercados com evidência e sem fonte de empresas (${j.choice.coverageGaps})`, el("ul", { class: "compact-list" }, ...j.choice.gaps.map((g) => el("li", {}, text("strong", g.label), text("span", ` — ${g.evidence}. Cobertura: ${g.coverage}.`))))) : null));
   // Decisão pendente: o que falta e como seguir.
   if (j.decision) {
     const dec = el("div", { class: `callout decision-box ${j.decision.category === "technical" ? "" : "warn"}`.trim() }, el("p", {}, text("strong", DECISION_HEAD[j.decision.category] ?? "Decisão necessária. "), j.decision.message));
@@ -5730,6 +5757,15 @@ async function showJob(id) {
         s.partial ? el("div", { class: "callout warn" }, text("p", s.partialNote)) : text("p", "Todas as fontes previstas responderam.", "muted"),
         el("ul", { class: "coverage-list" }, ...Object.entries(s.coverage ?? s.sources ?? {}).map(([k, v]) => el("li", {}, tag(typeof v === "string" ? v : { ok: "consultada", empty: "sem resultado nesta consulta", unavailable: "pendente", partial: "parcial", not_applicable: "não consultada" }[v.status] ?? v.status, typeof v === "string" ? "" : v.status === "ok" ? "ok" : v.status === "not_applicable" ? "" : "warn"), text("span", s.sourceLabels?.[k] ?? sourceName(k)), typeof v === "string" ? null : text("small", v.note ?? "")))),
       ),
+      s.existing?.count
+        ? panel(
+            `Empresas já cadastradas com atividade compatível (${s.existing.count})`,
+            text("p", "Reaproveitadas antes da busca de empresas novas. Atividade compatível é motivo para investigar, não prova de compra: a relação com este produto fica não confirmada, com situação e evidências próprias. Compra, decisor e contato de outra commodity não valem para esta.", "muted"),
+            tbl(["Empresa", "Por que investigar", "Outras commodities", "Decisor deste produto", "Restrições vigentes"], s.existing.items, (x) =>
+              el("tr", {}, el("td", {}, el("button", { type: "button", class: "link-btn", onclick: () => showCompany(x.companyId) }, x.name), x.trader ? tag("trader/distribuidor (separado)", "warn") : null, x.km != null ? text("small", ` · ${x.km} km`) : null), text("td", x.reasons.join("; ")), text("td", x.otherProducts?.join(", ") || "—"), el("td", { class: "dec-cell", "data-company": x.companyId }, "…"), text("td", x.restrictions?.join("; ") || "nenhuma")),
+            ),
+          )
+        : null,
       s.toIdentify?.length
         ? panel(
             `Compradores prováveis a identificar (${s.toIdentify.length})`,
@@ -5747,12 +5783,15 @@ async function showJob(id) {
   }
   // Decisores das empresas cadastradas (só leitura; mesma visibilidade do cadastro).
   safe(async () => {
-    const ids = [...node.querySelectorAll(".dec-cell")].map((td) => td.dataset.company).filter(Boolean);
+    const ids = [...new Set([...node.querySelectorAll(".dec-cell")].map((td) => td.dataset.company).filter(Boolean))];
     if (!ids.length) return;
-    const d = (await api(`/api/companies/decisors?ids=${ids.join(",")}`)).items;
+    // Decisor do produto desta prospecção: o de outra commodity não vale para esta.
+    const pid = j.input?.productId ? `&productId=${encodeURIComponent(j.input.productId)}` : "";
+    const d = (await api(`/api/companies/decisors?ids=${ids.join(",")}${pid}`)).items;
     for (const td of node.querySelectorAll(".dec-cell")) {
       const x = d[td.dataset.company];
-      td.textContent = x?.summary ? `${x.summary.name ?? "nome não informado"} (${x.summary.title ?? x.summary.roleLabel}) · ${x.summary.status}` : "Decisor ainda não identificado";
+      const other = (x?.people ?? []).filter((p) => p.productScope === "other_product");
+      td.textContent = x?.summary ? `${x.summary.name ?? "nome não informado"} (${x.summary.title ?? x.summary.roleLabel}) · ${x.summary.status}` : other.length ? `Não identificado para este produto (${other.map((p) => p.productScopeLabel).join("; ")})` : "Decisor ainda não identificado";
     }
   });
   // Registro das etapas (rastreabilidade) e controles.
@@ -5789,6 +5828,7 @@ function autoSearchBar(market) {
     tools.append(
       button(m === "national" ? "Pesquisa automática nacional" : "Pesquisa automática internacional", async () => {
         const r = await api("/api/prospect/auto", "POST", { market: m });
+        coverageGaps(gapsBox, r.coverage);
         if (!r.started) {
           out.textContent = `Nenhuma combinação elegível agora: ${r.reasons.join("; ")}. ${r.note}`;
           return;
@@ -5798,8 +5838,20 @@ function autoSearchBar(market) {
       }, true),
     );
   if (!writable()) tools.replaceChildren(text("small", "Seu perfil acompanha as pesquisas, sem iniciar."));
-  bar.append(out, tools);
+  const gapsBox = el("div", { class: "coverage-gaps" });
+  bar.append(out, tools, gapsBox);
   return bar;
+}
+// Mercados com comércio oficial com o Brasil e sem fonte de empresas: limitação de cobertura, sempre à vista.
+function coverageGaps(box, cov) {
+  box.replaceChildren();
+  if (!cov?.gapCount && !cov?.partialSummaries) return;
+  const d = el("details", {}, el("summary", {}, cov.gapCount ? `Mercados com evidência e sem fonte de empresas (${cov.gapCount})` : "Cobertura dos resumos"));
+  if (cov.note) d.append(text("p", cov.note));
+  if (cov.partialSummaries) d.append(text("p", cov.partialSummaries));
+  if (cov.gaps?.length) d.append(el("ul", { class: "compact-list" }, ...cov.gaps.map((g) => el("li", {}, text("strong", g.label), text("span", ` — ${g.evidence}. Cobertura: ${g.coverage}.`)))));
+  if (cov.gapCount > (cov.gaps?.length ?? 0)) d.append(text("small", `Mostrando ${cov.gaps.length} de ${cov.gapCount}.`));
+  box.append(d);
 }
 async function prospectHub(title, subtitle, market, manual, manualTitle) {
   const node = section(title, subtitle);
@@ -5850,12 +5902,12 @@ async function prospectSettingsView() {
   pol.append(
     po.current ? text("p", `Concedida por ${po.current.grantedBy} em ${fmtDate(po.current.grantedAt)}. Referência: ${po.current.reference}`) : el("div", { class: "callout warn" }, text("p", "Sem política, cada prospecção para em \"precisa de decisão\" antes de pesquisar.")),
     kv([
-      ["Cobre", t.covers.join("; ")],
-      ["Não cobre", t.excludes.join("; ")],
+      ["Cobre", ((po.current?.policy ?? t).covers ?? t.covers).join("; ")],
+      ["Não cobre", ((po.current?.policy ?? t).excludes ?? t.excludes).join("; ")],
       ["Raio máximo sem nova decisão", `${(po.current?.policy ?? t).maxRadiusKm} km`],
       ["Limitações aceitas uma vez", Object.keys(t.acceptedLimitations).map((k) => plainArea(k)).join(", ")],
     ]),
-    text("p", "Limitação nova, raio maior, fonte paga, fusão de empresas parecidas e exceções continuam pedindo decisão. A seleção de commodity e a busca no exterior pela política dependem da emenda da R12.7 (docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md).", "muted"),
+    text("p", "Limitação nova, raio maior, fonte paga, fusão de empresas parecidas e exceções continuam pedindo decisão. A seleção da commodity e a busca no exterior (R12.7) são feitas pela política desde a autorização delimitada de 2026-10-20 (revisão pós-aprovação 6 da Spec); contato, fichas, T11, canais, campanhas ativas e envios ficam fora.", "muted"),
   );
   if (approver()) {
     const conf = el("input", { type: "checkbox", name: "confirm" });

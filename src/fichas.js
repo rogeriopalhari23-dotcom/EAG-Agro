@@ -73,6 +73,11 @@ async function context(env, actor, companyId, campaignId, contactIds, opts = {})
     if (purpose === "identify_buyer" && ct.contact_kind !== "company_channel") fail(422, "recipient_not_channel", "A ficha de identificação vai ao canal geral publicado da empresa, não a uma pessoa.");
     if (purpose === "meeting" && ct.contact_kind === "company_channel") fail(422, "recipient_is_channel", "Canal geral da empresa não é decisor: use a ficha de identificação do responsável.");
     if (purpose === "meeting" && !ROLES.includes(ct.prospect_role)) fail(422, "recipient_role", "Destinatário precisa ser decisor, decisor provisório ou influenciador (PV8).");
+    // Papel registrado só para outra commodity não vale para esta (nada é propagado entre produtos).
+    if (purpose === "meeting") {
+      const links = (await s(env, "SELECT cp.product_id,p.commodity,COALESCE(p.display_name,p.variant_name) label FROM contact_products cp JOIN products p ON p.id=cp.product_id WHERE cp.tenant_id=? AND cp.contact_id=?", actor.tenant_id, ct.id).all()).results;
+      if (links.length && !links.some((l) => l.commodity === p.commodity)) fail(422, "recipient_other_product", `O destinatário responde por ${links.map((l) => l.label).join(", ")}; o papel não vale para ${p.variant_name}. Registre o vínculo dele com este produto, com a fonte, antes.`);
+    }
     const [fullName, jobTitle, email, linkedin] = await Promise.all(
       ["full_name", "job_title", "email", "linkedin_url"].map((k) => decryptPii(ct[`${k}_encrypted`], env)),
     );

@@ -11,7 +11,8 @@ import {
   WRITE_ROLES,
 } from "./http.js";
 import { getActor } from "./auth.js";
-import { statement as s, parameters } from "./store.js";
+import { statement as s, parameters, product, commit, auditStatement, now } from "./store.js";
+import { complementCompany } from "./relations.js";
 import * as companies from "./companies.js";
 import * as operations from "./operations.js";
 import * as catalog from "./catalog.js";
@@ -50,6 +51,7 @@ import { mapInfo, mapTiles } from "./map-tiles.js";
 import { geocodeUnitRoute } from "./geocoding.js";
 import { definitionsView } from "./parameter-registry.js";
 import { recalculate, qualify } from "./scores.js";
+import { linkContactProduct } from "./contact-products.js";
 // Não exportar: o workerd trata toda exportação nomeada do módulo principal como entrypoint (falha no wrangler dev).
 const VERSION = "0.3.1-review.2";
 // internalActor: identidade já resolvida, só para chamadas internas (motor da prospecção e cadastro pela rodada); nunca
@@ -240,12 +242,13 @@ async function route(request, env, rid, internalActor = null) {
   if (path === "/api/round-catalog" && method === "GET") return response(rounds.roundCatalog());
   if (path === "/api/geo/regions" && method === "GET") return response(await rounds.geoRegions(request, env));
   if (path === "/api/geo/municipalities" && method === "GET") return response(await rounds.geoMunicipalities(request, env));
-  const rnd = path.match(/^\/api\/rounds\/([0-9a-f-]{36})(?:\/(area|osm-query|preflight-ack|candidates|run|decisions|register|export|annotations))?$/);
+  const rnd = path.match(/^\/api\/rounds\/([0-9a-f-]{36})(?:\/(area|osm-query|preflight-ack|candidates|run|decisions|register|export|annotations|existing))?$/);
   if (rnd) {
     const [, rid2, sub] = rnd;
     if (!sub && method === "GET") return response(await rounds.getRound(env, actor, rid2));
     if (!sub && method === "PUT") return response(await rounds.updateRoundConfig(request, env, actor, rid, rid2));
     if (sub === "area" && method === "GET") return response(await rounds.getArea(env, actor, rid2));
+    if (sub === "existing" && method === "GET") return response(await rounds.existingForRound(env, actor, rid2));
     if (sub === "osm-query" && method === "GET") return response(await rounds.osmQuery(env, actor, rid2));
     if (sub === "export" && method === "GET") return response(await rounds.exportRound(env, actor, rid2));
     if (sub === "preflight-ack" && method === "POST") return response(await rounds.acknowledgePreflight(request, env, actor, rid, rid2));
@@ -351,6 +354,32 @@ async function route(request, env, rid, internalActor = null) {
   if (ppl && ppl[4] === "dismiss" && method === "POST") return response(await people.dismissPerson(request, env, actor, rid, ppl[1], ppl[3]));
   const ppe = path.match(/^\/api\/companies\/([^/]+)\/people\/([^/]+)$/);
   if (ppe && ppe[2] !== "research" && method === "PATCH") return response(await people.setPurchaseEvidence(request, env, actor, rid, ppe[1], ppe[2]));
+  // Empresa já cadastrada encontrada de novo (importação de lote, outra commodity): acrescenta a relação com o produto,
+  // a unidade e as evidências que faltam, sem duplicar nem substituir; mesmas rotas e regras do cadastro manual.
+  const rel = path.match(/^\/api\/companies\/([^/]+)\/relations$/);
+  if (rel && method === "POST") {
+    requireRole(actor, WRITE_ROLES);
+    const i = await bodyJson(request);
+    const p = await product(env, actor.tenant_id, str(i.productId, "produto", 80));
+    const dispatch = async (pp, m, body) => {
+      const headers = new Headers(request.headers);
+      headers.set("content-type", "application/json");
+      headers.delete("content-length");
+      try {
+        const res = await route(new Request(new URL(pp, request.url), { method: m, headers, body: JSON.stringify(body) }), env, rid, actor);
+        return { status: res.status, data: await res.json() };
+      } catch (e) {
+        if (e instanceof ApiException) return { status: e.status, data: { error: { code: e.code, message: e.message, details: e.details } } };
+        throw e;
+      }
+    };
+    const out = await complementCompany(env, actor.tenant_id, dispatch, { companyId: rel[1], productId: p.id, unit: i.unit ?? null, evidence: Array.isArray(i.evidence) ? i.evidence.slice(0, 50) : [], channels: Array.isArray(i.channels) ? i.channels.slice(0, 10) : [], profile: i.profile ?? null, at: now() });
+    if (!out.ok) fail(404, "company_not_found", out.reason);
+    await commit(env, [auditStatement(env, actor, rid, "company.relation_complemented", "company", rel[1], { productId: p.id, unit: out.unit, evidence: out.evidence, profile: out.profile })]);
+    return response(out);
+  }
+  const ctp = path.match(/^\/api\/contacts\/([^/]+)\/products$/);
+  if (ctp && method === "POST") return response(await linkContactProduct(request, env, actor, rid, ctp[1]), 201);
   const chn = path.match(/^\/api\/companies\/([^/]+)\/channels$/);
   if (chn && method === "POST") return response(await people.addChannel(request, env, actor, rid, chn[1]), 201);
   const fsp = path.match(/^\/api\/foreign-searches\/([^/]+)\/people\/research$/);

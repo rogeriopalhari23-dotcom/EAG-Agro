@@ -16,7 +16,8 @@ Uma política para Radar Nacional, Radar Internacional, Prospecção e Rodadas. 
 
 1. **Commodity e mercado na pesquisa automática.**
    - Nacional: commodity com segmento de busca automática, a partir de uma origem já configurada para ela (campanha nacional, rodada ou prospecção anterior), com o raio padrão configurado e dentro do limite da política.
-   - Internacional: produto com classificação confirmada × país com comércio oficial registrado com o Brasil (exportações do Brasil, MDIC; ou importações de origem Brasil declaradas pelo país, Comtrade) e com fonte de empresas coberta.
+   - Internacional: produto com classificação confirmada × país com comércio oficial registrado com o Brasil (exportações do Brasil, MDIC; ou importações de origem Brasil declaradas pelo país, Comtrade) em **qualquer** subposição do produto, não só nas cinco maiores do país (`trade_country_summary.hs6_json`, refeito do objeto oficial guardado, sem custo), e com fonte de empresas coberta.
+   - Mercado com evidência e sem conector de empresas: limitação de cobertura listada a cada pesquisa automática e na própria prospecção; nunca esquecido nem tratado como ausência de compradores.
    - Prioridade: nunca pesquisada; depois pesquisa com 30 dias ou mais (dados a atualizar); depois a menos pesquisada.
    - A justificativa da escolha fica na prospecção.
 2. **Segmentos e fontes.** Os segmentos vêm do perfil (uso final, conforme a skill) e as fontes da regra única de aplicabilidade. Fonte incompatível não aparece nem é consultada.
@@ -25,7 +26,7 @@ Uma política para Radar Nacional, Radar Internacional, Prospecção e Rodadas. 
 5. **Ciência das limitações já aceitas** pela política. Limitação nova ou mais grave pede decisão.
 6. **Classificação fiscal** por regra fundamentada em fonte oficial (`CLASSIFICACAO-PRODUTOS.md`). Quando falta uma característica que muda o código, o Compass pergunta só essa característica.
 7. **Indicadores do país** (lista mensal) pedidos pelo fluxo existente, sob política concedida por Administrador (R12.15).
-8. **Reaproveitamento de empresa já cadastrada** em nova commodity: a relação nova é acrescentada sem duplicar nem substituir as anteriores.
+8. **Reaproveitamento de empresa já cadastrada** em nova commodity: a relação nova é acrescentada sem duplicar nem substituir as anteriores. Antes de buscar empresas novas, a prospecção (e a tela da rodada, só leitura) considera as já cadastradas com atividade compatível (CNAE conferida no IBGE, atividade publicada ou relação com commodity de uso em ração), no raio ou no país. A relação entra **não confirmada** (trader separado). Confirmação de compra e decisor de outra commodity não são copiados; o decisor é registrado por produto (`contact_products`). Pausas, supressões e exclusões mantêm o próprio alcance.
 
 Tudo isso fica registrado como **automação sob a política** (canal `automation`, executor "Compass — prospecção automática", a política como autorização). Nada é atribuído a um clique ou confirmação de pessoa.
 

@@ -2996,3 +2996,17 @@ details.complementary > summary {
 .choice-note {
   margin: 8px 0;
 }
+.relations-item {
+  display: grid;
+  gap: 4px;
+  grid-column: 1 / -1;
+}
+.relations-list li {
+  overflow-wrap: anywhere;
+}
+.coverage-gaps details {
+  margin-top: 8px;
+}
+.coverage-gaps li {
+  overflow-wrap: anywhere;
+}

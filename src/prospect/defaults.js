@@ -46,6 +46,7 @@ export const POLICY_TEMPLATE = {
     "encaminhamento de candidatas com identificador cadastral ou site para descoberta",
     "ciência das limitações já aceitas (limitação nova ou mais grave pede decisão)",
     "classificação fiscal de produto por regra fundamentada em fonte oficial",
+    "reaproveitamento de empresas já cadastradas com atividade compatível (relação com o produto não confirmada, sem copiar compra nem decisor de outra commodity)",
   ],
   // Pedido dos indicadores oficiais de um país sem lista (R12.15, fluxo da lista mensal, fontes gratuitas dentro do
   // orçamento diário configurado, um por país por dia). Só entra quando quem concede é Administrador.

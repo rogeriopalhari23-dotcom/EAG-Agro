@@ -13,6 +13,7 @@ import { isSuppressed } from "./operations.js";
 import { validTimezone } from "./parameter-registry.js";
 import { impressumPeople, brasilApiCnpj, PEOPLE_REFRESH_DAYS } from "./adapters/people.js";
 import { AdapterError } from "./adapters/errors.js";
+import { productFor, productLinkStatement } from "./contact-products.js";
 
 const MAX_PEOPLE = 3;
 const BATCH = 5;
@@ -314,6 +315,8 @@ export async function acceptPerson(request, env, actor, rid, companyId, pid) {
   const i = await bodyJson(request);
   const role = oneOf(i.prospectRole ?? r.role_suggestion, ["decision_maker", "influencer", "provisional_decision_maker", "other"], "papel na prospecção");
   const email = r.email_scope === "personal" ? await decryptPii(r.email_encrypted, env) : null;
+  // Produto por que a pessoa responde (opcional): o papel vale só para ele, nunca para outra commodity.
+  const p = await productFor(env, actor.tenant_id, i.productId);
   const cid = crypto.randomUUID();
   const at = now();
   await commit(env, [
@@ -326,7 +329,8 @@ export async function acceptPerson(request, env, actor, rid, companyId, pid) {
       email ? await identifierHash(env, actor.tenant_id, "email", email) : null, email ? "pending" : null,
     ),
     s(env, "UPDATE person_candidates SET status='accepted',contact_id=?,decided_by=?,decided_at=? WHERE id=? AND status='to_validate'", cid, actor.id, at, r.id),
-    auditStatement(env, actor, rid, "people.accepted", "contact", cid, { companyId: c.id, personId: r.id, source: r.source_kind, emailCopied: !!email }),
+    ...(p ? [productLinkStatement(env, actor.tenant_id, { contactId: cid, productId: p.id, role, sourceLabel: `${SOURCE_LABEL[r.source_kind]} — verificado em ${r.verified_at.slice(0, 10)}`, sourceUrl: r.source_url, by: actor.id, at })] : []),
+    auditStatement(env, actor, rid, "people.accepted", "contact", cid, { companyId: c.id, personId: r.id, source: r.source_kind, emailCopied: !!email, productId: p?.id ?? null }),
   ]);
   return { contactId: cid, emailCopied: !!email, suppressed: email ? await isSuppressed(env, actor.tenant_id, "email", email) : false };
 }

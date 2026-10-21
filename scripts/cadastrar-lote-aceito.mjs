@@ -50,8 +50,20 @@ for (const e of lote.empresas) {
   const c = await call("POST", "/api/companies", e.company);
   let id = c.json.id;
   if (c.status === 409) {
-    // A empresa existente pode ser outra unidade da mesma raiz: não anexa evidência nem pessoas sem conferência humana.
-    console.log(`${e.chave}: já existe empresa com essa raiz ou CNPJ (id ${c.json.error?.details?.id}) — nada anexado; confira a unidade antes.`);
+    // Empresa já cadastrada (mesma raiz ou mesmo CNPJ, identificador oficial, nunca nome parecido): reaproveitada. Entra
+    // só o que falta para este produto (unidade, evidências, canal, relação); a relação com outra commodity fica como
+    // está. Pessoas e ligação de nível 0 não são criadas: o decisor de outra commodity não vale para esta.
+    const existing = c.json.error?.details?.id;
+    if (!existing) {
+      console.log(`${e.chave}: duplicada sem identificador da existente — nada anexado; confira.`);
+      continue;
+    }
+    if (!apply) {
+      console.log(`${e.chave}: já existe (id ${existing}); seria complementada com a relação deste produto.`);
+      continue;
+    }
+    const r = await call("POST", `/api/companies/${existing}/relations`, { productId: produto.id, unit: e.unit ?? null, evidence: e.evidence ?? [], channels: e.channels ?? [], profile: e.profile ?? null });
+    console.log(`${e.chave}: já existia (id ${existing}) — ${r.status < 300 ? `unidade ${r.json.unit ?? "sem mudança"}, evidências +${r.json.evidence?.added ?? 0} (reaproveitadas ${r.json.evidence?.reused ?? 0}), relação ${r.json.profile}${r.json.restrictions?.length ? `; restrições vigentes: ${r.json.restrictions.join("; ")}` : ""}` : `complemento recusado (${r.status} ${r.json.error?.code ?? ""})`}. Pessoas e ligação não criadas para outra commodity.`);
     continue;
   } else if (c.status !== 201) {
     console.log(`${e.chave}: falhou ao cadastrar (${c.status})`, c.json);

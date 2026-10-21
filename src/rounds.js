@@ -6,7 +6,8 @@
 // Nada aqui faz contato, aprova ficha, libera envio ou consome serviço pago. A triagem de sanções continua no Compass:
 // o cadastro em descoberta pode vir antes dela; os avanços que exigem triagem continuam bloqueados pelo próprio Compass.
 import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES } from "./http.js";
-import { complementCompany } from "./relations.js";
+import { complementCompany, ensureUnit } from "./relations.js";
+import { existingCompatible } from "./compatibility.js";
 import { statement as s, commit, auditStatement, now, product, parameters } from "./store.js";
 import { normalizeName } from "./geo.js";
 import { validateRoundConfig } from "./rodada/config.js";
@@ -531,6 +532,7 @@ export async function registerFromRound(request, env, actor, rid, id, dispatch) 
     else if (c.status !== 201) { outcome = "failed"; detail.error = c.data?.error ?? c.status; }
     else {
       outcome = "created";
+      if (e.unit) detail.unit = (await ensureUnit(env, actor.tenant_id, companyId, e.unit, now())).outcome;
       detail.evidence = [];
       for (const ev of e.evidence) detail.evidence.push((await dispatch(`/api/companies/${companyId}/evidence`, "POST", { ...ev, productId: p.id })).status);
       detail.channels = [];
@@ -592,4 +594,24 @@ export async function geoMunicipalities(request, env) {
   const like = q.replace(/[%_]/g, "");
   const rows = (await s(env, `SELECT ibge_code, name, uf FROM municipalities WHERE 1=1${uf ? " AND uf=?" : ""}${like ? " AND name_normalized LIKE ?" : ""} ORDER BY (name_normalized=?) DESC, (name_normalized LIKE ?) DESC, name LIMIT 30`, ...(uf ? [uf] : []), ...(like ? [`%${like}%`] : []), like, `${like}%`).all()).results;
   return { items: rows.map((r) => ({ code: String(r.ibge_code), name: r.name, uf: r.uf })) };
+}
+
+// GET /api/rounds/:id/existing — empresas já cadastradas com atividade compatível com a commodity da rodada, dentro do
+// raio e ainda sem relação com o produto (só leitura). Antes de trazer só candidatas novas; compatibilidade é motivo
+// para investigar, não prova de compra. O cadastro da relação continua pelo fluxo da rodada ou da prospecção.
+export async function existingForRound(env, actor, id) {
+  const r = await roundOf(env, actor, id);
+  const c = r.config;
+  const productId = c.commodity?.productId;
+  if (!productId) return { items: [], reason: "Produto do catálogo não definido na configuração da rodada." };
+  const p = await s(env, "SELECT * FROM products WHERE tenant_id=? AND id=?", actor.tenant_id, productId).first();
+  if (!p) return { items: [], reason: "Produto da configuração não está no catálogo." };
+  const o = c.origin ?? {};
+  if ((o.country ?? "BR") !== "BR") return { items: await existingCompatible(env, actor.tenant_id, { product: p, market: "international", iso2: o.country }) };
+  const m = (o.municipalityCode ? await s(env, "SELECT lat,lon FROM municipalities WHERE ibge_code=?", Number(o.municipalityCode)).first() : null)
+    ?? (o.municipality && o.region ? await s(env, "SELECT lat,lon FROM municipalities WHERE uf=? AND name_normalized=?", String(o.region).toUpperCase(), normalizeName(o.municipality)).first() : null)
+    ?? (typeof o.lat === "number" ? { lat: o.lat, lon: o.lon } : null);
+  if (!m) return { items: [], reason: "Origem sem coordenada: o reaproveitamento por distância não é calculado." };
+  const radiusKm = Number(c.radius?.value ?? 0) * (c.radius?.unit === "mi" ? 1.609344 : 1);
+  return { items: await existingCompatible(env, actor.tenant_id, { product: p, market: "national", origin: m, radiusKm }) };
 }

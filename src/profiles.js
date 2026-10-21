@@ -188,7 +188,7 @@ export async function changeProfile(request, env, actor, rid, id) {
 export async function listProfiles(env, actor, companyId) {
   await company(env, actor, companyId);
   const rows = (
-    await s(env, "SELECT * FROM buyer_profiles WHERE tenant_id=? AND company_id=? ORDER BY product_id,unit_key", actor.tenant_id, companyId).all()
+    await s(env, "SELECT b.*,COALESCE(p.display_name,p.variant_name) product_label,p.commodity FROM buyer_profiles b JOIN products p ON p.id=b.product_id WHERE b.tenant_id=? AND b.company_id=? ORDER BY b.product_id,b.unit_key", actor.tenant_id, companyId).all()
   ).results;
   return rows.map((r) => ({ ...r, ficha: canHaveFicha(r) }));
 }

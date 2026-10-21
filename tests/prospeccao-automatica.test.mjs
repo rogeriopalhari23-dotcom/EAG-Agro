@@ -142,7 +142,7 @@ test("pesquisa automática internacional: só país com comércio oficial com o 
   assert.equal(again.started, false, "a mesma combinação em andamento não é duplicada");
 });
 
-test("classificação automática: Açúcar ICUMSA 45 — África do Sul classificado sozinho (fonte oficial); VHP pergunta só a polarização; resposta não vira argumento comercial", async (t) => {
+test("classificação automática: Açúcar ICUMSA 45 — África do Sul classificado sozinho (fonte oficial); VHP usa a faixa documentada sem pergunta de lote; dado de classificação não vira argumento comercial", async (t) => {
   const { api, DB, env, grant, d } = await tradeWorld(t);
   await grant();
   const deps = { call: internalCaller(env, "rid-teste"), fetch: globalThis.fetch, trade: d.deps };
@@ -165,20 +165,15 @@ test("classificação automática: Açúcar ICUMSA 45 — África do Sul classif
   const again = await job("product-06");
   await runJob(env, again, deps);
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM product_codes WHERE product_id='product-06'").get().n, 2);
-  // VHP: a polarização da ficha (99,30–99,60%) cruza o limite de 99,5°: pergunta só essa característica.
+  // VHP: a polarização da ficha (99,30–99,60%) cruza o limite de 99,5°: a pesquisa de mercado usa as duas subposições da
+  // faixa documentada, sem perguntar a polarização do lote (classificação do lote fica na etapa comercial).
   const idV = await job("product-08");
   await runJob(env, idV, deps);
   j = await get(idV);
-  assert.equal(j.decision.kind, "classification_characteristic", JSON.stringify(j.decision));
-  assert.match(j.decision.message, /polarização do lote de VHP é inferior a 99,5°/);
-  assert.deepEqual(j.decision.action.options.map((o) => o.value), ["inferior_99_5", "igual_ou_superior_99_5"]);
-  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM product_codes WHERE product_id='product-08'").get().n, 0, "nada gravado sem a característica");
-  const r = await api(`/api/prospect/jobs/${idV}/act`, "POST", { action: "answer_characteristic", value: "inferior_99_5" });
-  assert.equal(r.status, 200, JSON.stringify(r.data));
-  await runJob(env, idV, deps);
-  assert.deepEqual(DB.raw.prepare("SELECT code FROM product_codes WHERE product_id='product-08' AND code_system='HS'").all().map((x) => x.code), ["170114"]);
+  assert.notEqual(j.decision?.kind, "classification_characteristic", JSON.stringify(j.decision));
+  assert.deepEqual(DB.raw.prepare("SELECT code FROM product_codes WHERE product_id='product-08' AND code_system='HS' ORDER BY code").all().map((x) => x.code), ["170114", "170199"]);
   const chars = DB.raw.prepare("SELECT * FROM product_characteristics WHERE product_id='product-08'").all();
-  assert.ok(chars.some((c) => c.char_key === "classificacao:polarizacao_do_lote" && /Informado por/.test(c.source_ref)), "resposta registrada com a autoria de quem respondeu");
+  assert.ok(chars.some((c) => c.char_key === "classificacao:polarizacao_especificada" && /Ficha técnica interna EAG/.test(c.source_ref)), "fato documental guardado com a fonte");
   assert.equal(mentionableCharacteristics(chars).length, 0, "dado de classificação não vira argumento de mensagem");
   // Sem regra fundamentada (UCO): pendência técnica para o Administrador, sem código genérico.
   const idU = await job("product-27");

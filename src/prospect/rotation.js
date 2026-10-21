@@ -13,6 +13,8 @@ const ACTIVE = ["queued", "running", "waiting", "needs_decision", "paused"];
 const parse = (t, d = null) => { try { return t ? JSON.parse(t) : d; } catch { return d; } };
 const norm = (x) => String(x ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 // Desempate estável por dia: a rotação muda de um dia para o outro, sem sorteio sem rastro.
+// "Commodity (variante)", sem repetir quando o nome da variante já é o da commodity.
+const both = (label, variant) => (!variant || variant === label ? variant || label : `${label} (${variant})`);
 const dayHash = (k, day) => [...`${k}|${day}`].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 
 async function history(env, tenant, market) {
@@ -73,43 +75,77 @@ export async function pickNational(env, tenant, { profile, policy, at }) {
   return best ? { ...best, eligible: cands.length } : { none: true, eligible: 0, reasons: busy ? [`as ${busy} combinação(ões) elegível(is) já têm pesquisa em andamento (reaproveitadas, sem duplicar)`, ...skipped] : skipped.length ? skipped : ["nenhuma origem configurada para commodity com busca automática (campanha nacional, rodada ou prospecção anterior)"] };
 }
 
-// ---------- internacional: produto classificado × país com comércio oficial com o Brasil e fonte de empresas ----------
-export async function pickInternational(env, tenant, { profile, at }) {
+// ---------- internacional: produto classificado × país com comércio oficial com o Brasil ----------
+// Evidência de mercado e fonte de empresas são separadas: o país entra pela evidência oficial em QUALQUER subposição do
+// produto (todas as subposições com valor de origem Brasil, não só as cinco maiores); a falta de conector de empresas
+// para o país e a commodity vira limitação de cobertura listada a cada consulta, nunca esquecimento do mercado nem
+// conclusão de que não há compradores.
+const SOURCE_TEXT = (sm, c) => sm.source === "mdic" ? `exportações do Brasil para ${c.name_pt} (MDIC, FOB, ${sm.period_from ?? "?"} a ${sm.period_to ?? "data não informada"})` : `importações de origem Brasil declaradas por ${c.name_pt} (Comtrade, ${sm.period_to ?? "ano não informado"})`;
+const SUMMARY_SQL = "SELECT t.iso3,t.source,t.top_json,t.hs6_json,t.period_from,t.period_to FROM trade_country_summary t JOIN trade_list_current c ON c.iso3=t.iso3 AND c.source=t.source AND c.content_sha256=t.content_sha256 WHERE t.period_months=(CASE t.source WHEN 'mdic' THEN ? ELSE 0 END) AND t.state='purchase_identified'";
+
+export async function pickInternational(env, tenant, { profile, at }, deps = {}) {
   const products = (await s(env, "SELECT * FROM products WHERE tenant_id=? AND active<>0 AND identity_status='confirmed'", tenant).all()).results;
-  const codes = (await s(env, "SELECT product_id,code FROM product_codes WHERE status='confirmed' AND code_system IN ('HS','NCM')", ).all()).results;
+  const codes = (await s(env, "SELECT product_id,code FROM product_codes WHERE status='confirmed' AND code_system IN ('HS','NCM')").all()).results;
   const hsOf = new Map();
-  for (const c of codes) (hsOf.get(c.product_id) ?? hsOf.set(c.product_id, new Set()).get(c.product_id)).add(String(c.code).replace(/\D/g, "").slice(0, 6));
-  // Resumos vigentes por país e fonte (lista mensal): subposições com valor de origem Brasil (Comtrade) ou exportadas pelo Brasil (MDIC).
-  const sums = (await s(env, "SELECT t.iso3,t.source,t.top_json,t.period_to FROM trade_country_summary t JOIN trade_list_current c ON c.iso3=t.iso3 AND c.source=t.source AND c.version_id=t.version_id", ).all()).results;
+  for (const c of codes) (hsOf.get(c.product_id) ?? hsOf.set(c.product_id, new Set()).get(c.product_id)).add(String(c.code).replace(/D/g, "").slice(0, 6));
+  const months = Number((await parameters(env, tenant))["period_default_months:international"]) || 0;
+  // Resumos vigentes por país e fonte (lista mensal já publicada). Resumo antigo sem a lista completa de subposições é
+  // refeito do objeto oficial guardado no R2 (reaproveitamento, sem chamada externa nem custo).
+  let sums = (await s(env, SUMMARY_SQL, months).all()).results;
+  // Ponteiro vigente sem resumo (ou com resumo antigo, sem a lista completa): refeito antes de escolher.
+  const missing = (await s(env, "SELECT COUNT(*) n FROM trade_list_current c LEFT JOIN trade_country_summary t ON t.content_sha256=c.content_sha256 AND t.period_months=(CASE c.source WHEN 'mdic' THEN ? ELSE 0 END) WHERE t.content_sha256 IS NULL OR t.hs6_json IS NULL", months).first())?.n ?? 0;
+  if (missing && deps.rebuild) {
+    await deps.rebuild(env, tenant).catch(() => null);
+    sums = (await s(env, SUMMARY_SQL, months).all()).results;
+  }
+  const partialSummaries = new Set(sums.filter((x) => x.hs6_json == null).map((x) => x.iso3));
   const countries = new Map((await s(env, "SELECT iso3,iso2,name_pt FROM countries").all()).results.map((c) => [c.iso3, c]));
   const allowed = new Set(profile.sources?.international ?? []);
   const jobs = (await history(env, tenant, "international")).map((j) => ({ ...j, key: `${j.input.productId}|${j.input.location?.iso3}` }));
   const day = at.slice(0, 10);
-  const cands = [];
-  let unclassified = 0, busy = 0;
+  const byKey = new Map();
+  let unclassified = 0;
   for (const p of products) {
     const hs = [...(hsOf.get(p.id) ?? [])];
     if (!hs.length) { unclassified++; continue; }
-    const label = await commodityLabelOf(env, tenant, p.commodity);
     for (const sm of sums) {
-      const top = parse(sm.top_json, []).filter((t) => hs.includes(String(t.hs6)) && t.usd > 0);
-      if (!top.length) continue;
       const c = countries.get(sm.iso3);
       if (!c?.iso2) continue;
-      const srcs = foreignSources(c.iso2, hs).filter((x) => x.status === "available" && allowed.has(x.key));
-      if (!srcs.length) continue; // sem fonte de empresas para o país e a commodity: não é escolhida agora
+      // Todas as subposições do país (ou, enquanto o resumo completo não existe, só as cinco maiores, avisando).
+      const all = sm.hs6_json != null ? parse(sm.hs6_json, {}) : Object.fromEntries(parse(sm.top_json, []).map((t) => [String(t.hs6), t.usd]));
+      const hit = hs.filter((h) => Number(all[h]) > 0);
+      if (!hit.length) continue;
       const key = `${p.id}|${c.iso3}`;
-      if (cands.some((x) => x.key === key)) continue;
-      const score = scoreOf(key, jobs, at);
-      if (!score) { busy++; continue; }
-      const what = sm.source === "mdic" ? `exportações do Brasil para ${c.name_pt} (MDIC, FOB, até ${sm.period_to ?? "data não informada"})` : `importações de origem Brasil declaradas por ${c.name_pt} (Comtrade, ${sm.period_to ?? "ano não informado"})`;
-      cands.push({
-        key, score, tie: jobs.filter((j) => j.input.productId === p.id).length,
-        input: { market: "international", productId: p.id, location: { iso3: c.iso3 } },
-        reason: `${label} (${p.variant_name}) × ${c.name_pt}: ${what} registram SH ${top.map((t) => t.hs6).join(", ")}; ${score.why}. Fontes de empresas: ${srcs.map((x) => x.label).join("; ")}.`,
-      });
+      const e = byKey.get(key) ?? byKey.set(key, { key, p, c, hs, evidence: [] }).get(key);
+      e.evidence.push({ source: sm.source, text: SOURCE_TEXT(sm, c), hs6: hit, usd: hit.reduce((n, h) => n + Number(all[h]), 0) });
     }
   }
+  const cands = [], gaps = [];
+  let busy = 0;
+  for (const e of byKey.values()) {
+    const label = await commodityLabelOf(env, tenant, e.p.commodity);
+    const ev = e.evidence.map((x) => `${x.text} registram SH ${x.hs6.join(", ")}`).join("; ");
+    const all = foreignSources(e.c.iso2, e.hs);
+    const srcs = all.filter((x) => x.status === "available" && allowed.has(x.key));
+    if (!srcs.length) {
+      // Mercado com evidência e sem fonte de empresas: limitação de cobertura, mantida à vista.
+      const why = all.length ? all.map((x) => `${x.label}: ${x.status === "available" ? "fora das fontes do perfil" : x.note ?? "pendente"}`).join("; ") : "nenhum conector de empresas cobre este país e esta commodity";
+      gaps.push({ productId: e.p.id, iso3: e.c.iso3, label: `${both(label, e.p.variant_name)} × ${e.c.name_pt}`, evidence: ev, coverage: why });
+      continue;
+    }
+    const score = scoreOf(e.key, jobs, at);
+    if (!score) { busy++; continue; }
+    cands.push({
+      key: e.key, score, tie: jobs.filter((j) => j.input.productId === e.p.id).length,
+      input: { market: "international", productId: e.p.id, location: { iso3: e.c.iso3 } },
+      reason: `${both(label, e.p.variant_name)} × ${e.c.name_pt}: ${ev}; ${score.why}. Fontes de empresas: ${srcs.map((x) => x.label).join("; ")}.`,
+    });
+  }
+  const coverage = {
+    gaps: gaps.slice(0, 30), gapCount: gaps.length,
+    note: gaps.length ? `${gaps.length} mercado(s) com comércio oficial registrado com o Brasil e sem fonte de empresas coberta: limitação de cobertura, não ausência de compradores.` : null,
+    partialSummaries: partialSummaries.size ? `Resumo completo de subposições ainda em preparação para ${partialSummaries.size} país(es): neles só as cinco maiores foram consideradas por enquanto.` : null,
+  };
   const best = pickBest(cands, day);
-  return best ? { ...best, eligible: cands.length } : { none: true, eligible: 0, reasons: [busy ? `as ${busy} combinação(ões) elegível(is) já têm pesquisa em andamento (reaproveitadas, sem duplicar)` : null, unclassified ? `${unclassified} produto(s) ainda sem classificação SH confirmada` : null, "nenhum país com comércio oficial registrado com o Brasil para os produtos classificados e com fonte de empresas coberta"].filter(Boolean) };
+  return best ? { ...best, eligible: cands.length, coverage } : { none: true, eligible: 0, coverage, reasons: [busy ? `as ${busy} combinação(ões) elegível(is) já têm pesquisa em andamento (reaproveitadas, sem duplicar)` : null, unclassified ? `${unclassified} produto(s) ainda sem classificação SH confirmada` : null, gaps.length ? coverage.note : null, !byKey.size ? "nenhum país com comércio oficial registrado com o Brasil para os produtos classificados (na lista mensal já publicada)" : null].filter(Boolean) };
 }

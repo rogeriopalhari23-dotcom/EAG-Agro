@@ -19,7 +19,7 @@ export const SOURCE_LABEL = {
 };
 
 export function summaryStmt(env, row) {
-  return s(env, `INSERT OR IGNORE INTO trade_country_summary(${SUMMARY_COLUMNS.join(",")}) VALUES (${SUMMARY_COLUMNS.map(() => "?").join(",")})`, ...SUMMARY_COLUMNS.map((c) => row[c] ?? null));
+  return s(env, `INSERT OR REPLACE INTO trade_country_summary(${SUMMARY_COLUMNS.join(",")}) VALUES (${SUMMARY_COLUMNS.map(() => "?").join(",")})`, ...SUMMARY_COLUMNS.map((c) => row[c] ?? null));
 }
 
 async function periodMonths(env, tenant) {
@@ -36,7 +36,7 @@ export async function rebuildSummaries(env, tenant, { limit = 40 } = {}) {
   if (!env.FILES) return { built: 0, remaining: null, reason: "R2 não configurado." };
   const missingSql = `FROM trade_list_current c LEFT JOIN trade_country_summary t
       ON t.content_sha256=c.content_sha256 AND t.period_months=(CASE c.source WHEN 'mdic' THEN ? ELSE 0 END)
-     WHERE t.content_sha256 IS NULL`;
+     WHERE t.content_sha256 IS NULL OR t.hs6_json IS NULL`;
   const todo = (await s(env, `SELECT c.iso3,c.source,c.version_id,c.r2_key,c.content_sha256 ${missingSql} ORDER BY c.source,c.iso3 LIMIT ?`, months, limit).all()).results;
   let built = 0;
   const failed = [];

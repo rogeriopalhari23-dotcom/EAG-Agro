@@ -12,6 +12,11 @@ const monthsBack = (ym, n) => {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 };
 
+// Todas as subposições com valor (não só as maiores): a pesquisa cruza o produto com qualquer uma delas.
+function every(byHs6) {
+  return Object.fromEntries([...byHs6.entries()].filter(([, usd]) => usd > 0).sort((a, b) => a[0].localeCompare(b[0])).map(([hs6, usd]) => [hs6, Math.round(usd)]));
+}
+
 function top(byHs6, names) {
   return [...byHs6.entries()]
     .filter(([, usd]) => usd > 0)
@@ -24,7 +29,7 @@ function top(byHs6, names) {
 export function summarizeMdic(obj, periodMonths) {
   const end = obj?.fileLastPeriod || obj?.lastPeriod;
   if (!obj || !end || obj.state === "data_unavailable")
-    return { source: "mdic", state: "data_unavailable", periodFrom: null, periodTo: null, basis: "FOB", brazilUsd: null, hs6Count: 0, top: [] };
+    return { source: "mdic", state: "data_unavailable", periodFrom: null, periodTo: null, basis: "FOB", brazilUsd: null, hs6Count: 0, top: [], all: {} };
   const from = monthsBack(end, periodMonths);
   const byHs6 = new Map(), best = new Map(), names = new Map();
   for (const l of obj.lines ?? []) {
@@ -44,16 +49,16 @@ export function summarizeMdic(obj, periodMonths) {
   const withValue = [...byHs6.values()].filter((v) => v > 0).length;
   return {
     source: "mdic", state: withValue ? "purchase_identified" : "no_record", periodFrom: from, periodTo: end, basis: "FOB",
-    brazilUsd: Math.round(total), hs6Count: withValue, top: top(byHs6, names),
+    brazilUsd: Math.round(total), hs6Count: withValue, top: top(byHs6, names), all: every(byHs6),
   };
 }
 
 // Comtrade: importações declaradas pelo país, origem Brasil, no último ano declarado (CIF quando houver).
 export function summarizeComtrade(obj) {
   if (!obj || obj.state === "data_unavailable")
-    return { source: "comtrade", state: "data_unavailable", periodFrom: null, periodTo: null, basis: null, brazilUsd: null, hs6Count: 0, top: [] };
+    return { source: "comtrade", state: "data_unavailable", periodFrom: null, periodTo: null, basis: null, brazilUsd: null, hs6Count: 0, top: [], all: {} };
   if (obj.state === "not_declared" || !obj.lines?.length)
-    return { source: "comtrade", state: obj.state === "not_declared" ? "not_declared" : "no_record", periodFrom: null, periodTo: obj.lastPeriod ?? null, basis: obj.basis ?? null, brazilUsd: null, hs6Count: 0, top: [] };
+    return { source: "comtrade", state: obj.state === "not_declared" ? "not_declared" : "no_record", periodFrom: null, periodTo: obj.lastPeriod ?? null, basis: obj.basis ?? null, brazilUsd: null, hs6Count: 0, top: [], all: {} };
   const year = Number(obj.lastPeriod) || Math.max(...obj.lines.map((l) => l.year));
   const byHs6 = new Map(), bases = new Set();
   for (const l of obj.lines) {
@@ -67,7 +72,7 @@ export function summarizeComtrade(obj) {
   return {
     source: "comtrade", state: withValue ? "purchase_identified" : "no_record", periodFrom: String(year), periodTo: String(year),
     basis: bases.size === 1 ? [...bases][0] : bases.size ? "misto" : obj.basis ?? null,
-    brazilUsd: Math.round(total), hs6Count: withValue, top: top(byHs6, names),
+    brazilUsd: Math.round(total), hs6Count: withValue, top: top(byHs6, names), all: every(byHs6),
   };
 }
 
@@ -76,7 +81,7 @@ export function summaryRow({ iso3, versionId, sha, periodMonths, summary }) {
   return {
     content_sha256: sha, period_months: summary.source === "mdic" ? periodMonths : 0, iso3, source: summary.source, version_id: versionId,
     state: summary.state, period_from: summary.periodFrom, period_to: summary.periodTo, basis: summary.basis,
-    brazil_usd: summary.brazilUsd, hs6_count: summary.hs6Count, top_json: JSON.stringify(summary.top),
+    brazil_usd: summary.brazilUsd, hs6_count: summary.hs6Count, top_json: JSON.stringify(summary.top), hs6_json: JSON.stringify(summary.all ?? {}),
   };
 }
-export const SUMMARY_COLUMNS = ["content_sha256", "period_months", "iso3", "source", "version_id", "state", "period_from", "period_to", "basis", "brazil_usd", "hs6_count", "top_json"];
+export const SUMMARY_COLUMNS = ["content_sha256", "period_months", "iso3", "source", "version_id", "state", "period_from", "period_to", "basis", "brazil_usd", "hs6_count", "top_json", "hs6_json"];

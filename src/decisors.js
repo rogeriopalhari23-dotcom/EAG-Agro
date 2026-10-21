@@ -6,6 +6,9 @@
 // Canal geral da empresa (contact_kind = company_channel) fica à parte: nunca aparece como contato pessoal de comprador.
 // Mesma visibilidade do detalhe da empresa (que já mostra os contatos decriptados); nada é deduzido nem validado aqui.
 import { decryptPii } from "./crypto.js";
+import { productLinks } from "./contact-products.js";
+// Com productId, a pessoa só conta como decisora quando está vinculada a esse produto (contact_products); vinculada só
+// a outro produto fica como "responde por outro produto"; sem vínculo, "produto não informado". Nada é propagado.
 
 const ROLE_LABEL = { decision_maker: "decisor", provisional_decision_maker: "decisor provisório", influencer: "influenciador", other: "outro papel" };
 const BUYER_ROLES = new Set(["decision_maker", "provisional_decision_maker", "influencer"]);
@@ -27,11 +30,12 @@ async function rowsFor(env, tenant, ids) {
 }
 
 // → Map(companyId → { people: [...], channels: [...], summary })
-export async function decisorsFor(env, tenant, ids) {
+export async function decisorsFor(env, tenant, ids, { productId = null } = {}) {
   const out = new Map(ids.map((id) => [id, { people: [], channels: [] }]));
   if (!ids.length) return out;
   const { contacts, verif, cands } = await rowsFor(env, tenant, ids);
   const confirmed = new Set(verif.map((v) => v.contact_id));
+  const links = await productLinks(env, tenant, contacts.filter((c) => c.contact_kind !== "company_channel").map((c) => c.id));
   for (const c of contacts) {
     const [name, title, email, phone] = await Promise.all([c.full_name_encrypted, c.job_title_encrypted, c.email_encrypted, c.phone_encrypted].map((x) => decryptPii(x, env)));
     const box = out.get(c.company_id);
@@ -39,7 +43,11 @@ export async function decisorsFor(env, tenant, ids) {
       box.channels.push({ email: email || null, phone: phone || null, sourceUrl: c.source_url, sourceLabel: c.source_label, emailValidation: c.email_validation ?? null });
       continue;
     }
-    box.people.push({ kind: "contact", id: c.id, name: name || null, title: title || null, email: email || null, phone: phone || null, role: c.prospect_role ?? null, roleLabel: ROLE_LABEL[c.prospect_role] ?? "papel não informado", buyer: BUYER_ROLES.has(c.prospect_role), status: confirmed.has(c.id) ? "confirmado" : "identificado", sourceUrl: c.source_url, sourceLabel: c.source_label, emailValidation: c.email_validation ?? null });
+    const prods = links.get(c.id) ?? [];
+    const mine = productId ? prods.find((x) => x.productId === productId) : null;
+    const scope = !productId ? null : mine ? "this_product" : prods.length ? "other_product" : "not_informed";
+    const role = mine?.role ?? c.prospect_role;
+    box.people.push({ kind: "contact", id: c.id, products: prods, productScope: scope, productScopeLabel: { this_product: "responde por este produto", other_product: `responde por ${prods.map((x) => x.label).join(", ")}`, not_informed: "produto não informado" }[scope] ?? null, name: name || null, title: title || null, email: email || null, phone: phone || null, role: role ?? null, roleLabel: ROLE_LABEL[role] ?? "papel não informado", buyer: BUYER_ROLES.has(role) && (!productId || scope === "this_product"), status: confirmed.has(c.id) ? "confirmado" : "identificado", sourceUrl: c.source_url, sourceLabel: c.source_label, emailValidation: c.email_validation ?? null });
   }
   for (const p of cands) {
     const [name, title, email, phone] = await Promise.all([p.name_encrypted, p.title_encrypted, p.email_encrypted, p.phone_encrypted].map((x) => decryptPii(x, env)));
@@ -47,7 +55,8 @@ export async function decisorsFor(env, tenant, ids) {
   }
   for (const box of out.values()) {
     box.people.sort((a, b) => (b.buyer ? 1 : 0) - (a.buyer ? 1 : 0) || STATUS_RANK[a.status] - STATUS_RANK[b.status] || String(a.name).localeCompare(String(b.name), "pt-BR"));
-    const main = box.people.find((x) => x.buyer) ?? null;
+    // Decisor antes de decisor provisório e de influenciador (o resumo mostra quem decide a compra).
+    const main = ["decision_maker", "provisional_decision_maker", "influencer"].map((r) => box.people.find((x) => x.buyer && x.role === r)).find(Boolean) ?? box.people.find((x) => x.buyer) ?? null;
     box.summary = main ? { name: main.name, title: main.title, status: main.status, roleLabel: main.roleLabel } : null;
     box.hasChannel = box.channels.length > 0 || box.people.some((x) => x.email || x.phone);
   }

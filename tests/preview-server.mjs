@@ -107,6 +107,15 @@ for (const cid of companies.slice(0, 3)) await api(`/api/companies/${cid}/level0
 DB.raw.prepare("UPDATE campaigns SET status='draft' WHERE id=?").run(camp.id);
 await api("/api/pauses", "POST", { scope: "company", scopeRef: companies[3], reason: "Prévia: pediu retorno em novembro (fictício)" });
 await api("/api/suppression", "POST", { channel: "email", value: "descadastro@exemplo.invalid", reason: "opt_out" });
+// Mesma empresa em duas commodities (fictício): milho e farelo de soja, cada uma com relação, evidência e decisor
+// próprios. A unidade ganha a CNAE e a coordenada do município (reaproveitamento por atividade compatível).
+{
+  const m = DB.raw.prepare("SELECT ibge_code,lat,lon FROM municipalities WHERE uf='GO' AND name='Trindade'").get();
+  if (m) DB.raw.prepare("UPDATE company_units SET primary_cnae='1066000',municipality_ibge=?,lat=?,lon=?,geo_precision='municipality_centroid',geo_source='IBGE (prévia)' WHERE cnpj='71111111000101'").run(m.ibge_code, m.lat, m.lon);
+  await api(`/api/companies/${a}/contacts`, "POST", { fullName: "Marcos Prado (fictício)", jobTitle: "Comprador de grãos", prospectRole: "decision_maker", sourceLabel: "Site da empresa (fictício)", productId: "product-03" });
+  await api(`/api/companies/${a}/relations`, "POST", { productId: "product-16", unit: { cnpj: "71111111000101", municipality: "Trindade", uf: "GO" }, evidence: [{ category: "business", evidenceType: "company_document", market: "national", supports: ["consumes_as_input"], reference: "Site próprio: 'farelo de soja na formulação' (fictício)", sourceUrl: "https://exemplo.invalid/formulacao", consultedAt: "2026-10-21", validationStatus: "pending" }], profile: { profileClass: "possible_final_consumer", basis: "Site próprio cita farelo de soja (fictício)" } });
+  await api(`/api/companies/${a}/contacts`, "POST", { fullName: "Paula Reis (fictícia)", jobTitle: "Compras de farelos", prospectRole: "decision_maker", sourceLabel: "Site da empresa (fictício)", productId: "product-16" });
+}
 
 // Rodada fictícia no mesmo formato da Rodada 1: importação, execução, cadastro em descoberta, pesquisa encerrada, anotação.
 const cfg = JSON.parse(await readFile(new URL("../docs/implementation/rodadas/exemplos/milho-gmo-indiara-300km.json", import.meta.url), "utf8"));
@@ -139,7 +148,11 @@ await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/G
 const snapshot = (t) => DB.raw.prepare(`SELECT * FROM ${t}`).all();
 const savedCountries = { countries: snapshot("countries"), country_mdic_codes: snapshot("country_mdic_codes") };
 keepCountries(DB, ["DEU", "CHN"]);
-await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "22"].sort() } });
+await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "15", "22"].sort() } });
+// Alemanha (FICTÍCIO): seis subposições maiores que o café nas exportações do Brasil (o café fica fora das cinco maiores
+// e a pesquisa automática ainda o encontra). China (FICTÍCIO): óleo de palma com comércio e sem conector de empresas.
+const deuBig = [["12019000", 200000], ["17011400", 210000], ["17019900", 220000], ["01012100", 230000], ["02013000", 240000], ["12011000", 250000]].map(([n, v]) => `"2026";"02";"${n}";"10";"023";"SP";"01";"0817600";${v};${v};${v}`);
+const chnPalm = '"2026";"02";"15111000";"10";"160";"PA";"01";"0817600";40000;40000;40000';
 // França (FICTÍCIO): a Comtrade simulada responde milho (1005.90) e álcool etílico (2207.10), mas o país fica SEM lista
 // mensal até a prospecção pedir a geração (o caso "Milho GMO — França").
 const tclock = { at: "2026-10-10T12:00:00.000Z" };
@@ -148,10 +161,10 @@ const tclock = { at: "2026-10-10T12:00:00.000Z" };
 const egyCorn = '"2025";"01";"10059010";"10";"240";"PR";"01";"0917500";500000;500000;120000';
 const tradeDriver = driver(ctx.env, tradeSources({
   hs: ["100590", "220710"],
-  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"'],
-  mdicRows: { 2026: MDIC_ROWS[2026], 2025: [...MDIC_ROWS[2025], egyCorn] },
-  comtrade: { 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
-  covered: { comtrade: ["FRA", "EGY"], mdic: ["EGY"] },
+  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"', '"17019900";"10";"170199";"Outros açúcares";"Other sugar"', '"01012100";"10";"010121";"Cavalos";"Horses"', '"02013000";"10";"020130";"Carne bovina";"Beef"', '"12011000";"10";"120110";"Soja para semeadura";"Soy seed"', '"15111000";"10";"151110";"Óleo de palma em bruto";"Crude palm oil"'],
+  mdicRows: { 2026: [...MDIC_ROWS[2026], ...deuBig, chnPalm], 2025: [...MDIC_ROWS[2025], egyCorn] },
+  comtrade: { 276: { years: [2022, 2023, 2024, 2025], rows: [rec(276, "090111", 2025, 0, 100), rec(276, "170114", 2024, 0, 50)] }, 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
+  covered: { comtrade: ["FRA", "EGY"], mdic: ["EGY", "CHN"] },
 }), tclock);
 await tradeDriver.start();
 await tradeDriver.drain();
@@ -161,7 +174,7 @@ for (const [t, rows] of Object.entries(savedCountries))
 const coffee = (await api("/api/catalog/product-05")).data;
 await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: coffee.revision, reason: "Prévia local (fictício)" });
 // Classificação SH só da PRÉVIA (fictícia, como se confirmada pelo Administrador): milho GMO e álcool etílico neutro.
-for (const [pid, code] of [["product-03", "100590"], ["product-11", "220710"], ["product-01", "120190"]]) {
+for (const [pid, code] of [["product-03", "100590"], ["product-11", "220710"], ["product-01", "120190"], ["product-22", "151110"]]) {
   const p = (await api(`/api/catalog/${pid}`)).data;
   await api(`/api/catalog/${pid}/codes`, "POST", { codeSystem: "HS", code, status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: p.revision, reason: "Prévia local (fictício)" });
 }

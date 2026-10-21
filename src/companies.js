@@ -23,6 +23,7 @@ import {
 } from "./store.js";
 import { encryptPii, decryptPii, identifierHash } from "./crypto.js";
 import { decisorsFor, companiesMatchingPeople } from "./decisors.js";
+import { productFor, productLinkStatement } from "./contact-products.js";
 import { contactTargetFlag, listProfiles } from "./profiles.js";
 import { validTimezone } from "./parameter-registry.js";
 import { isSuppressed } from "./operations.js";
@@ -372,6 +373,8 @@ export async function addContact(request, env, actor, rid, id) {
   // R2.1.2: contato suprimido nunca fica selecionável; o cadastro registra, a ficha recusa.
   const suppressed = values[2] ? await isSuppressed(env, actor.tenant_id, "email", values[2]) : false;
   const encrypted = await Promise.all(values.map((v) => encryptPii(v, env)));
+  // Produto por que a pessoa responde (opcional): o papel vale só para ele (contact_products).
+  const prod = await productFor(env, actor.tenant_id, i.productId);
   await commit(env, [
     companyLock(env, actor, c),
     s(
@@ -389,11 +392,13 @@ export async function addContact(request, env, actor, rid, id) {
       values[2] ? "pending" : null,
       timezone,
     ),
+    ...(prod ? [productLinkStatement(env, actor.tenant_id, { contactId: cid, productId: prod.id, role, sourceLabel: str(i.sourceLabel, "fonte", 1000), sourceUrl: url(i.sourceUrl), by: actor.id, at: now() })] : []),
     auditStatement(env, actor, rid, "contact.created", "contact", cid, {
       companyId: id,
       fieldsProvided: values.map(Boolean),
       prospectRole: role,
       suppressed,
+      productId: prod?.id ?? null,
     }),
   ]);
   return { id: cid, suppressed, targetFlag: contactTargetFlag(values[1], null) };
@@ -768,5 +773,7 @@ export async function updateContact(request, env, actor, rid, contactId) {
 export async function decisorsOf(request, env, actor) {
   const ids = String(new URL(request.url).searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 100);
   const own = ids.length ? (await env.DB.prepare(`SELECT id FROM companies WHERE tenant_id=? AND id IN (${ids.map(() => "?").join(",")})`).bind(actor.tenant_id, ...ids).all()).results.map((r) => r.id) : [];
-  return { items: Object.fromEntries(await decisorsFor(env, actor.tenant_id, own)) };
+  // ?productId=: decisores do produto pesquisado (o papel numa commodity não vale para outra).
+  const productId = new URL(request.url).searchParams.get("productId") || null;
+  return { items: Object.fromEntries(await decisorsFor(env, actor.tenant_id, own, { productId })) };
 }

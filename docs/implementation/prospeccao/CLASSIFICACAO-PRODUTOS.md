@@ -15,9 +15,9 @@
 | Sorgo | 1007.90 / 1007.90.00 | Sorgo de grão, não semente. |
 | Açúcar ICUMSA 45 | 1701.99 / 1701.99.00 | Polarização ≥ 99,80% (ficha): não é açúcar em bruto (Nota 1). |
 | Açúcar ICUMSA 150 | 1701.99 / 1701.99.00 | Polarização ≥ 99,50% (ficha), que não é "inferior a 99,5°": não é açúcar em bruto. |
-| Açúcar VHP | **pergunta**: polarização do lote | 99,30% a 99,60% cruza o limite. Inferior a 99,5° → 1701.14.00 (cana em bruto); igual ou superior → 1701.99.00. |
+| Açúcar VHP | 1701.14.00 e 1701.99.00 (escopo **pesquisa**) | 99,30% a 99,60% cruza o limite: a pesquisa de mercado usa as duas subposições da faixa documentada. A polarização de cada lote (inferior a 99,5° → 1701.14.00; igual ou superior → 1701.99.00) é classificação do lote comercial, fora da pesquisa. |
 | Café | **pergunta**: cru ou torrado; descafeinado | 0901.11.10, 0901.12.00 ou 0901.21.00. |
-| Etanol hidratado e anidro; álcool industrial (3) | **pergunta**: desnaturado? | Não desnaturado → 2207.10; desnaturado → 2207.20. |
+| Etanol hidratado e anidro; álcool industrial (3) | 2207.10 e 2207.20 (escopo **pesquisa**) | A adição de desnaturante é do lote: a pesquisa usa as duas subposições da posição 2207; o lote é classificado na etapa comercial. |
 | Trigo | **pergunta**: trigo duro? | 1001.19.00 (duro) × 1001.99.00 (outros). |
 | Farelo de soja | 2304.00 | Resíduos da extração do óleo de soja. |
 | Farelo de canola | 2306.41 / 2306.41.00 | Canola é colza de baixo teor de ácido erúcico. |
@@ -33,6 +33,10 @@
 | CSO | **sem regra** | Identidade do produto ainda pendente. |
 
 ## Funcionamento
+
+- **Pesquisa de mercado × lote comercial (2026-10-21):** quando a especificação documentada cobre mais de uma subposição, a pesquisa usa todas elas (`product_codes.scope = research`) e não pergunta característica de lote. Pergunta-se só característica do **produto** que muda o código e que nenhum documento registra (café cru ou torrado, trigo duro, óleo bruto ou refinado).
+- **Características guardadas:** resposta da pessoa e fato documental usado (ex.: `classificacao:polarizacao_especificada` = 99,30% a 99,60%, da ficha) ficam em `product_characteristics` com fonte e data (`verified_at`). São reaproveitadas: código removido depois é refeito sem nova pergunta.
+- **Sem pergunta repetida:** a mesma pergunta pendente em duas prospecções do mesmo produto aparece como uma só; a resposta dada numa delas destrava as outras.
 
 - **Classificação verificada:** o produto com código confirmado é reaproveitado e não é reclassificado.
 - **Sem código:** a pesquisa internacional aplica a regra no próprio trabalho automático e segue. O código entra como confirmado, com a fonte oficial, a versão e o fundamento. O autor é o usuário de sistema `system-classification`, e a auditoria `catalog.code_auto_classified` registra o canal `automation` e a política.
