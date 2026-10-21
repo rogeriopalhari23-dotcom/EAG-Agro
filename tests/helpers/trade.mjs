@@ -61,11 +61,13 @@ export const SIM_COUNTRIES = { comtrade: ["DEU", "USA", "PRT", "CHN"], mdic: ["D
 // opts.covered: { comtrade: [ISO3], mdic: [ISO3] } das linhas extras; opts.ncm: linhas extras da tabela NCM do MDIC.
 export function sources(opts = {}) {
   // opts.comtrade: declarantes extras { código: { years, rows } }; opts.hs: códigos SH6 extras da tabela da Comtrade.
-  const CT = { ...COMTRADE, ...(opts.comtrade ?? {}) };
+  // opts.exclusive: só os dados passados (extrato real da prévia), sem os exemplos fictícios padrão.
+  const CT = opts.exclusive ? { ...(opts.comtrade ?? {}) } : { ...COMTRADE, ...(opts.comtrade ?? {}) };
   const HSX = opts.hs ? { results: [...HS.results, ...opts.hs.map((id) => ({ id, aggrLevel: 6, text: `${id} - item ${id}` }))] } : HS;
   const calls = { comtrade: 0, data: 0, mdicGets: 0, log: [] };
   const etags = { 2026: '"a1"', 2025: '"b1"', ...(opts.etags || {}) };
-  const covered = { comtrade: [...SIM_COUNTRIES.comtrade, ...(opts.covered?.comtrade ?? [])], mdic: [...SIM_COUNTRIES.mdic, ...(opts.covered?.mdic ?? [])] };
+  const base = opts.exclusive ? { comtrade: [], mdic: [] } : SIM_COUNTRIES;
+  const covered = { comtrade: [...base.comtrade, ...(opts.covered?.comtrade ?? [])], mdic: [...base.mdic, ...(opts.covered?.mdic ?? [])], ...(opts.label ? { label: opts.label } : {}) };
   const ncmCsv = NCM_CSV + (opts.ncm ?? []).map((l) => l + "\n").join("");
   const file = (y) => new TextEncoder().encode([HEADER, ...(opts.mdicRows?.[y] ?? MDIC_ROWS[y])].join("\n") + "\n");
   const fetchImpl = async (url, init = {}) => {
@@ -75,7 +77,7 @@ export function sources(opts = {}) {
       // Como a fonte real: NCM.csv em windows-1252 (os acentos do fixture cabem em latin1).
       if (u.pathname.endsWith("/tabelas/NCM.csv")) return new Response(Buffer.from(ncmCsv, "latin1"), { status: 200, headers: { "content-type": "text/csv" } });
       const y = Number(/EXP_(\d{4})\.csv$/.exec(u.pathname)?.[1]);
-      if (!MDIC_ROWS[y] || opts.mdicDown) return new Response(null, { status: opts.mdicDown ? 503 : 404 });
+      if (!(opts.mdicRows?.[y] ?? MDIC_ROWS[y]) || opts.mdicDown) return new Response(null, { status: opts.mdicDown ? 503 : 404 });
       const bytes = file(y);
       const h = { etag: typeof etags[y] === "function" ? etags[y]() : etags[y], "last-modified": "Fri, 04 Sep 2026 18:05:56 GMT", "content-type": "text/csv" };
       if (init.method === "HEAD") return new Response(null, { status: 200, headers: { ...h, "content-length": String(bytes.length) } });

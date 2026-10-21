@@ -101,16 +101,11 @@ test("commodity com vários produtos: o país indica qual produto fundamenta a i
   const icumsa = await dest(api, { productId: "product-06" });
   assert.ok(!iso(icumsa).includes("USA"), "ICUMSA 45 (1701.99) não tem registro nos EUA");
   // Cada consulta recalcula: a escolha seguinte não herda a anterior.
+  // Café: nenhuma pergunta (cru/torrado fica para a etapa comercial); todas as subposições do café cruzam a lista.
   const coffee = await dest(api, { productId: "product-05" });
-  assert.ok(coffee.asks.length === 1 && /cru/.test(coffee.asks[0].question), "café sem classificação: pergunta só a característica do produto");
-  assert.equal(coffee.items.length, 0);
-  assert.equal(coffee.state, "needs_characteristic", "ambiguidade indispensável: só a característica que falta");
-  assert.match(coffee.message, /Falta uma característica do produto/);
-  const a = await api("/api/prospect/characteristic", "POST", { productId: "product-05", key: coffee.asks[0].key, value: "cru_nao_descafeinado" });
-  assert.equal(a.status, 200, JSON.stringify(a.data));
-  const coffee2 = await dest(api, { productId: "product-05" });
-  assert.deepEqual(iso(coffee2), ["DEU"]);
-  assert.equal(coffee2.asks.length, 0, "característica guardada: sem pergunta repetida");
+  assert.equal(coffee.asks.length, 0, "seleção de mercado sem característica de lote ou especificação");
+  assert.deepEqual(iso(coffee), ["DEU"]);
+  assert.deepEqual([...coffee.diagnostics[0].hs6].sort(), ["090111", "090112", "090121", "090122"]);
 });
 
 test("dados ausentes, resumos a refazer, vencidos e falha da fonte: estados distintos, nunca a lista inteira de países", async (t) => {

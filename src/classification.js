@@ -97,7 +97,12 @@ export async function resolveClassification(env, tenant, productId) {
   const answer = (await s(env, "SELECT char_value FROM product_characteristics WHERE product_id=? AND char_key=? AND status='confirmed' ORDER BY rowid DESC LIMIT 1", p.id, r.ask.key).first())?.char_value;
   const opt = answer && r.ask.options.find((o) => o.value === answer);
   if (opt) return { state: "classified", codes: opt.codes, product: p, scope: "product", facts: [], byCharacteristic: { key: r.ask.key, value: answer } };
-  return { state: "ask", ask: r.ask, why: r.why ?? null, product: p };
+  // Seleção de mercado (2026-10-21): a característica (café cru ou torrado, trigo duro, óleo bruto ou refinado) não é
+  // indispensável para saber quais países compram o produto. A pesquisa usa TODAS as subposições documentadas das opções
+  // (escopo "research") e não pergunta nada; a característica fica para a etapa comercial (oferta, ficha).
+  const union = [...new Map(r.ask.options.flatMap((o) => o.codes).map((c) => [c.hs6, c])).values()];
+  if (p.commodity === "coffee" && !union.some((c) => c.hs6 === "090122")) union.push(code("090122", "0901.22.00", "café torrado, descafeinado (NCM 0901.22.00)"));
+  return { state: "classified", codes: union, product: p, scope: "research", facts: [], note: `seleção de mercado em todas as subposições documentadas do produto (${union.map((c) => c.ncm).join(", ")}); "${r.ask.question}" fica para a etapa comercial`, commercialCharacteristic: { key: r.ask.key, question: r.ask.question } };
 }
 
 // Grava os códigos (SH6 e NCM quando de 8 dígitos) como automação sob a política; reaproveita o pendente igual.

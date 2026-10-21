@@ -156,15 +156,17 @@ try {
   await key("commodity", "ArrowUp");
   await key("commodity", "Enter");
   assert.equal(await hiddenVal("commodity"), "soy");
-  await until(`!!document.querySelector('${S} select[name="productId"]')`, "soja pede o produto");
-  await js(`(() => { const s = document.querySelector('${S} select[name="productId"]'); s.value = s.options[1].value; s.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+  // Internacional: commodity → país → iniciar; o produto vem da evidência do país (sem campo de produto).
+  await sleep(300);
+  assert.ok(await js(`!document.querySelector('${S} select[name="productId"]')`), "internacional sem campo de produto");
+
   // Trocar a commodity não herda o produto anterior.
   await typeIn("commodity", "cafe");
   await hasOption("commodity", "Café");
   await pickMouse("commodity", "Café");
   assert.equal(await hiddenVal("commodity"), "coffee");
-  assert.ok(await js(`!document.querySelector('${S} select[name="productId"]')`), "produto da soja não fica para o café");
-  assert.match(await js(`document.querySelector('${S} .prospect-product').innerText`), /Café/);
+  assert.ok(await js(`!document.querySelector('${S} select[name="productId"]')`), "nenhum produto herdado da soja");
+
 
   // Destinos do café (simulado): só a Alemanha, com fonte e período; acentos e nome em inglês reconhecidos.
   await until(`(() => { const t = document.querySelector("${S} .destinations-status").innerText; return t && !/Preparando/.test(t); })()`, "destinos do café");
@@ -178,7 +180,7 @@ try {
     await blur("country");
     await until(`document.querySelector('${S} [name="country"]').value === "DE"`, `${typed} reconhecido`);
   }
-  assert.match(await js(`document.querySelector("${S} .destination-evidence").innerText`), /Evidência: .*(MDIC|Comtrade).*Produto: Café/);
+  assert.match(await js(`document.querySelector("${S} .destination-evidence").innerText`), /Produto: Café.*(MDIC|Comtrade)/);
   await until(`/Fontes desta pesquisa/.test(document.querySelector("${S}").innerText)`, "cobertura informada para a Alemanha");
   const covCafe = await js(`document.querySelector("${S} .prospect-coverage").innerText`);
   assert.match(covCafe, /Kaffeeverband/);

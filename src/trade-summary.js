@@ -14,7 +14,7 @@ const monthsBack = (ym, n) => {
 
 // Todas as subposições com valor (não só as maiores): a pesquisa cruza o produto com qualquer uma delas.
 function every(byHs6) {
-  return Object.fromEntries([...byHs6.entries()].filter(([, usd]) => usd > 0).sort((a, b) => a[0].localeCompare(b[0])).map(([hs6, usd]) => [hs6, Math.round(usd)]));
+  return Object.fromEntries([...byHs6.entries()].filter(([, usd]) => usd > 0).sort((a, b) => a[0].localeCompare(b[0])).map(([hs6, usd]) => [hs6, Math.round(usd * 100) / 100]));
 }
 
 function top(byHs6, names) {
@@ -76,10 +76,38 @@ export function summarizeComtrade(obj) {
   };
 }
 
+// Comtrade em TODOS os anos guardados no objeto (janela autorizada: trade_list_comtrade_years), só origem Brasil.
+// Só conta o ano a partir de minYear (janela recente, linha a linha): a ausência de linha no ano mais recente não
+// apaga a evidência dos anos anteriores da janela, e declaração antiga (ex.: 2019) não vira evidência atual.
+// Guardado com period_months = minYear (o ano inicial faz parte da chave do resumo).
+export const comtradeMinYear = (comtradeYears, nowIso) => new Date(nowIso).getUTCFullYear() - (Number(comtradeYears) || 3) - 1;
+export function summarizeComtradeHistory(obj, minYear) {
+  const COMTRADE_HISTORY = minYear;
+  if (!obj || obj.state === "data_unavailable")
+    return { source: "comtrade", state: "data_unavailable", periodFrom: null, periodTo: null, basis: null, brazilUsd: null, hs6Count: 0, top: [], all: {}, periodMonths: COMTRADE_HISTORY };
+  if (obj.state === "not_declared" || !obj.lines?.length)
+    return { source: "comtrade", state: obj.state === "not_declared" ? "not_declared" : "no_record", periodFrom: null, periodTo: obj.lastPeriod ?? null, basis: obj.basis ?? null, brazilUsd: null, hs6Count: 0, top: [], all: {}, periodMonths: COMTRADE_HISTORY };
+  const byHs6 = new Map(), years = new Set(), bases = new Set();
+  for (const l of obj.lines) {
+    if (l.origin !== "brazil" || !(l.valueUsd > 0) || l.year < minYear) continue;
+    byHs6.set(l.hs6, (byHs6.get(l.hs6) ?? 0) + l.valueUsd);
+    years.add(l.year);
+    if (l.basis) bases.add(l.basis);
+  }
+  const ys = [...years].sort();
+  const names = new Map(Object.entries(obj.names ?? {}));
+  const allYears = [...new Set(obj.lines.map((l) => l.year))].filter((y) => y >= minYear).sort();
+  return {
+    source: "comtrade", state: byHs6.size ? "purchase_identified" : "no_record", periodFrom: String(ys[0] ?? allYears[0] ?? ""), periodTo: String(ys.at(-1) ?? allYears.at(-1) ?? ""),
+    basis: bases.size === 1 ? [...bases][0] : bases.size ? "misto" : null, brazilUsd: Math.round([...byHs6.values()].reduce((a, b) => a + b, 0)),
+    hs6Count: byHs6.size, top: top(byHs6, names), all: every(byHs6), periodMonths: COMTRADE_HISTORY, yearsConsulted: allYears,
+  };
+}
+
 // Linha para trade_country_summary. period_months = 0 na Comtrade (o resumo não depende da janela).
 export function summaryRow({ iso3, versionId, sha, periodMonths, summary }) {
   return {
-    content_sha256: sha, period_months: summary.source === "mdic" ? periodMonths : 0, iso3, source: summary.source, version_id: versionId,
+    content_sha256: sha, period_months: summary.periodMonths ?? (summary.source === "mdic" ? periodMonths : 0), iso3, source: summary.source, version_id: versionId,
     state: summary.state, period_from: summary.periodFrom, period_to: summary.periodTo, basis: summary.basis,
     brazil_usd: summary.brazilUsd, hs6_count: summary.hs6Count, top_json: JSON.stringify(summary.top), hs6_json: JSON.stringify(summary.all ?? {}),
   };

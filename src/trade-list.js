@@ -149,6 +149,8 @@ export async function daily(env, tenant, deps = {}) {
   await sweep(env, deps);
   // Resumos da lista de países que faltarem (só R2; limitado por execução).
   await rebuildSummaries(env, tenant, { limit: 60 }).catch((e) => console.error("trade_summary_rebuild_failed", { code: e?.code ?? null }));
+  // Histórico da Comtrade (todos os anos guardados): evidência antiga não some quando o último ano não tem linha.
+  await rebuildSummaries(env, tenant, { limit: 60, comtradeHistory: true }).catch((e) => console.error("trade_summary_rebuild_failed", { code: e?.code ?? null, history: true }));
   return { versionId: current?.id ?? null, status: current?.status ?? "not_started" };
 }
 

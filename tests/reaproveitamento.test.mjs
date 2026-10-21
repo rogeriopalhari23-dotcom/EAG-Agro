@@ -209,7 +209,7 @@ test("pesquisa automática internacional: commodity fora das cinco maiores do pa
   assert.doesNotMatch(JSON.stringify(again), /não há compradores|sem compradores/);
 });
 
-test("classificação persistida: característica do produto perguntada uma vez vale para todas as pesquisas; VHP e álcool usam a faixa documentada sem pergunta de lote", async (t) => {
+test("classificação persistida: seleção de mercado sem perguntas, característica já registrada reaproveitada; VHP e álcool usam a faixa documentada sem pergunta de lote", async (t) => {
   const { api, DB, env, grant, d, drive } = await tradeWorld(t);
   await grant();
   const extra = { trade: d.deps };
@@ -230,29 +230,19 @@ test("classificação persistida: característica do produto perguntada uma vez 
   assert.notEqual(al.decision?.kind, "classification_characteristic");
   assert.deepEqual(DB.raw.prepare("SELECT code FROM product_codes WHERE product_id='product-11' ORDER BY code").all().map((x) => x.code), ["220710", "220720"]);
 
-  // Café: estado (cru/torrado) é do PRODUTO e nenhum documento registra: pergunta uma vez. Duas pesquisas paradas na
-  // mesma pergunta; uma resposta destrava as duas.
+  // Café: cru ou torrado não é indispensável para escolher o mercado. Duas pesquisas, nenhuma pergunta: a seleção usa
+  // todas as subposições do café; a característica fica para a etapa comercial.
   const c1 = await job("product-05", "DEU"), c2 = await job("product-05", "USA");
   const j1 = await drive(c1, extra), j2 = await drive(c2, extra);
-  assert.equal(j1.decision.kind, "classification_characteristic");
-  assert.match(j2.decision.message, /mesma pergunta pendente na prospecção .*uma única resposta vale para as duas/);
-  const r = await api(`/api/prospect/jobs/${c1}/act`, "POST", { action: "answer_characteristic", value: "cru_nao_descafeinado" });
-  assert.equal(r.status, 200, JSON.stringify(r.data));
-  assert.ok(r.data.events.some((e) => /destravou 1 outra\(s\) prospecção\(ões\)/.test(e.message)));
-  const j2b = (await api(`/api/prospect/jobs/${c2}`)).data;
-  assert.equal(j2b.status, "queued", "a outra voltou à fila sem nova pergunta");
-  const j2c = await drive(c2, extra);
-  assert.notEqual(j2c.decision?.kind, "classification_characteristic");
-  const ch = DB.raw.prepare("SELECT char_value,verified_at,source_ref FROM product_characteristics WHERE product_id='product-05' AND char_key='classificacao:estado_do_cafe'").all();
-  assert.equal(ch.length, 1, "uma resposta só");
-  assert.match(ch[0].source_ref, /Informado por/);
-  assert.ok(ch[0].verified_at);
-  // Código removido do catálogo depois: a característica guardada reclassifica sozinha, sem perguntar de novo.
+  for (const j of [j1, j2]) assert.notEqual(j.decision?.kind, "classification_characteristic", JSON.stringify(j.decision));
+  assert.deepEqual(DB.raw.prepare("SELECT code,scope FROM product_codes WHERE product_id='product-05' AND code_system='HS' ORDER BY code").all().map((x) => [x.code, x.scope]), [["090111", "research"], ["090112", "research"], ["090121", "research"], ["090122", "research"]]);
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM product_characteristics WHERE product_id='product-05'").get().n, 0, "nada perguntado nem gravado como resposta");
+  // Característica já registrada (ex.: informada antes na etapa comercial) continua valendo e refina sem nova pergunta.
   DB.raw.prepare("DELETE FROM product_codes WHERE product_id='product-05'").run();
+  DB.raw.prepare("INSERT INTO product_characteristics(id,product_id,char_key,char_value,source_ref,status,verified_at) VALUES ('ch-cafe','product-05','classificacao:estado_do_cafe','cru_nao_descafeinado','Informado por Teste (fictício)','confirmed','2026-10-21')").run();
   for (const id of [c1, c2]) DB.raw.prepare("UPDATE prospect_jobs SET status='done' WHERE id=?").run(id);
   const c3 = await drive(await job("product-05", "DEU"), extra);
-  assert.notEqual(c3.decision?.kind, "classification_characteristic", JSON.stringify(c3.decision));
-  assert.ok(c3.events.some((e) => /Característica do produto já registrada no catálogo reaproveitada \(estado_do_cafe = cru_nao_descafeinado\), sem nova pergunta/.test(e.message)));
-  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM product_characteristics WHERE product_id='product-05'").get().n, 1);
+  assert.ok(c3.events.some((e) => /Característica do produto já registrada no catálogo reaproveitada \(estado_do_cafe = cru_nao_descafeinado\), sem nova pergunta/.test(e.message)), JSON.stringify(c3.events.map((e) => e.message)));
+  assert.deepEqual(DB.raw.prepare("SELECT code FROM product_codes WHERE product_id='product-05' AND code_system='HS'").all().map((x) => x.code), ["090111"]);
   void env;
 });

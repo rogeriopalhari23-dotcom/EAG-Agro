@@ -231,14 +231,13 @@ test("internacional: indicadores → seleção e busca pela política (R12.7) �
   assert.equal(JSON.parse(auth.new_value_json)._operation.channel, "automation");
   assert.match(JSON.parse(auth.new_value_json)._operation.authorization.reference, /Política de pesquisa de rotina v1/);
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM companies WHERE country_code='DE' AND registration_id_type='CNPJ'").get().n, 0, "sem CNPJ no exterior");
-  // Sem compra identificada do produto no país: decisão, nunca busca de empresas (R12.14).
+  // Sem compra identificada do produto no país: nunca busca de empresas (R12.14). Trigo: seleção de mercado nas duas
+  // subposições (1001.19 e 1001.99), sem perguntar "trigo duro?" (fica para a etapa comercial).
   const k = await drive((await legacyJob(env, { market: "international", productId: "product-14", location: { iso3: "CHN" } })).id);
-  assert.equal(k.status, "needs_decision");
-  // Trigo sem SH: a classificação depende só de "trigo duro?" (1001.19 × 1001.99); pergunta só essa característica.
-  assert.equal(k.decision.kind, "classification_characteristic", JSON.stringify(k.decision));
-  assert.equal(k.decision.category, "product");
-  assert.deepEqual(k.decision.action.options.map((o) => o.value), ["nao", "sim"]);
-  assert.match(k.decision.message, /trigo duro/);
+  assert.notEqual(k.decision?.kind, "classification_characteristic", JSON.stringify(k.decision));
+  assert.notEqual(k.status, "done", "sem evidência, a busca de empresas não é concluída");
+  assert.ok(!k.events.some((e) => e.step === "discover" && e.outcome === "ok"), "nenhuma busca de empresas sem evidência");
+  assert.deepEqual(DB.raw.prepare("SELECT code FROM product_codes WHERE product_id='product-14' AND code_system='HS' ORDER BY code").all().map((x) => x.code), ["100119", "100199"]);
 });
 
 test("cron: tick executa as prospecções devidas e ignora as que não venceram", async (t) => {

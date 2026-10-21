@@ -3,8 +3,8 @@
 // nunca somados (R12.13). Lê só a lista mensal já publicada e os resumos guardados; nenhuma chamada externa
 // (R12.2, R12.11). Dado do país: não indica que alguma empresa importe (R12.10).
 import { fail, requireRole } from "./http.js";
-import { statement as s, commit, parameters, auditStatement } from "./store.js";
-import { summarizeMdic, summarizeComtrade, summaryRow, SUMMARY_COLUMNS } from "./trade-summary.js";
+import { statement as s, commit, parameters, auditStatement, now } from "./store.js";
+import { summarizeMdic, summarizeComtrade, summarizeComtradeHistory, comtradeMinYear, summaryRow, SUMMARY_COLUMNS } from "./trade-summary.js";
 
 const ADMIN = new Set(["admin"]);
 export const STATE_LABEL = {
@@ -31,11 +31,16 @@ async function periodMonths(env, tenant) {
 // Preenche resumos que faltam para os ponteiros vigentes (objetos publicados antes do resumo existir, ou janela mudada).
 // Só lê o R2; limitado por chamada. Usado pelo cron diário e pelo admin.
 // months: janela do MDIC diferente da padrão (ex.: período guardado mais longo, para a evidência de mercado).
-export async function rebuildSummaries(env, tenant, { limit = 40, months: windowMonths = null } = {}) {
-  const months = windowMonths ?? (await periodMonths(env, tenant));
+// comtradeHistory: resumo da Comtrade nos anos guardados da janela recente (period_months = ano inicial), só Comtrade.
+export async function rebuildSummaries(env, tenant, { limit = 40, months: windowMonths = null, comtradeHistory = false } = {}) {
+  const minYear = comtradeHistory ? comtradeMinYear((await parameters(env, tenant))["trade_list_comtrade_years:international"], now()) : null;
+  const months = comtradeHistory ? minYear : windowMonths ?? (await periodMonths(env, tenant));
   if (months == null) return { built: 0, remaining: null, reason: "Parâmetro period_default_months (D1) não aprovado." };
   if (!env.FILES) return { built: 0, remaining: null, reason: "R2 não configurado." };
-  const missingSql = `FROM trade_list_current c LEFT JOIN trade_country_summary t
+  const missingSql = comtradeHistory
+    ? `FROM trade_list_current c LEFT JOIN trade_country_summary t ON t.content_sha256=c.content_sha256 AND t.period_months=?
+     WHERE c.source='comtrade' AND (t.content_sha256 IS NULL OR t.hs6_json IS NULL)`
+    : `FROM trade_list_current c LEFT JOIN trade_country_summary t
       ON t.content_sha256=c.content_sha256 AND t.period_months=(CASE c.source WHEN 'mdic' THEN ? ELSE 0 END)
      WHERE t.content_sha256 IS NULL OR t.hs6_json IS NULL`;
   const todo = (await s(env, `SELECT c.iso3,c.source,c.version_id,c.r2_key,c.content_sha256 ${missingSql} ORDER BY c.source,c.iso3 LIMIT ?`, months, limit).all()).results;
@@ -48,7 +53,7 @@ export async function rebuildSummaries(env, tenant, { limit = 40, months: window
       continue;
     }
     const obj = JSON.parse(await o.text());
-    const summary = p.source === "mdic" ? summarizeMdic(obj, months) : summarizeComtrade(obj);
+    const summary = comtradeHistory ? summarizeComtradeHistory(obj, minYear) : p.source === "mdic" ? summarizeMdic(obj, months) : summarizeComtrade(obj);
     await summaryStmt(env, summaryRow({ iso3: p.iso3, versionId: p.version_id, sha: p.content_sha256, periodMonths: months, summary })).run();
     built++;
   }

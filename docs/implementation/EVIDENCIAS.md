@@ -3573,3 +3573,61 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - óleo de soja com a Índia (exportação SIMULADA de 1507.10/1507.90);
   - "Como esta lista foi montada" com os países sem simulação identificados;
   - destino escolhido e prospecção iniciada.
+
+## 2026-10-21 — Base de mercados compradores reaproveitada: relação única commodity × países
+
+**Diagnóstico da base** (somente leitura). Onde se procurou: D1 `eag_compass` (tabelas da lista mensal), R2 `eag-compass-files` (objetos vigentes), repositório (`migrations/`, `docs/`, `tests/`), pasta de trabalho local e o workflow `mdic-mensal.yml`.
+
+| Conjunto | Onde | Período | Cobertura | Natureza |
+| --- | --- | --- | --- | --- |
+| MDIC, exportações do Brasil (FOB) | D1 `trade_list_current` (versão `2026-09-mdic`) + R2 `trade-src/2026-09-mdic/mdic/<ISO3>.json` | 2025-01 a 2026-08 | 250 países; 219 com compra na janela de 12 meses e 31 sem registro; 183 com registro de commodity do catálogo | **evidência real** |
+| UN Comtrade, importações declaradas (origem Brasil) | D1 (versões `2026-10`, parcial, e `2026-09-manual-DEU-0d4ed1a4`) + R2 `trade-src/2026-10/comtrade/<ISO3>.json` | últimos 3 anos declarados por país (1999 a 2025; só conta como atual a partir de 2022) | 99 países (81 com compra, 17 sem declaração, 1 sem registro); 120 países "não atualizada em 2026-10"; 32 sem código na fonte | **evidência real, parcial** |
+| Tabela de países | `migrations/0015_seed_paises.sql` (`countries`, `country_mdic_codes`) | — | 250 países, códigos MDIC e Comtrade | cadastro, não evidência |
+| Fixtures (`tests/helpers/trade.mjs`: DEU, USA, PRT, CHN…) e cenários da prévia anterior | repositório | — | poucos países | **simulação**, não base |
+
+- **Leitura:** 349 objetos vigentes baixados (`wrangler r2 object get`, só GET), com SHA-256 igual ao de cada ponteiro (349 de 349).
+- **Classificação da lista de produção:** `sh-01-24@2026-09-23`, capítulos 01–24 sem 03. O capítulo 29 (lecitina, SH 2923.20) **nunca foi consultado**, por isso "Derivados de soja" não tem cobertura na base, e não "nenhum comércio".
+- **MDIC de outubro não atualizado:** o workflow `mdic-mensal.yml` falhou em 10, 11 e 12/10/2026 no passo "Importar MDIC" (o log completo exige login no GitHub). O host antigo serve certificado vencido desde 03/10/2026, e o commit `2b8ce85` passou o job para o endereço oficial com o intermediário novo. A causa exata no log não foi lida.
+
+**Relação única commodity × países** (`src/destinations.js`, a mesma no formulário, na criação da pesquisa e na pesquisa automática):
+- **Seleção sem perguntas:** variedade, lote ou especificação comercial não são pedidos para escolher o mercado (café cru ou torrado, trigo duro, óleo bruto ou refinado, VHP, desnaturante). A seleção usa todas as subposições documentadas do produto (escopo `research`). A característica fica para a etapa comercial; uma já registrada continua refinando.
+- **Histórico na janela autorizada:**
+  - MDIC: período padrão e, sem registro nele, o período guardado mais longo.
+  - Comtrade: resumo dos anos guardados a partir do ano inicial da janela (ano corrente menos 3, menos 1 de defasagem), linha a linha. A ausência no último ano não apaga a evidência anterior, e declaração antiga (ex.: 2019) não vira evidência atual.
+- **Precisão dos valores:** registros abaixo de US$ 1 são mantidos com centavos (ex.: óleo de palma × Romênia).
+- **Tela:** commodity → país → iniciar. A caixa mostra só o nome do país; o produto que fundamenta o país é escolhido sozinho, e a troca fica em "Detalhes" junto com fonte, período e códigos. Sem campo de produto no fluxo internacional.
+
+**Prévia:** extrato `tests/fixtures/mercados-publicos.json` (470 KB), gerado por `scripts/extrair-mercados-publicos.mjs`:
+- só as 28 subposições das commodities do catálogo, dados agregados por país, sem empresas e sem dados pessoais;
+- passa pela mesma rotina, com a mesma classificação da produção;
+- país sem dado no extrato aparece como "fora do extrato da base pública";
+- o orçamento da Comtrade da prévia é 5.000, porque é reprodução em memória, sem rede e sem custo; na produção continua 400.
+
+**Verificação do catálogo inteiro** (`tests/base-mercados.test.mjs`): destinos do formulário comparados com destinos calculados diretamente do extrato, sem o código do Compass. Zero diferença nas 22 commodities:
+
+| Commodity | Países |
+| --- | --- |
+| Soja | 68 |
+| Milho | 116 |
+| Café | 153 |
+| Açúcar | 163 |
+| Etanol | 90 |
+| Álcool industrial | 90 |
+| Trigo | 38 |
+| Sorgo | 7 |
+| Farelo de soja | 79 |
+| Farelo de canola | 6 |
+| Farelo de algodão | 23 |
+| Óleo de soja | 103 |
+| Óleo de canola | 36 |
+| Óleo de algodão | 24 |
+| Óleo de palma | 40 |
+| DDGS | 18 |
+| CGF | 15 |
+| CGM | 15 |
+| Farelo de milho | 46 |
+| Lecitina de soja | 0 (fora da classificação da lista) |
+| UCO | 0 (sem classificação) |
+| CSO | 0 (sem classificação) |
+
+Etanol e álcool industrial têm a mesma lista porque usam as mesmas subposições, 2207.10 e 2207.20. Também foram testados: o histórico da Comtrade, a ausência sem cobertura e a pesquisa automática, que escolhe só combinações da relação.

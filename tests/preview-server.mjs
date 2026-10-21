@@ -148,33 +148,40 @@ await api(`${rb}/annotations`, "POST", { kind: "complement", text: "Anotação f
 const cfg2 = JSON.parse(await readFile(new URL("../docs/implementation/rodadas/exemplos/soja-rio-verde-150km.json", import.meta.url), "utf8"));
 await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/GO, 150 km (rascunho)", config: { ...cfg2, id: "previa-soja" } });
 
-// Indicadores oficiais SIMULADOS (fontes de teste do MDIC e da Comtrade, claramente fictícias) para a pesquisa
-// internacional. A prévia começa como uma base nova: SEM política, SEM classificação SH e SEM lista mensal, com TODOS os
-// países da base. Ao abrir os destinos, a automação autorizada prepara a política delimitada (autorização escrita de
-// 2026-10-20), aplica as classificações documentais e inicia a rotina mensal com os limites existentes (MDIC agregado
-// para todos os países; Comtrade em fila, no orçamento diário da prévia). Nenhum clique é atribuído a uma pessoa.
-// Parâmetros da rotina: valores da prévia (fictícios), como se aprovados pelo Administrador.
-await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "15", "22", "23", "29"].sort() } });
-// Alemanha (FICTÍCIO): seis subposições maiores que o café nas exportações do Brasil (o café fica fora das cinco maiores
-// e a pesquisa automática ainda o encontra). China (FICTÍCIO): óleo de palma com comércio e sem conector de empresas.
-const deuBig = [["12019000", 200000], ["17011400", 210000], ["17019900", 220000], ["01012100", 230000], ["02013000", 240000], ["12011000", 250000]].map(([n, v]) => `"2026";"02";"${n}";"10";"023";"SP";"01";"0817600";${v};${v};${v}`);
-// Canadá (SIMULADO, caso "Derivados de soja — Canadá"): o Brasil exporta soja em grão e farelo; lecitina NÃO. A Comtrade
-// simulada do Canadá só traz importação do MUNDO de lecitina (parceiro 0), que não comprova compra do Brasil.
-const canRows = ['"2026";"02";"12019000";"10";"149";"PR";"01";"0917500";300000;300000;300000', '"2026";"02";"23040010";"10";"149";"PR";"01";"0917500";150000;150000;150000'];
-// Índia (SIMULADO, caso "Óleo de soja"): exportação fictícia de óleo de soja em bruto e refinado do Brasil (MDIC).
-const indSoyOil = ['"2026";"03";"15071000";"10";"361";"PR";"01";"0917500";900000;900000;800000', '"2026";"04";"15079011";"10";"361";"PR";"01";"0917500";300000;300000;290000'];
-const chnPalm = '"2026";"02";"15111000";"10";"160";"PA";"01";"0817600";40000;40000;40000';
-// Egito (FICTÍCIO, o caso "Milho GMO — Egito"): o país não declarou à Comtrade (configurado assim) e o Brasil exportou
-// milho ao Egito em jan/2025 (MDIC), fora do período padrão de 12 meses e dentro dos 24 guardados.
-const egyCorn = '"2025";"01";"10059010";"10";"240";"PR";"01";"0917500";500000;500000;120000';
+// Mercados compradores: EXTRATO da base pública já construída (lista mensal em produção, lida somente por leitura;
+// tests/fixtures/mercados-publicos.json, gerado por scripts/extrair-mercados-publicos.mjs). Dados agregados por país do
+// MDIC (exportações do Brasil) e da UN Comtrade (importações declaradas, origem Brasil), só nas subposições das
+// commodities do catálogo; sem empresas e sem dados pessoais. A prévia começa sem política, sem classificação e sem lista
+// e passa o extrato pela MESMA rotina (fila, resumos, regra de destinos). País sem dado no extrato fica identificado como
+// tal (nunca como ausência de comércio). Parâmetros da rotina: valores da prévia, como se aprovados pelo Administrador.
+const EXTRACT = JSON.parse(await readFile(new URL("./fixtures/mercados-publicos.json", import.meta.url), "utf8"));
+// Orçamento da Comtrade só da prévia: as "chamadas" reproduzem o extrato em memória (sem rede, sem custo); na produção o
+// limite continua o aprovado (400 por dia).
+await tradeParams(api, { period_default_months: 12, comtrade_calls_per_day: 5000, agri_classification: EXTRACT.meta.classificacao }); // a mesma classificação da lista de produção
+const mdicCode = new Map(DB.raw.prepare("SELECT iso3,MIN(mdic_code) code FROM country_mdic_codes GROUP BY iso3").all().map((x) => [x.iso3, x.code]));
+const comtradeCode = new Map(DB.raw.prepare("SELECT iso3,comtrade_code FROM countries WHERE comtrade_code IS NOT NULL").all().map((x) => [x.iso3, x.comtrade_code]));
+const mdicRows = {};
+for (const [iso3, c] of Object.entries(EXTRACT.mdic)) {
+  const pais = mdicCode.get(iso3);
+  if (!pais) continue;
+  for (const [ncm, ym, fob, kg] of c.lines) (mdicRows[ym.slice(0, 4)] ??= []).push(`"${ym.slice(0, 4)}";"${ym.slice(5, 7)}";"${ncm}";"10";"${pais}";"SP";"01";"0817600";${kg};${kg};${fob}`);
+}
+const clean = (x) => String(x ?? "").replace(/"/g, "'").replace(/;/g, ",");
+const ncmLines = Object.entries(EXTRACT.names).map(([ncm, [hs6, pt, en]]) => `"${ncm}";"10";"${hs6}";"${clean(pt)}";"${clean(en)}"`);
+const comtrade = {};
+for (const [iso3, c] of Object.entries(EXTRACT.comtrade)) {
+  const code = comtradeCode.get(iso3);
+  if (code == null) continue;
+  comtrade[code] = { years: c.years ?? [], rows: c.lines.map(([hs6, year, value]) => rec(code, hs6, year, 76, value)) };
+}
 const tradeSrc = tradeSources({
-  hs: ["100590", "220710", "292320", "230400", "150710", "150790"],
-  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"', '"17019900";"10";"170199";"Outros açúcares";"Other sugar"', '"01012100";"10";"010121";"Cavalos";"Horses"', '"02013000";"10";"020130";"Carne bovina";"Beef"', '"12011000";"10";"120110";"Soja para semeadura";"Soy seed"', '"15111000";"10";"151110";"Óleo de palma em bruto";"Crude palm oil"', '"23040010";"10";"230400";"Farelo de soja";"Soybean meal"', '"29232000";"10";"292320";"Lecitinas";"Lecithins"', '"15071000";"10";"150710";"Óleo de soja em bruto";"Crude soybean oil"', '"15079011";"10";"150790";"Óleo de soja refinado";"Refined soybean oil"'],
-  mdicRows: { 2026: [...MDIC_ROWS[2026], ...deuBig, chnPalm, ...canRows, ...indSoyOil], 2025: [...MDIC_ROWS[2025], egyCorn] },
-  comtrade: { 124: { years: [2023, 2024, 2025], rows: [rec(124, "292320", 2025, 0, 5000)] }, 276: { years: [2022, 2023, 2024, 2025], rows: [rec(276, "090111", 2025, 0, 100), rec(276, "170114", 2024, 0, 50)] }, 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
-  covered: { comtrade: ["FRA", "EGY", "CAN"], mdic: ["EGY", "CHN", "CAN", "IND"] },
+  exclusive: true, mdicRows, ncm: ncmLines, comtrade, hs: EXTRACT.meta.subposicoes,
+  covered: { mdic: Object.keys(EXTRACT.mdic), comtrade: Object.keys(EXTRACT.comtrade) },
+  label: "fora do extrato da base pública (a lista de produção não tinha dado deste país nesta fonte)",
 });
+console.log(`Extrato público: MDIC ${EXTRACT.meta.cobertura.mdicPaises} países (${EXTRACT.meta.versoes.mdic.join(", ")}); Comtrade ${EXTRACT.meta.cobertura.comtradePaises} países (${EXTRACT.meta.versoes.comtrade.join(", ")}); lido em ${EXTRACT.meta.lidoEm}`);
 const tradeDriver = driver(ctx.env, tradeSrc, { get at() { return new Date().toISOString(); } });
+ctx.env.MDIC_CHUNK_BYTES = String(4 * 1024 * 1024); // extrato real: pedaços do tamanho da produção
 // Como na produção: a fila assíncrona e a rede da rotina são do ambiente (aqui, a fila local e as fontes simuladas).
 ctx.env.ASYNC_QUEUE = { sendBatch: async (msgs) => { for (const m of msgs) if (m.body?.type === "trade_job") tradeDriver.queue.push(m.body); }, send: async () => {} };
 const previewFetch = globalThis.fetch;
@@ -192,6 +199,7 @@ setInterval(async () => {
     // Resumos por país refeitos dos objetos já guardados (como no cron diário), nas duas janelas.
     await rebuildSummaries(ctx.env, "eag-internal", { limit: 60 });
     await rebuildSummaries(ctx.env, "eag-internal", { limit: 60, months: 24 });
+    await rebuildSummaries(ctx.env, "eag-internal", { limit: 60, comtradeHistory: true });
   } catch (e) {
     console.error("ciclo da prospecção:", e.message);
   } finally {
@@ -200,16 +208,6 @@ setInterval(async () => {
 }, 3000);
 
 const server = createServer(async (req, res) => {
-  // Só na PRÉVIA: acrescenta ao resumo do Canadá uma exportação SIMULADA de lecitina do Brasil (SH 292320), para conferir
-  // que o país passa a aparecer para "Derivados de soja" só quando existe evidência compatível.
-  if (req.method === "POST" && req.url === "/__previa/simular-lecitina-canada") {
-    for (const r of DB.raw.prepare("SELECT content_sha256,period_months,hs6_json FROM trade_country_summary WHERE iso3='CAN' AND source='mdic'").all()) {
-      const all = { ...JSON.parse(r.hs6_json ?? "{}"), 292320: 9000 };
-      DB.raw.prepare("UPDATE trade_country_summary SET hs6_json=?, state='purchase_identified' WHERE content_sha256=? AND period_months=?").run(JSON.stringify(all), r.content_sha256, r.period_months);
-    }
-    res.writeHead(200, { "content-type": "application/json" });
-    return res.end(JSON.stringify({ ok: true, simulado: "exportação de lecitina do Brasil ao Canadá (fictícia)" }));
-  }
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const body = Buffer.concat(chunks);
@@ -217,4 +215,4 @@ const server = createServer(async (req, res) => {
   res.writeHead(r.status, Object.fromEntries(r.headers));
   res.end(Buffer.from(await r.arrayBuffer()));
 });
-server.listen(PORT, "127.0.0.1", () => console.log(`Prévia local (dados fictícios) em http://127.0.0.1:${PORT} — commit ${PREVIEW_BUILD.commit}${PREVIEW_BUILD.dirty ? " + alterações locais" : ""}, pid ${PREVIEW_BUILD.pid}, iniciada ${PREVIEW_BUILD.startedAt} — Ctrl+C encerra`));
+server.listen(PORT, "127.0.0.1", () => console.log(`Prévia local (empresas e pessoas fictícias; mercados do extrato público) em http://127.0.0.1:${PORT} — commit ${PREVIEW_BUILD.commit}${PREVIEW_BUILD.dirty ? " + alterações locais" : ""}, pid ${PREVIEW_BUILD.pid}, iniciada ${PREVIEW_BUILD.startedAt} — Ctrl+C encerra`));

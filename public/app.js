@@ -5547,6 +5547,8 @@ function prospectStart(fixedMarket = null) {
     const list = commodities.find((x) => x.code === code)?.products ?? [];
     if (!list.some((p) => p.id === productId)) productId = list.length === 1 ? list[0].id : "";
     prodBox.replaceChildren();
+    // Internacional: commodity → país → iniciar. O produto vem da evidência do país escolhido (ver showEvidence).
+    if (market === "international") return;
     if (list.length > 1) {
       const sel = select("Produto", "productId", [["", "Escolha"], ...list.map((p) => [p.id, p.display_name ?? p.variant_name])], productId);
       sel.control.addEventListener("change", () => ((productId = sel.control.value), loadDestinations(), coverage()));
@@ -5574,23 +5576,32 @@ function prospectStart(fixedMarket = null) {
   // Internacional: só destinos com evidência oficial de comércio do produto escolhido com o Brasil (mesma regra do
   // servidor e da pesquisa automática). Sem dados, nunca a lista inteira de países: o estado aparece abaixo do campo.
   let dest = null, destSeq = 0, destKey = "", destTimer = null, destTries = 0;
-  const country = comboBox({ label: "País de destino", name: "country", placeholder: "Digite para buscar entre os destinos comprovados", load: async () => (dest?.state === "ready" ? dest.items : []).map((d) => ({ id: d.iso2, iso3: d.iso3, label: d.name, aliases: d.nameEn ? [d.nameEn] : [], dest: d, hint: `${d.line} · ${d.basis}${d.connector.available ? "" : " · sem fonte de empresas (limitação)"}${d.stale ? " · dado vencido, atualização pedida" : ""}` })), required: true });
+  const country = comboBox({ label: "País de destino", name: "country", placeholder: "Digite para buscar entre os destinos comprovados", load: async () => (dest?.state === "ready" ? dest.items : []).map((d) => ({ id: d.iso2, iso3: d.iso3, label: d.name, aliases: d.nameEn ? [d.nameEn] : [], dest: d })), required: true });
   const destBox = el("div", { class: "destinations-status", "aria-live": "polite" });
   const evidenceBox = el("div", { class: "destination-evidence" });
+  // Produto da pesquisa: o que fundamenta o país (maior valor registrado), trocável nos detalhes entre os que fundamentam.
   const showEvidence = () => {
     evidenceBox.replaceChildren();
     const d = country.item?.dest;
     if (!d) return;
+    if (!d.products.some((x) => x.productId === productId)) {
+      const best = [...d.evidence].sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0))[0];
+      productId = best?.productId ?? d.products[0].productId;
+    }
+    const chosen = d.products.find((x) => x.productId === productId);
+    const sel = d.products.length > 1 ? select("Produto desta pesquisa", "destProduct", d.products.map((x) => [x.productId, x.name]), productId) : null;
+    sel?.control.addEventListener("change", () => ((productId = sel.control.value), showEvidence(), coverage()));
     evidenceBox.append(
-      text("p", `Evidência: ${d.line}. Produto: ${d.basis}.`, "form-hint"),
-      details("Detalhes da evidência", el("ul", { class: "compact-list" }, ...d.evidence.map((e) => text("li", e.text)), text("li", d.connector.available ? `Fontes de empresas: ${d.connector.labels.join("; ")}.` : `Fontes de empresas: ${d.connector.note}.`), text("li", "Dado do país não prova que uma empresa importa do Brasil."))),
+      text("p", `Produto: ${chosen.name}. ${d.evidence.filter((e) => e.productId === productId).map((e) => e.source === "mdic" ? "Exportações do Brasil (MDIC)" : "Importações declaradas (Comtrade)").filter((x, i, a) => a.indexOf(x) === i).join(" e ")}.`, "form-hint"),
+      details("Detalhes", ...[sel?.node ?? null, el("ul", { class: "compact-list" }, ...d.evidence.map((e) => text("li", e.text)), text("li", d.connector.available ? `Fontes de empresas: ${d.connector.labels.join("; ")}.` : `Fontes de empresas: ${d.connector.note}.`), text("li", "Dado do país não prova que uma empresa importa do Brasil."))].filter(Boolean)),
     );
   };
   country.onChange(() => (showEvidence(), coverage()));
   const loadDestinations = (force = false, recover = false) => {
     clearTimeout(destTimer);
     const list = commodities.find((x) => x.code === code)?.products ?? [];
-    const body = productId ? { productId } : code ? { commodity: code } : null;
+    // A lista é da commodity inteira (produtos classificados), cada país com o produto que o fundamenta.
+    const body = code ? { commodity: code } : null;
     const key = JSON.stringify(body);
     if (!force && key === destKey && dest && market === "international") return;
     // Atualização da mesma escolha (preparação em andamento ou nova tentativa): a lista atual fica na tela até a resposta.
@@ -5684,13 +5695,14 @@ function prospectStart(fixedMarket = null) {
       cov.replaceChildren(
         text("strong", `Fontes desta pesquisa${r.country ? ` · ${r.commodity} em ${r.country}` : ` · ${r.commodity}`}`),
         r.items.length ? el("ul", { class: "coverage-list" }, ...r.items.map((x) => el("li", {}, tag(x.available ? "coberta" : "pendente", x.available ? "ok" : "warn"), text("span", x.label), x.note ? text("small", x.note) : null))) : text("p", "Nenhuma fonte de empresas cobre esta combinação no Compass.", "muted"),
-        r.partial && r.partialNote ? text("p", r.partialNote, "form-hint") : null,
+        ...(r.partial && r.partialNote ? [text("p", r.partialNote, "form-hint")] : []),
       );
     }).catch?.(() => {});
   };
   const showMarket = () => {
     natBox.hidden = market !== "national";
     intlBox.hidden = market !== "international";
+    renderProduct();
     loadDestinations();
     coverage();
   };
@@ -5722,7 +5734,7 @@ function prospectStart(fixedMarket = null) {
       const fail = (m) => ((error.textContent = m), (error.hidden = false));
       await comm.resolve();
       if (!code) return fail("Escolha a commodity na lista.");
-      if (!productId) return fail("Escolha o produto.");
+      if (!productId && market === "national") return fail("Escolha o produto.");
       const body = { market, productId };
       if (market === "national") {
         if (!region.control.value) return fail("Escolha o estado.");
@@ -5731,7 +5743,7 @@ function prospectStart(fixedMarket = null) {
         if (!(Number(radius.control.value) > 0)) return fail("Informe o raio.");
         Object.assign(body, { location: { region: c.uf, municipality: c.label, municipalityCode: c.id }, radius: { value: Number(radius.control.value), unit: "km" } });
       } else {
-        if (dest?.state !== "ready" || destBox.dataset.for !== JSON.stringify(productId ? { productId } : { commodity: code })) return fail("Aguarde a lista de destinos desta commodity e deste produto.");
+        if (dest?.state !== "ready" || destBox.dataset.for !== JSON.stringify({ commodity: code })) return fail("Aguarde a lista de destinos desta commodity.");
         const c = await country.resolve();
         if (!c) return fail("Escolha o país na lista.");
         if (!dest.items.some((x) => x.iso2 === c.id && x.products.some((p) => p.productId === productId))) return fail("Este país não tem evidência de comércio do produto escolhido com o Brasil: escolha um destino da lista.");

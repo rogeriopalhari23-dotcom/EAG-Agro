@@ -10,8 +10,9 @@
 //    conector, com a limitação indicada.
 // Estados: ready (há destinos), checking (resumos em preparação), none_valid (consulta válida, sem registros),
 // none_incomplete (sem destino e cobertura incompleta: produto sem classificação, país sem lista, fonte com falha).
-import { statement as s, parameters } from "./store.js";
+import { statement as s, parameters, now } from "./store.js";
 import { foreignSources } from "./sources-applicable.js";
+import { comtradeMinYear as minYearOf } from "./trade-summary.js";
 
 const parse = (t, d = null) => { try { return t ? JSON.parse(t) : d; } catch { return d; } };
 const SOURCE_SHORT = { mdic: "MDIC — exportações do Brasil (FOB)", comtrade: "UN Comtrade — importações declaradas, origem Brasil" };
@@ -20,9 +21,14 @@ async function windows(env, tenant) {
   const p = await parameters(env, tenant);
   const months = Number(p["period_default_months:international"]) || 0;
   const longest = Math.min(60, Math.max(12, (Number(p["trade_list_mdic_years:international"]) || 1) * 12));
-  return { months, longest: longest > months ? longest : null };
+  // Comtrade: a lista guarda os últimos N anos DECLARADOS, que podem ser antigos (país que parou de declarar). Só vale
+  // como evidência atual o ano dentro de N anos (+1 de defasagem da publicação) contados do ano corrente.
+  const comtradeMinYear = minYearOf(p["trade_list_comtrade_years:international"], now());
+  return { months, longest: longest > months ? longest : null, comtradeMinYear };
 }
-const SUMMARY_SQL = "SELECT t.iso3,t.source,t.period_months,t.hs6_json,t.top_json,t.period_from,t.period_to,c.version_id FROM trade_country_summary t JOIN trade_list_current c ON c.iso3=t.iso3 AND c.source=t.source AND c.content_sha256=t.content_sha256 WHERE t.state='purchase_identified' AND (t.source='comtrade' AND t.period_months=0 OR t.source='mdic' AND t.period_months IN (?,?))";
+const SUMMARY_SQL = "SELECT t.iso3,t.source,t.period_months,t.hs6_json,t.top_json,t.period_from,t.period_to,c.version_id FROM trade_country_summary t JOIN trade_list_current c ON c.iso3=t.iso3 AND c.source=t.source AND c.content_sha256=t.content_sha256 WHERE t.state='purchase_identified' AND (t.source='comtrade' AND t.period_months IN (0,?) OR t.source='mdic' AND t.period_months IN (?,?))";
+// Histórico da Comtrade (anos guardados da janela recente): period_months = ano inicial (src/trade-summary.js).
+const MISSING_HIST_SQL = "SELECT COUNT(*) n FROM trade_list_current c LEFT JOIN trade_country_summary t ON t.content_sha256=c.content_sha256 AND t.period_months=? WHERE c.source='comtrade' AND (t.content_sha256 IS NULL OR t.hs6_json IS NULL)";
 const MISSING_SQL = "SELECT COUNT(*) n FROM trade_list_current c LEFT JOIN trade_country_summary t ON t.content_sha256=c.content_sha256 AND t.period_months=(CASE c.source WHEN 'mdic' THEN ? ELSE 0 END) WHERE t.content_sha256 IS NULL OR t.hs6_json IS NULL";
 
 // Códigos SH6 verificados (confirmados) por produto.
@@ -46,12 +52,14 @@ const SRC = {
   mdic: { label: "MDIC — exportações do Brasil para o país (FOB, mensal)", direction: "exportações do Brasil (Brasil → país)" },
   comtrade: { label: "UN Comtrade — importações declaradas pelo país (anual)", direction: "importações declaradas pelo país com origem Brasil (país ← Brasil)" },
 };
-export async function productCoverage(env, { products, hsOf, months, countries }) {
+export async function productCoverage(env, { products, hsOf, months, countries, comtradeMinYear = 0 }) {
   const sim = parse(env.SIMULATED_TRADE, null);
   const cur = (await s(env, "SELECT iso3,source,version_id,content_sha256 FROM trade_list_current").all()).results;
   const ptr = new Map(cur.map((c) => [`${c.iso3}|${c.source}`, c]));
   const st = (await s(env, "SELECT t.iso3,t.source,t.state,t.hs6_json,t.period_from,t.period_to FROM trade_country_summary t JOIN trade_list_current c ON c.iso3=t.iso3 AND c.source=t.source AND c.content_sha256=t.content_sha256 WHERE t.period_months=(CASE t.source WHEN 'mdic' THEN ? ELSE 0 END)", months).all()).results;
   const sum = new Map(st.map((x) => [`${x.iso3}|${x.source}`, x]));
+  // Histórico (MDIC no período guardado mais longo; Comtrade em todos os anos guardados): registro antigo continua valendo.
+  const hist = new Map((await s(env, "SELECT t.iso3,t.source,t.hs6_json,t.period_to FROM trade_country_summary t JOIN trade_list_current c ON c.iso3=t.iso3 AND c.source=t.source AND c.content_sha256=t.content_sha256 WHERE t.state='purchase_identified' AND ((t.source='mdic' AND t.period_months>? AND t.period_months<1000) OR (t.source='comtrade' AND t.period_months=?))", months, comtradeMinYear).all()).results.map((x) => [`${x.iso3}|${x.source}`, parse(x.hs6_json, {})]));
   // Sem ponteiro: situação mais recente do país na fonte (em geração, falha, sem código).
   const last = new Map();
   for (const r of (await s(env, "SELECT st.iso3,st.source,st.state,st.error,v.status vstatus FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id ORDER BY v.started_at").all()).results) last.set(`${r.iso3}|${r.source}`, r);
@@ -73,7 +81,7 @@ export async function productCoverage(env, { products, hsOf, months, countries }
     const hs = [...(hsOf.get(p.id) ?? [])];
     const bySource = {};
     for (const source of ["mdic", "comtrade"]) {
-      const n = { positive: 0, valid_absent: 0, not_declared: 0, no_code: 0, no_simulation: 0, not_consulted: 0, failed: 0, pending: 0, missing: 0 };
+      const n = { positive: 0, valid_absent: 0, not_declared: 0, stale: 0, no_code: 0, no_simulation: 0, not_consulted: 0, failed: 0, pending: 0, missing: 0 };
       const periods = new Map();
       for (const c of countries.values()) {
         const key = `${c.iso3}|${source}`;
@@ -88,10 +96,12 @@ export async function productCoverage(env, { products, hsOf, months, countries }
         else {
           const sm = sum.get(key);
           if (!sm) state = "pending";
+          else if (source === "comtrade" && sm.period_to && Number(sm.period_to) < comtradeMinYear) state = "stale";
           else if (sm.state === "purchase_identified") {
             const all = parse(sm.hs6_json, {});
             state = hs.some((h) => Number(all[h]) > 0) ? "positive" : "valid_absent";
           } else state = { no_record: "valid_absent", not_declared: "not_declared", data_unavailable: "failed" }[sm.state] ?? "pending";
+          if (state === "valid_absent" && hs.some((h) => Number(hist.get(key)?.[h]) > 0)) state = "positive";
           if (sm && ["positive", "valid_absent"].includes(state)) {
             const per = source === "mdic" ? `${sm.period_from ?? "?"} a ${sm.period_to ?? "?"}` : String(sm.period_to ?? "?");
             periods.set(per, (periods.get(per) ?? 0) + 1);
@@ -104,10 +114,10 @@ export async function productCoverage(env, { products, hsOf, months, countries }
       const period = [...periods.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 2).join("; ") || "sem período consultado";
       const complete = source === "mdic"
         ? answered + n.no_code === total
-        : n.failed + n.pending + n.missing + n.no_simulation + n.not_consulted === 0;
+        : n.failed + n.pending + n.missing + n.no_simulation + n.not_consulted + n.stale === 0;
       bySource[source] = {
         ...SRC[source], counts: n, total, answered, complete, period,
-        text: `${SRC[source].label} — ${SRC[source].direction}; SH ${hs.join(", ")}; período ${period}: ${answered} de ${total} países com resposta válida que inclui o produto${n.positive ? ` (${n.positive} com registro)` : ""}${[["no_simulation", "sem resposta simulada configurada"], ["not_consulted", "consulta sem estes códigos"], ["not_declared", "sem declaração do país"], ["failed", "falha da fonte"], ["pending", "pendentes"], ["missing", "sem lista"], ["no_code", "sem código na fonte"]].filter(([k]) => n[k]).map(([k, l]) => `; ${n[k]} ${l}`).join("")}.`,
+        text: `${SRC[source].label} — ${SRC[source].direction}; SH ${hs.join(", ")}; período ${period}: ${answered} de ${total} países com resposta válida que inclui o produto${n.positive ? ` (${n.positive} com registro)` : ""}${[["no_simulation", sim?.label ?? "sem resposta simulada configurada"], ["not_consulted", "consulta sem estes códigos"], ["not_declared", "sem declaração do país"], ["stale", `última declaração antes de ${comtradeMinYear}`], ["failed", "falha da fonte"], ["pending", "pendentes"], ["missing", "sem lista"], ["no_code", "sem código na fonte"]].filter(([k]) => n[k]).map(([k, l]) => `; ${n[k]} ${l}`).join("")}.`,
       };
     }
     out.push({ productId: p.id, name: p.display_name ?? p.variant_name, hs6: hs, bySource, validAbsence: !bySource.mdic.counts.positive && !bySource.comtrade.counts.positive && bySource.mdic.complete && bySource.comtrade.complete });
@@ -134,7 +144,15 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
     }
     pending += n;
   }
-  const sums = classified.length ? (await s(env, SUMMARY_SQL, w.months, w.longest ?? w.months).all()).results : [];
+  {
+    let n = (await s(env, MISSING_HIST_SQL, w.comtradeMinYear).first())?.n ?? 0;
+    if (n && deps.rebuild) {
+      await deps.rebuild(env, tenant, { comtradeHistory: true }).catch(() => null);
+      n = (await s(env, MISSING_HIST_SQL, w.comtradeMinYear).first())?.n ?? 0;
+    }
+    pending += n;
+  }
+  const sums = classified.length ? (await s(env, SUMMARY_SQL, w.comtradeMinYear, w.months, w.longest ?? w.months).all()).results : [];
   const countries = new Map((await s(env, "SELECT iso3,iso2,name_pt,name_en FROM countries WHERE iso2 IS NOT NULL AND iso3<>'BRA'").all()).results.map((c) => [c.iso3, c]));
   // Cobertura: países com lista vigente, vencidos (a rotina mais recente não os atualizou) e em geração ou com falha.
   const cur = (await s(env, "SELECT iso3,source,version_id FROM trade_list_current").all()).results;
@@ -152,14 +170,16 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
     for (const sm of sums) {
       const c = countries.get(sm.iso3);
       if (!c) continue;
+      if (sm.source === "comtrade" && Number(sm.period_to) < w.comtradeMinYear) continue; // declaração antiga: não é evidência atual
       const all = sm.hs6_json != null ? parse(sm.hs6_json, {}) : Object.fromEntries(parse(sm.top_json, []).map((t) => [String(t.hs6), t.usd]));
       const hit = hs.filter((h) => Number(all[h]) > 0);
       if (!hit.length) continue;
-      const extended = sm.source === "mdic" && sm.period_months !== w.months;
+      // Histórico dentro da janela autorizada: MDIC no período guardado mais longo; Comtrade em todos os anos guardados.
+      const extended = sm.source === "mdic" ? sm.period_months !== w.months : sm.period_months === w.comtradeMinYear;
       const d = out.get(c.iso3) ?? out.set(c.iso3, { iso3: c.iso3, iso2: c.iso2, name: c.name_pt, nameEn: c.name_en, products: new Map(), evidence: [], stale: stale.has(c.iso3) }).get(c.iso3);
       const pr = d.products.get(p.id) ?? d.products.set(p.id, { productId: p.id, name, hs6: new Set() }).get(p.id);
       hit.forEach((h) => pr.hs6.add(h));
-      d.evidence.push({ productId: p.id, product: name, source: sm.source, extended, period: sm.source === "mdic" ? `${sm.period_from ?? "?"} a ${sm.period_to ?? "?"}` : `${sm.period_to ?? "ano não informado"}`, hs6: hit, usd: hit.reduce((n, h) => n + Number(all[h]), 0) });
+      d.evidence.push({ productId: p.id, product: name, source: sm.source, extended, period: sm.source === "mdic" ? `${sm.period_from ?? "?"} a ${sm.period_to ?? "?"}` : sm.period_months === w.comtradeMinYear && sm.period_from && sm.period_from !== sm.period_to ? `${sm.period_from}–${sm.period_to}` : `${sm.period_to ?? "ano não informado"}`, hs6: hit, usd: hit.reduce((n, h) => n + Number(all[h]), 0) });
     }
   }
   const items = [];
@@ -173,8 +193,8 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
     const first = ev[0];
     items.push({
       iso2: d.iso2, iso3: d.iso3, name: d.name, nameEn: d.nameEn ?? null, products, stale: d.stale, extended: ev.every((e) => e.extended),
-      evidence: ev.map((e) => ({ ...e, text: `${SOURCE_SHORT[e.source]}, ${e.period}${e.extended ? " (período guardado mais longo)" : ""}: SH ${e.hs6.join(", ")} (${e.product})` })),
-      line: `${SOURCE_SHORT[first.source]}, ${first.period}${first.extended ? " (período guardado mais longo)" : ""}${ev.length > 1 ? ` e mais ${ev.length - 1} registro(s)` : ""}`,
+      evidence: ev.map((e) => ({ ...e, text: `${SOURCE_SHORT[e.source]}, ${e.period}${e.extended ? " (histórico guardado)" : ""}: SH ${e.hs6.join(", ")} (${e.product})` })),
+      line: `${SOURCE_SHORT[first.source]}, ${first.period}${first.extended ? " (histórico guardado)" : ""}${ev.length > 1 ? ` e mais ${ev.length - 1} registro(s)` : ""}`,
       basis: products.length === 1 ? products[0].name : products.map((x) => x.name).join(", "),
       connector: srcs.length ? { available: true, labels: srcs.map((x) => x.label) } : { available: false, note: "sem fonte de empresas coberta para este país e esta commodity: limitação de cobertura" },
     });
@@ -200,7 +220,7 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
     pending ? `${pending} resumo(s) ainda em preparação` : null,
   ].filter(Boolean);
   // Cobertura por produto: a ausência só é afirmada com consultas válidas que incluíram o produto, em todas as fontes.
-  const diagnostics = classified.length ? await productCoverage(env, { products: classified, hsOf, months: w.months, countries }) : [];
+  const diagnostics = classified.length ? await productCoverage(env, { products: classified, hsOf, months: w.months, countries, comtradeMinYear: w.comtradeMinYear }) : [];
   const allAbsent = diagnostics.length > 0 && diagnostics.every((d) => d.validAbsence) && !unclassified.length;
   for (const d of diagnostics) if (!d.validAbsence && !items.some((x) => x.products.some((p) => p.productId === d.productId)))
     reasons.push(...["mdic", "comtrade"].filter((k) => !d.bySource[k].complete).map((k) => `${d.name}, ${k === "mdic" ? "MDIC" : "Comtrade"}: ${d.bySource[k].answered} de ${d.bySource[k].total} países com resposta válida que inclui o produto`));
