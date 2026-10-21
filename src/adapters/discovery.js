@@ -69,6 +69,65 @@ export function parseOverpass(data) {
   return { total: out.length, candidates: out, attribution: OSM_ATTRIBUTION };
 }
 
+// ---------- Chile — LENAA do SAG (lista oficial pública de fabricantes de alimentos para animais), sem chave ----------
+// A página oficial publica a planilha com data no nome; o endereço vigente é lido da própria página a cada consulta.
+// Identidade: razão social, RUT (dígito verificador conferido) e região chilena do registro; atividade autorizada pelo SAG.
+export const LENAA_PAGE = "https://www.sag.gob.cl/ambitos-de-accion/alimentacion-animal/registros";
+export function validRut(rut) {
+  const m = /^(\d{1,2}(?:\.?\d{3}){2})-([\dkK])$/.exec(String(rut ?? "").trim());
+  if (!m) return false;
+  const body = m[1].replace(/\./g, "");
+  let sum = 0, mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) (sum += Number(body[i]) * mul), (mul = mul === 7 ? 2 : mul + 1);
+  const dv = 11 - (sum % 11);
+  return (dv === 11 ? "0" : dv === 10 ? "K" : String(dv)) === m[2].toUpperCase();
+}
+const excelDate = (v) => (/^\d{5}$/.test(String(v)) ? new Date(Date.UTC(1899, 11, 30) + Number(v) * 86400000).toISOString().slice(0, 10) : null);
+export async function clLenaaCandidates({ activity, page = LENAA_PAGE }, fetchImpl = fetch) {
+  const html = await fetchImpl(page, { headers: { "user-agent": "eag-compass (uso pessoal, baixo volume)" } });
+  if (!html.ok) throw new AdapterError("temporary", `SAG: página dos registros respondeu ${html.status}.`, { retryable: html.status >= 500 || html.status === 429 });
+  const href = /href="([^"]*LENAA[^"]*\.xlsx)"/i.exec(await html.text())?.[1];
+  if (!href) throw new AdapterError("schema", "SAG: link da planilha LENAA não encontrado na página oficial.");
+  const url = new URL(href, page).toString();
+  const r = await fetchImpl(url, { headers: { "user-agent": "eag-compass (uso pessoal, baixo volume)" } });
+  if (!r.ok) throw new AdapterError("temporary", `SAG: planilha LENAA respondeu ${r.status}.`, { retryable: r.status >= 500 || r.status === 429 });
+  const { readXlsx } = await import("./xlsx.js");
+  const rows = await readXlsx(new Uint8Array(await r.arrayBuffer()));
+  const head = rows.findIndex((x) => /^c[oó]digo$/i.test(x[0] ?? "") && rows.indexOf(x) >= 0);
+  if (head < 0) throw new AdapterError("schema", "SAG: cabeçalho da LENAA diferente do conferido.", { code: "layout_changed" });
+  const updated = rows.slice(0, head).map((x) => /actualizaci[oó]n:\s*([\d/]+)/i.exec(x[0] ?? "")?.[1]).find(Boolean) ?? null;
+  // Uma candidata por empresa (RUT); as plantas registradas ficam juntas na atividade. Pessoa física aparece com o RUT
+  // mascarado ("XXX") e fica de fora, como RUT inválido: nenhum nome de pessoa é guardado.
+  const byRut = new Map();
+  let invalidRut = 0, otherActivity = 0;
+  for (const x of rows.slice(head + 1)) {
+    const [code, resolution, region, , name, rawRut, date, ...acts] = x;
+    if (!code || !name) continue;
+    const label = acts.filter(Boolean).join("; ").replace(/\s+/g, " ");
+    if (activity && !activity.test(label)) { otherActivity++; continue; }
+    const rut = String(rawRut ?? "").trim().replace(/[.\s]+$/, "");
+    if (!validRut(rut)) { invalidRut++; continue; }
+    const id = rut.replace(/\./g, "").toUpperCase();
+    const plant = `SAG ${code} — ${region ?? "região não informada"}: ${label}${resolution ? ` (resolução nº ${resolution}${excelDate(date) ? `, ${excelDate(date)}` : ""})` : ""}`;
+    const c = byRut.get(id) ?? byRut.set(id, { source: "cl_sag_lenaa", externalId: `RUT ${id}`, name: String(name).slice(0, 250), legalNameHint: String(name).slice(0, 250), city: region ? `Região ${region} (Chile)` : null, website: null, plants: [], size: null, registry: { id, type: "RUT" }, recordUrl: url }).get(id);
+    c.plants.push(plant);
+  }
+  // A atividade cabe no cadastro da empresa (500 caracteres com a região): plantas inteiras até o limite; as demais
+  // ficam contadas, com o detalhe na planilha oficial (endereço da fonte).
+  const fit = (plants) => {
+    let label = "";
+    for (let k = 0; k < plants.length; k++) {
+      const next = label ? `${label} | ${plants[k]}` : plants[k];
+      const more = plants.length - k - 1;
+      if (next.length + (more ? 40 : 0) > 440) return `${label || plants[k].slice(0, 400)} | +${plants.length - (label ? k : k + 1)} planta(s) na planilha LENAA`;
+      label = next;
+    }
+    return label;
+  };
+  const out = [...byRut.values()].map(({ plants, ...c }) => ({ ...c, activity: { code: `LENAA (${plants.length} planta${plants.length > 1 ? "s" : ""})`, label: fit(plants) } }));
+  return { query: `LENAA ${updated ?? "(data não informada)"}: atividade compatível com a commodity`, total: out.length, calls: 2, candidates: out, attribution: `SAG — LENAA, atualizada em ${updated ?? "data não informada"}`, skipped: { invalidRut, otherActivity }, updated, url };
+}
+
 // ---------- França — API Recherche d'entreprises (data.gouv), sem chave; 7 req/s por IP ----------
 // Faixa de efetivo INSEE → porte (00 = sem empregado; NN = não informado).
 const FR_BAND = { "01": "micro", "02": "micro", "03": "micro", "11": "small", "12": "small", "21": "medium", "22": "medium", "31": "medium", "32": "medium_plus", "41": "medium_plus", "42": "medium_plus", "51": "medium_plus", "52": "medium_plus", "53": "medium_plus" };

@@ -14,6 +14,7 @@ const FOREIGN = [
   { key: "fr_registry", label: "Registro oficial da França (atividade e porte)", countries: ["FR"], needs: "nace" },
   { key: "no_registry", label: "Registro oficial da Noruega (atividade, porte e site)", countries: ["NO"], needs: "nace" },
   { key: "de_coffee_assoc", label: "Deutscher Kaffeeverband — diretório de membros", countries: ["DE"], hs4: ["0901"] },
+  { key: "cl_sag_lenaa", label: "SAG (Chile) — LENAA, fabricantes de alimentos para animais", countries: ["CL"], needs: "feedRegistry" },
   { key: "osm", label: "OpenStreetMap", countries: "*", needs: "osm" },
 ];
 
@@ -28,6 +29,11 @@ export function foreignSources(iso2, hs6 = []) {
     if (d.needs === "osm") {
       if (!p?.processors.osm.length) continue; // sem regra para a commodity: o mapa não é cobertura
       out.push({ key: d.key, label: `OpenStreetMap — ${p.processors.label}`, status: "available", rule: tagText(p.processors.osm), note: weakOsm(p.processors.osm) ? "regra só pela etiqueta de produto, rara no mapa: cobertura muito irregular" : "cobertura irregular; quase nunca traz identificador cadastral" });
+      continue;
+    }
+    if (d.needs === "feedRegistry") {
+      if (!p?.processors.feedRegistry) continue; // commodity sem uso em ração: o registro não é cobertura
+      out.push({ key: d.key, label: d.label, status: "available", rule: "registro oficial de fabricantes de ração; atividade de animais de produção, aquicultura ou ingrediente vegetal", note: "identifica a empresa (RUT) e a atividade autorizada; não prova compra da commodity nem importação" });
       continue;
     }
     if (d.needs === "nace") {

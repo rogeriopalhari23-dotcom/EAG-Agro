@@ -7,7 +7,7 @@ import { statement as s, commit, product, auditStatement, now, company } from ".
 import { ensureForeignCompany, normalizeName } from "./foreign-companies.js";
 import { icpStatus } from "./profiles.js";
 import { proposalFor, MAP_VERSION } from "./discovery-map.js";
-import { osmCandidates, parseOverpass, overpassQuery, frCandidates, noCandidates, gleifLookup, eoriCheck, sourcesFor, OSM_ATTRIBUTION } from "./adapters/discovery.js";
+import { osmCandidates, parseOverpass, overpassQuery, frCandidates, noCandidates, clLenaaCandidates, gleifLookup, eoriCheck, sourcesFor, OSM_ATTRIBUTION } from "./adapters/discovery.js";
 
 import { kvSearch, kvProfile, classifyCoffeeProfile, isGermanPlace, REFRESH_DAYS } from "./adapters/kaffeeverband.js";
 import { impressumWithCache, cachedImpressum, siteOrigin, emailScope } from "./people.js";
@@ -15,7 +15,7 @@ import { decryptPii } from "./crypto.js";
 
 const SYSTEM_ID = "system-discovery";
 const addDays = (iso, d) => new Date(Date.parse(iso) + d * 86400000).toISOString();
-const SOURCE_LABEL = { de_coffee_assoc: "Deutscher Kaffeeverband — Kaffeekontakte", osm: "OpenStreetMap (Overpass)", fr_registry: "Registro oficial da França (API Recherche d'entreprises)", no_registry: "Registro oficial da Noruega (Brønnøysund)" };
+const SOURCE_LABEL = { de_coffee_assoc: "Deutscher Kaffeeverband — Kaffeekontakte", osm: "OpenStreetMap (Overpass)", fr_registry: "Registro oficial da França (API Recherche d'entreprises)", no_registry: "Registro oficial da Noruega (Brønnøysund)", cl_sag_lenaa: "SAG (Chile) — LENAA, fabricantes de alimentos para animais" };
 const NACE_RE = /^\d{2}\.\d{2}$/;
 
 async function searchOf(env, actor, id, { open = false } = {}) {
@@ -86,13 +86,15 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
   requireRole(actor, WRITE_ROLES);
   const { x, country, hs6, target } = await searchOf(env, actor, id, { open: true });
   const i = await bodyJson(request);
-  const source = oneOf(i.source, ["osm", "fr_registry", "no_registry", "de_coffee_assoc"], "fonte");
+  const source = oneOf(i.source, ["osm", "fr_registry", "no_registry", "de_coffee_assoc", "cl_sag_lenaa"], "fonte");
   const role = oneOf(i.role ?? "processor", ["processor", "trader"], "grupo");
   if (!sourcesFor(country.iso2, hs6).find((z) => z.key === source)?.available) fail(422, "source_not_available", "Fonte não cobre este país ou esta commodity.");
   if (source === "de_coffee_assoc") return discoverKaffeeverband(env, actor, rid, x, deps);
   const proposal = proposalFor(hs6);
   const nace = i.nace ?? proposal?.[role === "trader" ? "traders" : "processors"]?.nace;
-  if (!Array.isArray(nace) || !nace.length || nace.length > 12 || !nace.every((c) => NACE_RE.test(String(c))))
+  // Registro oficial por atividade (sem NACE): a regra de atividade vem do mapa da commodity.
+  if (source === "cl_sag_lenaa" && role === "trader") fail(422, "registry_traders_unsupported", "A LENAA lista fabricantes de ração; não é fonte de atacadistas.");
+  if (source !== "cl_sag_lenaa" && (!Array.isArray(nace) || !nace.length || nace.length > 12 || !nace.every((c) => NACE_RE.test(String(c)))))
     fail(422, "nace_required", "Informe as atividades NACE (formato NN.NN) — não há proposta para esta commodity.");
   if (source === "osm" && role === "trader") fail(422, "osm_traders_unsupported", "O OpenStreetMap não distingue atacadistas; use um registro oficial para traders.");
   const f = deps.fetch ?? fetch;
@@ -108,6 +110,15 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
         const informed = Number(i.overpass.totalElements);
         if (Number.isInteger(informed) && informed > r.candidates.length) Object.assign(r, { truncated: true, total: informed });
       } else r = await osmCandidates({ iso2: country.iso2, filters: proposal.processors.osm }, f);
+      // Matéria-prima diferente (ex.: azeite de oliva na etiqueta genérica oil_mill): fora, contado na nota.
+      if (proposal.processors.exclude) {
+        const before = r.candidates.length;
+        r.candidates = r.candidates.filter((c) => !proposal.processors.exclude.test(`${c.name} ${c.legalNameHint ?? ""}`));
+        r.excluded = before - r.candidates.length;
+      }
+    } else if (source === "cl_sag_lenaa") {
+      if (!proposal?.processors.feedRegistry) fail(422, "registry_rule_missing", "Sem regra de atividade para esta commodity no registro de fabricantes de ração.");
+      r = await clLenaaCandidates({ activity: proposal.processors.feedRegistry }, f);
     } else if (source === "fr_registry") {
       // Porte ordena, não exclui (2026-09-30): primeiro as faixas prioritárias da busca; depois todas as outras (micro,
       // grandes e sem faixa) na mesma execução. Cada candidata guarda a faixa informada pelo INSEE com a fonte.
@@ -140,7 +151,7 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
     fail(503, "source_unavailable", `${e.message} Nada foi descartado; tente de novo mais tarde.`, { retryable: e.retryable });
   }
   const runId = crypto.randomUUID();
-  const note = [source === "osm" ? OSM_ATTRIBUTION : null, r.browser ? "consulta executada no navegador (o servidor público do OSM recusa conexões da Cloudflare)" : null, r.truncated ? `lidos ${r.candidates.length} de ${r.total} (primeiras páginas)` : null, r.eoriAt ? `EORI conferido: ${r.candidates.filter((c) => c.eoriStatus === "valid").length} ativo(s)` : null, r.eoriNote ?? null, `mapa ${MAP_VERSION}`].filter(Boolean).join(" · ");
+  const note = [source === "osm" ? OSM_ATTRIBUTION : null, r.browser ? "consulta executada no navegador (o servidor público do OSM recusa conexões da Cloudflare)" : null, r.truncated ? `lidos ${r.candidates.length} de ${r.total} (primeiras páginas)` : null, r.eoriAt ? `EORI conferido: ${r.candidates.filter((c) => c.eoriStatus === "valid").length} ativo(s)` : null, r.eoriNote ?? null, r.excluded ? `${r.excluded} fora por matéria-prima diferente (ex.: azeite de oliva)` : null, r.attribution && source === "cl_sag_lenaa" ? `${r.attribution}; ${r.url}; RUT inválido ${r.skipped.invalidRut}, outra atividade ${r.skipped.otherActivity}` : null, `mapa ${MAP_VERSION}`].filter(Boolean).join(" · ");
   const stmts = [
     s(
       env,
@@ -159,7 +170,7 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
         c.eori ?? null, c.eoriStatus ?? "not_checked", c.eoriStatus && c.eoriStatus !== "not_checked" ? r.eoriAt : null,
       ),
     );
-  stmts.push(auditStatement(env, actor, rid, "foreign_search.discovered", "foreign_search", x.id, { source, role, nace, found: r.candidates.length, total: r.total }));
+  stmts.push(auditStatement(env, actor, rid, "foreign_search.discovered", "foreign_search", x.id, { source, role, nace: source === "cl_sag_lenaa" ? null : nace, found: r.candidates.length, total: r.total }));
   for (let k = 0; k < stmts.length; k += 90) await commit(env, stmts.slice(k, k + 90));
   return { runId, source, role, found: r.candidates.length, totalInSource: r.total, truncated: !!r.truncated, discovery: await getDiscovery(env, actor, x.id) };
 }

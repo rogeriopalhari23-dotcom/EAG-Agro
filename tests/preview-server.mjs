@@ -21,7 +21,7 @@ import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec,
 const PORT = Number(process.env.PREVIEW_PORT || 8790);
 // Identificação discreta da instância servida (rodapé e /api/session): commit, alterações locais e início do processo.
 const git = (args) => { try { return execFileSync("git", args, { cwd: new URL("..", import.meta.url), encoding: "utf8" }).trim(); } catch { return null; } };
-const PREVIEW_BUILD = { commit: git(["rev-parse", "--short", "HEAD"]) ?? "desconhecido", dirty: !!git(["status", "--porcelain", "--untracked-files=no"]), startedAt: new Date().toISOString(), pid: process.pid };
+const PREVIEW_BUILD = { mode: process.env.PREVIEW_REAL === "1" ? "real" : "demonstração", commit: git(["rev-parse", "--short", "HEAD"]) ?? "desconhecido", dirty: !!git(["status", "--porcelain", "--untracked-files=no"]), startedAt: new Date().toISOString(), pid: process.pid };
 const ctx = setup();
 const { api, DB } = ctx;
 Object.assign(ctx.env, { SENDER_NAME: "EAG Agro - Brasil (prévia)", EAG_POSTAL_ADDRESS: "Rua Fictícia, 000 — Indiara/GO", EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Fictícia, 000 — Indiara/GO", UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64") });
@@ -51,9 +51,13 @@ const FAKE_REG = {
 };
 // Mundo simulado da prospecção automática (mapa, sites, Receita, diretório alemão), com PREVIEW_OSM_RECUSA=1 para o mapa
 // recusar o servidor como faz com a Cloudflare.
-const world = simulatedWorld({ cityAt: nearestMunicipality(DB), refuseOsm: process.env.PREVIEW_OSM_RECUSA === "1" });
+// MODO REAL (PREVIEW_REAL=1): banco em memória, isolado da produção; rede real para as fontes de empresas (mapa,
+// registros oficiais, sites); nenhuma empresa, resposta ou lista fictícia. Falha ou ausência de fonte aparece como tal,
+// nunca vira exemplo. Os indicadores de mercado vêm do extrato real da produção (abaixo).
+const REAL = process.env.PREVIEW_REAL === "1";
+const world = REAL ? null : simulatedWorld({ cityAt: nearestMunicipality(DB), refuseOsm: process.env.PREVIEW_OSM_RECUSA === "1" });
 const realFetch = globalThis.fetch;
-globalThis.fetch = async (url, init) => {
+if (!REAL) globalThis.fetch = async (url, init) => {
   const sim = await world.fetch(url, init).catch(() => null);
   if (sim) return sim;
   const m = /publica\.cnpj\.ws\/cnpj\/(\d{14})/.exec(String(url));
@@ -67,7 +71,8 @@ globalThis.fetch = async (url, init) => {
   throw new Error(`Prévia local: rede bloqueada (${url})`);
 };
 
-// ---------- Dados fictícios ----------
+// ---------- Dados fictícios (só no modo de demonstração; nunca no modo real) ----------
+if (!REAL) {
 const put = (key, scope, value) => api(`/api/parameters/${key}`, "PUT", { scope, value, reason: "Prévia local (fictício)" });
 await put("send_timezone", "national", "America/Sao_Paulo");
 await put("send_window", "national", { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] });
@@ -148,6 +153,7 @@ await api(`${rb}/annotations`, "POST", { kind: "complement", text: "Anotação f
 const cfg2 = JSON.parse(await readFile(new URL("../docs/implementation/rodadas/exemplos/soja-rio-verde-150km.json", import.meta.url), "utf8"));
 await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/GO, 150 km (rascunho)", config: { ...cfg2, id: "previa-soja" } });
 
+}
 // Mercados compradores: EXTRATO da base pública já construída (lista mensal em produção, lida somente por leitura;
 // tests/fixtures/mercados-publicos.json, gerado por scripts/extrair-mercados-publicos.mjs). Dados agregados por país do
 // MDIC (exportações do Brasil) e da UN Comtrade (importações declaradas, origem Brasil), só nas subposições das
@@ -215,4 +221,4 @@ const server = createServer(async (req, res) => {
   res.writeHead(r.status, Object.fromEntries(r.headers));
   res.end(Buffer.from(await r.arrayBuffer()));
 });
-server.listen(PORT, "127.0.0.1", () => console.log(`Prévia local (empresas e pessoas fictícias; mercados do extrato público) em http://127.0.0.1:${PORT} — commit ${PREVIEW_BUILD.commit}${PREVIEW_BUILD.dirty ? " + alterações locais" : ""}, pid ${PREVIEW_BUILD.pid}, iniciada ${PREVIEW_BUILD.startedAt} — Ctrl+C encerra`));
+server.listen(PORT, "127.0.0.1", () => console.log(`${REAL ? "Execução local REAL (fontes reais; banco em memória, isolado da produção)" : "Prévia local (empresas e pessoas fictícias; mercados do extrato público)"} em http://127.0.0.1:${PORT} — commit ${PREVIEW_BUILD.commit}${PREVIEW_BUILD.dirty ? " + alterações locais" : ""}, pid ${PREVIEW_BUILD.pid}, iniciada ${PREVIEW_BUILD.startedAt} — Ctrl+C encerra`));

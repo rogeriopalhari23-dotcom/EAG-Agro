@@ -26,7 +26,7 @@ export const DEFAULT_PROFILE = {
   // Fontes gratuitas que a prospecção pode usar por mercado (as pagas nunca entram sem orçamento autorizado).
   sources: {
     national: ["br-cnpj-ws", "osm-overpass", "abic-certificados"],
-    international: ["fr_registry", "no_registry", "de_coffee_assoc", "osm"],
+    international: ["fr_registry", "no_registry", "de_coffee_assoc", "cl_sag_lenaa", "osm"],
   },
 };
 

@@ -7,15 +7,22 @@
 // osm: filtros [chave, valor exato ou /regex/] combinados com OU; nace: classes de 4 dígitos (NN.NN).
 export const MAP_VERSION = "descoberta-v1 (proposta de 2026-09-27, NACE Rev.2)";
 
-const P = (label, nace, osm = []) => ({ label, nace, osm });
+// exclude: matéria-prima diferente que a etiqueta genérica também pega (ex.: moinho de azeite de oliva em oil_mill).
+// feedRegistry: atividades de registros oficiais de fabricantes de ração (ex.: LENAA do SAG, Chile) compatíveis com a
+// commodity (ração para animais de produção e aquicultura, ingredientes de origem vegetal); suplemento de pet não é.
+const P = (label, nace, osm = [], extra = {}) => ({ label, nace, osm, ...extra });
+// Compatível = fabrica ALIMENTO (ração, concentrado) ou ingrediente vegetal, para animais de produção ou aquicultura.
+// Só suplemento, aditivo, premix ou produto de mascote não usa a commodity como matéria-prima principal.
+const FEED_ACTIVITY = { test: (label) => /aliment|concentrad|ingredientes? de origen vegetal/i.test(label) && /aves|pollo|porcin|cerdo|bovin|rumiant|abasto|peces|acuicult|salm[oó]n|trucha|ganad|lecher|equin|ingredientes? de origen vegetal/i.test(label) && !/^(?=[^]*(suplement|aditiv|premezcl))(?![^]*aliment)/i.test(label), source: "alimento ou ingrediente vegetal para animais de produção ou aquicultura" };
+const OLIVE = /oliv|almazara/i;
 export const DISCOVERY_MAP = {
   "0901": { commodity: "café", processors: P("torrefação e processamento de café", ["10.83"], [["craft", "coffee_roaster"], ["craft", "roaster"], ["industrial", "coffee"], ["product", /coffee|kaffee|café|koffie/]]), traders: P("atacado de café, chá e cacau", ["46.37"]) },
   "1701": { commodity: "açúcar", processors: P("confeitaria, chocolate, panificação, biscoitos e bebidas", ["10.82", "10.71", "10.72", "11.07", "10.52", "10.89"], [["craft", "confectionery"], ["industrial", "confectionery"], ["product", /sugar|zucker|confection|süßwaren|chocolate|schokolade|candy/]]), traders: P("atacado de açúcar, chocolate e confeitos", ["46.36"]) },
-  "1201": { commodity: "soja em grão", processors: P("esmagamento de oleaginosas e ração animal", ["10.41", "10.91"], [["industrial", "oil_mill"], ["product", /soy|soja|oilseed|ölsaat|feed|futter/]]), traders: P("atacado de grãos e ração", ["46.21"]) },
-  "2304": { commodity: "farelo de soja", processors: P("ração animal e pet food", ["10.91", "10.92"], [["industrial", "feed"], ["product", /feed|futter|fodder|pet food|tiernahrung/]]), traders: P("atacado de grãos e ração", ["46.21"]) },
-  "2303": { commodity: "resíduos de amido/destilaria (DDGS)", processors: P("ração animal", ["10.91"], [["industrial", "feed"], ["product", /feed|futter|fodder/]]), traders: P("atacado de grãos e ração", ["46.21"]) },
-  "1005": { commodity: "milho", processors: P("ração, amido, moagem e destilação", ["10.91", "10.62", "10.61", "11.01"], [["industrial", "feed"], ["product", /feed|futter|starch|stärke|maize|mais|corn/]]), traders: P("atacado de grãos e ração", ["46.21"]) },
-  "1507": { commodity: "óleo de soja", processors: P("refino de óleos, condimentos e alimentos preparados", ["10.41", "10.84", "10.85", "10.89"], [["industrial", "oil_mill"], ["product", /oil|öl|mayonnaise|sauce|margarine/]]), traders: P("atacado de óleos e gorduras", ["46.33"]) },
+  "1201": { commodity: "soja em grão", processors: P("esmagamento de oleaginosas e ração animal", ["10.41", "10.91"], [["industrial", "oil_mill"], ["industrial", "feed"], ["product", /soy|soja|oilseed|ölsaat|feed|futter/]], { exclude: OLIVE, feedRegistry: FEED_ACTIVITY }), traders: P("atacado de grãos e ração", ["46.21"]) },
+  "2304": { commodity: "farelo de soja", processors: P("ração animal e pet food", ["10.91", "10.92"], [["industrial", "feed"], ["product", /feed|futter|fodder|pet food|tiernahrung/]], { feedRegistry: FEED_ACTIVITY }), traders: P("atacado de grãos e ração", ["46.21"]) },
+  "2303": { commodity: "resíduos de amido/destilaria (DDGS)", processors: P("ração animal", ["10.91"], [["industrial", "feed"], ["product", /feed|futter|fodder/]], { feedRegistry: FEED_ACTIVITY }), traders: P("atacado de grãos e ração", ["46.21"]) },
+  "1005": { commodity: "milho", processors: P("ração, amido, moagem e destilação", ["10.91", "10.62", "10.61", "11.01"], [["industrial", "feed"], ["product", /feed|futter|starch|stärke|maize|mais|corn/]], { feedRegistry: FEED_ACTIVITY }), traders: P("atacado de grãos e ração", ["46.21"]) },
+  "1507": { commodity: "óleo de soja", processors: P("refino de óleos, condimentos e alimentos preparados", ["10.41", "10.84", "10.85", "10.89"], [["industrial", "oil_mill"], ["product", /oil|öl|mayonnaise|sauce|margarine/]], { exclude: OLIVE }), traders: P("atacado de óleos e gorduras", ["46.33"]) },
   "2207": { commodity: "etanol", processors: P("química, bebidas destiladas, cosméticos e farmacêutica", ["20.14", "11.01", "20.42", "21.20", "20.59"], [["product", /ethanol|alcohol|alkohol|spirit|spirituosen/]]), traders: P("atacado de produtos químicos", ["46.75"]) },
   "0201": { commodity: "carne bovina", processors: P("produtos de carne e refeições prontas", ["10.13", "10.85"], [["industrial", "slaughterhouse"], ["product", /meat|fleisch|wurst|sausage/]]), traders: P("atacado de carnes", ["46.32"]) },
   "0202": { commodity: "carne bovina congelada", processors: P("produtos de carne e refeições prontas", ["10.13", "10.85"], [["product", /meat|fleisch|wurst|sausage/]]), traders: P("atacado de carnes", ["46.32"]) },
