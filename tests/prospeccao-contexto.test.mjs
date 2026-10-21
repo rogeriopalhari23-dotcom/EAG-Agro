@@ -35,7 +35,7 @@ async function world(t, opts = {}) {
   const saved = { countries: snap("countries"), country_mdic_codes: snap("country_mdic_codes") };
   keepCountries(DB, ["DEU", "CHN"]);
   await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "22"].sort() }, ...(opts.callsPerDay ? { comtrade_calls_per_day: opts.callsPerDay } : {}) });
-  const src = sources({ comtrade: FR_DATA, hs: ["100590", "220710"], failData: opts.failFR ? (code) => code === 251 && opts.failFR() : undefined, failStatus: 400 });
+  const src = sources({ comtrade: FR_DATA, covered: { comtrade: ["FRA"] }, hs: ["100590", "220710"], failData: opts.failFR ? (code) => code === 251 && opts.failFR() : undefined, failStatus: 400 });
   const d = driver(env, src, { get at() { return iso(); } });
   await d.start();
   await d.drain();
@@ -158,7 +158,7 @@ test("milho × França sem lista mensal: o Compass pede a geração, acompanha e
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM trade_list_versions WHERE iso3='FRA'").get().n, 1, "uma geração só");
   assert.match(DB.raw.prepare("SELECT requested_by FROM trade_list_manual_refresh WHERE iso3='FRA'").get().requested_by, /^policy:/);
   assert.ok(j.events.some((e) => /Indicadores oficiais disponíveis/.test(e.message)));
-  assert.ok(j.events.some((e) => e.step === "analysis" && /compra identificada em 100590/.test(e.message)));
+  assert.ok(j.events.some((e) => e.step === "analysis" && e.message.includes("Evidência de mercado (R12.14): Importações declaradas por França (Comtrade, CIF, anual; visão do importador): comércio registrado de SH 100590")));
   // Regra vigente (não pendência técnica): seleção e autorização pela pessoa, com ação concreta.
   assert.equal(j.decision.kind, "r12_7");
   assert.equal(j.decision.category, "rule");

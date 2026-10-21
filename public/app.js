@@ -5479,7 +5479,10 @@ const WAITING_TEXT = {
   indicators_queued: "indicadores do país aguardando geração na lista mensal; retoma sozinha",
   indicators_processing: "indicadores do país em processamento; retoma sozinha",
   indicators_limit: "aguardando o limite da fonte de indicadores (uma geração por país por dia ou orçamento diário); retoma sozinha",
+  market_evidence: "aguardando evidência de mercado; o Compass confere de novo todo dia e retoma sozinho",
 };
+const EVIDENCE_TAG_UI = { positive: "comércio registrado", no_record: "sem registros para os filtros", not_declared: "sem declaração no período", unavailable: "falha ou limite", not_queried: "não consultada", no_source: "sem código na fonte", no_simulation: "sem simulação configurada" };
+const EVIDENCE_CLS = { positive: "ok", no_record: "", not_declared: "warn", unavailable: "warn", not_queried: "", no_source: "", no_simulation: "warn" };
 // Pendência da prospecção: técnica (o sistema ou o Administrador resolve), regra vigente (pede uma pessoa) ou decisão.
 const DECISION_HEAD = { technical: "Pendência técnica. ", rule: "A regra vigente pede a ação de uma pessoa. " };
 function decisionActions(j, id) {
@@ -5653,15 +5656,16 @@ async function showJob(id) {
   if (generation !== state.generation) return;
   const node = section(j.name, `${j.market === "national" ? "Prospecção nacional" : "Prospecção internacional"} · iniciada em ${fmtDate(j.createdAt)}`);
   node.dataset.step = "0";
-  const [st, cls] = JOB_STATUS[j.status] ?? [j.status, ""];
+  const [st, cls] = j.waitingFor === "market_evidence" ? ["Aguardando evidência de mercado", "warn"] : JOB_STATUS[j.status] ?? [j.status, ""];
   const s = j.summary;
+  const notStarted = s?.companySearch === "not_started";
   const item = (k, v, extra) => el("div", {}, text("span", k, "k"), v instanceof Node ? v : text("strong", v), extra ? text("small", extra) : null);
   const head = el(
     "div",
     { class: "company-summary round-summary" },
     item("Andamento", el("span", {}, tag(st, cls), " ", j.stepLabel), j.waitingFor ? WAITING_TEXT[j.waitingFor] ?? j.waitingFor : jobActive(j) ? "segue no servidor, mesmo com esta aba fechada" : null),
-    item("Candidatas encontradas", s ? String(s.candidates) : "—", s?.establishments != null ? `${s.establishments} estabelecimento(s) após deduplicação` : null),
-    item("Empresas cadastradas", s ? String(s.registered) : "—", "em descoberta: não é qualificação comercial"),
+    item("Candidatas encontradas", notStarted ? "busca não executada" : s ? String(s.candidates) : "—", notStarted ? `a pesquisa parou em: ${s.stageReached}` : s?.establishments != null ? `${s.establishments} estabelecimento(s) após deduplicação` : null),
+    item("Empresas cadastradas", notStarted ? "busca não executada" : s ? String(s.registered) : "—", notStarted ? "nenhuma empresa foi buscada" : "em descoberta: não é qualificação comercial"),
     item("Pendências para análise", s ? String(s.exceptions) : "—", s?.pendingLookups ? `${s.pendingLookups} consulta(s) adiada(s)` : null),
     el("div", { class: "next" }, el("p", {}, text("strong", "Próxima ação: "), j.decision ? (j.decision.action ? `${j.decision.action.label} (${j.decision.category === "technical" ? "pendência técnica" : j.decision.category === "rule" ? "ação de uma pessoa pela regra vigente" : "decisão"}; detalhes abaixo).` : j.decision.message) : s ? s.nextAction : jobActive(j) ? "Aguardar: a prospecção avança sozinha." : "—"), jobProgress(j)),
   );
@@ -5693,12 +5697,22 @@ async function showJob(id) {
     }
   }
   // Resultados: cadastradas com prioridade e evidência; fila de exceções.
+  if (s?.evidence?.length)
+    node.append(
+      panel(
+        "Evidência de mercado do país",
+        text("p", "Cada fonte com origem, direção, período e filtros. Exportações do Brasil e importações declaradas pelo destino são séries diferentes.", "muted"),
+        el("ul", { class: "coverage-list evidence-list" }, ...s.evidence.map((x) => el("li", {}, tag(EVIDENCE_TAG_UI[x.state] ?? x.state, EVIDENCE_CLS[x.state] ?? ""), text("span", x.text)))),
+      ),
+    );
   if (s) {
     const tbl = (cols, list, row) => el("div", { class: "table-wrap" }, el("table", { class: "trade" }, el("thead", {}, el("tr", {}, ...cols.map((c) => el("th", { scope: "col" }, c)))), el("tbody", {}, ...list.map(row))));
     const PROOF = { proved: "comprovado", indication: "indício", none: "sem evidência" };
     const SIZE = { medium: "média", small: "pequena", large: "grande", micro: "micro", unknown: "desconhecido" };
-    node.append(
-      panel(
+    node.append(...[
+      notStarted
+        ? null
+        : panel(
         `Empresas cadastradas em descoberta (${s.registered})`,
         text("p", s.notCommercial, "muted"),
         s.ranked.length
@@ -5725,7 +5739,7 @@ async function showJob(id) {
           ? el("div", {}, el("ul", { class: "plain-list" }, ...s.queue.map((q) => text("li", `${q.name}: ${(q.reasons ?? [q.reason]).filter(Boolean).join("; ")}`))), el("div", { class: "toolbar" }, s.roundId ? button("Revisar na rodada", () => ((state.roundTab = null), showRound(s.roundId))) : null, s.searchId ? button("Revisar na busca do país", () => showForeignSearch(s.searchId)) : null))
           : text("p", "Nenhuma exceção: tudo o que cumpriu as regras foi cadastrado.", "empty"),
       ),
-    );
+    ].filter(Boolean));
   }
   // Decisores das empresas cadastradas (só leitura; mesma visibilidade do cadastro).
   safe(async () => {
@@ -5741,7 +5755,7 @@ async function showJob(id) {
   const controls = el("div", { class: "toolbar" });
   if (writable()) {
     if (jobActive(j)) controls.append(button("Pausar", async () => (await api(`/api/prospect/jobs/${id}/pause`, "POST", {}), await showJob(id))));
-    if (["paused", "waiting"].includes(j.status)) controls.append(button("Retomar agora", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id)), true));
+    if (["paused", "waiting"].includes(j.status)) controls.append(button(j.waitingFor === "market_evidence" ? "Conferir a evidência de mercado agora" : "Retomar agora", async () => (await api(`/api/prospect/jobs/${id}/resume`, "POST", {}), await showJob(id)), true));
     if (!["done", "cancelled", "failed"].includes(j.status)) controls.append(button("Cancelar", async () => (await api(`/api/prospect/jobs/${id}/cancel`, "POST", {}), await showJob(id))));
     if (j.roundId) controls.append(button("Abrir a rodada", () => showRound(j.roundId)));
   }

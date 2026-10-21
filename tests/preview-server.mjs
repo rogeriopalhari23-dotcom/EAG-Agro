@@ -14,7 +14,7 @@ import { provenanceHeaders } from "../src/provenance.js";
 import { internalCaller } from "../src/worker.js";
 import { tick } from "../src/prospect/engine.js";
 import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.mjs";
-import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec } from "./helpers/trade.mjs";
+import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec, MDIC_ROWS } from "./helpers/trade.mjs";
 
 const PORT = Number(process.env.PREVIEW_PORT || 8790);
 const ctx = setup();
@@ -143,7 +143,16 @@ await tradeParams(api, { period_default_months: 12, agri_classification: { ...AG
 // França (FICTÍCIO): a Comtrade simulada responde milho (1005.90) e álcool etílico (2207.10), mas o país fica SEM lista
 // mensal até a prospecção pedir a geração (o caso "Milho GMO — França").
 const tclock = { at: "2026-10-10T12:00:00.000Z" };
-const tradeDriver = driver(ctx.env, tradeSources({ hs: ["100590", "220710"], comtrade: { 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] } } }), tclock);
+// Egito (FICTÍCIO, o caso "Milho GMO — Egito"): o país não declarou à Comtrade (configurado assim) e o Brasil exportou
+// milho ao Egito em jan/2025 (MDIC), fora do período padrão de 12 meses e dentro dos 24 guardados. Soja: nada nas duas.
+const egyCorn = '"2025";"01";"10059010";"10";"240";"PR";"01";"0917500";500000;500000;120000';
+const tradeDriver = driver(ctx.env, tradeSources({
+  hs: ["100590", "220710"],
+  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"'],
+  mdicRows: { 2026: MDIC_ROWS[2026], 2025: [...MDIC_ROWS[2025], egyCorn] },
+  comtrade: { 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
+  covered: { comtrade: ["FRA", "EGY"], mdic: ["EGY"] },
+}), tclock);
 await tradeDriver.start();
 await tradeDriver.drain();
 Object.defineProperty(tclock, "at", { get: () => new Date().toISOString() }); // depois da rotina inicial, relógio real
@@ -152,7 +161,7 @@ for (const [t, rows] of Object.entries(savedCountries))
 const coffee = (await api("/api/catalog/product-05")).data;
 await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: coffee.revision, reason: "Prévia local (fictício)" });
 // Classificação SH só da PRÉVIA (fictícia, como se confirmada pelo Administrador): milho GMO e álcool etílico neutro.
-for (const [pid, code] of [["product-03", "100590"], ["product-11", "220710"]]) {
+for (const [pid, code] of [["product-03", "100590"], ["product-11", "220710"], ["product-01", "120190"]]) {
   const p = (await api(`/api/catalog/${pid}`)).data;
   await api(`/api/catalog/${pid}/codes`, "POST", { codeSystem: "HS", code, status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: p.revision, reason: "Prévia local (fictício)" });
 }

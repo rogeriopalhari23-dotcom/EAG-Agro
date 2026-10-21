@@ -3416,3 +3416,39 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - sem texto cortado nem rolagem horizontal no celular, sem erro de JavaScript.
 - **Respostas reais nesta etapa:** nenhuma. Todas as respostas de fontes nos testes e na prévia foram simuladas (`tests/helpers/simulated-world.mjs`, `tests/helpers/trade.mjs`).
 - **Não feito:** publicação, migração remota, ponte, fichas, T11, canais, campanhas e mensagens.
+
+## 2026-10-20 — Evidência de mercado antes da busca de empresas ("Milho GMO — Egito")
+
+- **Causa do print** (prévia, dados conferidos no próprio banco da prévia):
+  - (1) o Egito não tinha lista, e o motor pediu a geração corretamente; mas a Comtrade **simulada** não tinha configuração para o Egito. Ela respondeu "nenhum ano disponível", gravado como `not_declared` sem data. O MDIC simulado não tinha linhas do Egito e gravou `no_record`. A lacuna da simulação virou "fato";
+  - (2) o motor tratava `not_declared` como resposta final: pulava para o relatório e marcava a pesquisa como **Concluída**, com zeros que pareciam "nada encontrado", "sem declaração desde —" e a recomendação de "escolher outro país".
+- **Evidência por fonte, sem misturar as séries:**
+  - importações declaradas pelo destino (Comtrade, CIF, anual) e exportações do Brasil para o destino (MDIC, FOB, mensal), cada uma com origem, direção, período e filtros (SH e produto);
+  - estados distintos: consulta não realizada, falha ou limite, sem declaração no período ("data não informada" quando falta a data), resposta válida sem registros para os filtros (sem extrapolar), evidência positiva, país sem código na fonte;
+  - só em teste ou prévia, "sem simulação configurada" (`SIMULATED_TRADE`, que a produção nunca define).
+- **Alternativas permitidas, nesta ordem:**
+  - fonte com falha → nova geração (uma por país por dia, tentativas controladas);
+  - sem evidência no período padrão → período guardado mais longo das exportações do Brasil (até 60 meses; 24 com os parâmetros atuais), identificado no registro;
+  - exportações do Brasil como fonte própria de evidência (R12.14: compra identificada em ao menos uma das fontes).
+- **Sem evidência:**
+  - a pesquisa fica **"Aguardando evidência de mercado"**, com motivo, na etapa de indicadores. Não é concluída;
+  - a busca de candidatas aparece como "não executada" (diferente de zero encontrado) e a lacuna entra nas pendências;
+  - o Compass confere de novo todo dia e retoma sozinho; o botão "Conferir a evidência de mercado agora" faz a mesma verificação na hora;
+  - iniciar a mesma pesquisa reaproveita a que já está em andamento, sem duplicar. A seleção R12.7 continua da pessoa.
+- **Outras correções:**
+  - aviso de que dado agregado não comprova aceitação de GMO nem identifica compradores;
+  - respiro interno da faixa "Próxima ação";
+  - painel vazio aparecia como o texto "null" (relatórios sem "compradores prováveis a identificar", desde o commit anterior).
+- **Testes:**
+  - `tests/prospeccao-evidencia.test.mjs` (6 casos parametrizados; nenhuma exceção fixa por país):
+    - Milho GMO — Egito sem declaração e sem exportação, com retomada quando os dados chegam;
+    - Milho GMO — Egito com exportação do Brasil;
+    - Soja — Japão com resposta válida sem registros;
+    - Milho GMO — Marrocos pelo período ampliado;
+    - Café — Marrocos com falha da fonte;
+    - Soja — Vietnã sem simulação configurada.
+  - Ajustes em `prospeccao-contexto` (mensagem de evidência por fonte).
+- **Prévia** (Edge; Egito configurado de forma fictícia: o país não declarou à Comtrade e o Brasil exportou milho em jan/2025): 19 conferências ok.
+  - Milho GMO — Egito segue até a R12.7 pela série de exportações do Brasil, com o período ampliado identificado.
+  - Soja GMO — Egito fica "Aguardando evidência de mercado", com os estados por fonte, sem "Concluída" e sem duplicar.
+- **Respostas reais:** nenhuma nesta etapa. Tudo foi simulado.

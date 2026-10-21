@@ -54,19 +54,26 @@ export const COMTRADE = {
 };
 const HS = { results: ["010121", "090111", "090112", "120190", "170114", "170199"].map((id) => ({ id, aggrLevel: 6, text: `${id} - item ${id}` })) };
 
+// Países com dado SIMULADO configurado em cada fonte (o resto não é ausência real de comércio: o Compass mostra
+// "sem simulação configurada"). MDIC: CO_PAIS 023/025 = DEU, 249 = USA, 607 = PRT. Comtrade: declarantes de COMTRADE.
+export const SIM_COUNTRIES = { comtrade: ["DEU", "USA", "PRT", "CHN"], mdic: ["DEU", "USA", "PRT"] };
+
+// opts.covered: { comtrade: [ISO3], mdic: [ISO3] } das linhas extras; opts.ncm: linhas extras da tabela NCM do MDIC.
 export function sources(opts = {}) {
   // opts.comtrade: declarantes extras { código: { years, rows } }; opts.hs: códigos SH6 extras da tabela da Comtrade.
   const CT = { ...COMTRADE, ...(opts.comtrade ?? {}) };
   const HSX = opts.hs ? { results: [...HS.results, ...opts.hs.map((id) => ({ id, aggrLevel: 6, text: `${id} - item ${id}` }))] } : HS;
   const calls = { comtrade: 0, data: 0, mdicGets: 0, log: [] };
   const etags = { 2026: '"a1"', 2025: '"b1"', ...(opts.etags || {}) };
+  const covered = { comtrade: [...SIM_COUNTRIES.comtrade, ...(opts.covered?.comtrade ?? [])], mdic: [...SIM_COUNTRIES.mdic, ...(opts.covered?.mdic ?? [])] };
+  const ncmCsv = NCM_CSV + (opts.ncm ?? []).map((l) => l + "\n").join("");
   const file = (y) => new TextEncoder().encode([HEADER, ...(opts.mdicRows?.[y] ?? MDIC_ROWS[y])].join("\n") + "\n");
   const fetchImpl = async (url, init = {}) => {
     const u = new URL(url);
     calls.log.push(u.pathname);
     if (u.host === "mdic.test") {
       // Como a fonte real: NCM.csv em windows-1252 (os acentos do fixture cabem em latin1).
-      if (u.pathname.endsWith("/tabelas/NCM.csv")) return new Response(Buffer.from(NCM_CSV, "latin1"), { status: 200, headers: { "content-type": "text/csv" } });
+      if (u.pathname.endsWith("/tabelas/NCM.csv")) return new Response(Buffer.from(ncmCsv, "latin1"), { status: 200, headers: { "content-type": "text/csv" } });
       const y = Number(/EXP_(\d{4})\.csv$/.exec(u.pathname)?.[1]);
       if (!MDIC_ROWS[y] || opts.mdicDown) return new Response(null, { status: opts.mdicDown ? 503 : 404 });
       const bytes = file(y);
@@ -91,7 +98,7 @@ export function sources(opts = {}) {
     }
     throw new Error("host inesperado " + u.host);
   };
-  return { fetchImpl, calls };
+  return { fetchImpl, calls, covered };
 }
 
 // Mantém só alguns países para o teste ser rápido (o seed tem 250).
@@ -112,6 +119,8 @@ export async function tradeParams(api, over = {}) {
 export function driver(env, src, clock) {
   const queue = [];
   const deps = { fetch: src.fetchImpl, now: () => clock.at, enqueue: async (msgs) => queue.push(...msgs.map((m) => m.body)) };
+  // Marca de simulação (só testes e prévia; a produção nunca define): países sem dado configurado não viram ausência.
+  if (src.covered) env.SIMULATED_TRADE = JSON.stringify(src.covered);
   Object.assign(env, { FILES: env.FILES || memoryR2(), MDIC_BULK_BASE: "https://mdic.test/bd", COMTRADE_BASE: "https://comtrade.test", COMTRADE_KEY: env.COMTRADE_KEY ?? "chave-teste", MDIC_CHUNK_BYTES: "150", DEFAULT_TENANT_ID: "eag-internal" });
   return {
     queue,

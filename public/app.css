@@ -2971,3 +2971,21 @@ details.complementary > summary {
 .decision-box .toolbar {
   margin: 0;
 }
+/* Faixa "Próxima ação": respiro interno (o texto não encosta na borda). */
+.company-summary .next {
+  padding: 12px 16px;
+}
+.evidence-list li span {
+  flex: 1 1 320px;
+}
+.evidence-list li {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+@media (max-width: 640px) {
+  .evidence-list li {
+    grid-template-columns: 1fr;
+  }
+}

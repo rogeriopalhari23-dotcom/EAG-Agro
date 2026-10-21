@@ -6,7 +6,7 @@
 // "automation" + a política vigente como autorização. Assim valem as mesmas validações, bloqueios e auditoria do uso
 // manual. Nada aqui faz contato, aprova ficha, ativa campanha, libera canal ou envia mensagem.
 import { bodyJson, fail, str, oneOf, number, requireRole, WRITE_ROLES, APPROVER_ROLES } from "../http.js";
-import { statement as s, commit, auditStatement, now, product } from "../store.js";
+import { statement as s, commit, auditStatement, now, product, parameters } from "../store.js";
 import { SEGMENT_PRESETS } from "../rodada/segments.js";
 import { provenanceHeaders } from "../provenance.js";
 import { DEFAULT_PROFILE, POLICY_TEMPLATE, uncoveredLimitations, AMENDMENT } from "./defaults.js";
@@ -199,6 +199,12 @@ export async function createJob(request, env, actor, rid, deps = {}) {
     input.location = { iso3: c.iso3, iso2: c.iso2, country: c.name_pt };
     if (i.hs6 != null) input.hs6 = [str(i.hs6, "código HS", 6)];
   }
+  // Pesquisa igual ainda em andamento (inclusive aguardando dados ou decisão): reaproveita a mesma, sem duplicar.
+  const same = (await s(env, "SELECT id,input_json FROM prospect_jobs WHERE tenant_id=? AND market=? AND status IN ('queued','running','waiting','needs_decision','paused')", actor.tenant_id, market).all()).results.find((r) => {
+    const x = parse(r.input_json, {});
+    return x.productId === input.productId && JSON.stringify(x.location) === JSON.stringify(input.location) && JSON.stringify(x.radius ?? null) === JSON.stringify(input.radius ?? null);
+  });
+  if (same) return { ...(await getJob(env, actor, same.id)), reused: true };
   const profile = await ensureProfile(env, actor, rid);
   const policy = await currentPolicy(env, actor.tenant_id);
   const where = market === "national" ? `${input.location.municipality}/${input.location.region}, ${input.radius.value} ${input.radius.unit}` : input.location.country;
@@ -395,6 +401,7 @@ export async function runJob(env, jobId, deps = {}) {
           break;
         }
         if (r.waitFor) {
+          if (r.summary) summary = r.summary;
           state.waitingFor = r.waitFor;
           state.steps[step] = "waiting";
           status = "waiting";
@@ -746,6 +753,70 @@ const NATIONAL = {
 };
 
 // ---------------------------------------------------------------- internacional (análise, seleção, busca, descoberta)
+// Evidência de mercado do produto no país, por fonte, sem misturar as séries: importações declaradas pelo destino
+// (Comtrade, CIF, anual) e exportações do Brasil para o destino (MDIC, FOB, mensal). Estados distintos: consulta não
+// realizada, falha ou limite, sem declaração, resposta válida sem registros para os filtros, evidência positiva, sem
+// código na fonte e, só em prévia ou teste, combinação sem simulação configurada (nunca apresentada como ausência real).
+const EVIDENCE_TAG = { positive: "comércio registrado", no_record: "sem registros para os filtros", not_declared: "sem declaração no período", unavailable: "falha ou limite da fonte", not_queried: "consulta não realizada", no_source: "país sem código na fonte", no_simulation: "sem simulação configurada" };
+function marketEvidence(ctx, a, hs, p, ind) {
+  const country = ctx.input.location.country, iso3 = ctx.input.location.iso3;
+  const codes = new Set(hs.map(String));
+  const rows = (a.rows ?? []).filter((r) => codes.has(String(r.hs6)) || r.catalog?.confirmed?.some((c) => c.productId === p.id));
+  const filters = `SH ${[...codes].join(", ")} (${commodityLabel(p)})`;
+  const sim = ctx.env.SIMULATED_TRADE ? JSON.parse(ctx.env.SIMULATED_TRADE) : null;
+  const stateOf = (src) => {
+    const raw = a.sources?.[src] ?? {}, b = ind.bySource?.[src] ?? {};
+    const st = raw.state ?? b.state, err = raw.error ?? raw.note ?? b.error;
+    if (sim && !(sim[src] ?? []).includes(iso3)) return { state: "no_simulation" };
+    if (!st || st === "pending") return { state: "not_queried" };
+    if (st === "data_unavailable") return { state: err === "país sem código nesta fonte" ? "no_source" : "unavailable", error: err };
+    if (st === "not_declared") return { state: "not_declared", lastPeriod: raw.lastDeclared ?? raw.lastPeriod ?? b.lastPeriod ?? null };
+    return { state: "valid" };
+  };
+  const ctYears = a.sources?.comtrade?.years ?? [];
+  const win = a.sources?.mdic?.window;
+  const defs = [
+    { key: "comtrade", label: `Importações declaradas por ${country} (Comtrade, CIF, anual; visão do importador)`, period: ctYears.length ? `${ctYears[0]}–${ctYears.at(-1)}` : "período não informado", pos: rows.filter((r) => r.comtrade?.years?.some((y) => (y.worldUsd ?? 0) > 0 || (y.brazilUsd ?? 0) > 0)) },
+    { key: "mdic", label: `Exportações do Brasil para ${country} (MDIC, FOB, mensal; visão do Brasil)`, period: win ? `${win.from} a ${win.to} (${a.periodMonths} meses)` : "período não informado", pos: rows.filter((r) => r.mdic && (r.mdic.fobUsd > 0 || r.mdic.netKg > 0)) },
+  ];
+  const items = defs.map((d) => {
+    const st = stateOf(d.key);
+    const state = st.state === "valid" ? (d.pos.length ? "positive" : "no_record") : st.state === "no_simulation" ? "no_simulation" : d.pos.length ? "positive" : st.state;
+    const text = {
+      positive: `${d.label}: comércio registrado de ${filters} em ${d.period}.`,
+      no_record: `${d.label}: resposta válida sem registros para ${filters} em ${d.period}. Não indica que ${country} não compra a commodity; só que esta fonte, com estes filtros e este período, não registrou.`,
+      not_declared: `${d.label}: ${country} não declarou o período à fonte (última declaração: ${st.lastPeriod ?? "data não informada"}). Ausência de declaração não permite concluir que o país não importa.`,
+      unavailable: `${d.label}: consulta com falha ou limite (${st.error ?? "sem detalhe"}). Não indica ausência de comércio.`,
+      not_queried: `${d.label}: consulta ainda não realizada.`,
+      no_source: `${d.label}: o país não tem código nesta fonte.`,
+      no_simulation: `${d.label}: combinação sem simulação configurada nesta prévia ou teste; não representa ausência real de comércio.`,
+    }[state];
+    return { key: d.key, label: d.label, state, tag: EVIDENCE_TAG[state], period: d.period, filters, text, hs6: d.pos.map((r) => String(r.hs6)) };
+  });
+  return { items, positive: items.filter((x) => x.state === "positive") };
+}
+const varietyNote = (p) => (varietyOf(p) ? `Dados agregados de ${commodityLabel(p)} não comprovam aceitação ${varietyOf(p) === "GMO" ? "de GMO" : "da variedade não GMO"} nem identificam compradores individuais.` : `Dados agregados não identificam compradores individuais.`);
+// Período mais longo ainda válido: o guardado da fonte mensal (anos do MDIC), no máximo 60 meses.
+async function maxEvidenceMonths(env, tenant) {
+  const p = await parameters(env, tenant);
+  return Math.min(60, Math.max(12, (Number(p["trade_list_mdic_years:international"]) || 1) * 12));
+}
+// Pesquisa parada antes da busca de empresas: resumo do ponto alcançado, com a lacuna como pendência.
+function gapSummary(ctx, ev, p, reason) {
+  return {
+    market: "international", country: ctx.input.location.country, companySearch: "not_started", stageReached: STEP_LABELS.analysis,
+    candidates: null, registered: null, exceptions: 1, ranked: [],
+    evidence: ev?.items ?? [],
+    queue: [{ name: "Evidência de mercado", reasons: [`${reason}; detalhes por fonte em "Evidência de mercado do país"`] }],
+    partial: true, partialNote: `Pesquisa interrompida antes da busca de empresas: ${reason}`,
+    coverage: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, { status: "not_applicable", note: "não consultada: a busca de empresas ainda não começou" }])),
+    sourceLabels: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, x.label])),
+    notCommercial: `Nenhuma empresa foi buscada, cadastrada, qualificada ou contatada. ${varietyNote(p)}`,
+    nextAction: "Aguardando evidência de mercado: o Compass confere de novo todo dia e retoma sozinho quando a lista do país mostrar comércio do produto; também é possível conferir agora.",
+    analysisId: ctx.state.analysisId ?? null,
+  };
+}
+const EVIDENCE_RECHECK_MS = 24 * 3600_000;
 const waitUntil = (ctx, at) => (at ? Math.min(6 * 3600_000, Math.max(60_000, Date.parse(at) - Date.parse(ctx.now()))) : 60_000);
 // País sem lista ou com falha: pede a geração (política de Administrador) ou para numa ação concreta. Uma por país por
 // dia (R12.15); depois de 2 pedidos sem sucesso, para como pendência técnica.
@@ -787,6 +858,12 @@ const INTERNATIONAL = {
     if (!hs.length)
       return { decision: { kind: "classification", category: "technical", message: `Pendência técnica do catálogo: ${commodityLabel(p)} ainda não tem código SH confirmado. Sem ele, a lista oficial do país não pode ser cruzada com o produto (R12.14). A confirmação é do Administrador, no Catálogo, com fonte.`, action: { id: "open_catalog", label: "Abrir o produto no Catálogo", roles: "admin", productId: p.id } } };
     const ind = await countryIndicators(env, input.location.iso3, { now: ctx.now });
+    // Volta de uma espera por evidência: reavalia com os dados vigentes (a análise igual é reaproveitada, sem duplicar).
+    if (state.recheckEvidence) {
+      delete state.analysisId;
+      delete state.extendedTried;
+      delete state.recheckEvidence;
+    }
     if (!state.analysisId) {
       if (state.indicators !== ind.state) {
         const say = {
@@ -804,8 +881,11 @@ const INTERNATIONAL = {
       state.indicators = ind.state;
       if (INDICATOR_WAIT[ind.state]) return { waitFor: INDICATOR_WAIT[ind.state], waitMs: waitUntil(ctx, ind.retryAt) };
       if (ind.state === "no_source") {
-        state.blocked = { kind: "no_source", message: ind.message };
-        return { outcome: "pending", jumpTo: "report" };
+        const reason = `sem fonte de indicadores para ${input.location.country}: ${ind.message}`;
+        state.marketGap = { reason, since: state.marketGap?.since ?? ctx.now() };
+        state.recheckEvidence = true;
+        ctx.log("analysis", "waiting", `Aguardando evidência de mercado: ${reason}.`);
+        return { waitFor: "market_evidence", waitMs: 7 * EVIDENCE_RECHECK_MS, summary: gapSummary(ctx, null, p, reason) };
       }
       if (ind.state === "failed" && !ind.retryable)
         return { decision: { kind: "indicators_failed", category: "technical", message: `Pendência técnica: ${ind.message}. Não indica ausência de importações.`, action: { id: "open_trade_list", label: "Abrir a lista mensal", roles: "admin" } } };
@@ -816,23 +896,39 @@ const INTERNATIONAL = {
       state.refs = { ...(state.refs ?? {}), analysisId: a.data.id };
     }
     const a = await ctx.call(`/api/country-analyses/${state.analysisId}`);
-    const rows = a.data.rows ?? a.data.items ?? [];
-    const codes = new Set(hs.map(String));
-    const match = rows.filter((r) => r.purchaseIdentified && (codes.has(String(r.hs6)) || r.catalog?.confirmed?.some((c) => c.productId === p.id)));
-    if (!match.length) {
-      // Sem compra do produto: só é "nenhum registro" se a fonte do importador respondeu; indisponível pede nova geração.
-      if (ind.comtradeUnavailable) {
-        delete state.analysisId;
-        return askIndicators(ctx, { state: "failed", retryable: true, triedToday: ind.triedToday, retryAt: ind.retryAt, message: `fonte do importador indisponível (${ind.comtradeUnavailable}); com os dados do Brasil não há compra registrada` });
-      }
-      const declared = ind.bySource?.comtrade?.state === "not_declared";
-      state.blocked = { kind: "no_record", message: declared ? `${input.location.country} não declarou à fonte do importador o período pedido (sem declaração desde ${ind.bySource.comtrade.lastPeriod ?? "—"}): sem compra identificada de ${commodityLabel(p)}. Isso não prova que não há compradores.` : `As fontes oficiais consultadas não registram compra de ${commodityLabel(p)} (SH ${[...codes].join(", ")}) por ${input.location.country} no período. A busca de empresas parte só de compra identificada (R12.14). Isso não prova que não há compradores.` };
-      ctx.log("analysis", "pending", state.blocked.message);
-      return { outcome: "pending", jumpTo: "report" };
+    const ev = marketEvidence(ctx, a.data, hs, p, ind);
+    if (ev.positive.length) {
+      state.hs6 = [...new Set(ev.positive.flatMap((x) => x.hs6))].slice(0, 6);
+      state.evidence = ev.items;
+      delete state.marketGap;
+      ctx.log("analysis", "ok", `Evidência de mercado (R12.14): ${ev.positive.map((x) => x.text).join(" ")} ${ev.items.filter((x) => x.state !== "positive").map((x) => x.text).join(" ")} Dado de comércio entre países orienta a escolha, mas não prova que alguma empresa importa do Brasil. ${varietyNote(p)}`.replace(/\s+/g, " ").trim(), { hs6: state.hs6, evidence: ev.items.map((x) => ({ source: x.key, state: x.state, period: x.period })) });
+      return {};
     }
-    state.hs6 = [...new Set(match.map((r) => String(r.hs6)))].slice(0, 6);
-    ctx.log("analysis", "ok", `Indicadores oficiais: compra identificada em ${state.hs6.join(", ")}. Dado de comércio entre países orienta a escolha, mas não prova que alguma empresa importa do Brasil.`, { hs6: state.hs6 });
-    return {};
+    // 1) Fonte com falha ou limite: nova geração pelo fluxo existente (limite diário e tentativas controladas).
+    if (ev.items.some((x) => x.state === "unavailable")) {
+      delete state.analysisId;
+      return askIndicators(ctx, { state: "failed", retryable: true, triedToday: ind.triedToday, retryAt: ind.retryAt, message: ev.items.filter((x) => x.state === "unavailable").map((x) => x.text).join(" ") });
+    }
+    // 2) Outro período válido: o período guardado mais longo da fonte mensal (exportações do Brasil), uma vez.
+    const maxM = await maxEvidenceMonths(env, ctx.job.tenant_id);
+    if (ctx.policy?.policy?.extendEvidencePeriod !== false && !state.extendedTried && (a.data.periodMonths ?? 12) < maxM && ev.items.some((x) => x.key === "mdic" && ["no_record"].includes(x.state))) {
+      state.extendedTried = true;
+      const b = await ctx.call("/api/country-analyses", "POST", { iso3: input.location.iso3, periodMonths: maxM });
+      if (ok(b)) {
+        state.analysisId = b.data.id;
+        if (!state.extendedLogged) ctx.log("analysis", "waiting", `Sem evidência no período padrão (${a.data.periodMonths} meses): conferindo o período guardado mais longo (${maxM} meses) das exportações do Brasil.`);
+        state.extendedLogged = true;
+        return INTERNATIONAL.analysis(ctx);
+      }
+    }
+    // 3) Lacuna continua: aguarda evidência de mercado (R12.14), com motivo; confere de novo todo dia e retoma sozinho.
+    const reason = `nenhuma fonte oficial mostra comércio de ${commodityLabel(p)} com ${input.location.country} no período consultado; a busca de empresas parte só de compra identificada (R12.14)`;
+    const fresh = state.marketGap?.reason !== reason;
+    state.marketGap = { reason, since: state.marketGap?.since ?? ctx.now() };
+    state.evidence = ev.items;
+    state.recheckEvidence = true;
+    if (fresh) ctx.log("analysis", "waiting", `Aguardando evidência de mercado: ${reason}. ${ev.items.map((x) => x.text).join(" ")}`, { evidence: ev.items.map((x) => ({ source: x.key, state: x.state, period: x.period, filters: x.filters })) });
+    return { waitFor: "market_evidence", waitMs: EVIDENCE_RECHECK_MS, summary: gapSummary(ctx, ev, p, reason) };
   },
   async select(ctx) {
     const { state, input } = ctx;
@@ -945,7 +1041,7 @@ const INTERNATIONAL = {
   async report(ctx) {
     if (!ctx.state.searchId) {
       const b = ctx.state.blocked ?? { message: "A busca de empresas não foi aberta." };
-      const summary = { market: "international", country: ctx.input.location.country, candidates: 0, registered: 0, exceptions: 0, ranked: [], queue: [], partial: true, partialNote: b.message, coverage: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, { status: "not_applicable", note: "não consultada: a busca de empresas não foi aberta" }])), sourceLabels: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, x.label])), notCommercial: "Nenhuma empresa foi buscada, cadastrada, qualificada ou contatada.", nextAction: b.kind === "no_record" ? "Escolher outro país com compra identificada da commodity, ou outro produto." : "Aguardar a fonte de indicadores; nada foi concluído sobre compradores.", analysisId: ctx.state.analysisId ?? null };
+      const summary = { market: "international", country: ctx.input.location.country, candidates: 0, registered: 0, exceptions: 0, ranked: [], queue: [], partial: true, partialNote: b.message, coverage: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, { status: "not_applicable", note: "não consultada: a busca de empresas não foi aberta" }])), sourceLabels: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, x.label])), notCommercial: "Nenhuma empresa foi buscada, cadastrada, qualificada ou contatada.", nextAction: "Aguardar a evidência de mercado do país; nada foi concluído sobre compradores.", analysisId: ctx.state.analysisId ?? null };
       ctx.log("report", "ok", `Relatório: ${b.message}`);
       return { summary };
     }
@@ -964,6 +1060,7 @@ const INTERNATIONAL = {
       ranked: ranked.slice(0, 50),
       queue: (ctx.state.exceptions ?? []).slice(0, 50),
       coverage: Object.fromEntries((ctx.state.applicable ?? []).map((x) => { const v = ctx.state.sourceRuns?.[x.key]; return [x.key, v ? (v.failed ? { status: "unavailable", note: v.failed } : { status: "ok", note: x.rule ?? "" }) : { status: x.status === "pending" ? "unavailable" : "not_applicable", note: x.note ?? "" }]; })),
+      evidence: ctx.state.evidence ?? [],
       sourceLabels: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, x.label])),
       partial: (ctx.state.applicable ?? []).some((x) => x.status === "pending") || Object.values(ctx.state.sourceRuns ?? {}).some((v) => v.failed),
       partialNote: "Pesquisa parcial: há fonte pertinente pendente ou indisponível; o resultado não representa todos os compradores do país.",

@@ -39,6 +39,8 @@ export const POLICY_TEMPLATE = {
   // Pedido dos indicadores oficiais de um país sem lista (R12.15, fluxo da lista mensal, fontes gratuitas dentro do
   // orçamento diário configurado, um por país por dia). Só entra quando quem concede é Administrador.
   indicators: true,
+  // Evidência de mercado num período mais longo, dentro dos dados guardados da lista mensal (até 60 meses), identificado.
+  extendEvidencePeriod: true,
   excludes: ["contato de qualquer tipo", "aprovação de fichas", "ativação de campanhas", "liberação de canais", "envio de mensagens", "fontes pagas ou consumo de créditos", "fusão de empresas parecidas"],
   markets: ["national", "international"],
   paidSources: [],
