@@ -5,6 +5,7 @@
 //   node tests/preview-server.mjs                     → http://127.0.0.1:8790 (interface desta branch)
 //   PREVIEW_PUBLIC=<pasta public antiga> PREVIEW_PORT=8791 node tests/preview-server.mjs   → interface anterior, mesmos dados
 import { createServer } from "node:http";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { setup } from "./helpers/db.mjs";
@@ -18,10 +19,14 @@ import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.m
 import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec, MDIC_ROWS } from "./helpers/trade.mjs";
 
 const PORT = Number(process.env.PREVIEW_PORT || 8790);
+// Identificação discreta da instância servida (rodapé e /api/session): commit, alterações locais e início do processo.
+const git = (args) => { try { return execFileSync("git", args, { cwd: new URL("..", import.meta.url), encoding: "utf8" }).trim(); } catch { return null; } };
+const PREVIEW_BUILD = { commit: git(["rev-parse", "--short", "HEAD"]) ?? "desconhecido", dirty: !!git(["status", "--porcelain", "--untracked-files=no"]), startedAt: new Date().toISOString(), pid: process.pid };
 const ctx = setup();
 const { api, DB } = ctx;
 Object.assign(ctx.env, { SENDER_NAME: "EAG Agro - Brasil (prévia)", EAG_POSTAL_ADDRESS: "Rua Fictícia, 000 — Indiara/GO", EAG_POSTAL_ADDRESS_CONFIRMED: "Rua Fictícia, 000 — Indiara/GO", UNSUB_TOKEN_KEY: Buffer.alloc(32, 7).toString("base64") });
 ctx.env.PUBLIC_BASE_URL = "https://previa-local.invalid";
+ctx.env.PREVIEW_BUILD = PREVIEW_BUILD;
 const types = { html: "text/html", js: "text/javascript", mjs: "text/javascript", css: "text/css", woff2: "font/woff2", json: "application/json", png: "image/png", txt: "text/plain" };
 ctx.env.ASSETS = {
   async fetch(request) {
@@ -156,16 +161,18 @@ const deuBig = [["12019000", 200000], ["17011400", 210000], ["17019900", 220000]
 // Canadá (SIMULADO, caso "Derivados de soja — Canadá"): o Brasil exporta soja em grão e farelo; lecitina NÃO. A Comtrade
 // simulada do Canadá só traz importação do MUNDO de lecitina (parceiro 0), que não comprova compra do Brasil.
 const canRows = ['"2026";"02";"12019000";"10";"149";"PR";"01";"0917500";300000;300000;300000', '"2026";"02";"23040010";"10";"149";"PR";"01";"0917500";150000;150000;150000'];
+// Índia (SIMULADO, caso "Óleo de soja"): exportação fictícia de óleo de soja em bruto e refinado do Brasil (MDIC).
+const indSoyOil = ['"2026";"03";"15071000";"10";"361";"PR";"01";"0917500";900000;900000;800000', '"2026";"04";"15079011";"10";"361";"PR";"01";"0917500";300000;300000;290000'];
 const chnPalm = '"2026";"02";"15111000";"10";"160";"PA";"01";"0817600";40000;40000;40000';
 // Egito (FICTÍCIO, o caso "Milho GMO — Egito"): o país não declarou à Comtrade (configurado assim) e o Brasil exportou
 // milho ao Egito em jan/2025 (MDIC), fora do período padrão de 12 meses e dentro dos 24 guardados.
 const egyCorn = '"2025";"01";"10059010";"10";"240";"PR";"01";"0917500";500000;500000;120000';
 const tradeSrc = tradeSources({
-  hs: ["100590", "220710", "292320", "230400"],
-  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"', '"17019900";"10";"170199";"Outros açúcares";"Other sugar"', '"01012100";"10";"010121";"Cavalos";"Horses"', '"02013000";"10";"020130";"Carne bovina";"Beef"', '"12011000";"10";"120110";"Soja para semeadura";"Soy seed"', '"15111000";"10";"151110";"Óleo de palma em bruto";"Crude palm oil"', '"23040010";"10";"230400";"Farelo de soja";"Soybean meal"', '"29232000";"10";"292320";"Lecitinas";"Lecithins"'],
-  mdicRows: { 2026: [...MDIC_ROWS[2026], ...deuBig, chnPalm, ...canRows], 2025: [...MDIC_ROWS[2025], egyCorn] },
+  hs: ["100590", "220710", "292320", "230400", "150710", "150790"],
+  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"', '"17019900";"10";"170199";"Outros açúcares";"Other sugar"', '"01012100";"10";"010121";"Cavalos";"Horses"', '"02013000";"10";"020130";"Carne bovina";"Beef"', '"12011000";"10";"120110";"Soja para semeadura";"Soy seed"', '"15111000";"10";"151110";"Óleo de palma em bruto";"Crude palm oil"', '"23040010";"10";"230400";"Farelo de soja";"Soybean meal"', '"29232000";"10";"292320";"Lecitinas";"Lecithins"', '"15071000";"10";"150710";"Óleo de soja em bruto";"Crude soybean oil"', '"15079011";"10";"150790";"Óleo de soja refinado";"Refined soybean oil"'],
+  mdicRows: { 2026: [...MDIC_ROWS[2026], ...deuBig, chnPalm, ...canRows, ...indSoyOil], 2025: [...MDIC_ROWS[2025], egyCorn] },
   comtrade: { 124: { years: [2023, 2024, 2025], rows: [rec(124, "292320", 2025, 0, 5000)] }, 276: { years: [2022, 2023, 2024, 2025], rows: [rec(276, "090111", 2025, 0, 100), rec(276, "170114", 2024, 0, 50)] }, 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
-  covered: { comtrade: ["FRA", "EGY", "CAN"], mdic: ["EGY", "CHN", "CAN"] },
+  covered: { comtrade: ["FRA", "EGY", "CAN"], mdic: ["EGY", "CHN", "CAN", "IND"] },
 });
 const tradeDriver = driver(ctx.env, tradeSrc, { get at() { return new Date().toISOString(); } });
 // Como na produção: a fila assíncrona e a rede da rotina são do ambiente (aqui, a fila local e as fontes simuladas).
@@ -210,4 +217,4 @@ const server = createServer(async (req, res) => {
   res.writeHead(r.status, Object.fromEntries(r.headers));
   res.end(Buffer.from(await r.arrayBuffer()));
 });
-server.listen(PORT, "127.0.0.1", () => console.log(`Prévia local (dados fictícios) em http://127.0.0.1:${PORT}  — Ctrl+C encerra`));
+server.listen(PORT, "127.0.0.1", () => console.log(`Prévia local (dados fictícios) em http://127.0.0.1:${PORT} — commit ${PREVIEW_BUILD.commit}${PREVIEW_BUILD.dirty ? " + alterações locais" : ""}, pid ${PREVIEW_BUILD.pid}, iniciada ${PREVIEW_BUILD.startedAt} — Ctrl+C encerra`));

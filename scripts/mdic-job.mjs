@@ -27,7 +27,8 @@ import { loadTrust, trustedFetch } from "./lib/mdic-tls.mjs";
 
 export const DB = "eag_compass";
 export const BUCKET = "eag-compass-files";
-const BASE = "https://balanca.economia.gov.br/balanca/bd";
+// Endereço oficial vigente (página de dados abertos do MDIC, conferida em 2026-10-21).
+const BASE = "https://balanca.mdic.gov.br/balanca/bd";
 const sha256 = (s) => createHash("sha256").update(s).digest("hex");
 const q = (v) => (v == null ? "NULL" : typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 export const spMonth = (d = new Date()) => new Date(d.getTime() - 3 * 3600000).toISOString().slice(0, 7);

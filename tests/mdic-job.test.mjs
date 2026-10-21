@@ -12,8 +12,8 @@ const sha = (s) => createHash("sha256").update(s).digest("hex");
 
 test("MDIC/TLS: intermediário fixado confere impressão, validade e assinatura por raiz pública", () => {
   const t = loadTrust();
-  assert.match(t.intermediate, /Sectigo Public Server Authentication CA OV R36/);
-  assert.match(t.root, /Sectigo Public Server Authentication Root R46/);
+  assert.match(t.intermediate, /AC SERPRO AR46 OV TLS CA 2025/);
+  assert.match(t.root, /GlobalSign Root R46/);
   assert.equal(t.ca.length, tls.rootCertificates.length + 1, "raízes públicas + intermediário como elo");
   // Outro certificado no lugar do fixado → recusado pela impressão.
   assert.throws(() => loadTrust({ pem: tls.rootCertificates[0] }), /impressão inesperada/);
@@ -26,7 +26,7 @@ test("MDIC/TLS: intermediário fixado confere impressão, validade e assinatura 
 });
 
 test("MDIC/TLS: fetch confiável só aceita HTTPS", async () => {
-  await assert.rejects(trustedFetch(loadTrust())("http://balanca.economia.gov.br/x"), /Só HTTPS/);
+  await assert.rejects(trustedFetch(loadTrust())("http://balanca.mdic.gov.br/x"), /Só HTTPS/);
 });
 
 // R2 e D1 em memória no lugar do wrangler.

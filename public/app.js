@@ -5624,6 +5624,7 @@ function prospectStart(fixedMarket = null) {
         return;
       }
       if (seq !== destSeq) return; // resposta atrasada de outra escolha: descartada
+      if (r.policy && !["ready", "prepared"].includes(policyState)) safe(renderCtx);
       dest = r;
       country.reload();
       country.control.disabled = r.state !== "ready";
@@ -5656,6 +5657,9 @@ function prospectStart(fixedMarket = null) {
       } else {
         destBox.append(el("div", { class: r.state === "none_valid" ? "callout" : "callout warn" }, text("p", r.message), r.retry ? button("Tentar de novo", () => loadDestinations(true, true)) : null));
       }
+      // Origem da lista: produto, códigos usados, fonte, direção (contraparte Brasil), período e países realmente cobertos.
+      if (r.diagnostics?.length)
+        destBox.append(details("Como esta lista foi montada", el("ul", { class: "compact-list" }, ...r.diagnostics.flatMap((d) => [text("li", `${d.name} — SH ${d.hs6.join(", ")}`), text("li", d.bySource.mdic.text), text("li", d.bySource.comtrade.text)]), ...(r.progressText ? [text("li", `Trabalhos em andamento: ${r.progressText}.`)] : []))));
       for (const a of r.asks ?? [])
         destBox.append(el("div", { class: "callout" }, text("p", `Para classificar ${a.name} falta uma característica do produto: ${a.question}${a.why ? ` (${a.why})` : ""}. A resposta fica no catálogo e vale para todas as pesquisas.`), approver() ? el("div", { class: "toolbar" }, ...a.options.map((o) => button(o.label, async () => { await api("/api/prospect/characteristic", "POST", { productId: a.productId, key: a.key, value: o.value }); notice("Característica registrada no catálogo."); loadDestinations(true); }))) : text("small", "Resposta de gestor comercial ou Administrador.")));
     })().catch((e) => notice(e.message, true));
@@ -5692,18 +5696,23 @@ function prospectStart(fixedMarket = null) {
   };
   marketSel?.control.addEventListener("change", () => ((market = marketSel.control.value), showMarket()));
   // Perfil e política: resumo curto, com ajuste fora do percurso.
-  const ctxLine = el("div", { class: "prospect-context" }, text("p", "Carregando perfil e política…", "muted"));
-  safe(async () => {
-    const [pr, po] = await Promise.all([api("/api/prospect/profile"), api("/api/prospect/policy")]);
+  // Política: lida ou preparada pela automação ao abrir a tela (autorização escrita), com o estado real na tela.
+  const ctxLine = el("div", { class: "prospect-context" }, text("p", "Preparando a política de pesquisa…", "muted"));
+  let policyState = null;
+  const renderCtx = async () => {
+    const [pr, po] = await Promise.all([api("/api/prospect/profile"), api("/api/prospect/policy/prepare", "POST", {}).catch((e) => ({ state: "failed", message: e.message }))]);
+    policyState = po.state;
     const p = pr.current.profile;
     const order = (p.sizes?.order ?? []).map((x) => ({ medium: "médias", small: "pequenas", large: "grandes com canal", micro: "micro", unknown: "porte desconhecido" })[x] ?? x).slice(0, 3).join(" > ");
+    const auth = po.policy
+      ? el("p", { class: "policy-line" }, text("strong", "Autorização: "), `política de pesquisa de rotina v${po.policy.version} — descoberta, consulta cadastral, triagem e cadastro em descoberta, sem contato.`, po.policy.grantedVia === "written_authorization" ? text("small", " Registrada pela automação a partir da autorização escrita de 2026-10-20 (sem clique de pessoa).") : null)
+      : el("div", { class: "callout warn" }, text("p", po.message), po.state === "failed" ? button("Tentar de novo", () => safe(renderCtx)) : approver() && po.state !== "revoked" ? button("Ver a política", () => navigate("Prospecção automática")) : null);
     ctxLine.replaceChildren(
       el("p", {}, text("strong", "Perfil comprador: "), `${(p.roles?.priority ?? []).map((r) => p.roles.labels?.[r] ?? r).join(", ")}; ${order}; distribuidor e trader à parte. `, el("button", { type: "button", class: "link-btn", onclick: () => navigate("Prospecção automática") }, "Ajustar")),
-      po.current
-        ? el("p", {}, text("strong", "Autorização: "), `política de pesquisa de rotina v${po.current.version} — descoberta, consulta cadastral, triagem e cadastro em descoberta, sem contato.`)
-        : el("div", { class: "callout warn" }, text("p", "Sem política de pesquisa de rotina: a prospecção começa, mas para em \"precisa de decisão\" até a política ser concedida (Configurações → Prospecção automática)."), approver() ? button("Ver a política", () => navigate("Prospecção automática")) : null),
+      auth,
     );
-  });
+  };
+  safe(renderCtx);
   const submit = el("button", { type: "submit", class: "primary" }, "Iniciar prospecção");
   form.append(el("div", { class: "form-grid" }, comm.node, prodBox, marketSel?.node ?? null), natBox, intlBox, cov, ctxLine, error, el("div", { class: "toolbar" }, submit));
   form.addEventListener("submit", (e) => {
@@ -5960,7 +5969,10 @@ async function prospectView() {
 
 // Configurações → Prospecção automática: perfil comprador (versionado) e política de pesquisa de rotina.
 async function prospectSettingsView() {
+  // Abrir a tela também prepara a política a partir da autorização escrita, quando cabe (automação, sem clique).
+  const prep = await api("/api/prospect/policy/prepare", "POST", {}).catch((e) => ({ state: "failed", message: e.message }));
   const [pr, po] = await Promise.all([api("/api/prospect/profile"), api("/api/prospect/policy")]);
+  if (prep.state === "failed") notice(prep.message, true);
   const node = section("Prospecção automática", "Perfil comprador usado como padrão e autorização persistente para a pesquisa de rotina. Contato, fichas, campanhas, canais e envios ficam fora.");
   const p = pr.current.profile;
   const prof = panel(`Perfil comprador${pr.current.version ? ` v${pr.current.version}` : " (padrão, ainda não registrado)"}`);
@@ -6068,7 +6080,7 @@ async function start() {
     state.products = catalog.products;
     state.commodities = catalog.commodities;
     $("session").textContent =
-      `${session.actor.display_name} · ${session.environment === "local" ? "Ambiente local" : "Produção"}`;
+      `${session.actor.display_name} · ${session.environment === "local" ? "Ambiente local" : "Produção"}${session.preview ? ` · prévia ${session.preview.commit}${session.preview.dirty ? "+" : ""} (${session.preview.startedAt.slice(11, 16)})` : ""}`;
     $("navigation").replaceChildren(
       ...NAV_GROUPS.map(([group, items]) =>
         el(

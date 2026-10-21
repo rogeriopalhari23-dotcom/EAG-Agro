@@ -7,7 +7,7 @@
 // Sem os caminhos, baixa das URLs oficiais. Roda local, uma vez; a rotina mensal não reescreve `countries`.
 import { readFileSync, writeFileSync } from "node:fs";
 
-const MDIC = "https://balanca.economia.gov.br/balanca/bd/tabelas/PAIS.csv";
+const MDIC = "https://balanca.mdic.gov.br/balanca/bd/tabelas/PAIS.csv";
 const REPORTERS = "https://comtradeapi.un.org/files/v1/app/reference/Reporters.json";
 const PARTNERS = "https://comtradeapi.un.org/files/v1/app/reference/partnerAreas.json";
 // CPLP (https://www.cplp.org/): países com português como língua de trabalho comercial.

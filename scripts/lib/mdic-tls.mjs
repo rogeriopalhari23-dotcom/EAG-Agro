@@ -1,5 +1,6 @@
-// Confiança TLS para o servidor do MDIC (balanca.economia.gov.br), que envia só o certificado folha.
-// NÃO desliga verificação: a conexão usa as raízes públicas do Node (Mozilla) + o intermediário Sectigo OV R36 só como
+// Confiança TLS para o servidor do MDIC (balanca.mdic.gov.br, endereço oficial vigente em 2026-10-21; o antigo
+// balanca.economia.gov.br serve certificado vencido em 03/10/2026), que envia só o certificado folha.
+// NÃO desliga verificação: a conexão usa as raízes públicas do Node (Mozilla) + o intermediário SERPRO AR46 OV TLS CA 2025 só como
 // elo da cadeia. O intermediário sozinho não é âncora (prova em EVIDENCIAS: sem as raízes a conexão falha).
 // A cada execução: impressão SHA-256 fixada, validade e assinatura por uma raiz pública conferidas antes de qualquer download.
 import https from "node:https";
@@ -7,10 +8,11 @@ import tls from "node:tls";
 import { X509Certificate } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-export const PINNED_PATH = new URL("../../certs/sectigo-public-server-authentication-ca-ov-r36.pem", import.meta.url);
-// Obtido em 2026-09-25 do endereço AIA do próprio certificado do MDIC:
-// http://crt.sectigo.com/SectigoPublicServerAuthenticationCAOVR36.crt (emitido por Sectigo Public Server Authentication Root R46).
-export const PINNED_SHA256 = "65:42:D1:76:BE:D5:0F:19:3C:0C:E2:97:AE:44:EC:D8:A0:A8:6B:EC:2E:DE:68:27:69:34:40:59:B4:E7:85:30";
+export const PINNED_PATH = new URL("../../certs/serpro-ar46-ov-tls-ca-2025.pem", import.meta.url);
+// Obtido em 2026-10-21 do endereço AIA do próprio certificado do MDIC (*.mdic.gov.br):
+// http://secure.globalsign.com/cacert/acserproar46ovtlsca2025.crt (emitido por GlobalSign Root R46; válido até 2030-10-15).
+// O intermediário anterior (Sectigo OV R36, certs/sectigo-…) era do host antigo e fica só no histórico.
+export const PINNED_SHA256 = "F2:70:95:D0:B4:0D:F7:65:59:94:04:01:1C:F8:B1:67:DA:06:26:0E:81:DD:A7:27:F1:63:EF:08:22:10:71:E4";
 
 export function loadTrust({ pem = readFileSync(PINNED_PATH, "utf8"), roots = tls.rootCertificates, now = new Date() } = {}) {
   const inter = new X509Certificate(pem);

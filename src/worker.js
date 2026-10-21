@@ -82,6 +82,8 @@ async function route(request, env, rid, internalActor = null) {
       actor,
       environment: env.ENVIRONMENT,
       version: VERSION,
+      // Só na prévia local (tests/preview-server.mjs): commit e início do processo, para conferir a instância servida.
+      ...(env.PREVIEW_BUILD ? { preview: env.PREVIEW_BUILD } : {}),
       capabilities: {
         sending: false,
         automatedSearch: false,
@@ -213,6 +215,7 @@ async function route(request, env, rid, internalActor = null) {
   // Prospecção automática: perfil comprador versionado, política de pesquisa de rotina e execução em segundo plano.
   if (path === "/api/prospect/profile" && method === "GET") return response(await prospect.getProfile(env, actor));
   if (path === "/api/prospect/profile" && method === "POST") return response(await prospect.saveProfile(request, env, actor, rid), 201);
+  if (path === "/api/prospect/policy/prepare" && method === "POST") return response(await prospect.preparePolicyRoute(request, env, actor));
   if (path === "/api/prospect/policy" && method === "GET") return response(await prospect.getPolicy(env, actor));
   if (path === "/api/prospect/policy" && method === "POST") return response(await prospect.grantPolicy(request, env, actor, rid), 201);
   if (path === "/api/prospect/policy/revoke" && method === "POST") return response(await prospect.revokePolicy(request, env, actor, rid));

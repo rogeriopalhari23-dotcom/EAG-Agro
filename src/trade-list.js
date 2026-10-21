@@ -16,7 +16,7 @@ import { bodyJson, fail, requireRole, str } from "./http.js";
 import { statement as s, commit, parameters, requireParameter, auditStatement, now as clock } from "./store.js";
 
 const ADMIN = new Set(["admin"]);
-const MDIC_BASE = (env) => env.MDIC_BULK_BASE || "https://balanca.economia.gov.br/balanca/bd";
+const MDIC_BASE = (env) => env.MDIC_BULK_BASE || "https://balanca.mdic.gov.br/balanca/bd"; // endereço oficial vigente (2026-10-21)
 const COMTRADE_BASE = (env) => env.COMTRADE_BASE || "https://comtradeapi.un.org";
 export const MERGE_BUCKETS = 4;
 const MAX_ATTEMPTS = 6;

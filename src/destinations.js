@@ -37,6 +37,84 @@ export async function verifiedHs(env, productIds) {
   return out;
 }
 
+// Cobertura POR PRODUTO, por país e por fonte: só conta como "consultado sem registro" o país cuja resposta da fonte é
+// válida E cuja consulta incluiu os códigos do produto (capítulo na classificação da lista; SH no bloco consultado da
+// Comtrade). Fonte disponível, disponibilidade de anos ou arquivo acessível não bastam. Na prévia e nos testes
+// (env.SIMULATED_TRADE), país sem resposta simulada configurada fica como tal, nunca como ausência de comércio.
+// Estados: positive, valid_absent, not_declared, no_code, no_simulation, not_consulted, failed, pending, missing.
+const SRC = {
+  mdic: { label: "MDIC — exportações do Brasil para o país (FOB, mensal)", direction: "exportações do Brasil (Brasil → país)" },
+  comtrade: { label: "UN Comtrade — importações declaradas pelo país (anual)", direction: "importações declaradas pelo país com origem Brasil (país ← Brasil)" },
+};
+export async function productCoverage(env, { products, hsOf, months, countries }) {
+  const sim = parse(env.SIMULATED_TRADE, null);
+  const cur = (await s(env, "SELECT iso3,source,version_id,content_sha256 FROM trade_list_current").all()).results;
+  const ptr = new Map(cur.map((c) => [`${c.iso3}|${c.source}`, c]));
+  const st = (await s(env, "SELECT t.iso3,t.source,t.state,t.hs6_json,t.period_from,t.period_to FROM trade_country_summary t JOIN trade_list_current c ON c.iso3=t.iso3 AND c.source=t.source AND c.content_sha256=t.content_sha256 WHERE t.period_months=(CASE t.source WHEN 'mdic' THEN ? ELSE 0 END)", months).all()).results;
+  const sum = new Map(st.map((x) => [`${x.iso3}|${x.source}`, x]));
+  // Sem ponteiro: situação mais recente do país na fonte (em geração, falha, sem código).
+  const last = new Map();
+  for (const r of (await s(env, "SELECT st.iso3,st.source,st.state,st.error,v.status vstatus FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id ORDER BY v.started_at").all()).results) last.set(`${r.iso3}|${r.source}`, r);
+  const versions = new Map((await s(env, "SELECT id,kind,classification_json FROM trade_list_versions").all()).results.map((v) => [v.id, v]));
+  const chaptersOf = (vid) => new Set(parse(versions.get(vid)?.classification_json, {})?.chapters ?? []);
+  // Blocos SH realmente consultados na Comtrade, por versão (referência guardada no R2).
+  const latestMonthly = [...versions.values()].filter((v) => v.kind === "monthly").map((v) => v.id).sort().at(-1);
+  const blocks = new Map();
+  for (const vid of new Set(cur.filter((c) => c.source === "comtrade").map((c) => c.version_id))) {
+    let ref = null;
+    for (const k of [vid, latestMonthly].filter(Boolean)) {
+      const o = env.FILES ? await env.FILES.get(`trade-ref/${k}/hs6-blocks.json`).catch(() => null) : null;
+      if (o) { ref = parse(await o.text(), null); break; }
+    }
+    blocks.set(vid, ref ? new Set(ref.blocks.flat().map(String)) : null);
+  }
+  const out = [];
+  for (const p of products) {
+    const hs = [...(hsOf.get(p.id) ?? [])];
+    const bySource = {};
+    for (const source of ["mdic", "comtrade"]) {
+      const n = { positive: 0, valid_absent: 0, not_declared: 0, no_code: 0, no_simulation: 0, not_consulted: 0, failed: 0, pending: 0, missing: 0 };
+      const periods = new Map();
+      for (const c of countries.values()) {
+        const key = `${c.iso3}|${source}`;
+        const pt = ptr.get(key);
+        let state;
+        if (!pt) {
+          const l = last.get(key);
+          state = !l ? "missing" : l.vstatus === "running" && l.state === "pending" ? "pending" : l.state === "data_unavailable" && l.error === "país sem código nesta fonte" ? "no_code" : l.state === "data_unavailable" ? "failed" : "missing";
+        } else if (sim && !(sim[source] ?? []).includes(c.iso3)) state = "no_simulation";
+        else if (!hs.some((h) => chaptersOf(pt.version_id).has(h.slice(0, 2)))) state = "not_consulted";
+        else if (source === "comtrade" && blocks.get(pt.version_id) && !hs.some((h) => blocks.get(pt.version_id).has(h))) state = "not_consulted";
+        else {
+          const sm = sum.get(key);
+          if (!sm) state = "pending";
+          else if (sm.state === "purchase_identified") {
+            const all = parse(sm.hs6_json, {});
+            state = hs.some((h) => Number(all[h]) > 0) ? "positive" : "valid_absent";
+          } else state = { no_record: "valid_absent", not_declared: "not_declared", data_unavailable: "failed" }[sm.state] ?? "pending";
+          if (sm && ["positive", "valid_absent"].includes(state)) {
+            const per = source === "mdic" ? `${sm.period_from ?? "?"} a ${sm.period_to ?? "?"}` : String(sm.period_to ?? "?");
+            periods.set(per, (periods.get(per) ?? 0) + 1);
+          }
+        }
+        n[state]++;
+      }
+      const total = countries.size;
+      const answered = n.positive + n.valid_absent;
+      const period = [...periods.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 2).join("; ") || "sem período consultado";
+      const complete = source === "mdic"
+        ? answered + n.no_code === total
+        : n.failed + n.pending + n.missing + n.no_simulation + n.not_consulted === 0;
+      bySource[source] = {
+        ...SRC[source], counts: n, total, answered, complete, period,
+        text: `${SRC[source].label} — ${SRC[source].direction}; SH ${hs.join(", ")}; período ${period}: ${answered} de ${total} países com resposta válida que inclui o produto${n.positive ? ` (${n.positive} com registro)` : ""}${[["no_simulation", "sem resposta simulada configurada"], ["not_consulted", "consulta sem estes códigos"], ["not_declared", "sem declaração do país"], ["failed", "falha da fonte"], ["pending", "pendentes"], ["missing", "sem lista"], ["no_code", "sem código na fonte"]].filter(([k]) => n[k]).map(([k, l]) => `; ${n[k]} ${l}`).join("")}.`,
+      };
+    }
+    out.push({ productId: p.id, name: p.display_name ?? p.variant_name, hs6: hs, bySource, validAbsence: !bySource.mdic.counts.positive && !bySource.comtrade.counts.positive && bySource.mdic.complete && bySource.comtrade.complete });
+  }
+  return out;
+}
+
 // products: linhas de products (uma commodity ou um produto). deps.rebuild(env, tenant, { months }) refaz resumos a
 // partir dos objetos oficiais já guardados (sem chamada externa). deps.refresh(iso3) pede a atualização de um país com
 // dado vencido pelo fluxo existente (R12.15), quando a política permite.
@@ -121,6 +199,11 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
     failedSources ? `${failedSources} país(es) com falha da fonte na última consulta` : null,
     pending ? `${pending} resumo(s) ainda em preparação` : null,
   ].filter(Boolean);
+  // Cobertura por produto: a ausência só é afirmada com consultas válidas que incluíram o produto, em todas as fontes.
+  const diagnostics = classified.length ? await productCoverage(env, { products: classified, hsOf, months: w.months, countries }) : [];
+  const allAbsent = diagnostics.length > 0 && diagnostics.every((d) => d.validAbsence) && !unclassified.length;
+  for (const d of diagnostics) if (!d.validAbsence && !items.some((x) => x.products.some((p) => p.productId === d.productId)))
+    reasons.push(...["mdic", "comtrade"].filter((k) => !d.bySource[k].complete).map((k) => `${d.name}, ${k === "mdic" ? "MDIC" : "Comtrade"}: ${d.bySource[k].answered} de ${d.bySource[k].total} países com resposta válida que inclui o produto`));
   // Preparação em curso (rotina iniciada, fila andando, resumos a refazer): os destinos chegam aos poucos; lista vazia
   // nunca é resultado final enquanto classificação ou cobertura estiverem pendentes.
   const { prep = null, progress = null, asks = [] } = preparation;
@@ -131,16 +214,16 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
     : preparing ? "preparing"
     : asks.length ? "needs_characteristic"
     : prep?.state === "blocked" ? "blocked"
-    : incomplete ? "none_incomplete" : "none_valid";
+    : allAbsent ? "none_valid" : "none_incomplete";
   const pct = (x) => (x?.total ? `${x.done} de ${x.total} países` : null);
   const progressText = progress ? [pct(progress.mdic) && `exportações do Brasil (MDIC): ${pct(progress.mdic)}`, pct(progress.comtrade) && `importações declaradas (Comtrade): ${pct(progress.comtrade)}`, progress.waiting].filter(Boolean).join("; ") : pending ? `${pending} resumo(s) em preparação a partir dos dados oficiais guardados` : null;
   return {
-    state, items, unclassified, coverage, incomplete, reasons, preparing, progress, progressText,
+    state, items, unclassified, coverage, incomplete: incomplete || !allAbsent, reasons, preparing, progress, progressText, diagnostics,
     message: state === "ready" ? (preparing ? `Preparando os mercados compradores: os destinos comprovados aparecem conforme os dados chegam (${progressText}).` : null)
       : state === "preparing" ? `Preparando os mercados compradores${progressText ? ` (${progressText})` : ""}.`
       : state === "needs_characteristic" ? `Falta uma característica do produto para classificá-lo: ${asks.map((a) => `${a.name}: ${a.question}`).join("; ")}.`
       : state === "blocked" ? `Os mercados compradores ainda não podem ser preparados: ${prep.reason}.`
-      : state === "none_valid" ? "Nenhum destino identificado nos dados disponíveis: as fontes responderam e não há registro de comércio deste produto com o Brasil no período."
+      : state === "none_valid" ? `Nenhum destino identificado: consultas válidas que incluíram o produto não registram comércio com o Brasil (${diagnostics.map((d) => `${d.name}: MDIC ${d.bySource.mdic.period}, ${d.bySource.mdic.answered} países; Comtrade ${d.bySource.comtrade.period}, ${d.bySource.comtrade.answered} países`).join("; ")}).`
       : `Nenhum destino identificado nos dados disponíveis. Cobertura incompleta: ${reasons.join("; ")}. Isso não indica ausência de compradores.`,
     retry: !["ready", "none_valid", "needs_characteristic"].includes(state),
   };

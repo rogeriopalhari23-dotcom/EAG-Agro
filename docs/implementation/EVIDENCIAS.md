@@ -3536,3 +3536,40 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Consultas reais, gratuitas e só de leitura (2026-10-21):**
   - MDIC (`HEAD …/comexstat-bd/ncm/EXP_2026.csv`): **certificado TLS do servidor vencido em 03/10/2026** (`*.economia.gov.br`, `CERT_HAS_EXPIRED`). A verificação não foi contornada. A rotina real do MDIC falharia até o certificado ser renovado ou a rotina passar pelo job externo (`MDIC_SOURCE=github`), que também verifica o certificado.
   - UN Comtrade, disponibilidade pública (`getDA`, Canadá, sem chave): respondeu com os anos declarados de 1989 a 2025, em 2,7 s.
+
+## 2026-10-21 — "Sem política" na tela e "Óleo de soja" sem destinos: causa, cobertura por produto e caminho real dos dados
+
+- **Versão demonstrada:** a porta 8790 era servida pelo processo 7816 (`tests/preview-server.mjs`), iniciado às 13:35:34. O commit `40fb20a` foi gravado às 13:35:35, então o código era o atual. A prévia agora mostra no rodapé e em `/api/session` o commit, as alterações locais, o início e o PID. Conferido: porta → PID = API = rodapé. O serviço `src\main.js` (PID 996) não foi tocado.
+- **Causa 1 (política):** o formulário lia `GET /api/prospect/policy` ao abrir, e essa rota não prepara nada. A preparação automática só acontecia depois, na consulta de destinos, e a linha "Sem política" nunca era atualizada. O roteiro anterior conferia só o bloco de destinos, por isso não pegou. Correção: `POST /api/prospect/policy/prepare` ao abrir o formulário e as Configurações, com os estados pronto, preparada, revogada (continua revogada), não autorizada e falha (com motivo e nova tentativa). A linha também é atualizada quando a consulta de destinos traz a política.
+- **Causa 2 (óleo de soja):** "as fontes responderam" se baseava em haver lista vigente e algum resumo, não em a consulta ter incluído o produto. Na prévia:
+  - a tabela SH da Comtrade simulada não continha 1507.10 nem 1507.90, então o produto nunca foi consultado;
+  - 234 países não tinham resposta simulada no MDIC.
+
+  Correção (`productCoverage`): estado por produto, país e fonte (positivo, sem registro válido, sem declaração, sem código, sem simulação, consulta sem os códigos, falha, pendente, sem lista). A ausência só é afirmada quando todas as consultas válidas incluíram o produto. A tela mostra "Como esta lista foi montada": produto, SH, fonte, direção (contraparte Brasil), período, países cobertos e trabalhos pendentes.
+- **Verificação parametrizada** (`tests/cobertura-produtos.test.mjs`, simulada): 27 produtos classificados (UCO e CSO ficam com o Administrador), em seis casos:
+  - resposta positiva pelo próprio código;
+  - ausência válida;
+  - cobertura parcial ou simulação ausente;
+  - falha da fonte;
+  - código fora da consulta;
+  - checagem de que o catálogo está classificado.
+- **Consultas REAIS (gratuitas, só de leitura, ambiente separado em memória):**
+  - **Relógio local** conferido com Comtrade, Google e gov.br: diferença de ≤ 9 s (2026-10-21T17:53Z).
+  - **MDIC, host antigo** `balanca.economia.gov.br:443`, às 17:52:54Z: `CERT_HAS_EXPIRED`. Folha `*.economia.gov.br` (SERPRO), emissor Sectigo Public Server Authentication CA OV R36, válida de 01/10/2025 a 03/10/2026, SHA-256 `70:69:83:47:…:98:04`, série `E40AD4160134707813868CC267A6EC8F`.
+  - **MDIC, endereço oficial vigente** (página de dados abertos): `balanca.mdic.gov.br`. A folha `*.mdic.gov.br` vai até 22/10/2026 e é emitida pela AC SERPRO AR46 OV TLS CA 2025. O servidor envia só a folha. O intermediário foi baixado pelo endereço AIA, a assinatura conferida pela GlobalSign Root R46 da loja do Node e a TLS verificada. Resultados:
+    - `HEAD EXP_2026.csv`: 84.646.313 bytes, modificado em 06/10/2026;
+    - um pedaço de 8 MB (`scripts/verificar-mdic-real.mjs`) com 933 linhas do capítulo 15;
+    - exportações do Brasil de NCM 1507 no pedaço: Índia US$ 95,1 mi, Peru US$ 8,1 mi, Moçambique, Bangladesh, Egito, Venezuela, China e outros.
+    - Job e padrão atualizados para o host e o intermediário novos.
+  - **Comtrade, do adaptador à lista de destinos** (`scripts/verificar-comtrade-real.mjs`): Canadá, capítulo 15, endpoint público de prévia, sem chave.
+    - Uma primeira tentativa com 2 anos foi recusada (400, "Maximum number of periods for preview is 1") e limitada (429). O Compass registrou falha da fonte, não ausência.
+    - Com 1 ano: `HS.json`, `getDA` e 3 blocos de dados, um deles com nova tentativa; 6 chamadas no orçamento de 10.
+    - Consolidado: 74 linhas de 2025. O óleo de soja só tem linhas de origem "mundo" (1507.10: US$ 2,74 mi; 1507.90: US$ 413 mi), sem linha do Brasil em 2025.
+    - Lista de destinos: Canadá ausente, com "1 de 241 países com resposta válida que inclui o produto" (cobertura incompleta, não "nenhum comércio").
+    - Consulta avulsa: em 2024 a Comtrade registrou Canadá ← Brasil, 1507.90, US$ 43.149 (valor primário; CIF ausente). O resumo da Comtrade usa só o último ano declarado.
+- **Tela (Edge, prévia vazia, sem roteiro auxiliar):** 16 de 16:
+  - política preparada e mostrada como automação;
+  - açúcar com EUA (VHP) e Alemanha;
+  - óleo de soja com a Índia (exportação SIMULADA de 1507.10/1507.90);
+  - "Como esta lista foi montada" com os países sem simulação identificados;
+  - destino escolhido e prospecção iniciada.

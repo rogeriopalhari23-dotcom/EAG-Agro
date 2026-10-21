@@ -66,6 +66,8 @@ Passos humanos, nesta ordem; nada disso foi criado automaticamente:
 
 ## MDIC mensal pelo GitHub (decisão de 2026-09-25, opção "a")
 
+**Endereço vigente (2026-10-21):** `https://balanca.mdic.gov.br/balanca/bd` (página de dados abertos do MDIC). O host antigo `balanca.economia.gov.br` serve certificado vencido em 03/10/2026. O novo também envia só a folha. O job fixa o intermediário `AC SERPRO AR46 OV TLS CA 2025` (`certs/serpro-ar46-ov-tls-ca-2025.pem`, SHA-256 `F2:70:95:D0:…:71:E4`, emitido pela GlobalSign Root R46, válido até 2030-10-15), sem desligar a verificação. O certificado-folha observado vence em 22/10/2026: conferir a renovação antes da próxima rotina.
+
 O Worker não lê o MDIC (`MDIC_SOURCE=github` no `wrangler.jsonc`): o servidor `balanca.economia.gov.br` não envia o certificado intermediário e o `fetch` do Worker responde 526 (evidência em `docs/implementation/EVIDENCIAS.md`, 2026-09-25). O workflow `.github/workflows/mdic-mensal.yml` roda `scripts/mdic-job.mjs` nos dias 10, 11 e 12 às 12:00 UTC; o Worker continua cuidando da Comtrade.
 
 - **Confiança TLS:** raízes públicas do Node + intermediário `certs/sectigo-public-server-authentication-ca-ov-r36.pem`, conferido a cada execução (impressão SHA-256 fixada, validade, assinatura pela raiz Sectigo R46 da loja do Node). Verificação nunca é desligada. Se o intermediário vencer (21/03/2036) ou o MDIC trocar de emissora, o job para antes de baixar qualquer coisa; atualizar o PEM **só** a partir do endereço AIA do certificado do servidor e conferir a assinatura por uma raiz pública.

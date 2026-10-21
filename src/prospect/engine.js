@@ -1234,6 +1234,23 @@ async function recoverMarketData(env, tenant, policy, rid, trade) {
   return done.length ? done : ["nada a retomar agora: a fila está em dia e não há falha recuperável hoje"];
 }
 
+// POST /api/prospect/policy/prepare — chamado pela tela ao abrir: lê a política vigente ou a prepara a partir da
+// autorização escrita (automação, sem clique de pessoa). Estados: ready, prepared, revoked, not_authorized, failed.
+export async function preparePolicyRoute(request, env, actor) {
+  const before = await currentPolicy(env, actor.tenant_id);
+  if (before) return { state: "ready", policy: policyView(before) };
+  try {
+    const p = await ensurePolicy(env, actor.tenant_id);
+    if (p) return { state: "prepared", policy: policyView(p), message: "Política delimitada preparada agora pela automação, a partir da autorização escrita de 2026-10-20 (sem clique de pessoa)." };
+    const rev = await s(env, "SELECT version,revoked_by,revoked_at,revoke_reason FROM research_policies WHERE tenant_id=? AND revoked_at IS NOT NULL ORDER BY version DESC LIMIT 1", actor.tenant_id).first();
+    if (rev) return { state: "revoked", message: `Política de pesquisa v${rev.version} revogada em ${rev.revoked_at.slice(0, 10)} (${rev.revoke_reason}). Continua revogada: nova concessão só por Administrador ou gestor comercial.` };
+    return { state: "not_authorized", message: "Não há política nem autorização registrada para prepará-la: concessão por Administrador ou gestor comercial (Configurações → Prospecção automática)." };
+  } catch (e) {
+    return { state: "failed", message: `A preparação da política falhou: ${e.message}` };
+  }
+}
+const policyView = (p) => ({ version: p.version, grantedBy: p.grantedBy, grantedAt: p.grantedAt, grantedVia: p.policy?.grantedVia ?? "panel", reference: p.reference });
+
 // Política delimitada a partir da autorização escrita já concedida (AMENDMENT, 2026-10-20), quando ainda não há
 // política: registrada como automação autorizada (usuário de sistema), nunca como clique de uma pessoa. Revogação
 // prevalece: depois de uma política revogada, nada é recriado sozinho.

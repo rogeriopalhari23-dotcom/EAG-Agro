@@ -52,7 +52,13 @@ test("Derivados de soja — Canadá (simulado): sem exportação de lecitina ao 
   assert.ok(!iso(r).includes("CAN"), JSON.stringify(r.items));
   assert.ok(["none_valid", "none_incomplete"].includes(r.state));
   assert.doesNotMatch(r.message, /não há compradores/);
-  assert.match(r.message, /Nenhum destino identificado nos dados disponíveis/);
+  // Ausência afirmada só com cobertura identificada: os 3 países com resposta simulada que incluiu o SH 2923.20.
+  assert.equal(r.state, "none_valid", r.message);
+  assert.match(r.message, /consultas válidas que incluíram o produto .*Lecitina de soja: MDIC 20\d\d-\d\d a 20\d\d-\d\d, 3 países; Comtrade 20\d\d, 3 países/);
+  const lec = r.diagnostics.find((x) => x.productId === "product-23");
+  assert.deepEqual(lec.hs6, ["292320"]);
+  assert.match(lec.bySource.comtrade.direction, /origem Brasil/);
+  assert.match(lec.bySource.mdic.direction, /Brasil → país/);
   // Farelo é outro produto: o Canadá entra pelo próprio código do farelo (2304), não pela soja em grão.
   const meal = await dest(api, { commodity: "soy_meal" });
   assert.deepEqual(iso(meal), ["CAN"]);
