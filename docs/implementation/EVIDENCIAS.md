@@ -3631,3 +3631,30 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 | CSO | 0 (sem classificação) |
 
 Etanol e álcool industrial têm a mesma lista porque usam as mesmas subposições, 2207.10 e 2207.20. Também foram testados: o histórico da Comtrade, a ausência sem cobertura e a pesquisa automática, que escolhe só combinações da relação.
+
+## 2026-10-21 — Descoberta real de empresas no Chile, sem simulação (commit 8975371)
+
+**Causa.** As empresas "(fictivo)" com zero evidência vinham do servidor de prévia (`tests/preview-server.mjs`). O `simulatedWorld` interceptava o OpenStreetMap, a consulta cadastral e os sites, e devolvia nomes inventados. O código publicado (`src/`) não tem alternativa simulada; um teste confere isso.
+
+**Correção.**
+- Modo real da prévia (`PREVIEW_REAL=1`): rede real para as fontes de empresas, banco em memória isolado da produção e nenhum dado fictício semeado. Os indicadores de mercado vêm do extrato real da produção. A simulação fica só no modo de demonstração identificado.
+- Nova fonte oficial do Chile, a LENAA do SAG (planilha pública: https://www.sag.gob.cl/ambitos-de-accion/alimentacion-animal/registros):
+  - integrada na regra única de fontes; vale só para o Chile e para commodities de ração (soja, farelos, milho);
+  - uma candidata por RUT, com dígito verificador conferido; pessoa física (RUT mascarado) fica fora;
+  - entra só atividade compatível (alimento ou ingrediente para animais de produção ou aquicultura).
+- Atividade de empresa com muitas plantas cabe no cadastro. Antes, 3 empresas eram recusadas com "Campo inválido: atividade".
+- OpenStreetMap: moinho de azeite de oliva fica fora da soja (7 dos 8 resultados chilenos eram azeite). Fábrica de ração entra.
+- Migração 0048, só local: fonte `cl_sag_lenaa` nas candidatas.
+
+**Execução real** (Edge, formulário "Soja — Chile", mesmo motor):
+- Comtrade: importações chilenas de SH 120190 do Brasil em 2023–2025. MDIC: sem registros no período.
+- LENAA (planilha de 09/10/2026): 147 empresas com RUT válido, todas cadastradas em descoberta, país CL. A fonte é a URL da planilha, e a atividade traz as plantas SAG com o número da resolução.
+- OpenStreetMap: 1 resultado (Nutrikelef), sem identificador; fica na fila de exceções.
+- Repetição e outra commodity (Milho — Chile): as mesmas empresas reaproveitadas, sem RUT duplicado, com relação nova "a investigar".
+
+**Limitações.**
+- A LENAA prova a fabricação de ração autorizada pelo SAG. Ela não prova compra de soja, importação do Brasil nem aceitação de GMO; tudo isso fica "não confirmado".
+- Triagem de sanções pendente: o banco isolado não tem listas importadas, e o que depende da triagem continua bloqueado.
+- Pessoas e canais: 5 empresas pesquisadas, sem registro novo.
+
+**Testes.** `tests/lenaa.test.mjs` (6): RUT, agrupamento e limite de atividade, filtro de país e commodity, falha da fonte sem simulação, azeite fora da soja, repetição sem duplicar. Suíte completa: 613 testes passaram, 0 falharam, e a UI smoke também passou.
