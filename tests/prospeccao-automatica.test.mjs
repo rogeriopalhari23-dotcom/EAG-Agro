@@ -6,6 +6,7 @@
 //     duplicar nem perder histórico; restrições da empresa continuam valendo para qualquer commodity.
 // Tudo SIMULADO (lista mensal de teste, Receita fictícia); nenhuma rede real.
 import test from "node:test";
+import { revokedPolicy } from "./helpers/revoked-policy.mjs";
 import { legacyJob } from "./helpers/legacy-job.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -86,7 +87,8 @@ test("mesma empresa para milho e farelo de soja: uma empresa, duas relações, e
 
 test("pesquisa automática nacional: rotação entre origens configuradas, justificativa, sem duplicar em andamento; dados a atualizar voltam", async (t) => {
   const { api, DB, grant } = await world(t);
-  // Sem política: recusa clara (a decisão é dada uma vez, na política).
+  // Sem política vigente (revogada): recusa clara; a revogação prevalece sobre a autorização escrita.
+  revokedPolicy(DB);
   assert.equal((await api("/api/prospect/auto", "POST", { market: "national" })).status, 409);
   await grant();
   for (const [cfg, pid] of [[CORN, "product-03"], [SOY, "product-01"], [SOYMEAL, "product-16"]]) assert.equal((await api("/api/rounds", "POST", { name: `Origem ${cfg.id}`, config: { ...cfg, commodity: { ...cfg.commodity, productId: pid } } })).status, 201);
@@ -109,7 +111,7 @@ test("pesquisa automática nacional: rotação entre origens configuradas, justi
   assert.equal(d.started, true);
   assert.match(d.reason, /há 4\d dias \(dados a atualizar\)/);
   // Política persistente: nenhuma pesquisa automática pediu decisão de política de novo.
-  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM research_policies").get().n, 1);
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM research_policies WHERE revoked_at IS NULL").get().n, 1, "uma política vigente (a revogada fica no histórico)");
 });
 
 async function tradeWorld(t) {

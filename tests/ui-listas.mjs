@@ -167,7 +167,7 @@ try {
   assert.match(await js(`document.querySelector('${S} .prospect-product').innerText`), /Café/);
 
   // Destinos do café (simulado): só a Alemanha, com fonte e período; acentos e nome em inglês reconhecidos.
-  await until(`(() => { const t = document.querySelector("${S} .destinations-status").innerText; return t && !/Verificando/.test(t); })()`, "destinos do café");
+  await until(`(() => { const t = document.querySelector("${S} .destinations-status").innerText; return t && !/Preparando/.test(t); })()`, "destinos do café");
   await js(`(() => { ${q("country")}.click(); return true; })()`);
   await until(`!${listOf("country")}.hidden`, "lista de destinos");
   assert.deepEqual(await options("country"), ["Alemanha"], "só destino com comércio do café registrado com o Brasil");

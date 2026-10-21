@@ -3510,3 +3510,29 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - açúcar com o produto que fundamenta;
   - dados ausentes, resumos refeitos, dado vencido, falha da fonte e recusa no servidor.
 - **Tela:** roteiro na prévia local fictícia, 18 de 18. Inclui a troca rápida, o país retirado e o Canadá que só aparece depois da exportação simulada de lecitina (rota `/__previa/simular-lecitina-canada`, só da prévia).
+
+## 2026-10-21 — Inicialização da pesquisa internacional ("Açúcar": sem classificação, 238 países sem lista, sem política)
+
+- **Causa:** três falhas juntas, todas da mesma origem.
+  1. A prévia guarda tudo em memória e começa sem política a cada reinício. A política só existia quando o roteiro de demonstração a concedia pela tela. Sem política, a classificação automática não se aplica (a regra exige a política), por isso ICUMSA 45, ICUMSA 150 e VHP apareciam sem classificação, embora as regras documentais existissem.
+  2. A prévia rodava a rotina mensal só com três países (recorte de velocidade) e depois devolvia os outros 238 à tabela. Esses países ficavam sem nenhum registro numa versão já concluída, e nada os atualizaria antes do mês seguinte.
+  3. Numa base vazia real, a rotina mensal só começa no dia configurado (cron), e não havia preparação a partir da tela.
+- **Correção:**
+  - política delimitada preparada da autorização escrita, como automação (revogação prevalece);
+  - classificação documental aplicada sob ela;
+  - `prepareMarketData`, com o mesmo código e os mesmos limites do cron: o MDIC lê o arquivo anual **agregado** (todos os países numa leitura) e a Comtrade segue na fila persistente, com orçamento diário, lease e retomada. Nenhum limite ou custo novo.
+- **Estados na tela:**
+  - "Preparando os mercados compradores", com progresso por fonte e motivo de espera (limite diário, chave);
+  - destinos acrescentados conforme chegam;
+  - sem lista vazia final enquanto há classificação ou cobertura pendente; "bloqueado" com o motivo concreto;
+  - "Tentar de novo" com recuperação concreta.
+- **Prévia:** começa como base nova (sem política, sem classificação, sem lista) e com todos os países. A preparação acontece ao abrir os destinos, registrada como automação.
+- **Testes** (`tests/preparacao-destinos.test.mjs`, simulados, base completa de países):
+  - base vazia;
+  - preparação, retomada após lease vencido sem duplicar e limite diário mantido;
+  - falha da fonte com novo pedido único no dia;
+  - política revogada.
+- **Tela:** 14 de 14 na prévia a partir da base vazia.
+- **Consultas reais, gratuitas e só de leitura (2026-10-21):**
+  - MDIC (`HEAD …/comexstat-bd/ncm/EXP_2026.csv`): **certificado TLS do servidor vencido em 03/10/2026** (`*.economia.gov.br`, `CERT_HAS_EXPIRED`). A verificação não foi contornada. A rotina real do MDIC falharia até o certificado ser renovado ou a rotina passar pelo job externo (`MDIC_SOURCE=github`), que também verifica o certificado.
+  - UN Comtrade, disponibilidade pública (`getDA`, Canadá, sem chave): respondeu com os anos declarados de 1989 a 2025, em 2,7 s.

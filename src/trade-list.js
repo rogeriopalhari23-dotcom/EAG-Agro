@@ -718,3 +718,50 @@ export async function resumeVersion(request, env, actor, rid, vid, deps = {}) {
   await sweep(env, deps);
   return { versionId: vid };
 }
+
+// Preparação dos dados de mercado para os destinos da pesquisa internacional (sob a política, R12.15). Mesmo código,
+// mesmas fontes gratuitas e mesmos limites do cron: o MDIC é lido por arquivo anual AGREGADO (todos os países numa
+// leitura) e a Comtrade segue na fila persistente, com orçamento diário, lease e retomada. Nada de custo ou limite novo.
+//  - Base sem nenhuma lista mensal: inicia a rotina do mês já (sem esperar o dia configurado).
+//  - Mês corrente sem versão e dia de atualização alcançado: inicia, como o cron.
+//  - Versão em andamento: só retoma a fila (jobs devidos e leases vencidos), sem duplicar.
+// → { state: "blocked"|"started"|"running"|"complete"|"existing", reason?, versionId? }
+export async function prepareMarketData(env, tenant, { allowStart = false, deps = {} } = {}) {
+  const at = deps.now?.() ?? clock();
+  let params;
+  try {
+    params = await routineParams(env, tenant);
+  } catch (e) {
+    return { state: "blocked", reason: `parâmetros da lista mensal ainda sem valor aprovado (${String(e.message).replace(/^Parâmetro sem valor aprovado: /, "")}): aprovação do Administrador em Configurações → Parâmetros` };
+  }
+  if (!env.FILES) return { state: "blocked", reason: "armazenamento de arquivos (R2) não configurado" };
+  const { month, day } = spMonthDay(at);
+  const cur = await version(env, month);
+  if (cur?.status === "running") {
+    await sweep(env, deps);
+    return { state: "running", versionId: month };
+  }
+  if (cur) return { state: "complete", versionId: month };
+  const anyMonthly = await s(env, "SELECT id FROM trade_list_versions WHERE kind='monthly' LIMIT 1").first();
+  const due = !anyMonthly || (params.refreshDay != null && day >= params.refreshDay);
+  if (!due) return { state: "existing", versionId: anyMonthly.id };
+  if (!allowStart) return { state: "blocked", reason: "rotina mensal ainda não executada e a política vigente não inclui iniciá-la (política concedida por Administrador)" };
+  const r = await startMonthlyRun(env, tenant, deps);
+  return { state: r.status === "running" ? "started" : "complete", versionId: r.versionId };
+}
+
+// Andamento da rotina em curso, por fonte, e o motivo de espera (limite diário, chave da Comtrade).
+export async function marketDataProgress(env, deps = {}) {
+  const at = deps.now?.() ?? clock();
+  const v = await s(env, "SELECT * FROM trade_list_versions WHERE status='running' ORDER BY kind='monthly' DESC, started_at DESC LIMIT 1").first();
+  if (!v) return null;
+  const rows = (await s(env, "SELECT source,SUM(state<>'pending') done,COUNT(*) total FROM trade_list_status WHERE version_id=? GROUP BY source", v.id).all()).results;
+  const by = Object.fromEntries(rows.map((r) => [r.source, { done: r.done, total: r.total }]));
+  const used = (await s(env, "SELECT used FROM provider_budget WHERE provider='comtrade' AND day=?", utcDay(at)).first())?.used ?? 0;
+  const perDay = JSON.parse(v.params_json).callsPerDay;
+  const pendingCt = (await s(env, "SELECT COUNT(*) n FROM trade_list_jobs WHERE version_id=? AND status='pending' AND kind IN ('comtrade_ref','comtrade_da','comtrade_call')", v.id).first())?.n ?? 0;
+  const waiting = v.comtrade_blocked
+    ? `consulta à Comtrade parada (${v.comtrade_blocked === "no_key" ? "chave não configurada" : "chave recusada"}): correção do Administrador`
+    : pendingCt && used >= perDay ? `limite diário de consultas à Comtrade atingido (${used} de ${perDay}); continua no próximo dia (UTC), sem aumentar o limite` : null;
+  return { versionId: v.id, kind: v.kind, mdic: by.mdic ?? null, comtrade: by.comtrade ?? null, comtradeBudget: { used, perDay }, waiting };
+}

@@ -5587,31 +5587,37 @@ function prospectStart(fixedMarket = null) {
     );
   };
   country.onChange(() => (showEvidence(), coverage()));
-  const loadDestinations = (force = false) => {
+  const loadDestinations = (force = false, recover = false) => {
     clearTimeout(destTimer);
     const list = commodities.find((x) => x.code === code)?.products ?? [];
     const body = productId ? { productId } : code ? { commodity: code } : null;
     const key = JSON.stringify(body);
     if (!force && key === destKey && dest && market === "international") return;
+    // Atualização da mesma escolha (preparação em andamento ou nova tentativa): a lista atual fica na tela até a resposta.
+    const refresh = force && key === destKey && !!dest;
     if (key !== destKey) destTries = 0;
     destKey = key;
     const seq = ++destSeq;
-    dest = null;
-    country.reload();
-    destBox.replaceChildren();
-    delete destBox.dataset.for;
+    if (!refresh) {
+      dest = null;
+      country.reload();
+      destBox.replaceChildren();
+      delete destBox.dataset.for;
+    }
     if (!body || market !== "international") {
       // Commodity sendo trocada (texto em edição): o país fica até a nova lista dizer se continua elegível.
       country.control.disabled = true;
       if (market === "international") destBox.append(text("p", "Escolha a commodity para ver os destinos com comércio comprovado com o Brasil.", "form-hint"));
       return;
     }
-    country.control.disabled = true;
-    destBox.append(text("p", "Verificando mercados compradores…", "muted"));
+    if (!refresh) {
+      country.control.disabled = true;
+      destBox.append(text("p", "Preparando os mercados compradores…", "muted"));
+    }
     (async () => {
       let r;
       try {
-        r = await api("/api/prospect/destinations", "POST", body);
+        r = await api("/api/prospect/destinations", "POST", recover ? { ...body, recover: true } : body);
       } catch (e) {
         if (seq !== destSeq) return;
         destBox.replaceChildren(el("div", { class: "callout warn" }, text("p", `Não foi possível verificar os destinos agora (${e.message}). Nenhum país é oferecido sem a verificação.`), button("Tentar de novo", () => loadDestinations(true))));
@@ -5632,14 +5638,23 @@ function prospectStart(fixedMarket = null) {
         country.set({ ...country.item, dest: r.items.find((x) => x.iso2 === country.item.id) }, true);
         showEvidence();
       }
+      // Enquanto prepara, a lista cresce conforme os dados chegam; nova consulta a cada poucos segundos.
+      const again = () => { if (destTries++ < 90) destTimer = setTimeout(() => loadDestinations(true), 4000); };
+      if (r.recovery?.length) destBox.append(text("small", `Nova tentativa: ${r.recovery.join("; ")}.`));
       if (r.state === "ready") {
-        destBox.append(text("p", `${r.items.length} destino(s) com comércio do produto registrado com o Brasil${list.length > 1 && !productId ? " (cada país indica o produto que o fundamenta)" : ""}.${r.incomplete ? " Cobertura incompleta: pode haver outros destinos." : ""}`, "form-hint"));
+        destBox.append(text("p", `${r.items.length} destino(s) com comércio do produto registrado com o Brasil${list.length > 1 && !productId ? " (cada país indica o produto que o fundamenta)" : ""}.${r.incomplete && !r.preparing ? " Cobertura incompleta: pode haver outros destinos." : ""}`, "form-hint"));
+        if (r.preparing) {
+          destBox.append(el("p", { class: "preparing" }, text("strong", "Preparando os mercados compradores: "), `os destinos comprovados aparecem conforme os dados chegam (${r.progressText}).`));
+          again();
+        }
         if (r.incomplete) destBox.append(details("Cobertura dos dados", el("ul", { class: "compact-list" }, ...r.reasons.map((x) => text("li", x)))));
-      } else if (r.state === "checking") {
-        destBox.append(text("p", "Verificando mercados compradores…", "muted"), text("small", r.reasons.join("; ")));
-        if (destTries++ < 20) destTimer = setTimeout(() => loadDestinations(true), 4000);
+      } else if (r.state === "preparing") {
+        destBox.append(el("p", { class: "preparing" }, text("strong", "Preparando os mercados compradores"), r.progressText ? text("span", ` — ${r.progressText}.`) : "…"), r.policy?.grantedVia === "written_authorization" ? text("small", "Preparação automática sob a política delimitada da autorização escrita de 2026-10-20 (automação, sem clique de pessoa).") : null);
+        again();
+      } else if (r.state === "needs_characteristic") {
+        destBox.append(text("p", r.message, "form-hint"));
       } else {
-        destBox.append(el("div", { class: r.state === "none_valid" ? "callout" : "callout warn" }, text("p", r.message), r.retry ? button("Tentar de novo", () => loadDestinations(true)) : null));
+        destBox.append(el("div", { class: r.state === "none_valid" ? "callout" : "callout warn" }, text("p", r.message), r.retry ? button("Tentar de novo", () => loadDestinations(true, true)) : null));
       }
       for (const a of r.asks ?? [])
         destBox.append(el("div", { class: "callout" }, text("p", `Para classificar ${a.name} falta uma característica do produto: ${a.question}${a.why ? ` (${a.why})` : ""}. A resposta fica no catálogo e vale para todas as pesquisas.`), approver() ? el("div", { class: "toolbar" }, ...a.options.map((o) => button(o.label, async () => { await api("/api/prospect/characteristic", "POST", { productId: a.productId, key: a.key, value: o.value }); notice("Característica registrada no catálogo."); loadDestinations(true); }))) : text("small", "Resposta de gestor comercial ou Administrador.")));

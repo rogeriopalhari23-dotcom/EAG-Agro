@@ -14,7 +14,7 @@ import { readCompanySite } from "./site.js";
 import { commodityLabelOf } from "../catalog-names.js";
 import { fetchAbicRoasters } from "../adapters/abic.js";
 import { nationalSources, foreignSources, inventory } from "../sources-applicable.js";
-import { countryIndicators, requestCountryList } from "../trade-list.js";
+import { countryIndicators, requestCountryList, prepareMarketData, marketDataProgress, sweep as tradeSweep } from "../trade-list.js";
 import { resolveClassification, applyClassification, recordCharacteristic } from "../classification.js";
 import { pickNational, pickInternational } from "./rotation.js";
 import { rebuildSummaries } from "../importers.js";
@@ -212,7 +212,7 @@ export async function createJob(request, env, actor, rid, deps = {}) {
   });
   if (same) return { ...(await getJob(env, actor, same.id)), reused: true };
   const profile = await ensureProfile(env, actor, rid);
-  const policy = await currentPolicy(env, actor.tenant_id);
+  const policy = await ensurePolicy(env, actor.tenant_id);
   // Destino só com evidência oficial de comércio deste produto com o Brasil (mesma regra do formulário e da pesquisa
   // automática). Pesquisas antigas e o histórico ficam como estão; só o início de uma combinação incompatível é recusado.
   if (market === "international" && !deps.allowUnverifiedDestination) {
@@ -1199,14 +1199,61 @@ export async function destinationsRoute(request, env, actor, rid, deps = {}) {
   const i = await bodyJson(request);
   const products = await productsOf(env, actor.tenant_id, { productId: i.productId ? str(i.productId, "produto", 80) : null, commodity: i.commodity ? str(i.commodity, "commodity", 60) : null });
   if (!products.length) fail(404, "product_not_found", "Commodity ou produto não encontrado no catálogo.");
-  const policy = await currentPolicy(env, actor.tenant_id);
+  // Pré-requisitos preparados pela automação autorizada: política delimitada (da autorização escrita), classificação
+  // documental dos produtos e dados oficiais de mercado (rotina mensal, mesmos limites do cron).
+  const policy = await ensurePolicy(env, actor.tenant_id);
   const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
   const cls = await ensureClassified(env, actor.tenant_id, products, policy);
+  const trade = deps.trade ?? {};
+  const recovery = i.recover === true ? await recoverMarketData(env, actor.tenant_id, policy, rid, trade) : null;
+  const prep = await prepareMarketData(env, actor.tenant_id, { allowStart: indicatorsAllowed(policy), deps: trade });
   const refresh = indicatorsAllowed(policy)
-    ? async (iso3) => !!(await requestCountryList(env, actor.tenant_id, iso3, { requestedBy: `policy:${policy.id}@v${policy.version}`, reason: "Destinos da pesquisa internacional: dado oficial vencido de destino comprovado", rid, deps: deps.trade ?? {} }))
+    ? async (iso3) => !!(await requestCountryList(env, actor.tenant_id, iso3, { requestedBy: `policy:${policy.id}@v${policy.version}`, reason: "Destinos da pesquisa internacional: dado oficial vencido de destino comprovado", rid, deps: trade }))
     : null;
-  const r = await destinationsFor(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }), refresh } });
-  return { ...r, asks: cls.asks, unresolvedClassification: cls.unresolved, products: products.map((p) => ({ id: p.id, name: p.display_name ?? p.variant_name })) };
+  const progress = await marketDataProgress(env, trade);
+  const r = await destinationsFor(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }), refresh }, preparation: { prep, progress, asks: cls.asks } });
+  return { ...r, asks: cls.asks, unresolvedClassification: cls.unresolved, recovery, policy: policy ? { version: policy.version, grantedVia: policy.policy?.grantedVia ?? "panel" } : null, products: products.map((p) => ({ id: p.id, name: p.display_name ?? p.variant_name })) };
+}
+
+// "Tentar de novo" com recuperação concreta: retoma a fila (jobs devidos e leases vencidos), refaz resumos a partir dos
+// objetos guardados e pede de novo os países cuja última consulta falhou (fluxo R12.15: um por país por dia, poucos por
+// vez, dentro do orçamento). → [texto de cada ação feita]
+async function recoverMarketData(env, tenant, policy, rid, trade) {
+  const done = [];
+  const sw = await tradeSweep(env, trade).catch(() => null);
+  if (sw?.enqueued) done.push(`${sw.enqueued} trabalho(s) da fila retomado(s)`);
+  const rb = await rebuildSummaries(env, tenant, { limit: 60 }).catch(() => null);
+  if (rb?.built) done.push(`${rb.built} resumo(s) refeito(s) dos dados guardados`);
+  if (indicatorsAllowed(policy)) {
+    const failed = (await s(env, "SELECT DISTINCT st.iso3 FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id WHERE v.status<>'running' AND st.state='data_unavailable' AND COALESCE(st.error,'')<>'país sem código nesta fonte' AND NOT EXISTS (SELECT 1 FROM trade_list_current c WHERE c.iso3=st.iso3 AND c.source=st.source) AND st.iso3 NOT IN (SELECT iso3 FROM trade_list_manual_refresh WHERE day=?) LIMIT 3", now().slice(0, 10)).all()).results;
+    for (const f of failed) {
+      const r = await requestCountryList(env, tenant, f.iso3, { requestedBy: `policy:${policy.id}@v${policy.version}`, reason: "Destinos da pesquisa internacional: nova tentativa após falha da fonte", rid, deps: trade }).catch(() => null);
+      if (r) done.push(`nova consulta pedida para ${f.iso3}`);
+    }
+  }
+  return done.length ? done : ["nada a retomar agora: a fila está em dia e não há falha recuperável hoje"];
+}
+
+// Política delimitada a partir da autorização escrita já concedida (AMENDMENT, 2026-10-20), quando ainda não há
+// política: registrada como automação autorizada (usuário de sistema), nunca como clique de uma pessoa. Revogação
+// prevalece: depois de uma política revogada, nada é recriado sozinho.
+export async function ensurePolicy(env, tenant) {
+  const cur = await currentPolicy(env, tenant);
+  if (cur || !AMENDMENT.approved) return cur;
+  if (await s(env, "SELECT 1 x FROM research_policies WHERE tenant_id=? LIMIT 1", tenant).first()) return null;
+  const t = POLICY_TEMPLATE;
+  const policy = {
+    ...t, paidSources: [], grantedByRole: "admin", grantedVia: "written_authorization", indicators: t.indicators === true,
+    covers: [...t.covers, ...(t.indicators ? ["pedido dos indicadores oficiais de país sem lista mensal e início da rotina mensal quando ainda não existe (R12.15; gratuito, no orçamento diário, um por país por dia)"] : [])],
+  };
+  const id = crypto.randomUUID(), at = now();
+  const reference = `Autorização delimitada escrita de ${AMENDMENT.approvedBy} em ${AMENDMENT.approvedAt} (${AMENDMENT.id}): ${AMENDMENT.scope.join("; ")}. Fora: ${AMENDMENT.notApproved.join("; ")}. Registrada pela automação do Compass, sem clique de pessoa.`;
+  const actor = { tenant_id: tenant, id: "system-authorization", role: "system" };
+  await commit(env, [
+    s(env, "INSERT INTO research_policies(id,tenant_id,version,policy_json,reference,granted_by,granted_at) SELECT ?,?,1,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM research_policies WHERE tenant_id=?)", id, tenant, JSON.stringify(policy), reference, actor.id, at, tenant),
+    auditStatement(env, actor, "automation:policy", "research_policy.granted_from_authorization", "research_policy", id, { amendment: AMENDMENT.id, approvedAt: AMENDMENT.approvedAt, channel: "automation" }),
+  ]);
+  return currentPolicy(env, tenant);
 }
 
 // POST /api/prospect/characteristic — { productId, key, value }: resposta da pessoa à característica do produto que
@@ -1278,7 +1325,7 @@ export async function autoStart(request, env, actor, rid, deps = {}) {
   requireRole(actor, WRITE_ROLES);
   const i = await bodyJson(request);
   const market = oneOf(i.market, ["national", "international"], "mercado");
-  const policy = await currentPolicy(env, actor.tenant_id);
+  const policy = await ensurePolicy(env, actor.tenant_id);
   if (!policy) fail(409, "no_policy", "Sem política de pesquisa de rotina vigente: conceda a política (Configurações → Prospecção automática) uma vez; depois a pesquisa automática não pede a mesma decisão de novo.");
   if (!policy.policy.markets.includes(market)) fail(409, "market_not_covered", "A política vigente não cobre este mercado.");
   const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;

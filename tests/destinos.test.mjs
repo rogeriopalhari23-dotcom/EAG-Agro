@@ -4,6 +4,7 @@
 // Caso "Derivados de soja — Canadá": o Canadá só aparece para a lecitina quando há exportação de lecitina do Brasil ao
 // Canadá; soja em grão, farelo e importação do mundo não comprovam.
 import test from "node:test";
+import { revokedPolicy } from "./helpers/revoked-policy.mjs";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
 import { sources, keepCountries, tradeParams, driver, AGRI, COMTRADE, rec, MDIC_ROWS } from "./helpers/trade.mjs";
@@ -97,7 +98,8 @@ test("commodity com vários produtos: o país indica qual produto fundamenta a i
   const coffee = await dest(api, { productId: "product-05" });
   assert.ok(coffee.asks.length === 1 && /cru/.test(coffee.asks[0].question), "café sem classificação: pergunta só a característica do produto");
   assert.equal(coffee.items.length, 0);
-  assert.match(coffee.message, /classificação SH ainda não confirmada/);
+  assert.equal(coffee.state, "needs_characteristic", "ambiguidade indispensável: só a característica que falta");
+  assert.match(coffee.message, /Falta uma característica do produto/);
   const a = await api("/api/prospect/characteristic", "POST", { productId: "product-05", key: coffee.asks[0].key, value: "cru_nao_descafeinado" });
   assert.equal(a.status, 200, JSON.stringify(a.data));
   const coffee2 = await dest(api, { productId: "product-05" });
@@ -111,10 +113,11 @@ test("dados ausentes, resumos a refazer, vencidos e falha da fonte: estados dist
     const { api } = await world(t, { noList: true });
     await api("/api/prospect/policy", "POST", { confirm: true, reference: "Decisão de teste (fictícia)" });
     const r = await dest(api, { commodity: "soy_meal" });
-    assert.equal(r.state, "none_incomplete");
+    // Sem armazenamento de arquivos, a rotina não pode rodar: bloqueio com o motivo concreto, nunca lista vazia final.
+    assert.equal(r.state, "blocked");
     assert.equal(r.items.length, 0);
     assert.equal(r.retry, true);
-    assert.match(r.message, /Cobertura incompleta: .*sem lista mensal vigente.*não indica ausência de compradores/);
+    assert.match(r.message, /não podem ser preparados: armazenamento de arquivos \(R2\) não configurado/);
   }
   const { api, DB } = await world(t);
   // Resumos apagados: refeitos do objeto oficial guardado (sem chamada externa) antes de responder.
@@ -144,7 +147,7 @@ test("dados ausentes, resumos a refazer, vencidos e falha da fonte: estados dist
   assert.ok(f.coverage.failed >= 1, JSON.stringify(f.coverage));
   assert.ok(f.reasons.some((x) => /falha da fonte/.test(x)), JSON.stringify(f.reasons));
   // A atualização pedida (Canadá) está em geração: "Verificando mercados compradores", sem oferecer outros países.
-  if (!f.items.length) assert.equal(f.state, "checking");
+  if (!f.items.length) assert.equal(f.state, "preparing");
 });
 
 test("pesquisa automática internacional usa a mesma regra: só combinações comprovadas do próprio produto", async (t) => {

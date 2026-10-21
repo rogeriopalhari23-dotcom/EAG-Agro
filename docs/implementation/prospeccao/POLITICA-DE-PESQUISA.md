@@ -55,4 +55,7 @@ Tudo isso fica registrado como **automação sob a política** (canal `automatio
 
 ## Concessão
 
+**Preparação automática (2026-10-21).** Sem nenhuma política registrada, o Compass registra a política delimitada a partir da autorização escrita de 2026-10-20 (`AMENDMENT`). O registro é feito como automação (`system-authorization`, origem `written_authorization`), sem clique de pessoa. Política revogada prevalece: nada é recriado sozinho. Sob essa política, a preparação dos destinos aplica as classificações documentais e inicia a rotina mensal quando a base ainda não tem lista, sem custo nem limite novo.
+
+
 A política é concedida uma vez, em Configurações → Prospecção automática, por Administrador ou gestor. O pedido de indicadores só entra quando quem concede é Administrador (R12.15). Depois disso, nenhuma pesquisa pede a mesma decisão de novo. A revogação para as pesquisas antes de qualquer nova consulta.

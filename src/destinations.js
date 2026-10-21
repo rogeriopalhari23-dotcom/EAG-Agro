@@ -40,7 +40,8 @@ export async function verifiedHs(env, productIds) {
 // products: linhas de products (uma commodity ou um produto). deps.rebuild(env, tenant, { months }) refaz resumos a
 // partir dos objetos oficiais já guardados (sem chamada externa). deps.refresh(iso3) pede a atualização de um país com
 // dado vencido pelo fluxo existente (R12.15), quando a política permite.
-export async function destinationsFor(env, tenant, { products, profile, deps = {} }) {
+// preparation: { prep (prepareMarketData), progress (marketDataProgress), asks (característica do produto pendente) }.
+export async function destinationsFor(env, tenant, { products, profile, deps = {}, preparation = {} }) {
   const w = await windows(env, tenant);
   const hsOf = await verifiedHs(env, products.map((p) => p.id));
   const classified = products.filter((p) => hsOf.get(p.id).size);
@@ -64,7 +65,7 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
   for (const c of cur) (byCountry.get(c.iso3) ?? byCountry.set(c.iso3, []).get(c.iso3)).push(c.version_id);
   const stale = new Set([...byCountry.entries()].filter(([, vs]) => latest && vs.every((v) => v < latest && !v.startsWith(latest))).map(([k]) => k));
   const running = (await s(env, "SELECT COUNT(DISTINCT st.iso3) n FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id WHERE v.status='running' AND st.state='pending'").first())?.n ?? 0;
-  const failedSources = (await s(env, "SELECT COUNT(DISTINCT st.iso3) n FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id WHERE v.status<>'running' AND st.state='data_unavailable' AND COALESCE(st.error,'')<>'país sem código nesta fonte' AND st.iso3 NOT IN (SELECT iso3 FROM trade_list_current)").first())?.n ?? 0;
+  const failedSources = (await s(env, "SELECT COUNT(DISTINCT st.iso3) n FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id WHERE v.status<>'running' AND st.state='data_unavailable' AND COALESCE(st.error,'')<>'país sem código nesta fonte' AND NOT EXISTS (SELECT 1 FROM trade_list_current c WHERE c.iso3=st.iso3 AND c.source=st.source)").first())?.n ?? 0;
   const allowed = new Set(profile?.sources?.international ?? []);
   const out = new Map();
   for (const p of classified) {
@@ -120,14 +121,28 @@ export async function destinationsFor(env, tenant, { products, profile, deps = {
     failedSources ? `${failedSources} país(es) com falha da fonte na última consulta` : null,
     pending ? `${pending} resumo(s) ainda em preparação` : null,
   ].filter(Boolean);
-  const state = items.length ? "ready" : pending > 0 || running > 0 ? "checking" : incomplete ? "none_incomplete" : "none_valid";
+  // Preparação em curso (rotina iniciada, fila andando, resumos a refazer): os destinos chegam aos poucos; lista vazia
+  // nunca é resultado final enquanto classificação ou cobertura estiverem pendentes.
+  const { prep = null, progress = null, asks = [] } = preparation;
+  if (prep?.state === "blocked") reasons.unshift(prep.reason);
+  if (progress?.waiting) reasons.push(progress.waiting);
+  const preparing = !!(progress || ["started", "running"].includes(prep?.state) || pending > 0);
+  const state = items.length ? "ready"
+    : preparing ? "preparing"
+    : asks.length ? "needs_characteristic"
+    : prep?.state === "blocked" ? "blocked"
+    : incomplete ? "none_incomplete" : "none_valid";
+  const pct = (x) => (x?.total ? `${x.done} de ${x.total} países` : null);
+  const progressText = progress ? [pct(progress.mdic) && `exportações do Brasil (MDIC): ${pct(progress.mdic)}`, pct(progress.comtrade) && `importações declaradas (Comtrade): ${pct(progress.comtrade)}`, progress.waiting].filter(Boolean).join("; ") : pending ? `${pending} resumo(s) em preparação a partir dos dados oficiais guardados` : null;
   return {
-    state, items, unclassified, coverage, incomplete, reasons,
-    message: state === "ready" ? null
-      : state === "checking" ? "Verificando mercados compradores"
+    state, items, unclassified, coverage, incomplete, reasons, preparing, progress, progressText,
+    message: state === "ready" ? (preparing ? `Preparando os mercados compradores: os destinos comprovados aparecem conforme os dados chegam (${progressText}).` : null)
+      : state === "preparing" ? `Preparando os mercados compradores${progressText ? ` (${progressText})` : ""}.`
+      : state === "needs_characteristic" ? `Falta uma característica do produto para classificá-lo: ${asks.map((a) => `${a.name}: ${a.question}`).join("; ")}.`
+      : state === "blocked" ? `Os mercados compradores ainda não podem ser preparados: ${prep.reason}.`
       : state === "none_valid" ? "Nenhum destino identificado nos dados disponíveis: as fontes responderam e não há registro de comércio deste produto com o Brasil no período."
       : `Nenhum destino identificado nos dados disponíveis. Cobertura incompleta: ${reasons.join("; ")}. Isso não indica ausência de compradores.`,
-    retry: state !== "ready" && state !== "none_valid",
+    retry: !["ready", "none_valid", "needs_characteristic"].includes(state),
   };
 }
 

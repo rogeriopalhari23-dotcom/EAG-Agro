@@ -13,6 +13,7 @@ import { securityHeaders } from "../src/http.js";
 import { provenanceHeaders } from "../src/provenance.js";
 import { internalCaller } from "../src/worker.js";
 import { tick } from "../src/prospect/engine.js";
+import { rebuildSummaries } from "../src/importers.js";
 import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.mjs";
 import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec, MDIC_ROWS } from "./helpers/trade.mjs";
 
@@ -142,12 +143,12 @@ await api(`${rb}/annotations`, "POST", { kind: "complement", text: "Anotação f
 const cfg2 = JSON.parse(await readFile(new URL("../docs/implementation/rodadas/exemplos/soja-rio-verde-150km.json", import.meta.url), "utf8"));
 await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/GO, 150 km (rascunho)", config: { ...cfg2, id: "previa-soja" } });
 
-// Indicadores oficiais SIMULADOS (lista mensal de teste) para a prospecção internacional; café com código HS 090111.
-// A lista simulada só cobre dois países; a tabela completa de países volta depois (a tela precisa de todos, inclusive os
-// que ainda não têm conector, como a Argentina).
-const snapshot = (t) => DB.raw.prepare(`SELECT * FROM ${t}`).all();
-const savedCountries = { countries: snapshot("countries"), country_mdic_codes: snapshot("country_mdic_codes") };
-keepCountries(DB, ["DEU", "CHN", "CAN"]);
+// Indicadores oficiais SIMULADOS (fontes de teste do MDIC e da Comtrade, claramente fictícias) para a pesquisa
+// internacional. A prévia começa como uma base nova: SEM política, SEM classificação SH e SEM lista mensal, com TODOS os
+// países da base. Ao abrir os destinos, a automação autorizada prepara a política delimitada (autorização escrita de
+// 2026-10-20), aplica as classificações documentais e inicia a rotina mensal com os limites existentes (MDIC agregado
+// para todos os países; Comtrade em fila, no orçamento diário da prévia). Nenhum clique é atribuído a uma pessoa.
+// Parâmetros da rotina: valores da prévia (fictícios), como se aprovados pelo Administrador.
 await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "15", "22", "23", "29"].sort() } });
 // Alemanha (FICTÍCIO): seis subposições maiores que o café nas exportações do Brasil (o café fica fora das cinco maiores
 // e a pesquisa automática ainda o encontra). China (FICTÍCIO): óleo de palma com comércio e sem conector de empresas.
@@ -156,31 +157,21 @@ const deuBig = [["12019000", 200000], ["17011400", 210000], ["17019900", 220000]
 // simulada do Canadá só traz importação do MUNDO de lecitina (parceiro 0), que não comprova compra do Brasil.
 const canRows = ['"2026";"02";"12019000";"10";"149";"PR";"01";"0917500";300000;300000;300000', '"2026";"02";"23040010";"10";"149";"PR";"01";"0917500";150000;150000;150000'];
 const chnPalm = '"2026";"02";"15111000";"10";"160";"PA";"01";"0817600";40000;40000;40000';
-// França (FICTÍCIO): a Comtrade simulada responde milho (1005.90) e álcool etílico (2207.10), mas o país fica SEM lista
-// mensal até a prospecção pedir a geração (o caso "Milho GMO — França").
-const tclock = { at: "2026-10-10T12:00:00.000Z" };
 // Egito (FICTÍCIO, o caso "Milho GMO — Egito"): o país não declarou à Comtrade (configurado assim) e o Brasil exportou
-// milho ao Egito em jan/2025 (MDIC), fora do período padrão de 12 meses e dentro dos 24 guardados. Soja: nada nas duas.
+// milho ao Egito em jan/2025 (MDIC), fora do período padrão de 12 meses e dentro dos 24 guardados.
 const egyCorn = '"2025";"01";"10059010";"10";"240";"PR";"01";"0917500";500000;500000;120000';
-const tradeDriver = driver(ctx.env, tradeSources({
+const tradeSrc = tradeSources({
   hs: ["100590", "220710", "292320", "230400"],
   ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"', '"17019900";"10";"170199";"Outros açúcares";"Other sugar"', '"01012100";"10";"010121";"Cavalos";"Horses"', '"02013000";"10";"020130";"Carne bovina";"Beef"', '"12011000";"10";"120110";"Soja para semeadura";"Soy seed"', '"15111000";"10";"151110";"Óleo de palma em bruto";"Crude palm oil"', '"23040010";"10";"230400";"Farelo de soja";"Soybean meal"', '"29232000";"10";"292320";"Lecitinas";"Lecithins"'],
   mdicRows: { 2026: [...MDIC_ROWS[2026], ...deuBig, chnPalm, ...canRows], 2025: [...MDIC_ROWS[2025], egyCorn] },
   comtrade: { 124: { years: [2023, 2024, 2025], rows: [rec(124, "292320", 2025, 0, 5000)] }, 276: { years: [2022, 2023, 2024, 2025], rows: [rec(276, "090111", 2025, 0, 100), rec(276, "170114", 2024, 0, 50)] }, 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
   covered: { comtrade: ["FRA", "EGY", "CAN"], mdic: ["EGY", "CHN", "CAN"] },
-}), tclock);
-await tradeDriver.start();
-await tradeDriver.drain();
-Object.defineProperty(tclock, "at", { get: () => new Date().toISOString() }); // depois da rotina inicial, relógio real
-for (const [t, rows] of Object.entries(savedCountries))
-  for (const r of rows) DB.raw.prepare(`INSERT OR IGNORE INTO ${t} (${Object.keys(r).join(",")}) VALUES (${Object.keys(r).map(() => "?").join(",")})`).run(...Object.values(r));
-const coffee = (await api("/api/catalog/product-05")).data;
-await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: coffee.revision, reason: "Prévia local (fictício)" });
-// Classificação SH só da PRÉVIA (fictícia, como se confirmada pelo Administrador): milho GMO e álcool etílico neutro.
-for (const [pid, code] of [["product-03", "100590"], ["product-11", "220710"], ["product-01", "120190"], ["product-22", "151110"]]) {
-  const p = (await api(`/api/catalog/${pid}`)).data;
-  await api(`/api/catalog/${pid}/codes`, "POST", { codeSystem: "HS", code, status: "confirmed", classificationVersion: "HS2022", sourceRef: "Prévia local (fictício)", expectedRevision: p.revision, reason: "Prévia local (fictício)" });
-}
+});
+const tradeDriver = driver(ctx.env, tradeSrc, { get at() { return new Date().toISOString(); } });
+// Como na produção: a fila assíncrona e a rede da rotina são do ambiente (aqui, a fila local e as fontes simuladas).
+ctx.env.ASYNC_QUEUE = { sendBatch: async (msgs) => { for (const m of msgs) if (m.body?.type === "trade_job") tradeDriver.queue.push(m.body); }, send: async () => {} };
+const previewFetch = globalThis.fetch;
+globalThis.fetch = (url, init) => (/^https:\/\/(mdic|comtrade)\.test\//.test(String(url)) ? tradeSrc.fetchImpl(url, init) : previewFetch(url, init));
 // O cron da produção roda a cada 5 minutos; aqui, um ciclo a cada 3 segundos (mesmo código, mesmas regras).
 let ticking = false;
 setInterval(async () => {
@@ -190,7 +181,10 @@ setInterval(async () => {
     await tick(ctx.env, "eag-internal", { call: internalCaller(ctx.env, "previa-cron"), trade: tradeDriver.deps });
     // Fila da lista mensal (na produção, a fila assíncrona da Cloudflare): pedidos da prospecção avançam aqui.
     await tradeDriver.sweep();
-    await tradeDriver.drain();
+    await tradeDriver.drain(400);
+    // Resumos por país refeitos dos objetos já guardados (como no cron diário), nas duas janelas.
+    await rebuildSummaries(ctx.env, "eag-internal", { limit: 60 });
+    await rebuildSummaries(ctx.env, "eag-internal", { limit: 60, months: 24 });
   } catch (e) {
     console.error("ciclo da prospecção:", e.message);
   } finally {

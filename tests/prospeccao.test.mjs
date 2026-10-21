@@ -1,6 +1,7 @@
 // Prospecção automática (2026-10-20): motor em segundo plano, perfil versionado, política de pesquisa de rotina.
 // Tudo SIMULADO (tests/helpers/simulated-world.mjs): mapa, sites, Receita e diretório alemão; nenhum dado real, nenhuma rede.
 import test from "node:test";
+import { revokedPolicy } from "./helpers/revoked-policy.mjs";
 import { legacyJob } from "./helpers/legacy-job.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -53,6 +54,7 @@ const cafe = { market: "national", productId: "product-05", location: { region: 
 
 test("sem política, a prospecção para em decisão; concedida, segue sozinha até o relatório e cadastra em descoberta com rastreio", async (t) => {
   const { api, DB, drive, grant, actions } = await world(t);
+  revokedPolicy(DB); // sem política vigente: revogada (a revogação prevalece sobre a autorização escrita)
   const job = (await api("/api/prospect/jobs", "POST", cafe)).data;
   assert.equal(job.name, "Café — Guaxupé/MG, 150 km");
   let j = await drive(job.id);
@@ -77,7 +79,7 @@ test("sem política, a prospecção para em decisão; concedida, segue sozinha a
   const reg = DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='round.registered'").get();
   const op = JSON.parse(reg.new_value_json).operation;
   assert.equal(op.channel, "automation");
-  assert.match(op.authorization.reference, /Política de pesquisa de rotina v1/);
+  assert.match(op.authorization.reference, /Política de pesquisa de rotina v2/);
   // Canal: só o e-mail geral do próprio domínio (o de pessoa no mesmo site fica de fora).
   const contacts = DB.raw.prepare("SELECT contact_kind, source_kind, source_url FROM contacts").all();
   assert.equal(contacts.length, 3);
