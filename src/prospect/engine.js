@@ -15,6 +15,8 @@ import { commodityLabelOf } from "../catalog-names.js";
 import { fetchAbicRoasters } from "../adapters/abic.js";
 import { nationalSources, foreignSources, inventory } from "../sources-applicable.js";
 import { countryIndicators, requestCountryList } from "../trade-list.js";
+import { resolveClassification, applyClassification, recordCharacteristic } from "../classification.js";
+import { pickNational, pickInternational } from "./rotation.js";
 const ADMIN_ROLES = new Set(["admin"]);
 // Produto com o nome da commodity da lista única do catálogo.
 const productL = async (env, tenant, id) => {
@@ -36,7 +38,7 @@ const STEP_LABELS = {
   conciliate: "Conciliação pelo site da empresa (CNPJ e canal publicados)",
   lookup: "Consulta cadastral (Receita), deduplicação e reaproveitamento",
   analysis: "Indicadores oficiais do país",
-  select: "Seleção da commodity e autorização da busca (R12.7)",
+  select: "Seleção da commodity e autorização da busca (R12.7, pela política)",
   authorize: "Busca de empresas no país",
   accept: "Aceite das candidatas com identificação suficiente",
   register: "Triagem de sanções e cadastro em descoberta",
@@ -158,7 +160,7 @@ function jobView(j, events = []) {
     id: j.id, market: j.market, name: j.name, input: parse(j.input_json, {}), status: j.status, step: j.step,
     stepLabel: STEP_LABELS[j.step] ?? j.step, steps: flow.map((k) => ({ key: k, label: STEP_LABELS[k], state: state.steps?.[k] ?? "todo" })),
     roundId: j.round_id, profileId: j.profile_id, policyId: j.policy_id, nextRunAt: j.next_run_at, cycles: j.cycles, error: j.error,
-    waitingFor: state.waitingFor ?? null, decision: state.decision ?? null, summary: parse(j.summary_json), refs: state.refs ?? {},
+    waitingFor: state.waitingFor ?? null, decision: state.decision ?? null, choice: state.choice ?? null, summary: parse(j.summary_json), refs: state.refs ?? {},
     createdBy: j.created_by, createdAt: j.created_at, updatedAt: j.updated_at, finishedAt: j.finished_at,
     events: events.map((e) => ({ at: e.at, step: e.step, stepLabel: STEP_LABELS[e.step] ?? e.step, outcome: e.outcome, message: e.message, detail: parse(e.detail_json) })),
   };
@@ -312,6 +314,11 @@ export async function actOnJob(request, env, actor, rid, id, call) {
     state.indicatorRequests = (state.indicatorRequests ?? 0) + (r.reused ? 0 : 1);
     delete state.indicators;
     note = r.reused ? "Geração dos indicadores já pedida hoje: acompanhando a mesma versão." : "Geração dos indicadores pedida pela pessoa (R12.15).";
+  } else if (act.id === "answer_characteristic") {
+    const value = str(i.value, "resposta", 80);
+    if (!(act.options ?? []).some((o) => o.value === value)) fail(422, "invalid_answer", "Escolha uma das opções.");
+    await recordCharacteristic(env, actor, rid, act.productId, act.key, value, `prospecção "${j.name}"`);
+    note = `Característica informada pela pessoa: ${act.key.replace("classificacao:", "")} = ${value}.`;
   } else if (act.id === "retry") {
     note = "Nova verificação pedida pela pessoa.";
   } else fail(422, "action_not_supported", "Ação sem execução pelo servidor (abra a tela indicada).");
@@ -673,7 +680,7 @@ const NATIONAL = {
       if (!part.data.remaining) break;
     }
     const n = (k) => items.filter((x) => x.outcome === k).length;
-    ctx.log("register", n("failed") ? "partial" : "ok", `Cadastro em descoberta: ${n("created")} criada(s), ${n("already_exists")} já existiam (reaproveitadas), ${n("failed")} falha(s). Exceções e conferências ficam na fila de revisão. ${policy.policy.autoScreening ? "Triagem de sanções executada junto." : "Sem triagem automática."} Nenhum contato, ficha ou envio criado.`);
+    ctx.log("register", n("failed") ? "partial" : "ok", `Cadastro em descoberta: ${n("created")} criada(s), ${n("relation_added")} já cadastrada(s) com a relação deste produto acrescentada (relações com outras commodities preservadas), ${n("already_exists")} já existiam com esta relação (reaproveitadas, sem duplicar), ${n("failed")} falha(s). Exceções e conferências ficam na fila de revisão. ${policy.policy.autoScreening ? "Triagem de sanções executada junto." : "Sem triagem automática."} Nenhum contato, ficha ou envio criado.`);
     return { outcome: n("failed") ? "partial" : "done" };
   },
   async evidence(ctx) {
@@ -855,8 +862,20 @@ const INTERNATIONAL = {
     const { state, input, env } = ctx;
     const p = await productL(env, ctx.job.tenant_id, input.productId);
     const hs = input.hs6?.length ? input.hs6 : await confirmedHs(env, p.id);
-    if (!hs.length)
-      return { decision: { kind: "classification", category: "technical", message: `Pendência técnica do catálogo: ${commodityLabel(p)} ainda não tem código SH confirmado. Sem ele, a lista oficial do país não pode ser cruzada com o produto (R12.14). A confirmação é do Administrador, no Catálogo, com fonte.`, action: { id: "open_catalog", label: "Abrir o produto no Catálogo", roles: "admin", productId: p.id } } };
+    if (!hs.length) {
+      const cl = await resolveClassification(env, ctx.job.tenant_id, p.id);
+      if (cl.state === "classified" && cl.codes.length) {
+        await applyClassification(env, ctx.job.tenant_id, p.id, cl, { policy: ctx.policy, jobId: ctx.job.id });
+        // Com a classificação, as fontes aplicáveis ao país e à commodity são recalculadas (mesma regra do planejamento).
+        ctx.state.applicable = foreignSources(input.location.iso2, cl.codes.map((c) => c.hs6)).filter((x) => (ctx.profile.sources?.international ?? []).includes(x.key));
+        ctx.log("plan", "ok", `Fontes aplicáveis com a classificação: ${ctx.state.applicable.filter((x) => x.status === "available").map((x) => x.label).join("; ") || "nenhuma fonte de empresas cobre este país e esta commodity"}.`);
+        ctx.log("analysis", "ok", `Classificação de ${p.variant_name} resolvida automaticamente (sob a política v${ctx.policy?.version}): ${cl.codes.map((c) => `SH ${c.hs6} / NCM ${c.ncm} — ${c.basis}`).join("; ")}. Fonte: NCM vigente (Res. Gecex nº 926/2026, Siscomex), SH 2022.`, { codes: cl.codes });
+        return INTERNATIONAL.analysis(ctx);
+      }
+      if (cl.state === "ask")
+        return { decision: { kind: "classification_characteristic", category: "product", message: `Para classificar ${p.variant_name} falta uma característica que muda o código: ${cl.ask.question}${cl.why ? ` (${cl.why})` : ""}. A resposta fica no catálogo com a sua autoria e a pesquisa continua sozinha.`, action: { id: "answer_characteristic", label: `Responder: ${cl.ask.question}`, roles: "approver", options: cl.ask.options.map((o) => ({ value: o.value, label: o.label })), productId: p.id, key: cl.ask.key } } };
+      return { decision: { kind: "classification", category: "technical", message: `Pendência técnica do catálogo: ${commodityLabel(p)} (${p.variant_name}) sem classificação: ${cl.reason}. Sem código SH, a lista oficial do país não é cruzada com o produto (R12.14). A classificação fica com o Administrador, no Catálogo.`, action: { id: "open_catalog", label: "Abrir o produto no Catálogo", roles: "admin", productId: p.id } } };
+    }
     const ind = await countryIndicators(env, input.location.iso3, { now: ctx.now });
     // Volta de uma espera por evidência: reavalia com os dados vigentes (a análise igual é reaproveitada, sem duplicar).
     if (state.recheckEvidence) {
@@ -941,7 +960,7 @@ const INTERNATIONAL = {
     if (!ok(sel)) return { decision: { kind: "selection", message: `Seleção recusada: ${errText(sel)}` } };
     state.campaignId = sel.data.campaigns[0].id;
     state.refs = { ...(state.refs ?? {}), campaignId: state.campaignId };
-    ctx.log("select", "ok", `Seleção registrada pela política de pesquisa v${ctx.policy.version} (R12.7 com a emenda aprovada). Campanha em rascunho criada pela regra da seleção; nada é ativado.`);
+    ctx.log("select", "ok", `Seleção registrada pela política de pesquisa v${ctx.policy.version} (R12.7, autorização delimitada de 2026-10-20). Campanha em rascunho criada pela regra da seleção; nada é ativado.`);
     return {};
   },
   async authorize(ctx) {
@@ -1119,4 +1138,31 @@ export async function applicableRoute(request, env, actor) {
   }
   const p = await productL(env, actor.tenant_id, str(i.productId, "produto", 80));
   return { items: foreignSources(str(i.iso2, "país", 2).toUpperCase(), await confirmedHs(env, p.id)) };
+}
+
+// POST /api/prospect/auto { market } — pesquisa automática: escolhe a combinação pela rotação (perfil, origens, limites,
+// evidência oficial e cobertura) e inicia a pesquisa dentro da política, com a justificativa registrada. Sem contato.
+export async function autoStart(request, env, actor, rid, deps = {}) {
+  requireRole(actor, WRITE_ROLES);
+  const i = await bodyJson(request);
+  const market = oneOf(i.market, ["national", "international"], "mercado");
+  const policy = await currentPolicy(env, actor.tenant_id);
+  if (!policy) fail(409, "no_policy", "Sem política de pesquisa de rotina vigente: conceda a política (Configurações → Prospecção automática) uma vez; depois a pesquisa automática não pede a mesma decisão de novo.");
+  if (!policy.policy.markets.includes(market)) fail(409, "market_not_covered", "A política vigente não cobre este mercado.");
+  const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
+  const at = deps.now?.() ?? now();
+  const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at });
+  if (pick.none) return { started: false, reasons: pick.reasons, note: "Nenhuma combinação elegível agora. Falta de dado ou falha de fonte não é conclusão de ausência de compradores." };
+  const job = await createJob(new Request("https://compass.internal/api/prospect/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pick.input) }), env, actor, rid, deps);
+  if (!job.reused) {
+    const j = await jobOf(env, actor.tenant_id, job.id);
+    const state = parse(j.state_json, {});
+    state.choice = { reason: pick.reason, eligible: pick.eligible, at };
+    await commit(env, [
+      s(env, "UPDATE prospect_jobs SET state_json=? WHERE id=?", JSON.stringify(state), job.id),
+      event(env, job.id, at, "plan", "ok", `Pesquisa automática ${market === "national" ? "nacional" : "internacional"} (rotação entre ${pick.eligible} combinação(ões) elegível(is)): ${pick.reason}`),
+      auditStatement(env, actor, rid, "prospect_job.auto_started", "prospect_job", job.id, { market, reason: pick.reason, eligible: pick.eligible, policyVersion: policy.version }),
+    ]);
+  }
+  return { started: true, reused: !!job.reused, reason: pick.reason, eligible: pick.eligible, job: await getJob(env, actor, job.id) };
 }

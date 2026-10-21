@@ -21,7 +21,7 @@ async function world(t, opts = {}) {
     await ctx.api(`/api/sanctions/versions/${v.data.id}/entries`, "POST", { entries: [{ primaryName: "Nome Sem Relação (fictício)" }] });
     await ctx.api(`/api/sanctions/versions/${v.data.id}/finish`, "POST", {});
   }
-  const deps = { call: internalCaller(ctx.env, "rid-teste"), fetch: globalThis.fetch, ...(opts.amendmentApproved ? { amendmentApproved: true } : {}) };
+  const deps = { call: internalCaller(ctx.env, "rid-teste"), fetch: globalThis.fetch, ...(opts.amendmentApproved !== undefined ? { amendmentApproved: opts.amendmentApproved } : {}) };
   // Ações concretas que a regra vigente pede de uma pessoa (emenda não aprovada): o teste faz o papel da pessoa, pela rota.
   const PERSON = new Set(opts.personActions ?? ["ack_limitations", "select_authorize", "accept_candidates"]);
   const actions = [];
@@ -67,10 +67,10 @@ test("sem política, a prospecção para em decisão; concedida, segue sozinha a
   assert.equal(s.registered, 3);
   assert.equal(s.exceptions, 3);
   assert.match(s.notCommercial, /não é qualificação comercial/);
-  // Emenda não aprovada: a ciência das limitações é da pessoa (ação concreta), nunca atribuída à política.
-  assert.deepEqual(actions, ["ack_limitations"]);
+  // Autorização delimitada (2026-10-20): limitações já aceitas têm a ciência da política, sem clique da pessoa.
+  assert.deepEqual(actions, []);
   const round = (await api(`/api/rounds/${j.roundId}`)).data;
-  assert.doesNotMatch(round.acknowledged.by, /^policy:/);
+  assert.match(round.acknowledged.by, /^policy:/);
   assert.equal(round.config.commodity.productId, "product-05");
   assert.deepEqual(Object.keys(round.config.commodity.segments), ["roaster"], "segmentos do café, sem ração");
   const reg = DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='round.registered'").get();
@@ -205,7 +205,7 @@ test("perfil versionado: nova versão vale para as próximas prospecções; perf
   assert.ok(j.decision.items.some((x) => /descoberta automática/.test(x)));
 });
 
-test("internacional: indicadores → seleção e busca pela pessoa (R12.7) → descoberta com fonte pendente → aceite → relatório", async (t) => {
+test("internacional: indicadores → seleção e busca pela política (R12.7) → descoberta com fonte pendente → encaminhamento → relatório", async (t) => {
   const ctx = await world(t);
   const { api, DB, drive, grant, env, actions } = ctx;
   keepCountries(DB, ["DEU", "CHN"]);
@@ -222,16 +222,20 @@ test("internacional: indicadores → seleção e busca pela pessoa (R12.7) → d
   assert.ok(j.summary.registered >= 1);
   assert.ok(j.summary.exceptions >= 1, "sem identificador nem site: fila de exceções");
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM campaigns WHERE status='active'").get().n, 0, "campanha nasce em rascunho");
-  // R12.7 vigente: seleção e autorização feitas pela pessoa (canal do painel); aceite das candidatas também.
-  assert.deepEqual(actions, ["select_authorize", "accept_candidates"]);
+  // R12.7 com a autorização delimitada: seleção, autorização e encaminhamento pela política (automação), sem clique.
+  assert.deepEqual(actions, []);
   const auth = DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='foreign_search.authorized'").get();
-  assert.equal(JSON.parse(auth.new_value_json)._operation.channel, "panel");
+  assert.equal(JSON.parse(auth.new_value_json)._operation.channel, "automation");
+  assert.match(JSON.parse(auth.new_value_json)._operation.authorization.reference, /Política de pesquisa de rotina v1/);
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM companies WHERE country_code='DE' AND registration_id_type='CNPJ'").get().n, 0, "sem CNPJ no exterior");
   // Sem compra identificada do produto no país: decisão, nunca busca de empresas (R12.14).
   const k = await drive((await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-14", location: { iso3: "CHN" } })).data.id);
   assert.equal(k.status, "needs_decision");
-  assert.equal(k.decision.kind, "classification", "produto sem código SH confirmado: pendência técnica do catálogo");
-  assert.equal(k.decision.category, "technical");
+  // Trigo sem SH: a classificação depende só de "trigo duro?" (1001.19 × 1001.99); pergunta só essa característica.
+  assert.equal(k.decision.kind, "classification_characteristic", JSON.stringify(k.decision));
+  assert.equal(k.decision.category, "product");
+  assert.deepEqual(k.decision.action.options.map((o) => o.value), ["nao", "sim"]);
+  assert.match(k.decision.message, /trigo duro/);
 });
 
 test("cron: tick executa as prospecções devidas e ignora as que não venceram", async (t) => {
@@ -244,11 +248,11 @@ test("cron: tick executa as prospecções devidas e ignora as que não venceram"
   assert.notEqual(j.status, "queued");
 });
 
-test("emenda aprovada (só se aprovada): a política registra a ciência das limitações como dela, nunca como clique", async (t) => {
-  const { api, drive, grant, actions } = await world(t, { amendmentApproved: true });
+test("sem a autorização delimitada (amendmentApproved=false): ciência pede a ação concreta da pessoa, registrada como dela", async (t) => {
+  const { api, drive, grant, actions } = await world(t, { amendmentApproved: false });
   await grant();
   const j = await drive((await api("/api/prospect/jobs", "POST", cafe)).data.id);
   assert.equal(j.status, "done", JSON.stringify(j.events.slice(-3)));
-  assert.deepEqual(actions, [], "nenhuma ação de pessoa com a emenda aprovada");
-  assert.match((await api(`/api/rounds/${j.roundId}`)).data.acknowledged.by, /^policy:/);
+  assert.deepEqual(actions, ["ack_limitations"]);
+  assert.doesNotMatch((await api(`/api/rounds/${j.roundId}`)).data.acknowledged.by, /^policy:/);
 });

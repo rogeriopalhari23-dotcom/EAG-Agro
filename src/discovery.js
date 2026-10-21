@@ -220,7 +220,11 @@ export async function accept(request, env, actor, rid, id) {
         ),
       );
     }
-    if (c.import_statement)
+    // Empresa já cadastrada por outra busca ou commodity: a mesma evidência (tipo + referência) não se repete.
+    const hasEv = async (type, ref) => !!(await s(env, "SELECT 1 x FROM evidence WHERE tenant_id=? AND company_id=? AND evidence_type=? AND reference=?", actor.tenant_id, companyId, type, ref).first());
+    const selfRef = c.import_statement ? `A própria empresa declara, no diretório ${SOURCE_LABEL[c.source]}: "${c.import_statement}". Sinal próprio de importação (origem e produto a confirmar).` : null;
+    const eoriRef = c.eori_status === "valid" ? `EORI ${c.eori} ativo na União Europeia (validação EOS da Comissão Europeia): empresa registrada na aduana para importar/exportar. Não prova importação da commodity nem origem Brasil.` : null;
+    if (c.import_statement && !(await hasEv("self_declaration", selfRef)))
       stmts.push(
         s(
           env,
@@ -230,7 +234,7 @@ export async function accept(request, env, actor, rid, id) {
           c.record_url, c.validated_at ?? at, JSON.stringify({ supports: ["imports"], mentionsBrazil: !!c.mentions_brazil }), actor.id,
         ),
       );
-    if (c.eori_status === "valid")
+    if (c.eori_status === "valid" && !(await hasEv("customs_registration", eoriRef)))
       stmts.push(
         s(
           env,

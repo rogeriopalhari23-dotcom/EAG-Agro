@@ -70,6 +70,7 @@ export function buildRegistrationBatch(run, { mode, decisions = {}, decidedBy, d
         sourceLabel: `Rodada ${config.id} (${trace.label}). ${notConfirmed(r, config)}.`,
         sourceUrl: r.assessment.commodityUse.sources.find((e) => e.url)?.url ?? reg.url ?? undefined,
       },
+      unit: r.registrationId ? { cnpj: r.registrationId, municipality: reg.municipality ?? r.municipality ?? null, uf: reg.region ?? r.region ?? null, sourceLabel: `Rodada ${config.id}`, sourceRef: reg.url ?? null } : null,
       evidence: evidenceFor(r, config),
       channels: r.assessment.channels.filter((c) => c.verified && /@/.test(c.value ?? "")).map((c) => ({ email: c.value, sourceUrl: c.source, sourceKind: "company_site", label: `Canal publicado (${c.type})` })),
       people: [],

@@ -35,13 +35,24 @@ export const DEFAULT_PROFILE = {
 export const POLICY_TEMPLATE = {
   // A seleção (R12.7), a ciência das limitações e o aceite internacional pela política dependem da emenda proposta
   // (AMENDMENT): enquanto ela não for aprovada, esses passos pedem a ação de uma pessoa, mesmo com a política vigente.
-  covers: ["descoberta de candidatas", "consulta cadastral", "conciliação e deduplicação", "triagem de sanções", "cadastro em descoberta (sem decisão comercial)"],
+  covers: [
+    "descoberta de candidatas",
+    "consulta cadastral",
+    "conciliação e deduplicação",
+    "triagem de sanções",
+    "cadastro em descoberta (sem decisão comercial)",
+    "seleção de commodity, mercado, segmentos e fontes (inclusive pesquisa automática por rotação)",
+    "seleção da commodity e autorização da busca no exterior (R12.7) para commodity com evidência de mercado",
+    "encaminhamento de candidatas com identificador cadastral ou site para descoberta",
+    "ciência das limitações já aceitas (limitação nova ou mais grave pede decisão)",
+    "classificação fiscal de produto por regra fundamentada em fonte oficial",
+  ],
   // Pedido dos indicadores oficiais de um país sem lista (R12.15, fluxo da lista mensal, fontes gratuitas dentro do
   // orçamento diário configurado, um por país por dia). Só entra quando quem concede é Administrador.
   indicators: true,
   // Evidência de mercado num período mais longo, dentro dos dados guardados da lista mensal (até 60 meses), identificado.
   extendEvidencePeriod: true,
-  excludes: ["contato de qualquer tipo", "aprovação de fichas", "ativação de campanhas", "liberação de canais", "envio de mensagens", "fontes pagas ou consumo de créditos", "fusão de empresas parecidas"],
+  excludes: ["custos novos e ampliação de escopo", "ambiguidade comercial real", "contato de qualquer tipo", "aprovação de fichas", "ativação de campanhas", "liberação de canais", "envio de mensagens", "fontes pagas ou consumo de créditos", "fusão de empresas parecidas"],
   markets: ["national", "international"],
   paidSources: [],
   maxRadiusKm: 500,
@@ -65,7 +76,18 @@ export const POLICY_TEMPLATE = {
 
 // Emenda da prospecção automática (docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md): PROPOSTA, não aprovada.
 // Só muda para approved: true por commit depois da aprovação registrada de Rogério Palhari; nenhuma tela ou rota muda isso.
-export const AMENDMENT = { id: "EMENDA-PROSPECCAO-AUTOMATICA", approved: false };
+// Autorização delimitada por instrução escrita de Rogério Palhari em 2026-10-20 (pesquisa e organização): seleção de
+// commodity, mercado, segmentos e fontes; seleção R12.7 e autorização da busca no exterior; encaminhamento de candidatas
+// para descoberta; ciência das limitações já aceitas. NÃO inclui: custos novos, ampliação de escopo, ambiguidade
+// comercial, contato, fichas, T11, canais, campanhas ativas, envios nem o plano de consultas fora da Cloudflare (ponte).
+export const AMENDMENT = {
+  id: "EMENDA-PROSPECCAO-AUTOMATICA",
+  approved: true,
+  approvedAt: "2026-10-20",
+  approvedBy: "Rogério Palhari (instrução escrita, sessão de 2026-10-20)",
+  scope: ["seleção de commodity, mercado, segmentos e fontes", "seleção R12.7 e autorização da busca de empresas no exterior", "encaminhamento de candidatas com identificador ou site para descoberta", "ciência de limitações já aceitas pela política"],
+  notApproved: ["custos novos", "ampliação de escopo", "ambiguidade comercial", "plano de consultas fora da Cloudflare (ponte)"],
+};
 
 const LEVEL = { supported: 0, partial: 1, unsupported: 2 };
 // Itens da verificação prévia que a política não cobre (nova limitação ou nível mais grave que o aceito).

@@ -5484,12 +5484,15 @@ const WAITING_TEXT = {
 const EVIDENCE_TAG_UI = { positive: "comércio registrado", no_record: "sem registros para os filtros", not_declared: "sem declaração no período", unavailable: "falha ou limite", not_queried: "não consultada", no_source: "sem código na fonte", no_simulation: "sem simulação configurada" };
 const EVIDENCE_CLS = { positive: "ok", no_record: "", not_declared: "warn", unavailable: "warn", not_queried: "", no_source: "", no_simulation: "warn" };
 // Pendência da prospecção: técnica (o sistema ou o Administrador resolve), regra vigente (pede uma pessoa) ou decisão.
-const DECISION_HEAD = { technical: "Pendência técnica. ", rule: "A regra vigente pede a ação de uma pessoa. " };
+const DECISION_HEAD = { technical: "Pendência técnica. ", rule: "A regra vigente pede a ação de uma pessoa. ", product: "Falta uma característica do produto. " };
 function decisionActions(j, id) {
   const a = j.decision.action;
   const can = (r) => (r === "admin" ? admin() : r === "approver" ? approver() : writable());
   const bar = el("div", { class: "toolbar" });
-  if (a) {
+  if (a?.options?.length) {
+    if (can(a.roles)) for (const o of a.options) bar.append(button(o.label, async () => (await api(`/api/prospect/jobs/${id}/act`, "POST", { action: a.id, value: o.value }), await showJob(id))));
+    else bar.append(text("small", "Resposta de um Administrador ou gestor comercial."));
+  } else if (a) {
     if (a.id === "open_catalog") bar.append(button(a.label, () => navigate("Catálogo")));
     else if (a.id === "open_trade_list") bar.append(button(a.label, () => navigate("Lista mensal")));
     else if (can(a.roles)) bar.append(button(a.label, async () => (await api(`/api/prospect/jobs/${id}/act`, "POST", { action: a.id }), await showJob(id)), true));
@@ -5667,9 +5670,10 @@ async function showJob(id) {
     item("Candidatas encontradas", notStarted ? "busca não executada" : s ? String(s.candidates) : "—", notStarted ? `a pesquisa parou em: ${s.stageReached}` : s?.establishments != null ? `${s.establishments} estabelecimento(s) após deduplicação` : null),
     item("Empresas cadastradas", notStarted ? "busca não executada" : s ? String(s.registered) : "—", notStarted ? "nenhuma empresa foi buscada" : "em descoberta: não é qualificação comercial"),
     item("Pendências para análise", s ? String(s.exceptions) : "—", s?.pendingLookups ? `${s.pendingLookups} consulta(s) adiada(s)` : null),
-    el("div", { class: "next" }, el("p", {}, text("strong", "Próxima ação: "), j.decision ? (j.decision.action ? `${j.decision.action.label} (${j.decision.category === "technical" ? "pendência técnica" : j.decision.category === "rule" ? "ação de uma pessoa pela regra vigente" : "decisão"}; detalhes abaixo).` : j.decision.message) : s ? s.nextAction : jobActive(j) ? "Aguardar: a prospecção avança sozinha." : "—"), jobProgress(j)),
+    el("div", { class: "next" }, el("p", {}, text("strong", "Próxima ação: "), j.decision ? (j.decision.action ? `${j.decision.action.label} (${j.decision.category === "technical" ? "pendência técnica" : j.decision.category === "rule" ? "ação de uma pessoa pela regra vigente" : j.decision.category === "product" ? "característica do produto" : "decisão"}; detalhes abaixo).` : j.decision.message) : s ? s.nextAction : jobActive(j) ? "Aguardar: a prospecção avança sozinha." : "—"), jobProgress(j)),
   );
   node.append(head);
+  if (j.choice) node.append(el("div", { class: "callout choice-note" }, el("p", {}, text("strong", "Por que esta pesquisa: "), j.choice.reason)));
   // Decisão pendente: o que falta e como seguir.
   if (j.decision) {
     const dec = el("div", { class: `callout decision-box ${j.decision.category === "technical" ? "" : "warn"}`.trim() }, el("p", {}, text("strong", DECISION_HEAD[j.decision.category] ?? "Decisão necessária. "), j.decision.message));
@@ -5775,9 +5779,31 @@ async function showJob(id) {
 }
 
 // Hub de prospecção em cada contexto: formulário + prospecções; o modo manual fica em "Recursos complementares".
+// Pesquisa automática: o Compass escolhe a combinação (rotação entre as elegíveis) e inicia dentro da política.
+function autoSearchBar(market) {
+  const bar = el("section", { class: "panel auto-search" }, text("h2", "Pesquisa automática"));
+  const markets = market ? [market] : ["national", "international"];
+  const out = el("p", { class: "form-hint", "aria-live": "polite" }, "O Compass escolhe commodity e local pelo perfil, pelas origens e limites configurados e pela evidência oficial; prioriza o pouco pesquisado e o que precisa de atualização. Sem contato comercial.");
+  const tools = el("div", { class: "toolbar" });
+  for (const m of markets)
+    tools.append(
+      button(m === "national" ? "Pesquisa automática nacional" : "Pesquisa automática internacional", async () => {
+        const r = await api("/api/prospect/auto", "POST", { market: m });
+        if (!r.started) {
+          out.textContent = `Nenhuma combinação elegível agora: ${r.reasons.join("; ")}. ${r.note}`;
+          return;
+        }
+        notice(r.reused ? `Pesquisa já em andamento reaproveitada: ${r.reason}` : `Pesquisa automática iniciada: ${r.reason}`);
+        await showJob(r.job.id);
+      }, true),
+    );
+  if (!writable()) tools.replaceChildren(text("small", "Seu perfil acompanha as pesquisas, sem iniciar."));
+  bar.append(out, tools);
+  return bar;
+}
 async function prospectHub(title, subtitle, market, manual, manualTitle) {
   const node = section(title, subtitle);
-  node.append(prospectStart(market), await prospectList(market));
+  node.append(autoSearchBar(market), prospectStart(market), await prospectList(market));
   if (manual) {
     const m = await manual();
     m.querySelector(":scope > .page-head")?.remove();

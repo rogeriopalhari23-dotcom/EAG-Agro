@@ -115,7 +115,7 @@ async function world(t, c) {
   return { ...ctx, clock, iso, until, start, get, newData, tradeDeps: () => d.deps };
 }
 
-const settled = (x) => x.waitingFor === "indicators_limit" || x.status === "needs_decision" || x.waitingFor === "market_evidence" || ["done", "failed"].includes(x.status);
+const settled = (x) => x.waitingFor === "indicators_limit" || x.step === "select" && x.status === "done" || x.status === "needs_decision" || x.waitingFor === "market_evidence" || ["done", "failed"].includes(x.status);
 for (const c of CASES) {
   test(c.name, async (t) => {
     const { DB, env, until, start, newData, clock, api, iso, tradeDeps } = await world(t, c);
@@ -156,15 +156,15 @@ for (const c of CASES) {
         clock.t += 24 * 3600_000;
         await requestCountryList(env, "eag-internal", c.iso3, { requestedBy: "teste", reason: "Teste: nova publicação do MDIC (fictícia)", deps: tradeDeps() });
         DB.raw.prepare("UPDATE prospect_jobs SET next_run_at=? WHERE id=?").run(iso(), first.id);
-        j = await until(first.id, (x) => x.status === "needs_decision", 40, 6 * 3600_000);
-        assert.equal(j.decision?.kind, "r12_7", JSON.stringify({ st: j.status, w: j.waitingFor, ev: j.events.map((e) => e.message.slice(0, 160)).slice(-4), cs: DB.raw.prepare("SELECT version_id,source,state,error FROM trade_list_status WHERE iso3=?").all(c.iso3) }));
+        j = await until(first.id, (x) => ["done", "failed", "needs_decision"].includes(x.status), 60, 6 * 3600_000);
+        assert.ok(j.events.some((e) => e.step === "select" && /pela política/.test(e.message)), JSON.stringify({ st: j.status, w: j.waitingFor, ev: j.events.map((e) => e.message.slice(0, 160)).slice(-4), cs: DB.raw.prepare("SELECT version_id,source,state,error FROM trade_list_status WHERE iso3=?").all(c.iso3) }));
         assert.ok(j.events.some((e) => /Exportações do Brasil para Egito \(MDIC, FOB, mensal; visão do Brasil\): comércio registrado de SH 100590/.test(e.message)));
         assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM prospect_jobs").get().n, 1, "a mesma pesquisa, sem duplicar");
       }
     } else {
-      // Evidência positiva (de qualquer das fontes): segue até a seleção R12.7, que continua sendo da pessoa.
-      assert.equal(j.status, "needs_decision", JSON.stringify(j.events.map((e) => e.message).slice(-3)));
-      assert.equal(j.decision.kind, "r12_7");
+      // Evidência positiva (de qualquer das fontes): segue pela seleção R12.7 da política até o relatório.
+      assert.ok(["done", "needs_decision"].includes(j.status), JSON.stringify(j.events.map((e) => e.message).slice(-3)));
+      assert.ok(j.events.some((e) => e.step === "select" && /pela política/.test(e.message)), "seleção R12.7 pela política");
       const ev = j.events.find((e) => /Evidência de mercado \(R12\.14\)/.test(e.message));
       assert.ok(ev);
       assert.match(ev.message, /Exportações do Brasil para .*\(MDIC, FOB, mensal; visão do Brasil\): comércio registrado/);

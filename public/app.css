@@ -2989,3 +2989,10 @@ details.complementary > summary {
     grid-template-columns: 1fr;
   }
 }
+/* Pesquisa automática (rotação): faixa curta acima do formulário. */
+.auto-search .toolbar {
+  margin-top: 8px;
+}
+.choice-note {
+  margin: 8px 0;
+}

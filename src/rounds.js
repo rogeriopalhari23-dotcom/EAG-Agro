@@ -6,6 +6,7 @@
 // Nada aqui faz contato, aprova ficha, libera envio ou consome serviço pago. A triagem de sanções continua no Compass:
 // o cadastro em descoberta pode vir antes dela; os avanços que exigem triagem continuam bloqueados pelo próprio Compass.
 import { bodyJson, fail, str, oneOf, requireRole, WRITE_ROLES } from "./http.js";
+import { complementCompany } from "./relations.js";
 import { statement as s, commit, auditStatement, now, product, parameters } from "./store.js";
 import { normalizeName } from "./geo.js";
 import { validateRoundConfig } from "./rodada/config.js";
@@ -517,7 +518,16 @@ export async function registerFromRound(request, env, actor, rid, id, dispatch) 
     const c = await dispatch("/api/companies", "POST", e.company);
     let outcome, companyId = c.data?.id ?? null;
     const detail = {};
-    if (c.status === 409) { outcome = "already_exists"; companyId = c.data?.error?.details?.id ?? null; }
+    if (c.status === 409) {
+      // Empresa já cadastrada (por outra commodity ou pesquisa anterior): reaproveita e acrescenta a relação com este
+      // produto quando houver evidência, sem duplicar nem substituir a de outra commodity.
+      outcome = "already_exists";
+      companyId = c.data?.error?.details?.id ?? null;
+      if (companyId) {
+        detail.relation = await complementCompany(env, actor.tenant_id, dispatch, { companyId, productId: p.id, unit: e.unit, evidence: e.evidence, channels: e.channels, profile: e.profile, at: now() });
+        if (detail.relation.ok && (detail.relation.profile === "added" || detail.relation.evidence.added || detail.relation.unit === "added")) outcome = "relation_added";
+      }
+    }
     else if (c.status !== 201) { outcome = "failed"; detail.error = c.data?.error ?? c.status; }
     else {
       outcome = "created";
@@ -532,11 +542,11 @@ export async function registerFromRound(request, env, actor, rid, id, dispatch) 
     detail.operation = op;
     await commit(env, [
       s(env, "INSERT INTO round_registrations(round_id,est_key,company_id,mode,decision_id,outcome,detail_json,registered_by,registered_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(round_id,est_key) DO UPDATE SET company_id=excluded.company_id,mode=excluded.mode,decision_id=excluded.decision_id,outcome=excluded.outcome,detail_json=excluded.detail_json,registered_by=excluded.registered_by,registered_at=excluded.registered_at",
-        id, e.chave, companyId, mode, d?.id ?? null, outcome, JSON.stringify(detail), actor.id, now()),
+        id, e.chave, companyId, mode, d?.id ?? null, outcome === "relation_added" ? "already_exists" : outcome, JSON.stringify(detail), actor.id, now()),
     ]);
     out.push({ key: e.chave, outcome, companyId, ...(outcome === "failed" ? { error: detail.error } : {}) });
   }
-  await commit(env, [auditStatement(env, actor, rid, "round.registered", "discovery_round", id, { mode, basis: mode === "accept" ? "decision_accept" : "discovery_mode", operation: op, productId: p.id, created: out.filter((x) => x.outcome === "created").length, existing: out.filter((x) => x.outcome === "already_exists").length, failed: out.filter((x) => x.outcome === "failed").length })]);
+  await commit(env, [auditStatement(env, actor, rid, "round.registered", "discovery_round", id, { mode, basis: mode === "accept" ? "decision_accept" : "discovery_mode", operation: op, productId: p.id, created: out.filter((x) => x.outcome === "created").length, existing: out.filter((x) => x.outcome === "already_exists").length, relationAdded: out.filter((x) => x.outcome === "relation_added").length, failed: out.filter((x) => x.outcome === "failed").length })]);
   return { mode, productId: p.id, items: out, remaining };
 }
 

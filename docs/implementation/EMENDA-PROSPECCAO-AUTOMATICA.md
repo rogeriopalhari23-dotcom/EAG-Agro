@@ -1,6 +1,6 @@
 # Emenda proposta: prospecção automática sob política de pesquisa de rotina (2026-10-20)
 
-**Estado:** proposta para decisão de Rogério Palhari. **Não aprovada.** Desde 2026-10-20 o código respeita isso: com `AMENDMENT.approved = false` (`src/prospect/defaults.js`), a seleção R12.7, a ciência das limitações e o aceite internacional param numa ação concreta da pessoa, mesmo com a política vigente. O código da branch `redesign-interface` implementa a política, mas nenhuma prospecção pesquisa sem uma política concedida. Em produção não há política, e a versão nova não foi publicada.
+**Estado (2026-10-20):** **aprovada em parte**, por instrução escrita de Rogério Palhari na sessão de 2026-10-20. A aprovação vale só para: seleção de commodity, mercado, segmentos e fontes; seleção R12.7 e autorização da busca no exterior pela política (texto da R12.7 atualizado na Spec, revisão pós-aprovação 6); encaminhamento de candidatas com identificador ou site para descoberta; ciência das limitações já aceitas pela política. **Não aprovado:** custos novos, ampliação de escopo, ambiguidade comercial, contato, fichas, T11, canais, campanhas ativas, envios e o plano de consultas fora da Cloudflare pela ponte (`PLANO-CONSULTAS-FORA-DA-CLOUDFLARE.md`, que segue como proposta). No código: `AMENDMENT` em `src/prospect/defaults.js`.
 
 ## O que muda na prática
 

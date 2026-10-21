@@ -139,7 +139,7 @@ test("mercado sem cobertura: commodity sem regra em país sem registro; nada apa
   assert.ok(r.data.config.some((x) => x.id === "mapa-sipeagro") && r.data.items.find((x) => x.key === "mapa-sipeagro").status === "pending");
 });
 
-test("milho × França sem lista mensal: o Compass pede a geração, acompanha e retoma; nenhuma geração duplicada; para na R12.7", async (t) => {
+test("milho × França sem lista mensal: o Compass pede a geração, acompanha e retoma; nenhuma geração duplicada; R12.7 pela política", async (t) => {
   const { api, DB, confirm, grant, job, act, until, cycle, get } = await world(t);
   await confirm("product-03", "100590");
   assert.equal((await grant()).status, 201);
@@ -154,28 +154,22 @@ test("milho × França sem lista mensal: o Compass pede a geração, acompanha e
   assert.ok(j.events.some((e) => /ainda não foi gerada/.test(e.message)));
   assert.ok(j.events.some((e) => /pedida pelo fluxo da lista mensal \(R12\.15\)/.test(e.message)));
   // Ciclos repetidos (cron) não geram outra versão.
-  j = await until(id, (x) => x.status === "needs_decision");
+  j = await until(id, (x) => ["done", "failed", "needs_decision"].includes(x.status), 60, 130_000);
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM trade_list_versions WHERE iso3='FRA'").get().n, 1, "uma geração só");
   assert.match(DB.raw.prepare("SELECT requested_by FROM trade_list_manual_refresh WHERE iso3='FRA'").get().requested_by, /^policy:/);
   assert.ok(j.events.some((e) => /Indicadores oficiais disponíveis/.test(e.message)));
   assert.ok(j.events.some((e) => e.step === "analysis" && e.message.includes("Evidência de mercado (R12.14): Importações declaradas por França (Comtrade, CIF, anual; visão do importador): comércio registrado de SH 100590")));
-  // Regra vigente (não pendência técnica): seleção e autorização pela pessoa, com ação concreta.
-  assert.equal(j.decision.kind, "r12_7");
-  assert.equal(j.decision.category, "rule");
-  assert.match(j.decision.message, /emenda .* não foi aprovada/);
-  assert.equal(j.decision.action.id, "select_authorize");
-  assert.match(j.decision.action.label, /Selecionar Milho e autorizar a busca em França/);
-  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM commodity_selections").get().n, 0, "nada selecionado pela política");
-  const r = await act(id, "select_authorize");
-  assert.equal(r.status, 200, JSON.stringify(r.data));
+  // R12.7 pela política (autorização delimitada de 2026-10-20): seleção e autorização registradas como automação.
+  assert.equal(j.status, "done", JSON.stringify(j.events.map((e) => e.message).slice(-4)));
+  assert.ok(j.events.some((e) => e.step === "select" && /pela política de pesquisa v1 \(R12\.7, autorização delimitada de 2026-10-20\)/.test(e.message)));
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM commodity_selections").get().n, 1, "uma seleção, sem duplicar");
   const sel = DB.raw.prepare("SELECT new_value_json FROM audit_log WHERE action='foreign_search.authorized'").get();
-  assert.equal(JSON.parse(sel.new_value_json)._operation.channel, "panel", "autorização registrada como da pessoa");
-  j = await until(id, (x) => !["queued", "running", "waiting"].includes(x.status) || x.status === "needs_decision", 40, 130_000);
-  assert.ok(["done", "needs_decision"].includes(j.status), JSON.stringify(j.events.slice(-3)));
+  assert.equal(JSON.parse(sel.new_value_json)._operation.channel, "automation", "autorização registrada como automação sob a política");
   // Fontes da descoberta: só as da França (registro e mapa com a regra do milho).
   assert.ok(!j.events.some((e) => /Kaffee|Noruega|torrefa/i.test(e.message)));
-  assert.equal((await api(`/api/prospect/jobs/${id}/act`, "POST", { action: "select_authorize" })).status, 409, "ação já feita não repete");
+  assert.equal((await api(`/api/prospect/jobs/${id}/act`, "POST", { action: "select_authorize" })).status, 409, "nada pendente para a pessoa");
   void get;
+  void act;
 });
 
 test("falha da fonte do importador: nova tentativa no dia seguinte, sem duplicar no mesmo dia; depois de 2 falhas, pendência técnica com ação", async (t) => {
@@ -224,8 +218,9 @@ test("limite diário da fonte: aguarda o limite (dito como tal) e retoma; polít
   j = await cycle(id, 1000);
   assert.equal(j.waitingFor, "indicators_limit", JSON.stringify(j.events.slice(-2)));
   assert.ok(j.events.some((e) => /Aguardando limite da fonte: limite diário de consultas à Comtrade/.test(e.message)));
-  // Dia seguinte: a fila retoma, os dados ficam prontos e a pesquisa segue até a R12.7.
-  j = await until(id, (x) => x.status === "needs_decision", 40, 6 * 3600_000);
-  assert.equal(j.decision.kind, "r12_7", JSON.stringify(j.events.map((e) => e.message).slice(-4)));
+  // Dia seguinte: a fila retoma, os dados ficam prontos e a pesquisa segue (R12.7 pela política) até o relatório.
+  j = await until(id, (x) => ["done", "failed", "needs_decision"].includes(x.status), 60, 6 * 3600_000);
+  assert.equal(j.status, "done", JSON.stringify(j.events.map((e) => e.message).slice(-4)));
+  assert.ok(j.events.some((e) => e.step === "select" && /pela política/.test(e.message)));
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM trade_list_versions WHERE iso3='FRA'").get().n, 1);
 });

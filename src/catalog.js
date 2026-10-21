@@ -21,7 +21,8 @@ const CODE_FORMAT = { NCM: /^\d{8}$/, HS: /^\d{4}(?:\d{2})?$/ };
 
 // R10.6 + errata: só característica confirmada e fora do escopo de amostra pode ser citada.
 export function mentionableCharacteristics(rows) {
-  return rows.filter((r) => r.status === "confirmed" && !r.sample_only);
+  // Dado técnico informado só para a classificação fiscal (prefixo "classificacao:") não vira argumento de mensagem.
+  return rows.filter((r) => r.status === "confirmed" && !r.sample_only && !String(r.char_key).startsWith("classificacao:"));
 }
 
 export async function catalog(env, actor, id) {

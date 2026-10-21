@@ -3452,3 +3452,37 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
   - Milho GMO — Egito segue até a R12.7 pela série de exportações do Brasil, com o período ampliado identificado.
   - Soja GMO — Egito fica "Aguardando evidência de mercado", com os estados por fonte, sem "Concluída" e sem duplicar.
 - **Respostas reais:** nenhuma nesta etapa. Tudo foi simulado.
+
+## 2026-10-20 — Política consolidada, autorização delimitada (R12.7), classificação automática, pesquisa automática e empresa em várias commodities
+
+- **Autorização** (instrução escrita de Rogério Palhari nesta data), registrada sem aprovação genérica:
+  - o Compass escolhe commodity, mercado, segmentos e fontes;
+  - faz a seleção R12.7 e autoriza a busca no exterior pela política;
+  - encaminha candidatas com identificador ou site para descoberta;
+  - registra a ciência das limitações já aceitas.
+  - Ficam fora: custos novos, ampliação de escopo, ambiguidade comercial, contato, fichas, T11, canais, campanhas ativas, envios e a ponte.
+  - Documentos: Spec R12.7 (revisão pós-aprovação 6), `FLUXO-RODADAS.md`, `EMENDA-PROSPECCAO-AUTOMATICA.md` (aprovada em parte) e a política consolidada `prospeccao/POLITICA-DE-PESQUISA.md`. No código: `AMENDMENT` e `POLICY_TEMPLATE` em `src/prospect/defaults.js`.
+- **Classificação** (`src/classification.js`, `prospeccao/CLASSIFICACAO-PRODUTOS.md`):
+  - fontes oficiais consultadas de verdade em 20/10: tabela NCM do Portal Único Siscomex ("Vigente em 20/10/2026", Resolução Gecex nº 926/2026) e Nota de subposição 1 do Cap. 17 (Res. Gecex nº 272/2021; texto do SH 2022);
+  - a polarização do açúcar vem da ficha técnica interna da EAG, lida localmente e fora do Git;
+  - "Açúcar ICUMSA 45 — África do Sul": 1701.99.00, porque a polarização mínima de 99,80% não é "inferior a 99,5°";
+  - VHP (99,30% a 99,60%): pergunta só a polarização do lote;
+  - café, álcool, trigo e óleos de canola e de algodão perguntam a única característica que muda o código;
+  - UCO e CSO ficam com o Administrador;
+  - código gravado como automação (`system-classification`, auditoria `catalog.code_auto_classified`, canal `automation`); resposta da pessoa gravada com a autoria dela e fora das características citáveis em mensagens.
+- **Pesquisa automática** (`src/prospect/rotation.js`, `POST /api/prospect/auto`, botões "Pesquisa automática nacional" e "Pesquisa automática internacional"):
+  - nacional: commodity com busca automática × origem configurada para ela (campanha, rodada ou prospecção anterior), com o raio padrão dentro do limite da política;
+  - internacional: produto classificado × país com comércio oficial com o Brasil (resumo da lista mensal: 5 maiores SH6 de origem Brasil por fonte) e com fonte de empresas;
+  - ordem: nunca pesquisada, depois 30 dias ou mais, depois a menos pesquisada; combinação em andamento é reaproveitada;
+  - a justificativa fica na prospecção; "nenhuma elegível" nunca vira conclusão sobre compradores.
+- **Empresa em várias commodities** (`src/relations.js`):
+  - **Lacuna encontrada:** o cadastro pela rodada marcava "já existe" e não acrescentava nada para o produto novo.
+  - **Agora** a empresa é reaproveitada; a unidade (outro CNPJ da mesma raiz), a relação unidade × produto (perfil comprador) e as evidências desse produto são acrescentadas quando faltam. A relação com outra commodity não é substituída.
+  - Nova pesquisa da mesma combinação não duplica (mesma evidência = mesmo tipo, página e trecho). No exterior, a evidência EORI ou de autodeclaração não se repete.
+  - Pausas, supressões e exclusões seguem valendo para qualquer commodity e aparecem na relação nova.
+- **Testes:**
+  - `tests/prospeccao-automatica.test.mjs` (4): duas commodities, rotação nacional, rotação internacional e classificação;
+  - atualizados para a autorização: `prospeccao` (9, com o caminho sem a autorização mantido), `prospeccao-contexto` (6), `prospeccao-evidencia` (6).
+- **Prévia** (Edge, dados e fontes simulados): botões nos dois mercados com justificativa; ciência pela política sem pedir de novo; ICUMSA 45 classificado sozinho; VHP com pergunta e resposta; celular; sem erro de JavaScript.
+- **Respostas reais:** só as consultas às fontes oficiais de classificação (Siscomex NCM e busca da nota do Cap. 17) e a leitura local da ficha da EAG. O resto foi simulado.
+- **Migrações:** nenhuma nova (sem mudança de esquema). Continuam só locais 0045 e 0046. Na publicação, a política precisa ser concedida uma vez por Administrador, em Configurações.
