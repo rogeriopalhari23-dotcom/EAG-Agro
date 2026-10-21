@@ -19,6 +19,7 @@ import { resolveClassification, applyClassification, recordCharacteristic } from
 import { pickNational, pickInternational } from "./rotation.js";
 import { rebuildSummaries } from "../importers.js";
 import { existingCompatible, addRelationsToInvestigate } from "../compatibility.js";
+import { destinationsFor, productsOf } from "../destinations.js";
 const ADMIN_ROLES = new Set(["admin"]);
 // Produto com o nome da commodity da lista única do catálogo.
 const productL = async (env, tenant, id) => {
@@ -212,6 +213,15 @@ export async function createJob(request, env, actor, rid, deps = {}) {
   if (same) return { ...(await getJob(env, actor, same.id)), reused: true };
   const profile = await ensureProfile(env, actor, rid);
   const policy = await currentPolicy(env, actor.tenant_id);
+  // Destino só com evidência oficial de comércio deste produto com o Brasil (mesma regra do formulário e da pesquisa
+  // automática). Pesquisas antigas e o histórico ficam como estão; só o início de uma combinação incompatível é recusado.
+  if (market === "international" && !deps.allowUnverifiedDestination) {
+    await ensureClassified(env, actor.tenant_id, [p], policy);
+    const dest = await destinationsFor(env, actor.tenant_id, { products: [p], profile: profile.profile ?? DEFAULT_PROFILE, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }) } });
+    const hit = dest.items.find((x) => x.iso3 === input.location.iso3);
+    if (!hit) fail(422, "destination_not_eligible", `${input.location.country} não tem evidência oficial de comércio de ${p.display_name ?? p.variant_name} com o Brasil nos dados disponíveis${dest.state === "ready" ? "" : ` (${dest.message})`}. A pesquisa não começa com uma combinação sem evidência; escolha um destino da lista.`, { state: dest.state, reasons: dest.reasons });
+    input.evidenceAtStart = { line: hit.line, basis: hit.basis, hs6: hit.products.flatMap((x) => x.hs6) };
+  }
   const where = market === "national" ? `${input.location.municipality}/${input.location.region}, ${input.radius.value} ${input.radius.unit}` : input.location.country;
   const name = `${commodityLabel(p)}${varietyOf(p) ? ` ${varietyOf(p)}` : ""} — ${where}`;
   const id = crypto.randomUUID(), at = now();
@@ -1163,6 +1173,57 @@ const INTERNATIONAL = {
   },
 };
 
+// Classificação automática dos produtos da escolha sem código verificado (sob a política, como na análise do país).
+// → { asks: [{ productId, name, key, question, options, why }], unresolved: [{ productId, name, reason }] }
+async function ensureClassified(env, tenant, products, policy) {
+  const out = { asks: [], unresolved: [] };
+  for (const p of products) {
+    if ((await confirmedHs(env, p.id)).length) continue;
+    const cl = await resolveClassification(env, tenant, p.id);
+    const name = p.display_name ?? p.variant_name;
+    if (cl.state === "classified" && cl.codes.length) {
+      if (policy) await applyClassification(env, tenant, p.id, cl, { policy, jobId: "destinos" });
+      else out.unresolved.push({ productId: p.id, name, reason: "classificação automática depende da política de pesquisa vigente" });
+    } else if (cl.state === "ask") out.asks.push({ productId: p.id, name, key: cl.ask.key, question: cl.ask.question, why: cl.why ?? null, options: cl.ask.options.map((o) => ({ value: o.value, label: o.label })) });
+    else if (cl.state !== "classified") out.unresolved.push({ productId: p.id, name, reason: cl.reason });
+  }
+  return out;
+}
+
+// POST /api/prospect/destinations — { commodity } ou { productId }: destinos com evidência oficial de comércio do
+// produto com o Brasil, para a lista de países do formulário. Reaproveita os dados oficiais guardados; refaz resumos do R2;
+// pede a atualização de destino com dado vencido quando a política permite (R12.15); classifica produto sem código sob a
+// política. Nunca devolve a lista inteira de países como alternativa.
+export async function destinationsRoute(request, env, actor, rid, deps = {}) {
+  requireRole(actor, WRITE_ROLES);
+  const i = await bodyJson(request);
+  const products = await productsOf(env, actor.tenant_id, { productId: i.productId ? str(i.productId, "produto", 80) : null, commodity: i.commodity ? str(i.commodity, "commodity", 60) : null });
+  if (!products.length) fail(404, "product_not_found", "Commodity ou produto não encontrado no catálogo.");
+  const policy = await currentPolicy(env, actor.tenant_id);
+  const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
+  const cls = await ensureClassified(env, actor.tenant_id, products, policy);
+  const refresh = indicatorsAllowed(policy)
+    ? async (iso3) => !!(await requestCountryList(env, actor.tenant_id, iso3, { requestedBy: `policy:${policy.id}@v${policy.version}`, reason: "Destinos da pesquisa internacional: dado oficial vencido de destino comprovado", rid, deps: deps.trade ?? {} }))
+    : null;
+  const r = await destinationsFor(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }), refresh } });
+  return { ...r, asks: cls.asks, unresolvedClassification: cls.unresolved, products: products.map((p) => ({ id: p.id, name: p.display_name ?? p.variant_name })) };
+}
+
+// POST /api/prospect/characteristic — { productId, key, value }: resposta da pessoa à característica do produto que
+// muda a classificação (fora de uma prospecção). Fica no catálogo com a autoria e a data; vale para todas as pesquisas.
+export async function answerCharacteristic(request, env, actor, rid) {
+  requireRole(actor, APPROVER_ROLES);
+  const i = await bodyJson(request);
+  const p = await productL(env, actor.tenant_id, str(i.productId, "produto", 80));
+  const cl = await resolveClassification(env, actor.tenant_id, p.id);
+  if (cl.state !== "ask" || cl.ask.key !== i.key) fail(409, "characteristic_not_pending", "Esta característica não está pendente para o produto.");
+  const value = str(i.value, "resposta", 80);
+  if (!cl.ask.options.some((o) => o.value === value)) fail(422, "invalid_answer", "Escolha uma das opções.");
+  await recordCharacteristic(env, actor, rid, p.id, cl.ask.key, value, "lista de destinos da pesquisa internacional");
+  await releaseTwins(env, actor, rid, "", { productId: p.id, key: cl.ask.key }, value);
+  return { ok: true };
+}
+
 // GET /api/prospect/coverage — fontes aplicáveis à escolha atual (mesma regra do motor); incompatíveis não aparecem.
 const IND_TEXT = { ready: "disponíveis", stale: "disponíveis, vencidos", queued: "aguardando geração", processing: "em processamento", waiting_limit: "aguardando limite da fonte", failed: "falha na consulta", no_source: "sem fonte para o país", not_generated: "lista mensal ainda não gerada" };
 export async function coverage(request, env, actor) {
@@ -1222,7 +1283,7 @@ export async function autoStart(request, env, actor, rid, deps = {}) {
   if (!policy.policy.markets.includes(market)) fail(409, "market_not_covered", "A política vigente não cobre este mercado.");
   const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
   const at = deps.now?.() ?? now();
-  const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at }, { rebuild: (e, t) => rebuildSummaries(e, t, { limit: 60 }) });
+  const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at }, { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }) });
   if (pick.none) return { started: false, reasons: pick.reasons, coverage: pick.coverage ?? null, note: "Nenhuma combinação elegível agora. Falta de dado ou falha de fonte não é conclusão de ausência de compradores." };
   const job = await createJob(new Request("https://compass.internal/api/prospect/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pick.input) }), env, actor, rid, deps);
   if (!job.reused) {

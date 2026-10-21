@@ -3010,3 +3010,12 @@ details.complementary > summary {
 .coverage-gaps li {
   overflow-wrap: anywhere;
 }
+.destinations-status,
+.destination-evidence {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.destinations-status .callout {
+  margin: 0;
+}

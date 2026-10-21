@@ -217,6 +217,8 @@ async function route(request, env, rid, internalActor = null) {
   if (path === "/api/prospect/policy" && method === "POST") return response(await prospect.grantPolicy(request, env, actor, rid), 201);
   if (path === "/api/prospect/policy/revoke" && method === "POST") return response(await prospect.revokePolicy(request, env, actor, rid));
   if (path === "/api/prospect/coverage" && method === "GET") return response(await prospect.coverage(request, env, actor));
+  if (path === "/api/prospect/destinations" && method === "POST") return response(await prospect.destinationsRoute(request, env, actor, rid, {}));
+  if (path === "/api/prospect/characteristic" && method === "POST") return response(await prospect.answerCharacteristic(request, env, actor, rid));
   if (path === "/api/prospect/auto" && method === "POST") return response(await prospect.autoStart(request, env, actor, rid), 201);
   if (path === "/api/prospect/connectors" && method === "GET") return response(await prospect.connectors(request, env, actor));
   if (path === "/api/sources/applicable" && method === "POST") return response(await prospect.applicableRoute(request, env, actor));

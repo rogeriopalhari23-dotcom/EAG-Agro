@@ -9,6 +9,7 @@ import { join } from "node:path";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
 import worker from "../src/worker.js";
+import { sources, keepCountries, tradeParams, driver } from "./helpers/trade.mjs";
 
 const shotPath = process.argv[2] ?? null;
 const ctx = setup();
@@ -89,6 +90,20 @@ for (const [pid, code] of [["product-05", "090111"], ["product-11", "220710"]]) 
   await ctx.api(`/api/catalog/${pid}/codes`, "POST", { codeSystem: "HS", code, status: "confirmed", classificationVersion: "HS2022", sourceRef: "Teste de tela (fictício)", expectedRevision: p.revision, reason: "Teste de tela" });
 }
 
+// Lista mensal SIMULADA (MDIC e Comtrade de teste) para os destinos do formulário internacional: o café tem comércio
+// registrado com a Alemanha; o álcool industrial, com nenhum país. A tabela completa de países volta depois (Rodadas).
+{
+  const snap = (t) => ctx.DB.raw.prepare(`SELECT * FROM ${t}`).all();
+  const saved = { countries: snap("countries"), country_mdic_codes: snap("country_mdic_codes") };
+  keepCountries(ctx.DB, ["DEU", "CHN"]);
+  await tradeParams(ctx.api, { period_default_months: 12 });
+  const d = driver(ctx.env, sources(), { at: new Date().toISOString() });
+  await d.start();
+  await d.drain();
+  for (const [t, rows] of Object.entries(saved)) for (const r of rows) ctx.DB.raw.prepare(`INSERT OR IGNORE INTO ${t} (${Object.keys(r).join(",")}) VALUES (${Object.keys(r).map(() => "?").join(",")})`).run(...Object.values(r));
+  await ctx.api("/api/prospect/policy", "POST", { confirm: true, reference: "Teste de tela (fictício)" });
+}
+
 const S = ".prospect-form";
 const q = (n) => `document.querySelector('${S} [name="${n}Text"]')`;
 const listOf = (n) => `${q(n)}.closest(".combo").querySelector(".combo-list")`;
@@ -108,23 +123,10 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url: origin + "/" });
   await until(`!!document.querySelector('#navigation button[data-view="Radar Internacional"]')`, "navegação");
-  // Falha de carregamento da lista de países: erro visível e "Tentar de novo" (a primeira chamada falha de propósito).
-  await js(`(() => { const f = window.fetch; let once = true; window.fetch = (u, i) => (once && String(u).includes("/api/countries") ? ((once = false), Promise.resolve(new Response(JSON.stringify({ error: { message: "falha simulada" } }), { status: 503, headers: { "content-type": "application/json" } }))) : f(u, i)); return true; })()`);
+  // Radar Internacional: antes da commodity, nenhum país (e nunca a lista inteira como alternativa).
   await nav("Radar Internacional");
   await until(`!!${q("country")}`, "formulário internacional");
-  await js(`(() => { ${q("country")}.click(); return true; })()`);
-  await until(`/Não foi possível carregar a lista/.test(${listOf("country")}.innerText)`, "erro de carregamento");
-  await js(`(() => { ${listOf("country")}.querySelector(".combo-error button").click(); return true; })()`);
-  await until(`${listOf("country")}.querySelectorAll("li[role=option]:not(.combo-error)").length > 150`, "lista recarregada");
-  // Clique abre a lista inteira (nenhum país escondido por falta de conector; o Brasil fica fora no internacional).
-  const all = await options("country");
-  assert.ok(all.length > 200 && all.includes("Argentina") && all.includes("Zâmbia"), `lista completa (${all.length})`);
-  assert.ok(!all.includes("Brasil"), "internacional não oferece o Brasil");
-  // Altura máxima com rolagem interna; linhas compactas e legíveis.
-  const geo = await js(`(() => { const l = ${listOf("country")}; const li = l.querySelector("li"); return { h: l.clientHeight, sh: l.scrollHeight, li: li.getBoundingClientRect().height, fs: parseFloat(getComputedStyle(li).fontSize) }; })()`);
-  assert.ok(geo.h <= 300 && geo.sh > geo.h, `altura máxima com rolagem: ${JSON.stringify(geo)}`);
-  assert.ok(geo.li >= 36 && geo.li <= 48 && geo.fs >= 14, `linha compacta e legível: ${JSON.stringify(geo)}`);
-  await key("country", "Escape");
+  assert.ok(await js(`${q("country")}.disabled`), "país desabilitado antes da commodity");
 
   // Commodity: Farelo de milho pesquisável e distinto de CGF/CGM/DDGS.
   await typeIn("commodity", "farelo de milho");
@@ -135,6 +137,18 @@ try {
   await until(`${listOf("commodity")}.querySelectorAll("li[role=option]:not(.combo-empty)").length > 0`, "glúten");
   const gl = await options("commodity");
   assert.ok(gl.some((x) => /\(CGF\)/.test(x)) && gl.some((x) => /\(CGM\)/.test(x)) && !gl.includes("Farelo de milho"), JSON.stringify(gl));
+  // Lista comum: altura máxima com rolagem interna; linhas compactas e legíveis.
+  await typeIn("commodity", "");
+  await until(`!${listOf("commodity")}.hidden && ${listOf("commodity")}.clientHeight > 0`, "lista de commodities aberta");
+  const geo = await js(`(() => { const l = ${listOf("commodity")}; const li = l.querySelector("li"); return { h: l.clientHeight, sh: l.scrollHeight, li: li.getBoundingClientRect().height, fs: parseFloat(getComputedStyle(li).fontSize) }; })()`);
+  assert.ok(geo.h <= 300 && geo.sh > geo.h, `altura máxima com rolagem: ${JSON.stringify(geo)}`);
+  assert.ok(geo.li >= 36 && geo.li <= 48 && geo.fs >= 14, `linha compacta e legível: ${JSON.stringify(geo)}`);
+  // Nome parcial e ambíguo (vários farelos): pede escolha, sem seleção invisível.
+  await typeIn("commodity", "farelo");
+  await sleep(60);
+  await blur("commodity");
+  await until(`/Escolha uma opção da lista/.test(${q("commodity")}.closest(".combo").innerText)`, "nome ambíguo pede escolha");
+  assert.equal(await hiddenVal("commodity"), "", "nenhuma seleção invisível em texto ambíguo");
   // Teclado: digitar e Enter escolhe a primeira; seta muda a opção ativa.
   await typeIn("commodity", "soja");
   await hasOption("commodity", "Soja");
@@ -152,49 +166,50 @@ try {
   assert.ok(await js(`!document.querySelector('${S} select[name="productId"]')`), "produto da soja não fica para o café");
   assert.match(await js(`document.querySelector('${S} .prospect-product').innerText`), /Café/);
 
-  // Países: digitar "argentina" e escolher com o mouse; nomes completos reconhecidos sem clique; acentos ignorados.
-  await typeIn("country", "argentina");
-  await hasOption("country", "Argentina");
-  await pickMouse("country", "Argentina");
-  assert.equal(await hiddenVal("country"), "AR");
-  assert.equal(await js(`${q("country")}.value`), "Argentina");
-  await until(`/Fontes desta pesquisa/.test(document.querySelector("${S}").innerText)`, "cobertura informada para a Argentina");
-  for (const [typed, iso, label] of [["Alemanha", "DE", "Alemanha"], ["portugal", "PT", "Portugal"], ["japao", "JP", "Japão"], ["MEXICO", "MX", "México"], ["Germany", "DE", "Alemanha"]]) {
+  // Destinos do café (simulado): só a Alemanha, com fonte e período; acentos e nome em inglês reconhecidos.
+  await until(`(() => { const t = document.querySelector("${S} .destinations-status").innerText; return t && !/Verificando/.test(t); })()`, "destinos do café");
+  await js(`(() => { ${q("country")}.click(); return true; })()`);
+  await until(`!${listOf("country")}.hidden`, "lista de destinos");
+  assert.deepEqual(await options("country"), ["Alemanha"], "só destino com comércio do café registrado com o Brasil");
+  await key("country", "Escape");
+  for (const typed of ["alemanha", "Germany"]) {
     await typeIn("country", typed);
     await sleep(60);
     await blur("country");
-    await until(`document.querySelector('${S} [name="country"]').value === "${iso}"`, `${typed} reconhecido`);
-    assert.equal(await js(`${q("country")}.value`), label);
+    await until(`document.querySelector('${S} [name="country"]').value === "DE"`, `${typed} reconhecido`);
   }
-  await typeIn("country", "Guin"); // Guiné, Guiné-Bissau, Guiné Equatorial…: parcial e ambíguo
+  assert.match(await js(`document.querySelector("${S} .destination-evidence").innerText`), /Evidência: .*(MDIC|Comtrade).*Produto: Café/);
+  await until(`/Fontes desta pesquisa/.test(document.querySelector("${S}").innerText)`, "cobertura informada para a Alemanha");
+  const covCafe = await js(`document.querySelector("${S} .prospect-coverage").innerText`);
+  assert.match(covCafe, /Kaffeeverband/);
+  assert.doesNotMatch(covCafe, /França|Noruega/);
+  await typeIn("country", "argentina");
   await sleep(60);
+  assert.deepEqual(await options("country"), [], "país sem evidência não é oferecido");
   await blur("country");
-  await until(`/Escolha uma opção da lista/.test(${q("country")}.closest(".combo").innerText)`, "nome ambíguo pede escolha");
-  assert.equal(await hiddenVal("country"), "", "nenhuma seleção invisível em texto ambíguo");
   assert.ok(!/\b(BRA|ARG|DEU)\b/.test(await js(`document.querySelector("${S}").innerText`)), "código do país fica interno");
-
-  // Troca rápida: a resposta atrasada da pesquisa anterior (café × Alemanha) não preenche a atual (álcool × Alemanha).
-  await js(`(() => { const f = window.fetch; window.fetch = (u, i) => (String(u).includes("/api/prospect/coverage") && String(u).includes("product-05") ? new Promise((r) => setTimeout(() => r(f(u, i)), 1500)) : f(u, i)); return true; })()`);
   await typeIn("country", "Alemanha");
   await sleep(60);
   await blur("country");
-  await until(`document.querySelector('${S} [name="country"]').value === "DE"`, "Alemanha");
+  await until(`document.querySelector('${S} [name="country"]').value === "DE"`, "Alemanha de novo");
+
+  // Troca rápida com resposta atrasada: os destinos do café chegam depois da troca para o álcool e são descartados.
+  await js(`(() => { const f = window.fetch; window.fetch = (u, i) => (String(u).includes("/api/prospect/destinations") && String(i?.body ?? "").includes("product-05") ? new Promise((r) => setTimeout(() => r(f(u, i)), 1500)) : f(u, i)); return true; })()`);
+  await typeIn("commodity", "cafe");
+  await pickMouse("commodity", "Café");
   await typeIn("commodity", "álcool industrial");
   await hasOption("commodity", "Álcool industrial");
   await pickMouse("commodity", "Álcool industrial");
   await sleep(2200);
-  const cov = await js(`document.querySelector("${S} .prospect-coverage").innerText`);
-  assert.match(cov, /Álcool industrial em Alemanha/, cov);
-  assert.doesNotMatch(cov, /Kaffeeverband|torrefação|Noruega|França/, "nada de café, Noruega ou França na pesquisa de álcool");
-  assert.match(await js(`document.querySelector("${S} .prospect-coverage").dataset.for`), /product-1[123]/);
-  // Café × Alemanha: diretório do café e mapa de torrefação; nada da França nem da Noruega.
-  await typeIn("commodity", "cafe");
-  await hasOption("commodity", "Café");
-  await pickMouse("commodity", "Café");
-  await until(`/Café em Alemanha/.test(document.querySelector("${S} .prospect-coverage").innerText)`, "cobertura do café", 6000);
-  const covCafe = await js(`document.querySelector("${S} .prospect-coverage").innerText`);
-  assert.match(covCafe, /Kaffeeverband/);
-  assert.doesNotMatch(covCafe, /França|Noruega/);
+  const st = await js(`document.querySelector("${S} .destinations-status").innerText`);
+  assert.match(st, /Nenhum destino identificado nos dados disponíveis|produto/, st);
+  assert.match(await js(`document.querySelector("${S} .destinations-status").dataset.for ?? ""`), /industrial_alcohol|product-1[123]/, "estado da escolha atual (álcool)");
+  assert.equal(await hiddenVal("country"), "", "Alemanha retirada: sem evidência para o álcool");
+  assert.ok(await js(`${q("country")}.disabled`), "sem destino comprovado, o país fica desabilitado");
+  // Início impedido com combinação incompatível.
+  await click("Iniciar prospecção");
+  await until(`!document.querySelector("${S} .error").hidden`, "erro do formulário");
+  assert.match(await js(`document.querySelector("${S} .error").innerText`), /produto|destinos|país/);
 
   // Brasil (origem nacional) na mesma lista comum: Rodadas → configuração manual.
   await nav("Rodadas");
@@ -203,6 +218,14 @@ try {
   await until(`/Nova rodada/.test(document.body.innerText)`, "configuração manual");
   await js(`(() => { const d = [...document.querySelectorAll("details")].find((x) => x.querySelector("summary").textContent === "Nova rodada"); d.open = true; return true; })()`);
   await until(`!!document.querySelector('.round-form [name="countryText"]')`, "formulário da rodada");
+  // Lista completa (rodada): falha de carregamento com "Tentar de novo"; altura máxima e linhas legíveis; nomes ambíguos.
+  const R = (x) => `document.querySelector('.round-form [name="countryText"]')${x}`;
+  const RL = R(`.closest(".combo").querySelector(".combo-list")`);
+  // Campo vem com o Brasil (origem nacional): apagado, a lista inteira aparece.
+  await js(`(() => { const c = ${R("")}; c.focus(); c.value = ""; c.dispatchEvent(new Event("input", { bubbles: true })); c.click(); return true; })()`);
+  await until(`!${RL}.hidden && ${RL}.querySelectorAll("li[role=option]:not(.combo-error)").length > 150`, "lista completa na rodada");
+  const all = await js(`[...${RL}.querySelectorAll("li[role=option]")].map((li) => li.firstChild?.textContent)`);
+  assert.ok(all.length > 200 && all.includes("Argentina") && all.includes("Zâmbia"), `lista completa (${all.length})`);
 
   // Empresas: decisor e canal geral separados, "Decisor ainda não identificado" e busca pelo nome da pessoa.
   await nav("Empresas");
@@ -226,12 +249,12 @@ try {
   await sleep(300);
   await nav("Radar Internacional");
   await until(`!!${q("country")}`, "formulário no celular");
-  await typeIn("country", "arg");
-  await hasOption("country", "Argentina");
-  const mob = await js(`${listOf("country")}.querySelector("li").getBoundingClientRect().height`);
+  await typeIn("commodity", "milho");
+  await hasOption("commodity", "Milho");
+  const mob = await js(`${listOf("commodity")}.querySelector("li").getBoundingClientRect().height`);
   assert.ok(mob >= 44, `alvo de toque no celular: ${mob}`);
-  await pickMouse("country", "Argentina");
-  assert.equal(await hiddenVal("country"), "AR");
+  await pickMouse("commodity", "Milho");
+  assert.equal(await hiddenVal("commodity"), "corn");
   assert.ok(await js(`document.documentElement.scrollWidth <= window.innerWidth + 1`), "sem rolagem horizontal no celular");
   assert.deepEqual(errors, [], "sem erro de JavaScript na página");
   console.log("ui-listas: ok");

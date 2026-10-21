@@ -17,6 +17,7 @@ Uma política para Radar Nacional, Radar Internacional, Prospecção e Rodadas. 
 1. **Commodity e mercado na pesquisa automática.**
    - Nacional: commodity com segmento de busca automática, a partir de uma origem já configurada para ela (campanha nacional, rodada ou prospecção anterior), com o raio padrão configurado e dentro do limite da política.
    - Internacional: produto com classificação confirmada × país com comércio oficial registrado com o Brasil (exportações do Brasil, MDIC; ou importações de origem Brasil declaradas pelo país, Comtrade) em **qualquer** subposição do produto, não só nas cinco maiores do país (`trade_country_summary.hs6_json`, refeito do objeto oficial guardado, sem custo), e com fonte de empresas coberta.
+   - Lista de países do formulário (Radar Internacional e Prospecção), criação da pesquisa e pesquisa automática usam a mesma regra (`src/destinations.js`): só destinos com evidência do PRÓPRIO produto (soja em grão não comprova farelo nem óleo; importação do mundo não comprova compra do Brasil); período padrão e, sem registro nele, o período guardado mais longo das exportações do Brasil (identificado).
    - Mercado com evidência e sem conector de empresas: limitação de cobertura listada a cada pesquisa automática e na própria prospecção; nunca esquecido nem tratado como ausência de compradores.
    - Prioridade: nunca pesquisada; depois pesquisa com 30 dias ou mais (dados a atualizar); depois a menos pesquisada.
    - A justificativa da escolha fica na prospecção.

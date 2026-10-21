@@ -6,6 +6,7 @@
 //     duplicar nem perder histórico; restrições da empresa continuam valendo para qualquer commodity.
 // Tudo SIMULADO (lista mensal de teste, Receita fictícia); nenhuma rede real.
 import test from "node:test";
+import { legacyJob } from "./helpers/legacy-job.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setup } from "./helpers/db.mjs";
@@ -146,7 +147,7 @@ test("classificação automática: Açúcar ICUMSA 45 — África do Sul classif
   const { api, DB, env, grant, d } = await tradeWorld(t);
   await grant();
   const deps = { call: internalCaller(env, "rid-teste"), fetch: globalThis.fetch, trade: d.deps };
-  const job = async (productId) => (await api("/api/prospect/jobs", "POST", { market: "international", productId, location: { iso3: "ZAF" } })).data.id;
+  const job = async (productId) => (await legacyJob(env, { market: "international", productId, location: { iso3: "ZAF" } })).id;
   const get = async (id) => (await api(`/api/prospect/jobs/${id}`)).data;
   const id45 = await job("product-06");
   await runJob(env, id45, deps);

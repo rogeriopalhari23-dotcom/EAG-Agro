@@ -4,6 +4,7 @@
 //   evidência positiva e combinação sem simulação configurada (nunca apresentada como ausência real de comércio).
 // Inclui "Milho GMO — Egito" (o caso do print) como um caso da tabela, sem exceção fixa para o país.
 import test from "node:test";
+import { legacyJob } from "./helpers/legacy-job.mjs";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
 import { simulatedWorld } from "./helpers/simulated-world.mjs";
@@ -103,7 +104,7 @@ async function world(t, c) {
     return j;
   };
   const start = async () => {
-    const r = (await api("/api/prospect/jobs", "POST", { market: "international", productId: c.product, location: { iso3: c.iso3 } })).data;
+    const r = (await legacyJob(env, { market: "international", productId: c.product, location: { iso3: c.iso3 } }));
     DB.raw.prepare("UPDATE prospect_jobs SET next_run_at=? WHERE id=?").run(iso(), r.id);
     return r;
   };
@@ -146,7 +147,7 @@ for (const c of CASES) {
       }
       assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM commodity_selections").get().n, 0, "R12.14/R12.7: nada selecionado sem evidência");
       // A mesma pesquisa é reaproveitada (sem duplicar) enquanto aguarda.
-      const again = (await api("/api/prospect/jobs", "POST", { market: "international", productId: c.product, location: { iso3: c.iso3 } })).data;
+      const again = (await legacyJob(env, { market: "international", productId: c.product, location: { iso3: c.iso3 } }));
       assert.equal(again.id, first.id);
       assert.equal(again.reused, true);
       assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM prospect_jobs").get().n, 1);

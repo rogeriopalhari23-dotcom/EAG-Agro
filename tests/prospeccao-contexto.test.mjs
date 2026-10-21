@@ -7,6 +7,7 @@
 //     seleção R12.7 (regra vigente) com ação concreta da pessoa.
 //   - Falha da fonte, nova tentativa no dia seguinte, limite diário da fonte e política concedida por gestor.
 import test from "node:test";
+import { legacyJob } from "./helpers/legacy-job.mjs";
 import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
 import { simulatedWorld } from "./helpers/simulated-world.mjs";
@@ -51,7 +52,8 @@ async function world(t, opts = {}) {
   };
   const deps = { call: internalCaller(env, "rid-teste"), fetch: globalThis.fetch, now: iso, trade: d.deps };
   const job = async (body) => {
-    const id = (await api("/api/prospect/jobs", "POST", body)).data.id;
+    // Internacional: pesquisa criada como antes da regra de destinos (o motor segue valendo para as existentes).
+    const id = body.market === "international" ? (await legacyJob(env, body)).id : (await api("/api/prospect/jobs", "POST", body)).data.id;
     DB.raw.prepare("UPDATE prospect_jobs SET next_run_at=? WHERE id=?").run(iso(), id); // relógio do teste
     return id;
   };

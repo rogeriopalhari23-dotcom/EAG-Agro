@@ -1,6 +1,7 @@
 // Prospecção automática (2026-10-20): motor em segundo plano, perfil versionado, política de pesquisa de rotina.
 // Tudo SIMULADO (tests/helpers/simulated-world.mjs): mapa, sites, Receita e diretório alemão; nenhum dado real, nenhuma rede.
 import test from "node:test";
+import { legacyJob } from "./helpers/legacy-job.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { setup } from "./helpers/db.mjs";
@@ -159,12 +160,12 @@ test("mapa recusa o servidor: aguarda o navegador (dito como tal) ou segue sem; 
 });
 
 test("escopo: raio acima da política e mercado não coberto pedem decisão; política revogada para antes de pesquisar", async (t) => {
-  const { api, drive, grant } = await world(t);
+  const { api, env, drive, grant } = await world(t);
   await grant({ maxRadiusKm: 200, markets: ["national"] });
   let j = await drive((await api("/api/prospect/jobs", "POST", { ...cafe, radius: { value: 300, unit: "km" } })).data.id);
   assert.equal(j.decision.kind, "scope");
   assert.match(j.decision.message, /300 km acima do limite/);
-  j = await drive((await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-05", location: { iso3: "DEU" } })).data.id);
+  j = await drive((await legacyJob(env, { market: "international", productId: "product-05", location: { iso3: "DEU" } })).id);
   assert.equal(j.decision.kind, "scope");
   await api("/api/prospect/policy/revoke", "POST", { reason: "Teste de revogação" });
   j = await drive((await api("/api/prospect/jobs", "POST", cafe)).data.id);
@@ -214,7 +215,7 @@ test("internacional: indicadores → seleção e busca pela política (R12.7) �
   await d.start();
   await d.drain();
   await grant();
-  const j = await drive((await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-05", location: { iso3: "DEU" }, hs6: "090111" })).data.id);
+  const j = await drive((await legacyJob(env, { market: "international", productId: "product-05", location: { iso3: "DEU" }, hs6: "090111" })).id);
   assert.equal(j.status, "done", JSON.stringify(j.events.slice(-4)));
   assert.ok(j.events.some((e) => e.step === "analysis" && /não prova que alguma empresa importa do Brasil/.test(e.message)));
   assert.ok(j.events.some((e) => e.step === "discover" && e.outcome === "pending"), "fonte indisponível fica pendente");
@@ -229,7 +230,7 @@ test("internacional: indicadores → seleção e busca pela política (R12.7) �
   assert.match(JSON.parse(auth.new_value_json)._operation.authorization.reference, /Política de pesquisa de rotina v1/);
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM companies WHERE country_code='DE' AND registration_id_type='CNPJ'").get().n, 0, "sem CNPJ no exterior");
   // Sem compra identificada do produto no país: decisão, nunca busca de empresas (R12.14).
-  const k = await drive((await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-14", location: { iso3: "CHN" } })).data.id);
+  const k = await drive((await legacyJob(env, { market: "international", productId: "product-14", location: { iso3: "CHN" } })).id);
   assert.equal(k.status, "needs_decision");
   // Trigo sem SH: a classificação depende só de "trigo duro?" (1001.19 × 1001.99); pergunta só essa característica.
   assert.equal(k.decision.kind, "classification_characteristic", JSON.stringify(k.decision));

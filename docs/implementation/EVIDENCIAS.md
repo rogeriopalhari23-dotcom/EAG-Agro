@@ -3495,3 +3495,18 @@ Por dia UTC, pela API GraphQL de análise (`d1AnalyticsAdaptiveGroups`, dimensã
 - **Classificação:** pesquisa × lote. VHP (faixa 99,30–99,60% da ficha) e álcool (desnaturante do lote) usam as duas subposições na pesquisa, `scope = research`, sem pergunta. Características guardadas com fonte e data (`verified_at`). A mesma pergunta pendente em duas prospecções destrava as duas com uma resposta. Código removido é refeito da característica guardada, sem nova pergunta.
 - **Verificação:** `npm run check` (ver o commit); `tests/reaproveitamento.test.mjs` (5), todo simulado. Roteiro pela tela na prévia local com dados fictícios: 17 de 17 conferências, inclusive a seção recolhida "Conceder a política" aberta pelo resumo e a política lida na tela sem script abrir nada.
 - **Consulta real:** só a API de dados do IBGE para conferir as subclasses CNAE. O resto é simulado.
+
+## 2026-10-21 — Lista de países dependente da commodity e do produto
+
+- **Regra única** (`src/destinations.js`): só países com evidência oficial de comércio DO PRODUTO com o Brasil. As fontes são o MDIC (exportações do Brasil, FOB) e a Comtrade (importações declaradas pelo país, só a linha de origem Brasil). Usa as classificações verificadas e todas as subposições de cada produto. Cada país indica o produto que o fundamenta, a fonte e o período. Período padrão e, sem registro nele, o período guardado mais longo das exportações do Brasil (identificado). O conector de empresas é separado: o país fica, com a limitação indicada.
+- **Onde vale:** formulário do Radar Internacional e da Prospecção (`POST /api/prospect/destinations`), criação da pesquisa (422 `destination_not_eligible`) e pesquisa automática internacional. Pesquisas existentes e o histórico não mudam. Os testes que exercitam o motor para pesquisas antigas criam a pesquisa como antes (`tests/helpers/legacy-job.mjs`).
+- **Estados:** "Verificando mercados compradores" (resumos em preparação ou lista em geração, com nova consulta automática); "Nenhum destino identificado nos dados disponíveis", que distingue consulta válida sem registros de cobertura incompleta (motivos e "Tentar de novo"). Nunca a lista inteira de países. Dado vencido de destino comprovado: atualização pedida pelo fluxo R12.15, quando a política foi concedida por Administrador (um por país por dia).
+- **Seleção consistente:** trocar commodity ou produto recalcula a lista. O país que deixa de ser elegível é retirado, com aviso. A resposta atrasada da escolha anterior é descartada. O início com combinação incompatível é impedido na tela e no servidor.
+- **Testes:** `tests/destinos.test.mjs` (5, simulados), cobrindo:
+  - "Derivados de soja — Canadá" sem e com exportação de lecitina;
+  - soja em grão e farelo que não comprovam lecitina nem óleo;
+  - importação do mundo que não conta;
+  - óleo de soja pela segunda classificação;
+  - açúcar com o produto que fundamenta;
+  - dados ausentes, resumos refeitos, dado vencido, falha da fonte e recusa no servidor.
+- **Tela:** roteiro na prévia local fictícia, 18 de 18. Inclui a troca rápida, o país retirado e o Canadá que só aparece depois da exportação simulada de lecitina (rota `/__previa/simular-lecitina-canada`, só da prévia).

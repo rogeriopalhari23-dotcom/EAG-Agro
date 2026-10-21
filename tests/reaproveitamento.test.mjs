@@ -2,6 +2,7 @@
 // Compass com relações independentes por produto, decisor por produto e classificação reutilizada sem perguntas repetidas.
 // Tudo SIMULADO (lista mensal de teste, Receita fictícia, R2 em memória); nenhuma rede real.
 import test from "node:test";
+import { legacyJob } from "./helpers/legacy-job.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setup } from "./helpers/db.mjs";
@@ -212,7 +213,7 @@ test("classificação persistida: característica do produto perguntada uma vez 
   const { api, DB, env, grant, d, drive } = await tradeWorld(t);
   await grant();
   const extra = { trade: d.deps };
-  const job = async (productId, iso3) => (await api("/api/prospect/jobs", "POST", { market: "international", productId, location: { iso3 } })).data.id;
+  const job = async (productId, iso3) => (await legacyJob(env, { market: "international", productId, location: { iso3 } })).id;
   // VHP: a faixa da ficha (99,30–99,60%) cobre 1701.14 e 1701.99: pesquisa de mercado nas duas, nenhuma pergunta de lote.
   const v = await drive(await job("product-08", "USA"), extra);
   assert.notEqual(v.decision?.kind, "classification_characteristic", JSON.stringify(v.decision));

@@ -30,8 +30,9 @@ async function periodMonths(env, tenant) {
 
 // Preenche resumos que faltam para os ponteiros vigentes (objetos publicados antes do resumo existir, ou janela mudada).
 // Só lê o R2; limitado por chamada. Usado pelo cron diário e pelo admin.
-export async function rebuildSummaries(env, tenant, { limit = 40 } = {}) {
-  const months = await periodMonths(env, tenant);
+// months: janela do MDIC diferente da padrão (ex.: período guardado mais longo, para a evidência de mercado).
+export async function rebuildSummaries(env, tenant, { limit = 40, months: windowMonths = null } = {}) {
+  const months = windowMonths ?? (await periodMonths(env, tenant));
   if (months == null) return { built: 0, remaining: null, reason: "Parâmetro period_default_months (D1) não aprovado." };
   if (!env.FILES) return { built: 0, remaining: null, reason: "R2 não configurado." };
   const missingSql = `FROM trade_list_current c LEFT JOIN trade_country_summary t

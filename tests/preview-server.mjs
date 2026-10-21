@@ -147,11 +147,14 @@ await api("/api/rounds", "POST", { name: "Rodada fictícia — soja, Rio Verde/G
 // que ainda não têm conector, como a Argentina).
 const snapshot = (t) => DB.raw.prepare(`SELECT * FROM ${t}`).all();
 const savedCountries = { countries: snapshot("countries"), country_mdic_codes: snapshot("country_mdic_codes") };
-keepCountries(DB, ["DEU", "CHN"]);
-await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "15", "22"].sort() } });
+keepCountries(DB, ["DEU", "CHN", "CAN"]);
+await tradeParams(api, { period_default_months: 12, agri_classification: { ...AGRI, chapters: [...AGRI.chapters, "10", "15", "22", "23", "29"].sort() } });
 // Alemanha (FICTÍCIO): seis subposições maiores que o café nas exportações do Brasil (o café fica fora das cinco maiores
 // e a pesquisa automática ainda o encontra). China (FICTÍCIO): óleo de palma com comércio e sem conector de empresas.
 const deuBig = [["12019000", 200000], ["17011400", 210000], ["17019900", 220000], ["01012100", 230000], ["02013000", 240000], ["12011000", 250000]].map(([n, v]) => `"2026";"02";"${n}";"10";"023";"SP";"01";"0817600";${v};${v};${v}`);
+// Canadá (SIMULADO, caso "Derivados de soja — Canadá"): o Brasil exporta soja em grão e farelo; lecitina NÃO. A Comtrade
+// simulada do Canadá só traz importação do MUNDO de lecitina (parceiro 0), que não comprova compra do Brasil.
+const canRows = ['"2026";"02";"12019000";"10";"149";"PR";"01";"0917500";300000;300000;300000', '"2026";"02";"23040010";"10";"149";"PR";"01";"0917500";150000;150000;150000'];
 const chnPalm = '"2026";"02";"15111000";"10";"160";"PA";"01";"0817600";40000;40000;40000';
 // França (FICTÍCIO): a Comtrade simulada responde milho (1005.90) e álcool etílico (2207.10), mas o país fica SEM lista
 // mensal até a prospecção pedir a geração (o caso "Milho GMO — França").
@@ -160,11 +163,11 @@ const tclock = { at: "2026-10-10T12:00:00.000Z" };
 // milho ao Egito em jan/2025 (MDIC), fora do período padrão de 12 meses e dentro dos 24 guardados. Soja: nada nas duas.
 const egyCorn = '"2025";"01";"10059010";"10";"240";"PR";"01";"0917500";500000;500000;120000';
 const tradeDriver = driver(ctx.env, tradeSources({
-  hs: ["100590", "220710"],
-  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"', '"17019900";"10";"170199";"Outros açúcares";"Other sugar"', '"01012100";"10";"010121";"Cavalos";"Horses"', '"02013000";"10";"020130";"Carne bovina";"Beef"', '"12011000";"10";"120110";"Soja para semeadura";"Soy seed"', '"15111000";"10";"151110";"Óleo de palma em bruto";"Crude palm oil"'],
-  mdicRows: { 2026: [...MDIC_ROWS[2026], ...deuBig, chnPalm], 2025: [...MDIC_ROWS[2025], egyCorn] },
-  comtrade: { 276: { years: [2022, 2023, 2024, 2025], rows: [rec(276, "090111", 2025, 0, 100), rec(276, "170114", 2024, 0, 50)] }, 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
-  covered: { comtrade: ["FRA", "EGY"], mdic: ["EGY", "CHN"] },
+  hs: ["100590", "220710", "292320", "230400"],
+  ncm: ['"10059010";"10";"100590";"Milho em grão";"Maize"', '"17019900";"10";"170199";"Outros açúcares";"Other sugar"', '"01012100";"10";"010121";"Cavalos";"Horses"', '"02013000";"10";"020130";"Carne bovina";"Beef"', '"12011000";"10";"120110";"Soja para semeadura";"Soy seed"', '"15111000";"10";"151110";"Óleo de palma em bruto";"Crude palm oil"', '"23040010";"10";"230400";"Farelo de soja";"Soybean meal"', '"29232000";"10";"292320";"Lecitinas";"Lecithins"'],
+  mdicRows: { 2026: [...MDIC_ROWS[2026], ...deuBig, chnPalm, ...canRows], 2025: [...MDIC_ROWS[2025], egyCorn] },
+  comtrade: { 124: { years: [2023, 2024, 2025], rows: [rec(124, "292320", 2025, 0, 5000)] }, 276: { years: [2022, 2023, 2024, 2025], rows: [rec(276, "090111", 2025, 0, 100), rec(276, "170114", 2024, 0, 50)] }, 251: { years: [2023, 2024, 2025], rows: [rec(251, "100590", 2025, 0, 500), rec(251, "100590", 2025, 76, 120), rec(251, "220710", 2025, 0, 80)] }, 818: { years: [], rows: [] } },
+  covered: { comtrade: ["FRA", "EGY", "CAN"], mdic: ["EGY", "CHN", "CAN"] },
 }), tclock);
 await tradeDriver.start();
 await tradeDriver.drain();
@@ -196,6 +199,16 @@ setInterval(async () => {
 }, 3000);
 
 const server = createServer(async (req, res) => {
+  // Só na PRÉVIA: acrescenta ao resumo do Canadá uma exportação SIMULADA de lecitina do Brasil (SH 292320), para conferir
+  // que o país passa a aparecer para "Derivados de soja" só quando existe evidência compatível.
+  if (req.method === "POST" && req.url === "/__previa/simular-lecitina-canada") {
+    for (const r of DB.raw.prepare("SELECT content_sha256,period_months,hs6_json FROM trade_country_summary WHERE iso3='CAN' AND source='mdic'").all()) {
+      const all = { ...JSON.parse(r.hs6_json ?? "{}"), 292320: 9000 };
+      DB.raw.prepare("UPDATE trade_country_summary SET hs6_json=?, state='purchase_identified' WHERE content_sha256=? AND period_months=?").run(JSON.stringify(all), r.content_sha256, r.period_months);
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    return res.end(JSON.stringify({ ok: true, simulado: "exportação de lecitina do Brasil ao Canadá (fictícia)" }));
+  }
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const body = Buffer.concat(chunks);
