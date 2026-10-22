@@ -5758,6 +5758,8 @@ function prospectStart(fixedMarket = null) {
         again();
       } else if (r.state === "none_identified") {
         destBox.append(el("div", { class: "callout" }, text("p", r.message)));
+        // Dados ainda chegando: a relação cresce; nova consulta a cada poucos segundos, como na preparação.
+        if (r.preparing) again();
       } else if (r.state === "needs_characteristic") {
         destBox.append(text("p", r.message, "form-hint"));
       } else {
