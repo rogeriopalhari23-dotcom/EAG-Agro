@@ -26,6 +26,9 @@ async function searchOf(env, actor, id, { open = false } = {}) {
   return { x, country, hs6: JSON.parse(x.hs6_json), target: JSON.parse(x.target_json) };
 }
 
+// Departamentos ultramarinos franceses: busca no registro francês pelo departamento.
+const FR_OVERSEAS = { GP: "971", MQ: "972", GF: "973", RE: "974", YT: "976" };
+
 // GET /api/foreign-searches/:id/discovery — proposta de atividades, fontes do país e candidatos encontrados.
 export async function getDiscovery(env, actor, id) {
   const { x, country, hs6 } = await searchOf(env, actor, id);
@@ -122,9 +125,10 @@ export async function discover(request, env, actor, rid, id, deps = {}) {
     } else if (source === "fr_registry") {
       // Porte ordena, não exclui (2026-09-30): primeiro as faixas prioritárias da busca; depois todas as outras (micro,
       // grandes e sem faixa) na mesma execução. Cada candidata guarda a faixa informada pelo INSEE com a fonte.
-      r = await frCandidates({ nace, sizes: role === "processor" ? target.sizes : null }, f);
+      const departement = FR_OVERSEAS[country.iso2] ?? null;
+      r = await frCandidates({ nace, sizes: role === "processor" ? target.sizes : null, departement }, f);
       if (role === "processor" && target.sizes?.length) {
-        const rest = await frCandidates({ nace, sizes: null }, f);
+        const rest = await frCandidates({ nace, sizes: null, departement }, f);
         const seen = new Set(r.candidates.map((c) => c.externalId));
         r = { ...r, query: `${r.query} + todas as faixas`, calls: (r.calls ?? 1) + (rest.calls ?? 1), total: rest.total, truncated: rest.truncated, candidates: [...r.candidates, ...rest.candidates.filter((c) => !seen.has(c.externalId))] };
       }

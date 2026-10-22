@@ -131,16 +131,12 @@ async function tradeWorld(t) {
 test("pesquisa automática internacional: só país com comércio oficial com o Brasil e fonte de empresas; produto sem classificação fica de fora", async (t) => {
   const { api, grant } = await tradeWorld(t);
   await grant();
-  let r = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
-  assert.equal(r.started, false, "nenhum produto classificado ainda");
-  assert.ok(r.reasons.some((x) => /sem classificação SH confirmada/.test(x)));
-  assert.doesNotMatch(JSON.stringify(r), /não há compradores|sem compradores/);
-  const p = (await api("/api/catalog/product-05")).data;
-  await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Teste (fictício)", expectedRevision: p.revision, reason: "Teste" });
-  r = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
+  // Classificação fiscal automática sob a política antes de escolher (2026-10-22, a mesma da lista de destinos).
+  const r = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
   assert.equal(r.started, true, JSON.stringify(r));
+  assert.doesNotMatch(JSON.stringify(r), /não há compradores|sem compradores/);
   assert.equal(r.job.input.location.iso3, "DEU");
-  assert.match(r.reason, /Café .*× Alemanha: .*(importações de origem Brasil declaradas por Alemanha \(Comtrade|exportações do Brasil para Alemanha \(MDIC).*SH 090111.*nunca pesquisada.*Fontes de empresas: .*Kaffeeverband/);
+  assert.match(r.reason, /Café .*× Alemanha: .*(importações de origem Brasil declaradas por Alemanha \(Comtrade|exportações do Brasil para Alemanha \(MDIC).*SH 090111.*nunca pesquisad[ao].*Fontes de empresas: .*Kaffeeverband/);
   const again = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
   assert.equal(again.started, false, "a mesma combinação em andamento não é duplicada");
 });

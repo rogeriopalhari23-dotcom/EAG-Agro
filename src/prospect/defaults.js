@@ -74,7 +74,10 @@ export const POLICY_TEMPLATE = {
   },
   // Disponibilidade (src/availability.js): busca real vazia sai da seleção principal por reassessEmptyDays (depois, ou com
   // fonte/regra nova ou empresa compatível, volta); pendência técnica espera retryTechnicalHours na pesquisa automática.
-  international: { acceptCandidatesWith: ["registry_id", "website"], reassessEmptyDays: 90, retryTechnicalHours: 24 },
+  // Exploração em segundo plano dos mercados a investigar (src/prospect/explore.js): uma pesquisa por vez, no máximo
+  // explorationPerDay por dia. Consulta sem estabelecimentos: nova tentativa em reassessEmptyDays (busca com registro ou
+  // diretório da atividade) ou reassessPartialDays (só o mapa colaborativo).
+  international: { acceptCandidatesWith: ["registry_id", "website"], reassessEmptyDays: 90, reassessPartialDays: 30, retryTechnicalHours: 24, exploration: true, explorationPerDay: 6 },
 };
 
 // Emenda da prospecção automática (docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md): PROPOSTA, não aprovada.

@@ -1,8 +1,9 @@
-// Filtro de disponibilidade da prospecção internacional (2026-10-22): uma relação país × produto nos dois sentidos
-// (commodity → países; país → commodities), na criação da pesquisa e na pesquisa automática; busca real vazia retirada
-// temporariamente (motivo, fontes, data, reavaliação), pendência técnica distinta, simulação sem efeito, empresa já
-// cadastrada de outra commodity mantém a combinação, reinclusão por prazo, por fonte/regra nova ou por pedido; retomada
-// automática dos resumos com lease, cursor e falha registrada.
+// Disponibilidade da prospecção internacional (2026-10-22, revisão): mercado comprador × capacidade efetiva de encontrar
+// empresas. Seleção principal = empresas identificadas (candidatas reais ou já cadastradas compatíveis, inclusive de
+// outra commodity); "Mercados a investigar" = comércio comprovado sem candidata (não pesquisado, consultas sem
+// estabelecimentos com cobertura e qualidade registradas, pendência técnica, sem fonte). Mesma regra nos dois sentidos,
+// na criação, na pesquisa automática e na exploração em segundo plano. Simulação, falha e cobertura insuficiente nunca
+// concluem ausência. Retomada automática dos resumos com lease, cursor e falha registrada.
 // Tudo SIMULADO e identificado: lista mensal de teste, R2 em memória, descoberta fictícia; nenhuma rede real.
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -13,14 +14,19 @@ import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.m
 import { legacyJob } from "./helpers/legacy-job.mjs";
 import { internalCaller } from "../src/worker.js";
 import { runJob } from "../src/prospect/engine.js";
-import { recordAssessment, fingerprintOf } from "../src/availability.js";
+import { exploreTick } from "../src/prospect/explore.js";
+import { recordAssessment, fingerprintOf, EXPLORER_ID } from "../src/availability.js";
 import { DEFAULT_PROFILE } from "../src/prospect/defaults.js";
 import { summaryCatchUp, catchUpStatus } from "../src/importers.js";
 import { destinationsFor, productsOf } from "../src/destinations.js";
+import { overpassQuery, parseOverpass } from "../src/adapters/discovery.js";
+import { foreignSources } from "../src/sources-applicable.js";
 
 async function world(t) {
   const ctx = setup();
-  t.after(() => ctx.close());
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => { throw new Error(`rede bloqueada no teste: ${url}`); };
+  t.after(() => ((globalThis.fetch = real), ctx.close()));
   const { api, DB, env } = ctx;
   keepCountries(DB, ["DEU", "CHN"]);
   await tradeParams(api, { period_default_months: 12 });
@@ -32,133 +38,167 @@ async function world(t) {
 }
 const coffee = async (api) => (await api("/api/prospect/destinations", "POST", { commodity: "coffee" })).data;
 const germany = async (api) => (await api("/api/prospect/availability", "POST", { iso2: "DE" })).data;
-// Pesquisa real concluída: as fontes aplicáveis responderam (found = candidatas de cada uma).
 const job = (id = "job-teste") => ({ id, tenant_id: "eag-internal" });
 const INPUT = { productId: "product-05", location: { iso3: "DEU", iso2: "DE", country: "Alemanha" } };
+const APPLICABLE = [{ key: "de_coffee_assoc", label: "Kaffeeverband (diretório)" }, { key: "osm", label: "OpenStreetMap — torrefações", note: "cobertura irregular; quase nunca traz identificador cadastral" }];
 const ran = (found = { osm: 0, de_coffee_assoc: 0 }, extra = {}) => ({
-  searchId: "busca-teste", hs6: ["090111"], existing: { count: 0 },
-  applicable: [{ key: "de_coffee_assoc", label: "Kaffeeverband (diretório)" }, { key: "osm", label: "OpenStreetMap — torrefações" }],
+  searchId: "busca-teste", hs6: ["090111"], existing: { count: 0 }, applicable: APPLICABLE,
   sourceRuns: Object.fromEntries(Object.entries(found).map(([k, n]) => [k, { done: true, found: n }])),
   ...extra,
 });
-const assess = (env, state, summary = { candidates: 0, registered: 0 }, at) => recordAssessment(env, { job: job(), input: INPUT, state, summary, profile: DEFAULT_PROFILE, policy: null, ...(at ? { at } : {}) });
+const assess = (env, state, summary = { candidates: 0, registered: 0 }, input = INPUT) => recordAssessment(env, { job: job(), input, state, summary, profile: DEFAULT_PROFILE, policy: null });
+const pairOf = (r) => r.items.find((x) => x.iso3 === "DEU")?.products.find((p) => p.productId === "product-05")?.availability;
 
-test("dois sentidos com a mesma relação: café → Alemanha e Alemanha → café; busca real vazia retira dos dois e da criação", async (t) => {
-  const { api, env, DB } = await world(t);
-  let r = await coffee(api);
-  assert.equal(r.state, "ready", r.message);
-  assert.ok(r.items.some((x) => x.iso3 === "DEU"));
-  assert.equal(r.items.find((x) => x.iso3 === "DEU").products[0].availability.tag, "não pesquisada");
-  let g = await germany(api);
-  assert.ok(g.countries.some((c) => c.iso2 === "DE" && c.commodities.some((x) => x.code === "coffee")), JSON.stringify(g.countries));
-  assert.ok(g.country.commodities.some((x) => x.code === "coffee"));
-
-  const a = await assess(env, ran());
-  assert.equal(a.outcome, "empty");
-  assert.match(a.reason, /Busca real concluída sem candidatas: Kaffeeverband \(diretório\) respondeu com 0; OpenStreetMap — torrefações respondeu com 0/);
-  r = await coffee(api);
-  assert.ok(!r.items.some((x) => x.iso3 === "DEU"), "fora da seleção principal");
-  const w = r.withdrawn.find((x) => x.iso3 === "DEU");
-  assert.ok(w, "preservada na seção recolhida");
-  assert.equal(w.status, "withdrawn");
-  assert.deepEqual(w.sources.map((x) => [x.key, x.status, x.found]), [["de_coffee_assoc", "ok", 0], ["osm", "ok", 0]]);
-  assert.ok(w.assessedAt && w.reviewAfter > w.assessedAt);
-  assert.ok(w.evidence.length, "evidência de comércio preservada");
-  assert.equal(r.state, "none_available");
-  assert.doesNotMatch(r.message, /não há compradores|ausência de compradores confirmada/);
-  g = await germany(api);
-  assert.ok(!g.countries.some((c) => c.iso2 === "DE"), "país → commodities: mesma regra");
-  assert.equal(g.country.withdrawn[0].productId, "product-05");
-  // Criação da pesquisa (formulário e API): recusada com o motivo; país, commodity e evidência continuam no cadastro.
-  const c = await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-05", location: { iso3: "DEU" } });
-  assert.equal(c.status, 409, JSON.stringify(c.data));
-  assert.equal(c.data.error.code, "market_withdrawn");
-  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM countries WHERE iso3='DEU'").get().n, 1);
-  // Pesquisa automática: não escolhe a combinação retirada e diz por quê.
-  const auto = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
-  assert.equal(auto.started, false, JSON.stringify(auto));
-  assert.ok(auto.reasons.some((x) => /retirada\(s\) temporariamente por busca real recente sem candidatas/.test(x)), JSON.stringify(auto.reasons));
+test("mercado comprovado sem pesquisa: \"Mercados a investigar\" (nos dois sentidos), com fundamento e fontes a consultar; nunca na seleção principal", async (t) => {
+  const { api } = await world(t);
+  const r = await coffee(api);
+  assert.equal(r.state, "none_identified", r.message);
+  assert.equal(r.principal.length, 0);
+  assert.ok(r.items.some((x) => x.iso3 === "DEU"), "evidência de comércio preservada");
+  const inv = r.investigate.find((x) => x.iso3 === "DEU");
+  assert.equal(inv.status, "not_researched");
+  assert.ok(inv.evidence.length && inv.evidence.every((e) => /MDIC|Comtrade/.test(e)));
+  assert.deepEqual(inv.sourcesToTry.map((x) => [x.key, x.quality]), [["de_coffee_assoc", "boa"], ["osm", "parcial"]]);
+  assert.match(r.message, /Mercados a investigar/);
+  const g = await germany(api);
+  assert.ok(!g.countries.some((c) => c.iso2 === "DE"), "destino → commodities: mesma regra");
+  assert.equal(g.country.investigate[0].productId, "product-05");
+  assert.ok(g.investigateCountries.some((c) => c.iso2 === "DE"));
 });
 
-test("empresas encontradas, inclusive já cadastradas para outra commodity, mantêm a combinação disponível", async (t) => {
+test("candidatas encontradas: seleção principal nos dois sentidos, \"empresas identificadas\" sem chamar de compradoras", async (t) => {
+  const { api, env } = await world(t);
+  await assess(env, ran({ osm: 3, de_coffee_assoc: 1 }), { candidates: 4, registered: 3 });
+  const r = await coffee(api);
+  assert.equal(r.state, "ready");
+  const de = r.principal.find((x) => x.iso3 === "DEU");
+  assert.equal(de.products[0].availability.tag, "empresas identificadas");
+  assert.match(de.products[0].availability.note, /Candidatas, não compradoras confirmadas/);
+  const g = await germany(api);
+  assert.ok(g.countries.some((c) => c.iso2 === "DE" && c.commodities.some((x) => x.code === "coffee")));
+});
+
+test("empresa já cadastrada de outra commodity com atividade compatível: empresas identificadas mesmo após consultas vazias", async (t) => {
   const { api, env, DB } = await world(t);
-  await assess(env, ran({ osm: 3, de_coffee_assoc: 0 }), { candidates: 3, registered: 2 });
-  let r = await coffee(api);
-  assert.equal(r.items.find((x) => x.iso3 === "DEU").products[0].availability.tag, "empresas encontradas");
-  // Busca vazia, mas há empresa já cadastrada no país com atividade compatível (relacionada a açúcar, outra commodity).
   await assess(env, ran());
-  assert.ok(!(await coffee(api)).items.some((x) => x.iso3 === "DEU"));
+  assert.equal(pairOf(await coffee(api)).status, "empty");
   const sugar = DB.raw.prepare("SELECT id FROM products WHERE commodity='sugar' LIMIT 1").get().id;
   DB.raw.exec(`INSERT INTO companies(id,tenant_id,legal_name,country_code,activity_text,source_label,created_by) VALUES ('co-de','eag-internal','Röstwerk Nord GmbH (fictícia)','DE','Kaffeerösterei und Süßwaren','Teste (fictício)','system-admin')`);
   DB.raw.prepare("INSERT INTO buyer_profiles(id,tenant_id,company_id,unit_key,product_id,profile_class,basis,icp_status,is_giant,updated_by,updated_at) VALUES ('bp-de','eag-internal','co-de','',?, 'unconfirmed','Teste (fictício)','pending_size',0,'system-admin','2026-10-01T00:00:00Z')").run(sugar);
-  r = await coffee(api);
-  const de = r.items.find((x) => x.iso3 === "DEU");
-  assert.ok(de, "empresa compatível já cadastrada devolve a combinação");
-  assert.equal(de.products[0].availability.tag, "empresas já cadastradas");
-  assert.match(de.products[0].availability.note, /inclusive de outra commodity/);
+  const a = pairOf(await coffee(api));
+  assert.equal(a.tier, "identified");
+  assert.match(a.note, /atividade compatível \(inclusive de outra commodity\)/);
 });
 
-test("falha, fonte pendente e busca não aberta: pendência técnica, nunca retirada; automática espera o prazo de nova tentativa", async (t) => {
+test("consulta sem estabelecimentos: cobertura e qualidade registradas, nova tentativa no prazo da qualidade; não conclui ausência; não repete a consulta idêntica", async (t) => {
   const { api, env } = await world(t);
-  const failed = await assess(env, ran({ de_coffee_assoc: 0 }, { sourceRuns: { de_coffee_assoc: { done: true, found: 0 }, osm: { done: true, failed: "OpenStreetMap: servidor recusou (521)" } } }));
-  assert.equal(failed.outcome, "technical");
-  assert.match(failed.reason, /Pesquisa incompleta: OpenStreetMap — torrefações: falhou \(OpenStreetMap: servidor recusou \(521\)\)\. Isso não indica ausência de compradores/);
-  const r = await coffee(api);
-  const de = r.items.find((x) => x.iso3 === "DEU");
-  assert.ok(de, "continua na seleção principal");
-  assert.equal(de.products[0].availability.tag, "pendência técnica");
-  assert.equal(r.withdrawn.length, 0);
-  const auto = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
-  assert.equal(auto.started, false, "sem repetir a consulta idêntica antes do prazo");
-  assert.ok(auto.coverage.waitingRetry.some((x) => /pendência técnica, nova tentativa a partir de/.test(x)), JSON.stringify(auto.coverage));
-  // Busca de empresas não aberta (aguardando evidência) e fonte sem cobertura: também técnicas.
-  assert.equal((await assess(env, { applicable: [], sourceRuns: {}, marketGap: { reason: "sem comércio no período" } })).outcome, "technical");
-  assert.equal((await assess(env, ran({ de_coffee_assoc: 0 }, { applicable: [{ key: "de_coffee_assoc", label: "K" }, { key: "osm", label: "O", status: "pending", note: "sem cobertura" }] }))).outcome, "technical");
-});
-
-test("simulação nunca altera a disponibilidade dos mercados reais", async (t) => {
-  const { api, env, DB } = await world(t);
-  env.SIMULATED_DISCOVERY = "1";
   const a = await assess(env, ran());
-  assert.equal(a.origin, "simulated");
-  delete env.SIMULATED_DISCOVERY;
-  const de = (await coffee(api)).items.find((x) => x.iso3 === "DEU");
-  assert.ok(de, "a combinação real continua disponível");
-  assert.equal(de.products[0].availability.tag, "não pesquisada");
-  assert.equal(DB.raw.prepare("SELECT origin FROM market_assessments").get().origin, "simulated", "registrada como simulada");
-  // Avaliação real posterior não encerra a simulada nem é encerrada por ela.
-  await assess(env, ran());
-  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM market_assessments WHERE superseded_at IS NULL").get().n, 2);
+  assert.deepEqual([a.outcome, a.quality], ["empty", "complete"]);
+  assert.match(a.reason, /Kaffeeverband \(diretório\) \(cobertura registro ou diretório da atividade, qualidade boa\): 0; OpenStreetMap — torrefações \(cobertura parcial \(só o que foi mapeado\), qualidade parcial\): 0/);
+  assert.match(a.reason, /comprova só o resultado destas consultas, não ausência de compradores/);
+  const days = (Date.parse(a.reviewAfter) - Date.now()) / 86400000;
+  assert.ok(days > 89 && days < 91, `busca com registro: 90 dias (${days})`);
+  const p = pairOf(await coffee(api));
+  assert.deepEqual([p.tier, p.status, p.sameQuery], ["investigate", "empty", true]);
+  assert.equal(p.sources[0].coverage, "registro ou diretório da atividade");
+  const c = await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-05", location: { iso3: "DEU" } });
+  assert.equal(c.data.error?.code, "same_query_recent", JSON.stringify(c.data));
+  // Só o mapa colaborativo (qualidade parcial): prazo menor (30 dias).
+  const b = await assess(env, ran({ osm: 0 }, { applicable: [APPLICABLE[1]] }));
+  assert.equal(b.quality, "partial");
+  const d2 = (Date.parse(b.reviewAfter) - Date.now()) / 86400000;
+  assert.ok(d2 > 29 && d2 < 31, `só o mapa: 30 dias (${d2})`);
+  // Regra do mapa fraca (só etiqueta de produto) fica registrada como tal.
+  const weak = await assess(env, ran({ osm: 0 }, { applicable: [{ key: "osm", label: "OpenStreetMap — etanol", note: "regra só pela etiqueta de produto, rara no mapa: cobertura muito irregular" }] }));
+  assert.match(weak.reason, /qualidade fraca/);
 });
 
-test("reinclusão: prazo vencido, fonte ou regra nova e pedido de reavaliação, com histórico preservado", async (t) => {
+test("falha técnica e simulação nunca concluem nada: pendência com espera crescente; simulada sem efeito", async (t) => {
+  const { api, env, DB } = await world(t);
+  const f1 = await assess(env, ran({ de_coffee_assoc: 0 }, { sourceRuns: { de_coffee_assoc: { done: true, found: 0 }, osm: { done: true, failed: "OpenStreetMap: servidor recusou (521)" } } }));
+  assert.equal(f1.outcome, "technical");
+  assert.match(f1.reason, /Isso não indica ausência de compradores/);
+  const f2 = await assess(env, ran({}, { sourceRuns: { osm: { done: true, failed: "521" }, de_coffee_assoc: { done: true, failed: "503" } } }));
+  const h1 = (Date.parse(f1.reviewAfter) - Date.now()) / 3600000, h2 = (Date.parse(f2.reviewAfter) - Date.now()) / 3600000;
+  assert.ok(h1 > 23 && h1 < 25 && h2 > 47 && h2 < 49, `espera crescente (${h1}, ${h2})`);
+  const p = pairOf(await coffee(api));
+  assert.deepEqual([p.tier, p.status], ["investigate", "technical"]);
+  // Simulação: registrada como tal, sem efeito sobre o mercado real.
+  DB.raw.exec("DELETE FROM market_assessments");
+  env.SIMULATED_DISCOVERY = "1";
+  assert.equal((await assess(env, ran(), { candidates: 5, registered: 5 })).origin, "simulated");
+  delete env.SIMULATED_DISCOVERY;
+  assert.equal(pairOf(await coffee(api)).status, "not_researched");
+});
+
+test("reinclusão: candidatas encontradas depois levam à seleção principal; regra ou fonte nova libera nova tentativa; pedido de pessoa; mesma consulta de outro produto", async (t) => {
   const { api, env, DB } = await world(t);
   await assess(env, ran());
-  assert.ok(!(await coffee(api)).items.some((x) => x.iso3 === "DEU"));
-  // Fonte ou regra nova: a impressão das fontes muda.
-  DB.raw.prepare("UPDATE market_assessments SET fingerprint=? WHERE superseded_at IS NULL").run(fingerprintOf("DE", ["090111"], { sources: { international: ["osm"] } }));
-  let de = (await coffee(api)).items.find((x) => x.iso3 === "DEU");
-  assert.equal(de?.products[0].availability.tag, "reavaliação");
-  assert.match(de.products[0].availability.note, /mudaram as fontes ou a regra de descoberta/);
-  // Prazo vencido.
-  DB.raw.prepare("UPDATE market_assessments SET fingerprint=?, review_after='2000-01-01T00:00:00.000Z' WHERE superseded_at IS NULL").run(fingerprintOf("DE", ["090111"], DEFAULT_PROFILE));
-  de = (await coffee(api)).items.find((x) => x.iso3 === "DEU");
-  assert.match(de?.products[0].availability.note ?? "", /avaliação vencida/);
-  // Pedido de reavaliação por pessoa (busca vazia vigente): volta; a avaliação anterior fica no histórico.
-  await assess(env, ran());
-  assert.ok(!(await coffee(api)).items.some((x) => x.iso3 === "DEU"));
-  const rr = await api("/api/prospect/availability/reassess", "POST", { productId: "product-05", iso3: "DEU" });
+  DB.raw.prepare("UPDATE market_assessments SET fingerprint='consulta-antiga'").run();
+  const p = pairOf(await coffee(api));
+  assert.deepEqual([p.status, p.nextAttempt], ["empty", null], "regra ou fonte nova: tentativa devida");
+  assert.match(p.note, /Fontes ou regras mudaram/);
+  DB.raw.prepare("UPDATE market_assessments SET fingerprint=?").run(fingerprintOf("DE", ["090111"], DEFAULT_PROFILE));
+  const rr = await api("/api/prospect/availability/reassess", "POST", { assessmentId: p.assessmentId });
   assert.equal(rr.status, 200, JSON.stringify(rr.data));
-  de = (await coffee(api)).items.find((x) => x.iso3 === "DEU");
-  assert.equal(de?.products[0].availability.tag, "não pesquisada");
-  const hist = DB.raw.prepare("SELECT outcome,superseded_reason FROM market_assessments ORDER BY assessed_at").all();
-  assert.equal(hist.length, 2, "nada apagado");
-  assert.deepEqual(hist.map((x) => x.superseded_reason), ["nova avaliação", "reavaliação pedida por pessoa"]);
-  assert.ok(DB.raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='market_assessment.reassess_requested'").get().n === 1);
-  assert.equal((await api("/api/prospect/availability/reassess", "POST", { productId: "product-05", iso3: "DEU" })).status, 404, "sem avaliação vigente");
+  assert.equal(pairOf(await coffee(api)).status, "not_researched");
+  // Mesma consulta feita para outro produto do país: resultado compartilhado e identificado.
+  await recordAssessment(env, { job: job("irmao"), input: { productId: "product-irmao-teste", location: INPUT.location }, state: ran(), summary: { candidates: 0, registered: 0 }, profile: DEFAULT_PROFILE, policy: null });
+  const s2 = pairOf(await coffee(api));
+  assert.equal(s2.viaProductId, "product-irmao-teste");
+  assert.match(s2.reason, /mesma consulta de empresas já feita na pesquisa de product-irmao-teste/);
+  // A exploração acha candidatas: passa para a seleção principal.
+  await assess(env, ran({ osm: 2, de_coffee_assoc: 0 }), { candidates: 2, registered: 2 });
+  assert.ok((await coffee(api)).principal.some((x) => x.iso3 === "DEU"));
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM market_assessments").get().n, 3, "histórico preservado");
 });
 
-test("preparação parcial: resumo ausente é preparação, nunca ausência; retomada automática em lotes com lease, cursor e falha registrada", async (t) => {
+test("exploração em segundo plano: só com política, uma por vez, limite diário, identidade de automação", async (t) => {
+  const { api, env, DB } = await world(t);
+  const a = await exploreTick(env, "eag-internal");
+  assert.equal(a.state, "started", JSON.stringify(a));
+  const j = DB.raw.prepare("SELECT id,created_by,status FROM prospect_jobs WHERE id=?").get(a.jobId);
+  assert.equal(j.created_by, EXPLORER_ID, "identidade de automação, não uma pessoa");
+  const ev = DB.raw.prepare("SELECT message FROM prospect_job_events WHERE job_id=? ORDER BY at").all(a.jobId).map((x) => x.message).join(" | ");
+  assert.match(ev, /Exploração automática em segundo plano \(política de pesquisa v1; 1 de 6 hoje/);
+  assert.equal((await exploreTick(env, "eag-internal")).state, "busy", "uma de cada vez");
+  // O motor executa a pesquisa com a identidade de automação (sem conta de acesso).
+  await runJob(env, a.jobId, { call: internalCaller(env, "rid-teste"), fetch: globalThis.fetch });
+  const after = (await api(`/api/prospect/jobs/${a.jobId}`)).data;
+  assert.ok(!after.events.some((e) => /não está mais ativa/.test(e.message)), JSON.stringify(after.events.slice(-2)));
+  // Limite diário pela política.
+  DB.raw.prepare("UPDATE prospect_jobs SET status='done'").run();
+  const pol = DB.raw.prepare("SELECT id,policy_json FROM research_policies WHERE revoked_at IS NULL").get();
+  const pj = JSON.parse(pol.policy_json);
+  DB.raw.prepare("UPDATE research_policies SET policy_json=? WHERE id=?").run(JSON.stringify({ ...pj, international: { ...pj.international, explorationPerDay: 1 } }), pol.id);
+  assert.equal((await exploreTick(env, "eag-internal")).state, "limit");
+  // Status para a tela.
+  const st = (await coffee(api)).exploration;
+  assert.ok(st && st.last?.state === "started" && st.lastRunAt, JSON.stringify(st));
+  // Sem política vigente: nada.
+  await api("/api/prospect/policy/revoke", "POST", { reason: "Teste de revogação" });
+  assert.equal((await exploreTick(env, "eag-internal")).state, "no_policy");
+});
+
+test("pesquisa automática do botão: empresa identificada sem pesquisa própria vem antes de mercado a investigar", async (t) => {
+  const { api, DB } = await world(t);
+  DB.raw.exec(`INSERT INTO companies(id,tenant_id,legal_name,country_code,activity_text,source_label,created_by) VALUES ('co-de2','eag-internal','Kaffee Werk GmbH (fictícia)','DE','Kaffeerösterei','Teste (fictício)','system-admin')`);
+  const r = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
+  assert.equal(r.started, true, JSON.stringify(r));
+  assert.match(r.reason, /empresas identificadas .* sem pesquisa própria: aproveitar o que existe/);
+});
+
+test("Martinica: área do país em qualquer nível do mapa; área inexistente é falha da consulta; registro francês cobre os departamentos ultramarinos", () => {
+  const q = overpassQuery("MQ", [["craft", "coffee_roaster"]]);
+  assert.ok(!/admin_level/.test(q), q);
+  assert.match(q, /area\["ISO3166-1"="MQ"\]->\.a;\.a out count;/);
+  assert.throws(() => parseOverpass({ elements: [{ type: "count", id: 0, tags: { areas: "0", total: "0" } }] }), /área do país não foi encontrada.*falha da consulta, não ausência/);
+  assert.equal(parseOverpass({ elements: [{ type: "count", id: 0, tags: { areas: "2" } }] }).areaCount, 2);
+  for (const iso2 of ["MQ", "GP", "GF", "RE", "YT"]) assert.ok(foreignSources(iso2, ["090111"]).some((x) => x.key === "fr_registry" && x.status === "available"), iso2);
+  assert.ok(!foreignSources("BR", ["090111"]).some((x) => x.key === "fr_registry"));
+});
+
+test("preparação parcial: resumo ausente é preparação, nunca ausência; retomada em lotes com lease, cursor e falha registrada", async (t) => {
   const { api, env, DB } = await world(t);
   const p = (await api("/api/catalog/product-05")).data;
   await api("/api/catalog/product-05/codes", "POST", { codeSystem: "HS", code: "090111", status: "confirmed", classificationVersion: "HS2022", sourceRef: "Teste (fictício)", expectedRevision: p.revision, reason: "Teste" });
@@ -166,29 +206,25 @@ test("preparação parcial: resumo ausente é preparação, nunca ausência; ret
   const products = await productsOf(env, "eag-internal", { commodity: "coffee" });
   const before = await destinationsFor(env, "eag-internal", { products, profile: DEFAULT_PROFILE });
   assert.equal(before.state, "preparing", before.message);
-  assert.ok(!["none_valid", "none_incomplete"].includes(before.state));
-  assert.ok(before.coverage.pendingSummaries > 0);
-  const total = before.coverage.pendingSummaries;
-  // Um objeto oficial ausente no R2: falha registrada, os demais seguem.
   const lost = DB.raw.prepare("SELECT r2_key FROM trade_list_current WHERE source='comtrade' AND iso3='CHN'").get()?.r2_key;
   if (lost) env.FILES.store.delete(lost);
-  // Duas execuções ao mesmo tempo: só uma pega o lease.
   const [a, b] = await Promise.all([summaryCatchUp(env, "eag-internal", { batch: 1 }), summaryCatchUp(env, "eag-internal", { batch: 1 })]);
   assert.deepEqual([a.state, b.state].sort(), ["busy", "ran"]);
-  const first = a.state === "ran" ? a : b;
-  assert.ok(first.remaining < total || first.errors.length, "progresso persistido");
-  let st = await catchUpStatus(env);
-  assert.ok(st.lastFinishedAt && st.remaining != null);
-  for (let k = 0; k < 20; k++) {
-    const r = await summaryCatchUp(env, "eag-internal", { batch: 2 });
-    if (r.state === "idle") break;
-  }
-  st = await catchUpStatus(env);
-  if (lost) assert.match(st.error ?? "", /comtrade\/CHN: objeto não encontrado no R2/, "falha identificada como tal");
+  for (let k = 0; k < 20; k++) if ((await summaryCatchUp(env, "eag-internal", { batch: 2 })).state === "idle") break;
+  const st = await catchUpStatus(env);
+  if (lost) assert.match(st.error ?? "", /comtrade\/CHN: objeto não encontrado no R2/);
   const after = await destinationsFor(env, "eag-internal", { products, profile: DEFAULT_PROFILE });
   assert.ok(after.items.some((x) => x.iso3 === "DEU"), after.message);
-  // Sem nada pendente: nenhuma gravação a cada ciclo.
-  if (!lost) assert.equal((await summaryCatchUp(env, "eag-internal")).state, "idle");
+});
+
+test("retomada sem pendência não relê o D1 a cada ciclo; lista nova invalida a verificação guardada", async (t) => {
+  const { env, DB } = await world(t);
+  for (let k = 0; k < 40; k++) if ((await summaryCatchUp(env, "eag-internal", { batch: 60 })).state === "idle") break;
+  assert.equal((await summaryCatchUp(env, "eag-internal")).state, "idle");
+  const b = await summaryCatchUp(env, "eag-internal");
+  assert.deepEqual([b.state, b.cached], ["idle", true]);
+  DB.raw.prepare("UPDATE trade_list_versions SET finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 minute') WHERE rowid=(SELECT MAX(rowid) FROM trade_list_versions)").run();
+  assert.equal((await summaryCatchUp(env, "eag-internal")).cached, undefined);
 });
 
 test("pela prospecção: o relatório registra a avaliação (execução real × simulada)", async (t) => {
@@ -220,53 +256,17 @@ test("pela prospecção: o relatório registra a avaliação (execução real ×
     }
     return (await api(`/api/prospect/jobs/${id}`)).data;
   };
-  // Descoberta desta execução é a do mundo simulado do teste; aqui ela vale como execução "real" do motor (sem a marca).
   const j = await drive((await legacyJob(env, { market: "international", productId: "product-05", location: { iso3: "DEU" }, hs6: "090111" })).id);
   assert.equal(j.status, "done", JSON.stringify(j.events.slice(-3)));
-  assert.ok(j.summary.assessment, "relatório traz a avaliação");
+  assert.ok(j.summary.assessment);
   assert.ok(j.events.some((e) => e.step === "report" && /^Disponibilidade: /.test(e.message)));
   const row = DB.raw.prepare("SELECT * FROM market_assessments WHERE job_id=?").get(j.id);
   assert.equal(row.outcome, j.summary.assessment.outcome);
   assert.equal(row.origin, "real");
-  assert.ok(JSON.parse(row.sources_json).length >= 1);
-  // A mesma prévia em modo demonstração marca a execução como simulada.
+  assert.ok(JSON.parse(row.sources_json).every((x) => x.coverage && x.quality), "cobertura e qualidade por fonte");
   env.SIMULATED_DISCOVERY = "1";
   DB.raw.prepare("UPDATE prospect_jobs SET status='done'").run();
   const j2 = await drive((await legacyJob(env, { market: "international", productId: "product-05", location: { iso3: "DEU" }, hs6: "090111" })).id);
   assert.equal(DB.raw.prepare("SELECT origin FROM market_assessments WHERE job_id=?").get(j2.id).origin, "simulated");
   assert.match(j2.events.find((e) => e.step === "report" && /^Disponibilidade/.test(e.message)).message, /execução simulada: registrada, sem efeito sobre os mercados reais/);
-});
-
-test("retomada sem pendência não relê o D1 a cada ciclo; lista nova invalida a verificação guardada", async (t) => {
-  const { env, DB } = await world(t);
-  for (let k = 0; k < 40; k++) if ((await summaryCatchUp(env, "eag-internal", { batch: 60 })).state === "idle") break;
-  const a = await summaryCatchUp(env, "eag-internal");
-  assert.equal(a.state, "idle");
-  const b = await summaryCatchUp(env, "eag-internal");
-  assert.deepEqual([b.state, b.cached], ["idle", true], "verificação guardada: sem contar os resumos de novo");
-  // Nova versão da lista (rotina mensal ou pedido manual): confere de novo.
-  DB.raw.prepare("UPDATE trade_list_versions SET finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 minute') WHERE rowid=(SELECT MAX(rowid) FROM trade_list_versions)").run();
-  const c = await summaryCatchUp(env, "eag-internal");
-  assert.equal(c.cached, undefined, "lista nova: verificação refeita");
-});
-
-test("mesma consulta de empresas para outro produto do país (ex.: Milho GMO × não GMO): o resultado vale, identificado; reavaliação pela avaliação", async (t) => {
-  const { api, env, DB } = await world(t);
-  // Pesquisa real vazia feita para outro produto (identificador fictício) com a MESMA consulta (mesmas fontes e regras).
-  await recordAssessment(env, { job: job("job-irmao"), input: { productId: "product-irmao-teste", location: INPUT.location }, state: ran(), summary: { candidates: 0, registered: 0 }, profile: DEFAULT_PROFILE, policy: null });
-  let r = await coffee(api);
-  assert.ok(!r.items.some((x) => x.iso3 === "DEU"), "consulta idêntica não é oferecida de novo");
-  const w = r.withdrawn.find((x) => x.iso3 === "DEU");
-  assert.equal(w.productId, "product-05");
-  assert.equal(w.viaProductId, "product-irmao-teste");
-  assert.match(w.reason, /mesma consulta de empresas já feita na pesquisa de product-irmao-teste: mesmas fontes e regras/);
-  // Consulta diferente (outra regra/fonte): não herda.
-  DB.raw.prepare("UPDATE market_assessments SET fingerprint='outra-consulta'").run();
-  assert.ok((await coffee(api)).items.some((x) => x.iso3 === "DEU"));
-  DB.raw.prepare("UPDATE market_assessments SET fingerprint=?").run(fingerprintOf("DE", ["090111"], DEFAULT_PROFILE));
-  // Reavaliar pela tela: pela avaliação herdada.
-  const rr = await api("/api/prospect/availability/reassess", "POST", { assessmentId: w.assessmentId, productId: "product-05", iso3: "DEU" });
-  assert.equal(rr.status, 200, JSON.stringify(rr.data));
-  r = await coffee(api);
-  assert.equal(r.items.find((x) => x.iso3 === "DEU")?.products[0].availability.tag, "não pesquisada");
 });

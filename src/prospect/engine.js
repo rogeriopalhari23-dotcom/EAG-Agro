@@ -20,7 +20,7 @@ import { pickNational, pickInternational } from "./rotation.js";
 import { rebuildSummaries } from "../importers.js";
 import { existingCompatible, addRelationsToInvestigate } from "../compatibility.js";
 import { destinationsFor, productsOf } from "../destinations.js";
-import { availabilityFor, byCountry, recordAssessment, reassessRoute as reassessPair } from "../availability.js";
+import { availabilityFor, byCountry, recordAssessment, reassessRoute as reassessPair, EXPLORER_ID } from "../availability.js";
 import { catchUpStatus } from "../importers.js";
 const ADMIN_ROLES = new Set(["admin"]);
 // Produto com o nome da commodity da lista única do catálogo.
@@ -65,6 +65,13 @@ const varietyOf = (p) => (/n[ãa]o[- ]?gmo/i.test(p.variant_name) ? "não GMO" :
 const commodityLabel = (p) => p.commodityLabel ?? p.display_name ?? p.group_name ?? p.commodity;
 
 // ---------------------------------------------------------------- perfil comprador
+// Identidade da exploração automática: só existe com política de pesquisa vigente que cobre o mercado internacional.
+// Não é usuário (não entra no painel); age pela autorização delimitada registrada na política.
+export async function explorerActor(env, tenant) {
+  const pol = await currentPolicy(env, tenant);
+  if (!pol || !pol.policy?.markets?.includes("international")) return null;
+  return { id: EXPLORER_ID, tenant_id: tenant, email: null, display_name: "Exploração automática (política de pesquisa)", role: "commercial_manager" };
+}
 export async function currentProfile(env, tenant) {
   const row = await s(env, "SELECT * FROM prospect_profiles WHERE tenant_id=? ORDER BY version DESC LIMIT 1", tenant).first();
   return row ? { id: row.id, version: row.version, profile: parse(row.profile_json), reason: row.reason, createdBy: row.created_by, createdAt: row.created_at } : null;
@@ -185,6 +192,8 @@ export async function getJob(env, actor, id) {
   const ev = (await s(env, "SELECT * FROM prospect_job_events WHERE job_id=? ORDER BY at, rowid", id).all()).results;
   return jobView(j, ev);
 }
+// Registro no andamento de uma prospecção (usado pela exploração em segundo plano para dizer por que começou).
+export const noteJob = (env, jobId, at, step, outcome, message, detail) => commit(env, [event(env, jobId, at, step, outcome, message, detail)]);
 const event = (env, jobId, at, step, outcome, message, detail) =>
   s(env, "INSERT INTO prospect_job_events(id,job_id,at,step,outcome,message,detail_json) VALUES (?,?,?,?,?,?,?)", crypto.randomUUID(), jobId, at, step, outcome, String(message).slice(0, 1000), detail ? JSON.stringify(detail).slice(0, 8000) : null);
 
@@ -220,11 +229,13 @@ export async function createJob(request, env, actor, rid, deps = {}) {
   if (market === "international" && !deps.allowUnverifiedDestination) {
     await ensureClassified(env, actor.tenant_id, [p], policy);
     const dest = await availabilityFor(env, actor.tenant_id, { products: [p], profile: profile.profile ?? DEFAULT_PROFILE, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) } });
-    const hit = dest.items.find((x) => x.iso3 === input.location.iso3);
-    // Mesma relação do formulário: par retirado por busca vazia recente, ou sem fonte de empresas, não começa.
-    const out = [...dest.withdrawn, ...dest.coverageGaps].find((x) => x.iso3 === input.location.iso3 && x.productId === p.id);
-    if (!hit && out?.status === "withdrawn") fail(409, "market_withdrawn", `${input.location.country} × ${p.display_name ?? p.variant_name} está retirada temporariamente da seleção: ${out.reason} Reavaliação a partir de ${out.reviewAfter.slice(0, 10)}, ou antes pela reavaliação na tela (fontes, regra ou empresa compatível nova).`, { assessmentId: out.assessmentId });
-    if (!hit && out?.status === "coverage") fail(422, "no_company_source", `${input.location.country} tem comércio comprovado de ${p.display_name ?? p.variant_name} com o Brasil, mas nenhuma fonte de empresas coberta no Compass: limitação de cobertura, não ausência de compradores.`);
+    const found = dest.items.find((x) => x.iso3 === input.location.iso3 && x.products.some((y) => y.productId === p.id));
+    // Mesma relação do formulário: sem fonte de empresas não começa; a mesma consulta sem estabelecimentos não se repete
+    // antes do prazo registrado (fonte ou regra nova libera na hora).
+    const pa = found?.products.find((y) => y.productId === p.id)?.availability;
+    if (pa?.status === "no_source") fail(422, "no_company_source", `${input.location.country} tem comércio comprovado de ${p.display_name ?? p.variant_name} com o Brasil, mas nenhuma fonte de empresas coberta no Compass: limitação de cobertura, não ausência de compradores.`);
+    if (pa?.status === "empty" && pa.nextAttempt && pa.sameQuery) fail(409, "same_query_recent", `A mesma consulta de empresas para ${input.location.country} × ${p.display_name ?? p.variant_name} já foi feita em ${pa.assessedAt.slice(0, 10)} e não achou estabelecimentos (${pa.reason}). Nova tentativa automática a partir de ${pa.nextAttempt.slice(0, 10)}, ou antes com fonte ou regra nova.`, { assessmentId: pa.assessmentId });
+    const hit = found;
     if (!hit) fail(422, "destination_not_eligible", `${input.location.country} não tem evidência oficial de comércio de ${p.display_name ?? p.variant_name} com o Brasil nos dados disponíveis${dest.state === "ready" ? "" : ` (${dest.message})`}. A pesquisa não começa com uma combinação sem evidência; escolha um destino da lista.`, { state: dest.state, reasons: dest.reasons });
     input.evidenceAtStart = { line: hit.line, basis: hit.basis, hs6: hit.products.flatMap((x) => x.hs6) };
   }
@@ -413,7 +424,8 @@ export async function runJob(env, jobId, deps = {}) {
   ).bind(addMs(at0, LEASE_MS), token, jobId, at0, at0).run();
   if (!lease.meta?.changes) return { skipped: true };
   let j = await s(env, "SELECT * FROM prospect_jobs WHERE id=?", jobId).first();
-  const actor = await s(env, "SELECT id,tenant_id,email,display_name,role FROM users WHERE id=? AND status='active'", j.created_by).first();
+  // Exploração em segundo plano (src/prospect/explore.js): identidade de automação sob a política, sem conta de acesso.
+  const actor = j.created_by === EXPLORER_ID ? await explorerActor(env, j.tenant_id) : await s(env, "SELECT id,tenant_id,email,display_name,role FROM users WHERE id=? AND status='active'", j.created_by).first();
   const state = parse(j.state_json, {});
   state.steps ??= {};
   const stmts = [];
@@ -1183,16 +1195,16 @@ const INTERNATIONAL = {
 };
 
 // Avaliação da combinação para a seleção (src/availability.js), registrada no andamento da pesquisa.
-const OUTCOME_TEXT = { found: "empresas encontradas: a combinação continua disponível", empty: "combinação retirada temporariamente da seleção principal", technical: "pendência técnica: a combinação continua disponível e nada se conclui sobre compradores" };
+const OUTCOME_TEXT = { found: "empresas identificadas: a combinação fica na seleção principal (candidatas, não compradoras confirmadas)", empty: "consultas sem estabelecimentos: a combinação fica em \"Mercados a investigar\"; nada se conclui sobre compradores", technical: "pendência técnica: a combinação fica em \"Mercados a investigar\"; nada se conclui sobre compradores" };
 async function assess(ctx, summary) {
   const a = await recordAssessment(ctx.env, { job: ctx.job, input: ctx.input, state: ctx.state, summary, profile: ctx.profile, policy: ctx.policy, at: ctx.now() });
-  ctx.log("report", a.outcome === "found" ? "ok" : "partial", `Disponibilidade: ${OUTCOME_TEXT[a.outcome]}${a.origin === "simulated" ? " (execução simulada: registrada, sem efeito sobre os mercados reais)" : ""}. ${a.reason}${a.outcome === "found" ? "" : ` Reavaliação a partir de ${a.reviewAfter.slice(0, 10)}, ou antes com fonte nova, regra nova ou empresa compatível cadastrada.`}`);
-  return { outcome: a.outcome, origin: a.origin, reason: a.reason, reviewAfter: a.reviewAfter };
+  ctx.log("report", a.outcome === "found" ? "ok" : "partial", `Disponibilidade: ${OUTCOME_TEXT[a.outcome]}${a.origin === "simulated" ? " (execução simulada: registrada, sem efeito sobre os mercados reais)" : ""}. ${a.reason}${a.outcome === "found" ? "" : ` Nova tentativa automática a partir de ${a.reviewAfter.slice(0, 16).replace("T", " ")} UTC${a.quality ? ` (busca de qualidade ${a.quality === "complete" ? "completa: registro ou diretório da atividade" : "parcial: só o mapa colaborativo"})` : ""}, ou antes com fonte ou regra nova ou empresa compatível cadastrada.`}`);
+  return { outcome: a.outcome, origin: a.origin, reason: a.reason, reviewAfter: a.reviewAfter, quality: a.quality };
 }
 
 // Classificação automática dos produtos da escolha sem código verificado (sob a política, como na análise do país).
 // → { asks: [{ productId, name, key, question, options, why }], unresolved: [{ productId, name, reason }] }
-async function ensureClassified(env, tenant, products, policy) {
+export async function ensureClassified(env, tenant, products, policy) {
   const out = { asks: [], unresolved: [] };
   for (const p of products) {
     if ((await confirmedHs(env, p.id)).length) continue;
@@ -1383,13 +1395,15 @@ export async function autoStart(request, env, actor, rid, deps = {}) {
   if (!policy.policy.markets.includes(market)) fail(409, "market_not_covered", "A política vigente não cobre este mercado.");
   const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
   const at = deps.now?.() ?? now();
+  // Classificação fiscal automática sob a política (a mesma da lista de destinos), antes de escolher.
+  if (market === "international") await ensureClassified(env, actor.tenant_id, (await s(env, "SELECT * FROM products WHERE tenant_id=? AND active<>0", actor.tenant_id).all()).results, policy);
   const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at }, { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) });
   if (pick.none) return { started: false, reasons: pick.reasons, coverage: pick.coverage ?? null, note: "Nenhuma combinação elegível agora. Falta de dado ou falha de fonte não é conclusão de ausência de compradores." };
   const job = await createJob(new Request("https://compass.internal/api/prospect/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pick.input) }), env, actor, rid, deps);
   if (!job.reused) {
     const j = await jobOf(env, actor.tenant_id, job.id);
     const state = parse(j.state_json, {});
-    state.choice = { reason: pick.reason, eligible: pick.eligible, at, ...(pick.coverage?.gapCount ? { coverageGaps: pick.coverage.gapCount, gaps: pick.coverage.gaps.slice(0, 10) } : {}) };
+    state.choice = { reason: pick.reason, eligible: pick.eligible, at, ...(pick.coverage?.gapCount ? { coverageGaps: pick.coverage.gapCount, gaps: pick.coverage.gaps.slice(0, 10) } : {}), ...(pick.coverage?.noSourceNote ? { coverageNote: pick.coverage.noSourceNote } : {}) };
     await commit(env, [
       s(env, "UPDATE prospect_jobs SET state_json=? WHERE id=?", JSON.stringify(state), job.id),
       event(env, job.id, at, "plan", "ok", `Pesquisa automática ${market === "national" ? "nacional" : "internacional"} (rotação entre ${pick.eligible} combinação(ões) elegível(is)): ${pick.reason}`),

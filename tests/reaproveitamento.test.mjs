@@ -194,17 +194,18 @@ test("pesquisa automática internacional: commodity fora das cinco maiores do pa
   assert.equal(r.job.input.location.iso3, "DEU");
   assert.match(r.reason, /Café .*× Alemanha: exportações do Brasil para Alemanha \(MDIC.*SH 090111.*Fontes de empresas: .*Kaffeeverband/);
   // Mercado com evidência e sem fonte de empresas: limitação de cobertura, não esquecimento nem ausência de compradores.
-  assert.equal(r.coverage.gapCount, 1, JSON.stringify(r.coverage));
-  assert.match(r.coverage.gaps[0].label, /Óleo de palma.*Estados Unidos/);
-  assert.match(r.coverage.gaps[0].coverage, /nenhum conector de empresas cobre este país e esta commodity/);
-  assert.match(r.coverage.note, /limitação de cobertura, não ausência de compradores/);
-  assert.equal(r.job.choice?.coverageGaps ?? JSON.parse(DB.raw.prepare("SELECT state_json FROM prospect_jobs WHERE id=?").get(r.job.id).state_json).choice.coverageGaps, 1);
+  assert.match(r.coverage.noSourceNote, /^1 combinação\(ões\) com comércio comprovado e sem fonte de empresas coberta: limitação de cobertura, não ausência de compradores/, JSON.stringify(r.coverage));
+  const palm = (await api("/api/prospect/destinations", "POST", { commodity: "palm_oil" })).data.investigate.find((x) => x.iso3 === "USA");
+  assert.equal(palm?.status, "no_source", "Óleo de palma × Estados Unidos em Mercados a investigar, sem fonte");
+  assert.match(JSON.parse(DB.raw.prepare("SELECT state_json FROM prospect_jobs WHERE id=?").get(r.job.id).state_json).choice.coverageNote, /sem fonte de empresas coberta/);
   // Resumo antigo, sem a lista completa: refeito do objeto oficial guardado (sem chamada externa); o mercado continua.
   DB.raw.prepare("UPDATE trade_country_summary SET hs6_json=NULL").run();
   const again = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
-  assert.equal(again.started, false, "a combinação em andamento não é duplicada");
-  assert.ok(again.reasons.some((x) => /já têm pesquisa em andamento/.test(x)), JSON.stringify(again));
-  assert.equal(again.coverage.gapCount, 1, "o mercado sem conector continua listado");
+  // Com todos os produtos classificados (classificação automática, 2026-10-22), outra combinação pode começar; a em
+  // andamento nunca é repetida.
+  if (again.started) assert.ok(!(again.job.input.productId === r.job.input.productId && again.job.input.location.iso3 === r.job.input.location.iso3), "a combinação em andamento não é duplicada");
+  else assert.ok(again.reasons.some((x) => /já com pesquisa em andamento/.test(x)), JSON.stringify(again));
+  assert.match(again.coverage.noSourceNote ?? "", /sem fonte de empresas coberta/, "o mercado sem conector continua listado");
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM trade_country_summary WHERE hs6_json IS NULL").get().n, 0, "resumos completos refeitos do R2");
   assert.doesNotMatch(JSON.stringify(again), /não há compradores|sem compradores/);
 });

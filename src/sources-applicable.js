@@ -11,7 +11,8 @@ const weakOsm = (osm) => osm.every(([k]) => k === "product");
 
 // ---------- exterior ----------
 const FOREIGN = [
-  { key: "fr_registry", label: "Registro oficial da França (atividade e porte)", countries: ["FR"], needs: "nace" },
+  // Departamentos ultramarinos (Guadalupe, Martinica, Guiana Francesa, Reunião, Mayotte) estão no registro francês.
+  { key: "fr_registry", label: "Registro oficial da França (atividade e porte)", countries: ["FR", "GP", "MQ", "GF", "RE", "YT"], needs: "nace" },
   { key: "no_registry", label: "Registro oficial da Noruega (atividade, porte e site)", countries: ["NO"], needs: "nace" },
   { key: "de_coffee_assoc", label: "Deutscher Kaffeeverband — diretório de membros", countries: ["DE"], hs4: ["0901"] },
   { key: "cl_sag_lenaa", label: "SAG (Chile) — LENAA, fabricantes de alimentos para animais", countries: ["CL"], needs: "feedRegistry" },

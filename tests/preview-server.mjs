@@ -15,6 +15,7 @@ import { provenanceHeaders } from "../src/provenance.js";
 import { internalCaller } from "../src/worker.js";
 import { tick } from "../src/prospect/engine.js";
 import { summaryCatchUp } from "../src/importers.js";
+import { exploreTick } from "../src/prospect/explore.js";
 import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.mjs";
 import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec, MDIC_ROWS } from "./helpers/trade.mjs";
 
@@ -207,6 +208,8 @@ setInterval(async () => {
     await tradeDriver.drain(400);
     // Resumos por país que faltam: a mesma retomada do cron de 5 minutos da produção (lote, lease, cursor, falha registrada).
     await summaryCatchUp(ctx.env, "eag-internal", { batch: 60 });
+    // Mercados a investigar: a mesma exploração em segundo plano do cron da produção.
+    await exploreTick(ctx.env, "eag-internal");
   } catch (e) {
     console.error("ciclo da prospecção:", e.message);
   } finally {

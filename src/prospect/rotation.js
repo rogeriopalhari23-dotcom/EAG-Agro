@@ -82,48 +82,62 @@ export async function pickNational(env, tenant, { profile, policy, at }) {
 // conector vira limitação de cobertura listada a cada consulta, nunca esquecimento do mercado nem ausência de compradores.
 const evText = (e, name) => e.source === "mdic" ? `exportações do Brasil para ${name} (MDIC, FOB, ${e.period}${e.extended ? ", período guardado mais longo" : ""})` : `importações de origem Brasil declaradas por ${name} (Comtrade, ${e.period})`;
 
+// Ordem (mesma relação do formulário, src/availability.js):
+//  0 empresas identificadas ainda sem pesquisa própria (já cadastradas compatíveis: aproveitar o que existe);
+//  1 mercado a investigar nunca pesquisado; 2 empresas identificadas com pesquisa antiga (dados a atualizar);
+//  3 mercado a investigar com nova tentativa vencida (consulta sem estabelecimentos ou pendência técnica).
+// Dentro do nível: fonte de melhor qualidade (registro/diretório antes do mapa), maior valor de comércio, desempate do dia.
+// Fora: pesquisa em andamento, sem fonte de empresas, nova tentativa ainda não vencida, identificadas pesquisadas há pouco.
+export function rankPairs(dest, jobsByKey, at) {
+  const out = [];
+  const skipped = { researching: 0, waiting: 0, noSource: 0, recent: 0 };
+  for (const d of dest.items) for (const pr of d.products) {
+    const a = pr.availability;
+    const key = `${pr.productId}|${d.iso3}`;
+    if (a.status === "researching") { skipped.researching++; continue; }
+    if (a.status === "no_source") { skipped.noSource++; continue; }
+    if (a.nextAttempt) { skipped.waiting++; continue; }
+    const mine = jobsByKey.get(key) ?? [];
+    const last = mine.map((j) => j.created_at).sort().at(-1);
+    const days = last ? Math.floor((Date.parse(at) - Date.parse(last)) / DAY) : null;
+    let rank, why;
+    if (a.tier === "identified") {
+      if (!mine.length) (rank = 0), (why = `empresas identificadas (${a.note}) sem pesquisa própria: aproveitar o que existe`);
+      else if (days >= STALE_DAYS) (rank = 2), (why = `empresas identificadas; última pesquisa há ${days} dias (dados a atualizar)`);
+      else { skipped.recent++; continue; }
+    } else if (a.status === "not_researched") (rank = 1), (why = "mercado a investigar, nunca pesquisado");
+    else (rank = 3), (why = `mercado a investigar: nova tentativa vencida (${a.tag})`);
+    const conn = (a.sourcesToTry ?? []);
+    const quality = conn.some((x) => x.quality === "boa") ? 0 : 1;
+    const usd = d.evidence.filter((e) => e.productId === pr.productId).reduce((n, e) => n + (Number(e.usd) || 0), 0);
+    out.push({ key, rank, quality, usd, why, d, pr });
+  }
+  return { list: out.sort((a, b) => a.rank - b.rank || a.quality - b.quality || b.usd - a.usd || dayHash(a.key, at.slice(0, 10)) - dayHash(b.key, at.slice(0, 10))), skipped };
+}
+
 export async function pickInternational(env, tenant, { profile, at }, deps = {}) {
   const products = (await s(env, "SELECT * FROM products WHERE tenant_id=? AND active<>0 AND identity_status='confirmed'", tenant).all()).results;
-  // Mesma relação do formulário (src/availability.js): par retirado por busca vazia recente ou sem fonte de empresas
-  // fica fora; pendência técnica recente espera o prazo de nova tentativa (sem repetir consulta idêntica).
   const dest = await availabilityFor(env, tenant, { products, profile, deps, at });
-  const jobs = (await history(env, tenant, "international")).map((j) => ({ ...j, key: `${j.input.productId}|${j.input.location?.iso3}` }));
+  const jobsByKey = new Map();
+  for (const j of await history(env, tenant, "international")) { const k = `${j.input.productId}|${j.input.location?.iso3}`; (jobsByKey.get(k) ?? jobsByKey.set(k, []).get(k)).push(j); }
+  // Fontes de cada par (a classificação de investigate já traz sourcesToTry; identificadas, do mesmo cálculo).
+  for (const d of dest.items) for (const pr of d.products) pr.availability.sourcesToTry ??= dest.investigate.find((x) => x.iso3 === d.iso3 && x.productId === pr.productId)?.sourcesToTry ?? foreignSources(d.iso2, pr.hs6).filter((x) => x.status === "available" && (profile.sources?.international ?? []).includes(x.key)).map((x) => ({ key: x.key, label: x.label, quality: x.key === "osm" ? "parcial" : "boa" }));
+  const { list, skipped } = rankPairs(dest, jobsByKey, at);
   const byId = new Map(products.map((p) => [p.id, p]));
-  const day = at.slice(0, 10);
-  const cands = [], waitingRetry = [];
-  const gaps = [];
-  for (const g of dest.coverageGaps) {
-    const all = foreignSources(g.iso2, g.hs6);
-    const p = byId.get(g.productId);
-    const label = await commodityLabelOf(env, tenant, p.commodity);
-    gaps.push({ productId: g.productId, iso3: g.iso3, label: `${both(label, p.variant_name)} × ${g.country}`, evidence: g.evidence.join("; "), coverage: all.length ? all.map((x) => `${x.label}: ${x.status === "available" ? "fora das fontes do perfil" : x.note ?? "pendente"}`).join("; ") : "nenhum conector de empresas cobre este país e esta commodity" });
-  }
-  let busy = 0;
-  for (const d of dest.items) {
-    for (const pr of d.products) {
-      const p = byId.get(pr.productId);
-      const label = await commodityLabelOf(env, tenant, p.commodity);
-      const ev = d.evidence.filter((e) => e.productId === p.id).map((e) => `${evText(e, d.name)} registram SH ${e.hs6.join(", ")}`).join("; ");
-      const srcs = foreignSources(d.iso2, pr.hs6).filter((x) => x.status === "available" && (profile.sources?.international ?? []).includes(x.key));
-      const key = `${p.id}|${d.iso3}`;
-      if (pr.availability?.technical && pr.availability.retryAfter) { waitingRetry.push(`${both(label, p.variant_name)} × ${d.name}: pendência técnica, nova tentativa a partir de ${pr.availability.retryAfter.slice(0, 16).replace("T", " ")} UTC (${pr.availability.note})`); continue; }
-      const score = scoreOf(key, jobs, at);
-      if (!score) { busy++; continue; }
-      cands.push({
-        key, score, tie: jobs.filter((j) => j.input.productId === p.id).length,
-        input: { market: "international", productId: p.id, location: { iso3: d.iso3 } },
-        reason: `${both(label, p.variant_name)} × ${d.name}: ${ev}; ${score.why}${pr.availability?.tag === "reavaliação" ? ` (${pr.availability.note})` : ""}. Fontes de empresas: ${srcs.map((x) => x.label).join("; ")}.`,
-      });
-    }
-  }
   const coverage = {
-    gaps: gaps.slice(0, 30), gapCount: gaps.length,
-    note: gaps.length ? `${gaps.length} mercado(s) com comércio oficial registrado com o Brasil e sem fonte de empresas coberta: limitação de cobertura, não ausência de compradores.` : null,
-    withdrawn: dest.withdrawn.slice(0, 30).map((w) => ({ productId: w.productId, iso3: w.iso3, label: `${w.product} × ${w.country}`, reason: w.reason, assessedAt: w.assessedAt, reviewAfter: w.reviewAfter })),
-    withdrawnNote: dest.withdrawn.length ? `${dest.withdrawn.length} combinação(ões) retirada(s) temporariamente por busca real recente sem candidatas (reavaliação no prazo ou com atualização).` : null,
-    waitingRetry: waitingRetry.slice(0, 30),
+    identified: dest.principal.length, toInvestigate: dest.investigate.length, exploration: dest.exploration,
+    noSourceNote: skipped.noSource ? `${skipped.noSource} combinação(ões) com comércio comprovado e sem fonte de empresas coberta: limitação de cobertura, não ausência de compradores.` : null,
+    waitingNote: skipped.waiting ? `${skipped.waiting} combinação(ões) aguardando o prazo de nova tentativa (consulta sem estabelecimentos ou pendência técnica, com cobertura e qualidade registradas).` : null,
     partialSummaries: dest.coverage.pendingSummaries ? `Resumo completo de subposições ainda em preparação para ${dest.coverage.pendingSummaries} registro(s).` : null,
   };
-  const best = pickBest(cands, day);
-  return best ? { ...best, eligible: cands.length, coverage } : { none: true, eligible: 0, coverage, reasons: [busy ? `as ${busy} combinação(ões) elegível(is) já têm pesquisa em andamento (reaproveitadas, sem duplicar)` : null, dest.unclassified.length ? `${dest.unclassified.length} produto(s) ainda sem classificação SH confirmada` : null, gaps.length ? coverage.note : null, coverage.withdrawnNote, waitingRetry.length ? `${waitingRetry.length} combinação(ões) com pendência técnica recente aguardando o prazo de nova tentativa` : null, !dest.items.length && !dest.withdrawn.length && !gaps.length ? "nenhum país com comércio oficial registrado com o Brasil para os produtos classificados (na lista mensal já publicada)" : null].filter(Boolean) };
+  const best = list[0];
+  if (!best) return { none: true, eligible: 0, coverage, reasons: [skipped.researching ? `${skipped.researching} combinação(ões) já com pesquisa em andamento (reaproveitadas, sem duplicar)` : null, coverage.waitingNote, coverage.noSourceNote, skipped.recent ? `${skipped.recent} combinação(ões) com empresas identificadas e pesquisa recente` : null, dest.unclassified.length ? `${dest.unclassified.length} produto(s) ainda sem classificação SH confirmada` : null, !dest.items.length ? "nenhum país com comércio oficial registrado com o Brasil para os produtos classificados (na lista mensal já publicada)" : null].filter(Boolean) };
+  const p = byId.get(best.pr.productId);
+  const label = await commodityLabelOf(env, tenant, p.commodity);
+  const ev = best.d.evidence.filter((e) => e.productId === p.id).map((e) => `${evText(e, best.d.name)} registram SH ${e.hs6.join(", ")}`).join("; ");
+  return {
+    key: best.key, eligible: list.length, coverage,
+    input: { market: "international", productId: p.id, location: { iso3: best.d.iso3 } },
+    reason: `${both(label, p.variant_name)} × ${best.d.name}: ${ev}; ${best.why}. Fontes de empresas: ${(best.pr.availability.sourcesToTry ?? []).map((x) => x.label).join("; ") || "—"}.`,
+  };
 }

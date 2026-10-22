@@ -80,17 +80,21 @@ test("Derivados de soja — Canadá (simulado): sem exportação de lecitina ao 
 test("Derivados de soja — Canadá (simulado): com exportação de lecitina do Brasil ao Canadá, o país aparece, com fonte, período e produto que fundamenta", async (t) => {
   const { api } = await world(t, { lecithinToCanada: true });
   const r = await dest(api, { commodity: "soy_lecithin" });
-  // Filtro de disponibilidade (2026-10-22): sem fonte de empresas coberta, o país comprovado sai da seleção principal e
-  // fica na seção "sem fonte de empresas", com produto, código, evidência e a limitação (nunca "sem destino").
-  assert.equal(r.state, "none_available", r.message);
-  assert.ok(!r.items.some((x) => x.iso3 === "CAN"));
-  const can = r.coverageGaps.find((x) => x.iso3 === "CAN");
+  // Disponibilidade (2026-10-22): o destino comprovado continua na relação (fundamento preservado); sem fonte de empresas
+  // e sem empresa identificada, fica em "Mercados a investigar" como limitação de cobertura, nunca "sem destino".
+  assert.equal(r.state, "none_identified", r.message);
+  const can = r.items.find((x) => x.iso3 === "CAN");
   assert.ok(can, JSON.stringify(r));
-  assert.equal(can.product, "Lecitina de soja");
-  assert.deepEqual(can.hs6, ["292320"]);
-  assert.ok(can.evidence.length && can.evidence.every((e) => /^MDIC — exportações do Brasil/.test(e)), "a importação do mundo declarada pelo Canadá não entra");
-  assert.match(can.note, /limitação de cobertura/);
-  assert.match(r.message, /sem fonte de empresas coberta/);
+  assert.equal(can.basis, "Lecitina de soja");
+  assert.deepEqual(can.products[0].hs6, ["292320"]);
+  assert.ok(can.evidence.every((e) => e.source === "mdic"), "a importação do mundo declarada pelo Canadá não entra");
+  assert.match(can.line, /MDIC — exportações do Brasil/);
+  assert.equal(can.connector.available, false);
+  assert.match(can.connector.note, /limitação de cobertura/);
+  const inv = r.investigate.find((x) => x.iso3 === "CAN");
+  assert.equal(inv.status, "no_source");
+  assert.match(inv.note, /limitação de cobertura, não ausência de compradores/);
+  assert.ok(!r.principal.some((x) => x.iso3 === "CAN"));
 });
 
 test("commodity com vários produtos: o país indica qual produto fundamenta a inclusão; produto específico restringe a lista", async (t) => {

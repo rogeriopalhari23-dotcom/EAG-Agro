@@ -45,6 +45,7 @@ import * as decisionReview from "./decision-review.js";
 import * as integrations from "./integrations.js";
 import * as rounds from "./rounds.js";
 import * as prospect from "./prospect/engine.js";
+import { exploreTick } from "./prospect/explore.js";
 import { readProvenance } from "./provenance.js";
 import { handleQueue, handlers as queueHandlers } from "./queue.js";
 import { mapInfo, mapTiles } from "./map-tiles.js";
@@ -679,6 +680,8 @@ export default {
       // Resumos da lista de países que faltam (dados oficiais já guardados): lote pequeno com lease e cursor; falha fica
       // registrada em maintenance_leases e aparece na tela de destinos.
       await importers.summaryCatchUp(env, tenant).catch((e) => console.error("trade_summary_catchup_failed", { message: String(e?.message ?? "").slice(0, 120) }));
+      // Mercados a investigar: exploração em segundo plano sob a política (uma de cada vez, limite diário).
+      await exploreTick(env, tenant).catch((e) => console.error("market_exploration_failed", { message: String(e?.message ?? "").slice(0, 120) }));
       // Respostas primeiro: uma resposta recém-chegada pausa antes do próximo envio.
       // Com a ponte (SEND_TRANSPORT=bridge), leitura e envio acontecem pelas rotas /api/bridge/*; o cron não fala com a caixa.
       if (env.SEND_TRANSPORT !== "bridge") {

@@ -25,7 +25,10 @@ function osmFilter([k, v]) {
 export function overpassQuery(iso2, filters, limit = 500) {
   if (!/^[A-Z]{2}$/.test(iso2)) throw new AdapterError("invalid_request", "País sem código ISO de duas letras.");
   if (!filters.length) throw new AdapterError("invalid_request", "Nenhuma etiqueta do OpenStreetMap para esta commodity.");
-  return `[out:json][timeout:90];area["ISO3166-1"="${iso2}"][admin_level=2]->.a;(${filters.map(osmFilter).join("")});out tags center ${limit};`;
+  // Área pelo código do país em QUALQUER nível administrativo: territórios como Martinica, Guadalupe e Reunião têm o
+  // código no nível 3/4, não no 2 (achado em 2026-10-22: a exigência do nível 2 fazia a consulta buscar numa área vazia e
+  // responder 0 sem erro). A contagem de áreas vem na resposta: área não encontrada é falha da consulta, nunca "0".
+  return `[out:json][timeout:90];area["ISO3166-1"="${iso2}"]->.a;.a out count;(${filters.map(osmFilter).join("")});out tags center ${limit};`;
 }
 // Só o servidor principal (FOSSGIS, cobertura mundial). Espelhos testados em 2026-09-27: um regional devolveu 0 resultados
 // para a Alemanha (vazio falso) e outros não responderam. Falha do servidor vira erro temporário, nunca "nenhuma empresa".
@@ -51,6 +54,9 @@ export async function osmCandidates({ iso2, filters, limit = 500, servers = OVER
 // conexões vindas da Cloudflare: 521/522 testados em 2026-09-27).
 export function parseOverpass(data) {
   if (!Array.isArray(data?.elements)) throw new AdapterError("schema", "OpenStreetMap: resposta sem elements.");
+  const count = data.elements.find((e) => e.type === "count");
+  const areaCount = count ? Number(count.tags?.areas ?? count.tags?.total ?? 0) : null;
+  if (areaCount === 0) throw new AdapterError("filter_not_applied", "OpenStreetMap: a área do país não foi encontrada no mapa; a consulta não buscou em lugar nenhum (falha da consulta, não ausência de estabelecimentos).");
   const out = [];
   for (const e of data.elements) {
     const t = e.tags ?? {};
@@ -66,7 +72,7 @@ export function parseOverpass(data) {
       recordUrl: `https://www.openstreetmap.org/${e.type}/${e.id}`,
     });
   }
-  return { total: out.length, candidates: out, attribution: OSM_ATTRIBUTION };
+  return { total: out.length, candidates: out, attribution: OSM_ATTRIBUTION, areaCount };
 }
 
 // ---------- Chile — LENAA do SAG (lista oficial pública de fabricantes de alimentos para animais), sem chave ----------
@@ -133,13 +139,15 @@ export async function clLenaaCandidates({ activity, page = LENAA_PAGE }, fetchIm
 const FR_BAND = { "01": "micro", "02": "micro", "03": "micro", "11": "small", "12": "small", "21": "medium", "22": "medium", "31": "medium", "32": "medium_plus", "41": "medium_plus", "42": "medium_plus", "51": "medium_plus", "52": "medium_plus", "53": "medium_plus" };
 // Porte-alvo da busca → faixas de efetivo INSEE (filtro da própria API).
 const FR_TRANCHES = { small: ["11", "12"], medium: ["21", "22", "31"], medium_plus: ["32", "41", "42", "51", "52", "53"] };
-export async function frCandidates({ nace, sizes = null, maxPages = 4, base = "https://recherche-entreprises.api.gouv.fr" }, fetchImpl = fetch) {
+// departement: departamento ultramarino (971 Guadalupe, 972 Martinica, 973 Guiana Francesa, 974 Reunião, 976 Mayotte):
+// empresas com estabelecimento ativo ali (o registro francês cobre os departamentos); a cidade vem do estabelecimento.
+export async function frCandidates({ nace, sizes = null, departement = null, maxPages = 4, base = "https://recherche-entreprises.api.gouv.fr" }, fetchImpl = fetch) {
   const codes = nafCodes(nace);
   const tranches = sizes ? sizes.flatMap((z) => FR_TRANCHES[z] ?? []) : [];
   const out = [];
   let total = 0, calls = 0;
   for (let page = 1; page <= maxPages; page++) {
-    const url = `${base}/search?activite_principale=${encodeURIComponent(codes.join(","))}&etat_administratif=A${tranches.length ? `&tranche_effectif_salarie=${tranches.join(",")}` : ""}&per_page=25&page=${page}`;
+    const url = `${base}/search?activite_principale=${encodeURIComponent(codes.join(","))}&etat_administratif=A${departement ? `&departement=${departement}` : ""}${tranches.length ? `&tranche_effectif_salarie=${tranches.join(",")}` : ""}&per_page=25&page=${page}`;
     const d = await getJson("Registro francês (Recherche d'entreprises)", url, {}, fetchImpl);
     calls++;
     if (!Array.isArray(d?.results)) throw new AdapterError("schema", "Registro francês: resposta sem results.");
@@ -148,7 +156,7 @@ export async function frCandidates({ nace, sizes = null, maxPages = 4, base = "h
       const band = FR_BAND[x.tranche_effectif_salarie] ?? null;
       out.push({
         source: "fr_registry", externalId: x.siren, name: x.nom_complet || x.nom_raison_sociale, legalNameHint: x.nom_raison_sociale || x.nom_complet,
-        city: x.siege?.libelle_commune ?? null, website: null,
+        city: (departement ? x.matching_etablissements?.find((m) => String(m.code_postal ?? "").startsWith(departement.slice(0, 3)))?.libelle_commune ?? x.matching_etablissements?.[0]?.libelle_commune : null) ?? x.siege?.libelle_commune ?? null, website: null,
         activity: { code: x.activite_principale, label: `NAF ${x.activite_principale}` },
         size: band ? { band, source: `INSEE, faixa de efetivo ${x.tranche_effectif_salarie} (${x.annee_tranche_effectif_salarie ?? "ano não informado"}), via API Recherche d'entreprises; categoria ${x.categorie_entreprise ?? "—"}` } : null,
         registry: { id: x.siren, type: "SIREN" },
@@ -158,7 +166,7 @@ export async function frCandidates({ nace, sizes = null, maxPages = 4, base = "h
     }
     if (page >= (d.total_pages ?? 1)) break;
   }
-  return { query: `activite_principale=${codes.join(",")}; etat_administratif=A${tranches.length ? `; tranche_effectif_salarie=${tranches.join(",")}` : ""}`, total, calls, candidates: out, truncated: out.length < total };
+  return { query: `activite_principale=${codes.join(",")}; etat_administratif=A${departement ? `; departement=${departement}` : ""}${tranches.length ? `; tranche_effectif_salarie=${tranches.join(",")}` : ""}`, total, calls, candidates: out, truncated: out.length < total };
 }
 
 // ---------- Noruega — Enhetsregisteret (Brønnøysund), NLOD 2.0, sem chave ----------
