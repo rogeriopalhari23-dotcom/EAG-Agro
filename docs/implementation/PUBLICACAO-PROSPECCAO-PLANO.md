@@ -1,4 +1,4 @@
-# Plano de publicação: prospecção automática e descoberta real (preparado em 2026-10-21, não executado)
+# Plano de publicação: prospecção automática e descoberta real (preparado em 2026-10-21; executado em 2026-10-22, ver EVIDENCIAS)
 
 Aguarda autorização de Rogério. Este plano publica o código. **Não cadastra** em produção as 147 empresas do Chile. O cadastro desse lote é uma ação separada, que pede autorização própria.
 

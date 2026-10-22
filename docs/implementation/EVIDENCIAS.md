@@ -3658,3 +3658,75 @@ Etanol e álcool industrial têm a mesma lista porque usam as mesmas subposiçõ
 - Pessoas e canais: 5 empresas pesquisadas, sem registro novo.
 
 **Testes.** `tests/lenaa.test.mjs` (6): RUT, agrupamento e limite de atividade, filtro de país e commodity, falha da fonte sem simulação, azeite fora da soja, repetição sem duplicar. Suíte completa: 613 testes passaram, 0 falharam, e a UI smoke também passou.
+
+## 2026-10-22 — Publicação da prospecção automática e da descoberta real (0045–0048), autorizada por Rogério
+
+Executado conforme `PUBLICACAO-PROSPECCAO-PLANO.md`. Nenhuma pesquisa foi iniciada e as 147 empresas do Chile não foram cadastradas.
+
+**Antes:**
+- Worker vigente `4933fc92-71b6-4163-8b24-41035e0a88b3` (código `e58b7ed`), 100%.
+- Pendentes só 0045, 0046, 0047 e 0048.
+
+**Backup privado** (fora do Git), em `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0045-0048-20261022\`:
+- `eag_compass.sql`, 31,7 MB, SHA-256 `f8a12b7a2a25aa9b9f131a14293c674117658fa29dfa40bea66627f02fd0edc5`, conferido com `sha256sum -c`;
+- marcador do Time Travel em 2026-10-22T02:24:42Z: `0000083d-0000084c-0000510c-de217cc5abea93cf13e67c3a34f46f2b`.
+
+Carregado localmente, o backup bateu com a produção: 37 empresas, 73 candidatas, campanhas 3 `draft` + 1 `ended`, 44 migrações, `integrity_check` ok, 0 pendências de chave estrangeira.
+
+Para carregar a exportação fora do D1, é preciso desligar as chaves estrangeiras durante a carga: há referências a tabelas que aparecem depois no arquivo.
+
+**0048 (reconstrução de `discovery_candidates`)**, ensaiada sobre a cópia com os dados reais:
+- as 73 candidatas ficaram idênticas campo a campo;
+- 0 pendências de chave estrangeira;
+- os 3 índices recriados;
+- UNIQUE `(search_id, source, external_id)` mantida;
+- chaves estrangeiras para `foreign_searches`, `foreign_search_sources` e `companies` mantidas;
+- `cl_sag_lenaa` aceita na restrição de fonte.
+
+**Compatibilidade do Worker anterior com o esquema final.** A suíte do commit `e58b7ed` foi rodada com 0045–0048 numa cópia temporária, fora do repositório: 513 testes mais 2 de integração `workerd` + D1, 0 falhas.
+
+Mudaram só três expectativas sobre os dados semeados do catálogo: 29 produtos em vez de 28, um código novo (Farelo de milho, 0046) e a busca do CSO pelo nome. Nenhuma mudança de comportamento. Por isso `4933fc92` é a reversão de código válida.
+
+**Migrações:**
+- `npm run db:migrate:remote`, 02:26:41–02:26:46Z;
+- depois: "No migrations to apply", 48 migrações, 37 empresas, 73 candidatas, índices e restrições conferidos e 0 pendências de chave estrangeira.
+
+**Publicação:**
+- `npm run deploy`; o `predeploy` rodou 574 + 2 + 37 testes, 0 falhas, e `validate-deploy`;
+- publicado o Worker **`a74acf8e-79ef-4e01-94b9-3f5ca3d21e60`** (2026-10-22T02:30:22Z), código `1e7be00`, 100%.
+
+O `wrangler` terminou com código 1 por causa da atualização do consumidor da fila `eag-compass-async`: "only partially updated", erro 10013 da API. Os crons foram atualizados.
+
+A consulta de leitura à API mostrou o consumidor existente intacto: `eag-compass-production`, lote 10, 5 tentativas, `eag-compass-dlq`, igual ao `wrangler.jsonc`, que não mudou. O deploy não foi repetido.
+
+**Conferência.** Foi feita pelo Chrome sem interface, com a sessão do Access obtida sem exibir o token; o arquivo do token foi apagado depois. Houve só navegação e escolha nas listas, sem iniciar prospecção e sem enviar formulário. **Não foi só leitura.** Ao abrir as telas Prospecção e Radar Internacional, o código publicado gravou (gravações cobertas pela autorização):
+- 02:35:29Z: política delimitada v1 (`research_policy.granted_from_authorization`, ator `system-authorization`, a partir da autorização escrita de 2026-10-20);
+- 02:35:41–42Z: classificação fiscal automática da soja em `product-01` e `product-02`, NCM 1201.90.00, fonte oficial (`catalog.code_auto_classified`, ator `system-classification`);
+- 02:36–02:38Z: resumos da lista de países refeitos a partir dos dados oficiais já guardados no R2. A Comtrade passou de 60 para 92 de 99 países com detalhe por subposição; o MDIC continua com 0 de 250. Sem consulta externa nova: nenhuma versão nova de lista e nenhum pedido manual.
+
+**Estado depois:**
+- canais e-mail, LinkedIn e WhatsApp `planned`;
+- T11 sem validação;
+- cópia `enabled:false`;
+- campanhas 3 `draft` + 1 `ended`;
+- fichas: 6 `in_approval` e 7 `discarded`;
+- aprovações e `send_outbox` (6 aceitos, 22 cancelados) iguais às de 14/10, 21:12Z (teste D5-a), nada novo;
+- 37 empresas, 0 no Chile, 73 candidatas, 0 trabalhos de prospecção, 1 busca internacional.
+
+**Ponte:** leitura bem-sucedida às 02:38:58Z, depois da publicação. O último erro, ECONNRESET, foi às 02:12Z, antes dela.
+
+**Limitações:**
+- **Lista de países ainda em preparo.** Commodity → países mostrou "Preparando os mercados compradores…": os resumos por subposição (coluna nova da 0047) são refeitos 60 por chamada, a cada abertura da tela e pelo cron diário das 02:17Z, Comtrade antes do MDIC. Até completar, a lista de destinos fica incompleta. Isso não é ausência de destino.
+- **SAG (LENAA) no Worker publicado: ainda não comprovado.** Nenhuma pesquisa foi iniciada nesta etapa. Se o SAG recusar a Cloudflare, aparece como fonte indisponível.
+- **OpenStreetMap: depende do navegador aberto** (o Overpass recusa a Cloudflare).
+
+**Reversão de código:** `npx wrangler rollback 4933fc92-71b6-4163-8b24-41035e0a88b3`, compatível com o esquema final, conforme o teste acima. Não restaurar o banco automaticamente. Antes de qualquer restauração:
+- determinar o estado efetivo;
+- considerar que restaurar descarta gravações posteriores (ponte, política, classificação);
+- considerar que pode trazer de volta dados pessoais excluídos depois do backup; os registros de eliminação posteriores teriam de ser reaplicados.
+
+**Pendente para a etapa seguinte:** filtro de disponibilidade da prospecção, nos dois sentidos (commodity → países e país → commodities), com:
+- resultado vazio válido distinto de falha, falta de cobertura, pesquisa incompleta e simulação ausente;
+- seção recolhida com motivo e histórico;
+- reavaliação por atualização ou vencimento;
+- investigação dos casos Etanol — África do Sul e Milho — Albânia.
