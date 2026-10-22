@@ -136,7 +136,8 @@ function classify({ product, iso2, iso3, hs6, profile, at, ctx }) {
   const active = job && ACTIVE.includes(job.status);
   // Empresas identificadas: candidatas encontradas na pesquisa ou empresas já cadastradas (relação ou atividade).
   if (a?.outcome === "found" || co.relatedN || co.compatibleN) {
-    const parts = [a?.outcome === "found" ? a.reason.replace(/ \(candidatas, não compradoras confirmadas\)\.$/, ".") : null, co.relatedN ? `${co.relatedN} empresa(s) já cadastrada(s) relacionada(s) ao produto` : null, co.compatibleN ? `${co.compatibleN} empresa(s) já cadastrada(s) com atividade compatível (inclusive de outra commodity)` : null].filter(Boolean);
+    // Candidatas da própria pesquisa já viram empresas relacionadas ao produto: não contar duas vezes.
+    const parts = [a?.outcome === "found" ? a.reason.replace(/ \(candidatas, não compradoras confirmadas\)\.$/, "") : null, co.relatedN && a?.outcome !== "found" ? `${co.relatedN} empresa(s) já cadastrada(s) relacionada(s) ao produto` : null, co.compatibleN ? `${co.compatibleN} empresa(s) já cadastrada(s) com atividade compatível (inclusive de outra commodity)` : null].filter(Boolean);
     return { tier: "identified", status: active ? "researching" : "identified", tag: "empresas identificadas", note: `${parts.join("; ")}${via}. Candidatas, não compradoras confirmadas.`, ...base, related: co.relatedN, compatible: co.compatibleN, jobId: active ? job.id : base.jobId };
   }
   if (!conn.length) return { tier: "investigate", status: "no_source", tag: "sem fonte de empresas", note: "nenhuma fonte de empresas coberta para este país e esta commodity: limitação de cobertura, não ausência de compradores", nextAttempt: null };

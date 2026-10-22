@@ -889,7 +889,7 @@ function marketEvidence(ctx, a, hs, p, ind) {
       unavailable: `${d.label}: consulta com falha ou limite (${st.error ?? "sem detalhe"}). Não indica ausência de comércio.`,
       not_queried: `${d.label}: consulta ainda não realizada.`,
       no_source: `${d.label}: o país não tem código nesta fonte.`,
-      no_simulation: `${d.label}: combinação sem simulação configurada nesta prévia ou teste; não representa ausência real de comércio.`,
+      no_simulation: `${d.label}: ${sim?.label ? `${sim.label} (prévia ou teste)` : "combinação sem simulação configurada nesta prévia ou teste"}; não representa ausência real de comércio.`,
     }[state];
     return { key: d.key, label: d.label, state, tag: EVIDENCE_TAG[state], period: d.period, filters, text, hs6: d.pos.map((r) => String(r.hs6)) };
   });

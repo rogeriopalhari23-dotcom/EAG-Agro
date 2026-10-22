@@ -65,7 +65,8 @@ test("Identificação do responsável: canal geral com fonte vira destinatário 
   assert.match(emails[0].body, /Meu nome é Rogerio Palhari e trabalho com originação de commodities agrícolas\. Atuo como franqueado da EAG Agro/, "SENDER_NAME é só o nome do campo De; o texto usa o nome da pessoa");
   assert.doesNotMatch(emails[0].body, /EAG Agro - Brasil/);
   assert.equal(emails[1].subject, emails[0].subject, "acompanhamento sem Re:");
-  assert.doesNotMatch(emails.map((m) => m.body).join("\n"), /20 minutos|preço|lote|volume/i, "sem reunião nem condição comercial");
+  // Sem os endereços (o link de descadastro tem um token aleatório, que às vezes contém "lote"): só o texto escrito.
+  assert.doesNotMatch(emails.map((m) => m.body.replace(/https?:\/\/\S+/g, "")).join("\n"), /20 minutos|preço|lote|volume/i, "sem reunião nem condição comercial");
   assert.match(emails[0].body, /Rua Exemplo, 100/);
   assert.match(emails[0].body, /"sair"/);
   // Nova versão mantém a finalidade da anterior.
