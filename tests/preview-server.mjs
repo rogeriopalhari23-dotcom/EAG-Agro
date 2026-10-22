@@ -57,6 +57,9 @@ const FAKE_REG = {
 const REAL = process.env.PREVIEW_REAL === "1";
 const world = REAL ? null : simulatedWorld({ cityAt: nearestMunicipality(DB), refuseOsm: process.env.PREVIEW_OSM_RECUSA === "1" });
 const realFetch = globalThis.fetch;
+// Demonstração: descoberta simulada marcada como tal (a avaliação de disponibilidade é gravada como simulada e nunca muda
+// a disponibilidade dos mercados reais).
+if (!REAL) ctx.env.SIMULATED_DISCOVERY = "1";
 if (!REAL) globalThis.fetch = async (url, init) => {
   const sim = await world.fetch(url, init).catch(() => null);
   if (sim) return sim;

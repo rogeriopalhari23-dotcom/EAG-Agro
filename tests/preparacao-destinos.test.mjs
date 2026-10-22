@@ -7,6 +7,9 @@ import assert from "node:assert/strict";
 import { setup } from "./helpers/db.mjs";
 import { sources, tradeParams, driver, AGRI } from "./helpers/trade.mjs";
 import { revokedPolicy } from "./helpers/revoked-policy.mjs";
+import { summaryCatchUp } from "../src/importers.js";
+// Cron de 5 minutos: resumos que faltam, em lotes (src/importers.js summaryCatchUp).
+const catchUp = async (env) => { for (let k = 0; k < 40; k++) if ((await summaryCatchUp(env, "eag-internal", { batch: 60 })).state === "idle") break; };
 
 // Ambiente da rota (como na produção): fila assíncrona e rede apontam para as fontes simuladas.
 function wire(t, env, src) {
@@ -76,6 +79,7 @@ test("preparação autorizada: rotina iniciada para todos os países, \"Preparan
   await d.drain();
   // Como a tela: nova consulta a cada poucos segundos enquanto os resumos são refeitos (60 por consulta).
   for (let k = 0; k < 12; k++) {
+    await catchUp(env);
     r = await dest(api, { commodity: "sugar" });
     if (r.items.some((x) => x.iso3 === "USA") && !r.coverage.pendingSummaries) break;
   }
@@ -107,6 +111,7 @@ test("falha da fonte e cobertura parcial: recuperação concreta pede de novo o 
   }
   const usaCt = DB.raw.prepare("SELECT st.state,st.error FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id WHERE st.iso3='USA' AND st.source='comtrade' AND v.kind='monthly'").get();
   assert.equal(usaCt?.state, "data_unavailable", JSON.stringify(usaCt));
+  await catchUp(env);
   let r = await dest(api, { commodity: "sugar" });
   assert.ok(r.reasons.some((x) => /falha da fonte/.test(x)), JSON.stringify(r.reasons));
   assert.ok(r.items.some((x) => x.iso3 === "USA"), "o MDIC continua comprovando os EUA: a falha da Comtrade não apaga a evidência");

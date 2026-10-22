@@ -72,7 +72,9 @@ export const POLICY_TEMPLATE = {
     "prova de uso e compra": "partial",
     "triagem de sanções": "partial",
   },
-  international: { acceptCandidatesWith: ["registry_id", "website"] },
+  // Disponibilidade (src/availability.js): busca real vazia sai da seleção principal por reassessEmptyDays (depois, ou com
+  // fonte/regra nova ou empresa compatível, volta); pendência técnica espera retryTechnicalHours na pesquisa automática.
+  international: { acceptCandidatesWith: ["registry_id", "website"], reassessEmptyDays: 90, retryTechnicalHours: 24 },
 };
 
 // Emenda da prospecção automática (docs/implementation/EMENDA-PROSPECCAO-AUTOMATICA.md): PROPOSTA, não aprovada.

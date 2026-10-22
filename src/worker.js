@@ -221,6 +221,8 @@ async function route(request, env, rid, internalActor = null) {
   if (path === "/api/prospect/policy/revoke" && method === "POST") return response(await prospect.revokePolicy(request, env, actor, rid));
   if (path === "/api/prospect/coverage" && method === "GET") return response(await prospect.coverage(request, env, actor));
   if (path === "/api/prospect/destinations" && method === "POST") return response(await prospect.destinationsRoute(request, env, actor, rid, {}));
+  if (path === "/api/prospect/availability" && method === "POST") return response(await prospect.availabilityRoute(request, env, actor, rid));
+  if (path === "/api/prospect/availability/reassess" && method === "POST") return response(await prospect.reassessRoute(request, env, actor, rid));
   if (path === "/api/prospect/characteristic" && method === "POST") return response(await prospect.answerCharacteristic(request, env, actor, rid));
   if (path === "/api/prospect/auto" && method === "POST") return response(await prospect.autoStart(request, env, actor, rid), 201);
   if (path === "/api/prospect/connectors" && method === "GET") return response(await prospect.connectors(request, env, actor));
@@ -674,6 +676,9 @@ export default {
     if (controller.cron === "*/5 * * * *") {
       // Prospecções devidas (espera por limite de fonte vencida ou mensagem da fila perdida): retoma sem duplicar.
       await prospect.tick(env, tenant, { call: internalCaller(env, crypto.randomUUID()) }).catch((e) => console.error("prospect_tick_failed", { message: String(e?.message ?? "").slice(0, 120) }));
+      // Resumos da lista de países que faltam (dados oficiais já guardados): lote pequeno com lease e cursor; falha fica
+      // registrada em maintenance_leases e aparece na tela de destinos.
+      await importers.summaryCatchUp(env, tenant).catch((e) => console.error("trade_summary_catchup_failed", { message: String(e?.message ?? "").slice(0, 120) }));
       // Respostas primeiro: uma resposta recém-chegada pausa antes do próximo envio.
       // Com a ponte (SEND_TRANSPORT=bridge), leitura e envio acontecem pelas rotas /api/bridge/*; o cron não fala com a caixa.
       if (env.SEND_TRANSPORT !== "bridge") {

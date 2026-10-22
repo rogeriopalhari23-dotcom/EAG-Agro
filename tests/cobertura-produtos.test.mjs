@@ -56,7 +56,9 @@ test("resposta positiva: cada produto aparece pelo próprio código, no país co
   const { api, products } = await world(t, (ps) => ({ mdicRows: { ...MDIC_ROWS, 2026: [...MDIC_ROWS[2026], ...ps.map((p) => `"2026";"03";"${ncm(p)}";"10";"249";"SP";"01";"0817600";1000;1000;5000`)] }, ncm: ncmLines(ps), hs: hsAll(ps) }));
   for (const p of products) {
     const r = await dest(api, p.id);
-    const usa = r.items.find((x) => x.iso3 === "USA");
+    // Sem fonte de empresas coberta, o destino comprovado fica fora da seleção principal, com o motivo (2026-10-22).
+    const gaps = (r.coverageGaps ?? []).filter((x) => x.iso3 === "USA");
+    const usa = r.items.find((x) => x.iso3 === "USA") ?? (gaps.length ? { products: gaps.map((x) => ({ productId: x.productId, hs6: x.hs6 })) } : null);
     assert.ok(usa, `${p.name}: EUA com registro (${r.state}: ${r.message})`);
     assert.deepEqual(usa.products.map((x) => x.productId), [p.id], `${p.name}: só o próprio produto fundamenta`);
     assert.ok(usa.products[0].hs6.every((h) => p.hs6.includes(h)), `${p.name}: códigos do próprio produto`);

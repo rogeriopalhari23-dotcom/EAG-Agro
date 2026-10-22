@@ -5534,13 +5534,31 @@ function decisionActions(j, id) {
 }
 const jobActive = (j) => ["queued", "running", "waiting"].includes(j.status);
 
+// Fora da seleção principal (mesma relação do servidor, src/availability.js): retiradas temporariamente por busca real
+// vazia (motivo, fontes, datas e reavaliação) e destinos sem fonte de empresas (limitação de cobertura). Recolhidas.
+const catchUpText = (c) => `Preparação automática dos resumos a partir dos dados oficiais guardados (a cada 5 minutos)${c.remaining != null ? `: ${c.remaining} restante(s)` : ""}${c.lastFinishedAt ? `; último lote em ${fmtDate(c.lastFinishedAt)}${c.built != null ? ` (${c.built} feito(s))` : ""}` : "; ainda não executada"}${c.error ? `; última falha: ${c.error} (${fmtDate(c.errorAt)})` : ""}.`;
+function availabilityLists(r, reload) {
+  const out = [];
+  if (r.withdrawn?.length)
+    out.push(details(`Retiradas temporariamente da seleção (${r.withdrawn.length})`, el("ul", { class: "compact-list availability-withdrawn" }, ...r.withdrawn.map((w) => el("li", {},
+      text("strong", `${w.country} — ${w.product}`),
+      text("p", w.reason),
+      text("small", `Avaliada em ${fmtDate(w.assessedAt)}. Fontes: ${(w.sources ?? []).map((x) => `${x.label} (${x.status === "ok" ? `${x.found ?? 0} encontrada(s)` : x.status})`).join("; ") || "não registradas"}. Reavaliação a partir de ${fmtDate(w.reviewAfter)}, ou antes com fonte nova, regra nova ou empresa compatível cadastrada.`),
+      writable() ? button("Reavaliar agora", async () => { await api("/api/prospect/availability/reassess", "POST", { productId: w.productId, iso3: w.iso3 }); notice("Combinação devolvida à seleção principal; a avaliação anterior fica no histórico."); reload(); }) : null,
+    )))));
+  if (r.coverageGaps?.length) out.push(details(`Sem fonte de empresas coberta (${r.coverageGaps.length})`, el("ul", { class: "compact-list" }, ...r.coverageGaps.map((w) => text("li", `${w.country} — ${w.product}: ${w.note}.`)))));
+  if (r.catchUp && (r.catchUp.remaining || r.catchUp.error)) out.push(text("small", catchUpText(r.catchUp)));
+  return out;
+}
+
 // Formulário mínimo. market: "national" | "international" | null (pergunta).
 function prospectStart(fixedMarket = null) {
   const commodities = catalogCommodities();
   const box = el("section", { class: "panel prospect-start" }, text("h2", "Iniciar prospecção"));
   const form = el("form", { class: "prospect-form", novalidate: "" });
   const error = el("p", { class: "error", hidden: "" });
-  const comm = comboBox({ label: "Commodity", name: "commodity", placeholder: "Digite para buscar (ex.: café, milho, farelo)", load: commodityItems, required: true });
+  // Internacional começando pelo país: só as commodities disponíveis nele (mesma relação do sentido commodity → países).
+  const comm = comboBox({ label: "Commodity", name: "commodity", placeholder: "Digite para buscar (ex.: café, milho, farelo)", load: async () => { const all = await commodityItems(); return market === "international" && startBy === "country" && countryFirst.item?.choice ? all.filter((c) => countryFirst.item.choice.commodities.some((x) => x.code === c.id)) : all; }, required: true });
   const prodBox = el("div", { class: "prospect-product" });
   let code = "", productId = "";
   const renderProduct = () => {
@@ -5578,6 +5596,51 @@ function prospectStart(fixedMarket = null) {
   let dest = null, destSeq = 0, destKey = "", destTimer = null, destTries = 0;
   const country = comboBox({ label: "País de destino", name: "country", placeholder: "Digite para buscar entre os destinos comprovados", load: async () => (dest?.state === "ready" ? dest.items : []).map((d) => ({ id: d.iso2, iso3: d.iso3, label: d.name, aliases: d.nameEn ? [d.nameEn] : [], dest: d })), required: true });
   const destBox = el("div", { class: "destinations-status", "aria-live": "polite" });
+  // Sentido país → commodities: o país primeiro (países com alguma commodity disponível), depois a commodity.
+  let startBy = "commodity", avail = null;
+  const startSel = select("Começar por", "startBy", [["commodity", "Commodity"], ["country", "País"]], startBy);
+  const firstBox = el("div", { class: "availability-country", "aria-live": "polite" });
+  const countryFirst = comboBox({
+    label: "País", name: "countryFirst", placeholder: "Digite para buscar entre os países disponíveis",
+    load: async () => {
+      avail ??= await api("/api/prospect/availability", "POST", {});
+      const r = avail;
+      if (r.state !== "ready") {
+        firstBox.replaceChildren(text("p", r.message ?? `Preparando os mercados compradores${r.progressText ? ` (${r.progressText})` : ""}.`, "form-hint"), ...(r.catchUp ? [text("small", catchUpText(r.catchUp))] : []));
+        avail = null; // nova consulta na próxima abertura da lista
+      }
+      return (r.countries ?? []).map((c) => ({ id: c.iso2, iso3: c.iso3, label: c.name, hint: `${c.commodities.length} commodity(ies) disponível(is)`, choice: c }));
+    },
+  });
+  countryFirst.onChange((it) => safe(async () => {
+    firstBox.replaceChildren();
+    comm.reload();
+    if (!it) return;
+    if (code && !it.choice.commodities.some((c) => c.code === code)) {
+      comm.clear();
+      code = "";
+      productId = "";
+      country.clear();
+      evidenceBox.replaceChildren();
+      loadDestinations();
+    }
+    const r = await api("/api/prospect/availability", "POST", { iso2: it.id });
+    const c = r.country;
+    firstBox.append(
+      text("p", c?.commodities.length ? `Disponíveis em ${it.label}: ${c.commodities.map((x) => x.label).join(", ")}.` : `Nenhuma commodity disponível em ${it.label} agora.`, "form-hint"),
+      ...availabilityLists({ withdrawn: c?.withdrawn ?? [], coverageGaps: c?.coverageGaps ?? [], catchUp: r.catchUp }, () => ((avail = null), countryFirst.set(it, false))),
+    );
+    if (code) loadDestinations(true);
+  }));
+  const startBox = el("div", { class: "form-grid prospect-startby" }, startSel.node, el("div", {}, countryFirst.node, firstBox));
+  countryFirst.node.hidden = true;
+  startSel.control.addEventListener("change", () => {
+    startBy = startSel.control.value;
+    countryFirst.node.hidden = startBy !== "country";
+    firstBox.replaceChildren();
+    if (startBy !== "country") countryFirst.clear();
+    comm.reload();
+  });
   const evidenceBox = el("div", { class: "destination-evidence" });
   // Produto da pesquisa: o que fundamenta o país (maior valor registrado), trocável nos detalhes entre os que fundamentam.
   const showEvidence = () => {
@@ -5591,7 +5654,9 @@ function prospectStart(fixedMarket = null) {
     const chosen = d.products.find((x) => x.productId === productId);
     const sel = d.products.length > 1 ? select("Produto desta pesquisa", "destProduct", d.products.map((x) => [x.productId, x.name]), productId) : null;
     sel?.control.addEventListener("change", () => ((productId = sel.control.value), showEvidence(), coverage()));
+    const av = chosen.availability;
     evidenceBox.append(
+      ...(av ? [text("p", `Situação: ${av.tag}${av.note && av.note !== av.tag ? ` — ${av.note}` : ""}.`, av.technical ? "form-hint warn" : "form-hint")] : []),
       text("p", `Produto: ${chosen.name}. ${d.evidence.filter((e) => e.productId === productId).map((e) => e.source === "mdic" ? "Exportações do Brasil (MDIC)" : "Importações declaradas (Comtrade)").filter((x, i, a) => a.indexOf(x) === i).join(" e ")}.`, "form-hint"),
       details("Detalhes", ...[sel?.node ?? null, el("ul", { class: "compact-list" }, ...d.evidence.map((e) => text("li", e.text)), text("li", d.connector.available ? `Fontes de empresas: ${d.connector.labels.join("; ")}.` : `Fontes de empresas: ${d.connector.note}.`), text("li", "Dado do país não prova que uma empresa importa do Brasil."))].filter(Boolean)),
     );
@@ -5650,6 +5715,11 @@ function prospectStart(fixedMarket = null) {
         country.set({ ...country.item, dest: r.items.find((x) => x.iso2 === country.item.id) }, true);
         showEvidence();
       }
+      // Começando pelo país: o mesmo país já vem escolhido quando a commodity o tem na lista.
+      if (startBy === "country" && countryFirst.item && !country.item) {
+        const it = r.items.find((x) => x.iso2 === countryFirst.item.id);
+        if (it) (country.set({ id: it.iso2, iso3: it.iso3, label: it.name, aliases: it.nameEn ? [it.nameEn] : [], dest: it }, true), showEvidence(), coverage());
+      }
       // Enquanto prepara, a lista cresce conforme os dados chegam; nova consulta a cada poucos segundos.
       const again = () => { if (destTries++ < 90) destTimer = setTimeout(() => loadDestinations(true), 4000); };
       if (r.recovery?.length) destBox.append(text("small", `Nova tentativa: ${r.recovery.join("; ")}.`));
@@ -5663,11 +5733,14 @@ function prospectStart(fixedMarket = null) {
       } else if (r.state === "preparing") {
         destBox.append(el("p", { class: "preparing" }, text("strong", "Preparando os mercados compradores"), r.progressText ? text("span", ` — ${r.progressText}.`) : "…"), r.policy?.grantedVia === "written_authorization" ? text("small", "Preparação automática sob a política delimitada da autorização escrita de 2026-10-20 (automação, sem clique de pessoa).") : null);
         again();
+      } else if (r.state === "none_available") {
+        destBox.append(el("div", { class: "callout" }, text("p", r.message)));
       } else if (r.state === "needs_characteristic") {
         destBox.append(text("p", r.message, "form-hint"));
       } else {
         destBox.append(el("div", { class: r.state === "none_valid" ? "callout" : "callout warn" }, text("p", r.message), r.retry ? button("Tentar de novo", () => loadDestinations(true, true)) : null));
       }
+      destBox.append(...availabilityLists(r, () => loadDestinations(true)));
       // Origem da lista: produto, códigos usados, fonte, direção (contraparte Brasil), período e países realmente cobertos.
       if (r.diagnostics?.length)
         destBox.append(details("Como esta lista foi montada", el("ul", { class: "compact-list" }, ...r.diagnostics.flatMap((d) => [text("li", `${d.name} — SH ${d.hs6.join(", ")}`), text("li", d.bySource.mdic.text), text("li", d.bySource.comtrade.text)]), ...(r.progressText ? [text("li", `Trabalhos em andamento: ${r.progressText}.`)] : []))));
@@ -5702,6 +5775,7 @@ function prospectStart(fixedMarket = null) {
   const showMarket = () => {
     natBox.hidden = market !== "national";
     intlBox.hidden = market !== "international";
+    startBox.hidden = market !== "international";
     renderProduct();
     loadDestinations();
     coverage();
@@ -5726,7 +5800,7 @@ function prospectStart(fixedMarket = null) {
   };
   safe(renderCtx);
   const submit = el("button", { type: "submit", class: "primary" }, "Iniciar prospecção");
-  form.append(el("div", { class: "form-grid" }, comm.node, prodBox, marketSel?.node ?? null), natBox, intlBox, cov, ctxLine, error, el("div", { class: "toolbar" }, submit));
+  form.append(startBox, el("div", { class: "form-grid" }, comm.node, prodBox, marketSel?.node ?? null), natBox, intlBox, cov, ctxLine, error, el("div", { class: "toolbar" }, submit));
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     safe(async () => {

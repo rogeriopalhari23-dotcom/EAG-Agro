@@ -32,7 +32,9 @@ async function periodMonths(env, tenant) {
 // Só lê o R2; limitado por chamada. Usado pelo cron diário e pelo admin.
 // months: janela do MDIC diferente da padrão (ex.: período guardado mais longo, para a evidência de mercado).
 // comtradeHistory: resumo da Comtrade nos anos guardados da janela recente (period_months = ano inicial), só Comtrade.
-export async function rebuildSummaries(env, tenant, { limit = 40, months: windowMonths = null, comtradeHistory = false } = {}) {
+// after: cursor "fonte|ISO3" (retomada do lote anterior, sem recomeçar pelos mesmos países); objeto que falha não
+// interrompe o lote: fica em failed, com o motivo, e os demais seguem.
+export async function rebuildSummaries(env, tenant, { limit = 40, months: windowMonths = null, comtradeHistory = false, after = null } = {}) {
   const minYear = comtradeHistory ? comtradeMinYear((await parameters(env, tenant))["trade_list_comtrade_years:international"], now()) : null;
   const months = comtradeHistory ? minYear : windowMonths ?? (await periodMonths(env, tenant));
   if (months == null) return { built: 0, remaining: null, reason: "Parâmetro period_default_months (D1) não aprovado." };
@@ -42,25 +44,98 @@ export async function rebuildSummaries(env, tenant, { limit = 40, months: window
      WHERE c.source='comtrade' AND (t.content_sha256 IS NULL OR t.hs6_json IS NULL)`
     : `FROM trade_list_current c LEFT JOIN trade_country_summary t
       ON t.content_sha256=c.content_sha256 AND t.period_months=(CASE c.source WHEN 'mdic' THEN ? ELSE 0 END)
-     WHERE t.content_sha256 IS NULL OR t.hs6_json IS NULL`;
-  const todo = (await s(env, `SELECT c.iso3,c.source,c.version_id,c.r2_key,c.content_sha256 ${missingSql} ORDER BY c.source,c.iso3 LIMIT ?`, months, limit).all()).results;
-  let built = 0;
-  const failed = [];
+     WHERE (t.content_sha256 IS NULL OR t.hs6_json IS NULL)`;
+  // Só contagem (limit 0): nenhuma leitura do R2 e nenhuma gravação.
+  if (limit === 0) return { built: 0, remaining: (await s(env, `SELECT COUNT(*) n ${missingSql}`, months).first()).n, failed: [], errors: [], last: null, exhausted: true };
+  const todo = (await s(env, `SELECT c.iso3,c.source,c.version_id,c.r2_key,c.content_sha256 ${missingSql}${after ? " AND (c.source||'|'||c.iso3)>?" : ""} ORDER BY c.source,c.iso3 LIMIT ?`, ...(after ? [months, after, limit] : [months, limit])).all()).results;
+  let built = 0, last = null;
+  const failed = [], errors = [];
   for (const p of todo) {
-    const o = await env.FILES.get(p.r2_key);
-    if (!o) {
+    last = `${p.source}|${p.iso3}`;
+    try {
+      const o = await env.FILES.get(p.r2_key);
+      if (!o) {
+        failed.push(p.iso3);
+        errors.push(`${p.source}/${p.iso3}: objeto não encontrado no R2`);
+        continue;
+      }
+      const obj = JSON.parse(await o.text());
+      const summary = comtradeHistory ? summarizeComtradeHistory(obj, minYear) : p.source === "mdic" ? summarizeMdic(obj, months) : summarizeComtrade(obj);
+      await summaryStmt(env, summaryRow({ iso3: p.iso3, versionId: p.version_id, sha: p.content_sha256, periodMonths: months, summary })).run();
+      built++;
+    } catch (e) {
       failed.push(p.iso3);
-      continue;
+      errors.push(`${p.source}/${p.iso3}: ${String(e?.message ?? e).slice(0, 120)}`);
     }
-    const obj = JSON.parse(await o.text());
-    const summary = comtradeHistory ? summarizeComtradeHistory(obj, minYear) : p.source === "mdic" ? summarizeMdic(obj, months) : summarizeComtrade(obj);
-    await summaryStmt(env, summaryRow({ iso3: p.iso3, versionId: p.version_id, sha: p.content_sha256, periodMonths: months, summary })).run();
-    built++;
   }
   // Resumos de objetos que nenhum ponteiro usa mais saem (a lista nunca os mostraria).
   await s(env, "DELETE FROM trade_country_summary WHERE content_sha256 NOT IN (SELECT content_sha256 FROM trade_list_current)").run();
   const remaining = (await s(env, `SELECT COUNT(*) n ${missingSql}`, months).first()).n;
-  return { built, remaining, failed };
+  return { built, remaining, failed, errors, last, exhausted: todo.length < limit };
+}
+
+// Retomada automática dos resumos que faltam (cron de 5 minutos): lotes pequenos, um executor por vez (lease), cursor
+// persistido por janela e último resultado ou falha visível na tela. Só lê objetos oficiais já guardados no R2; nenhuma
+// chamada externa. Enquanto houver resumo pendente, a lista de destinos fica "em preparação": resumo ausente nunca é
+// ausência de comércio nem de empresas.
+export const CATCHUP = "trade_summary_catchup";
+export async function summaryWindows(env, tenant) {
+  const p = await parameters(env, tenant);
+  const months = Number(p["period_default_months:international"]) || null;
+  const longest = Math.min(60, Math.max(12, (Number(p["trade_list_mdic_years:international"]) || 1) * 12));
+  return [
+    months ? { key: `m${months}`, months } : null,
+    months && longest > months ? { key: `m${longest}`, months: longest } : null,
+    { key: "hist", comtradeHistory: true },
+  ].filter(Boolean);
+}
+export async function summaryCatchUp(env, tenant, { at = now(), batch = 20, leaseMs = 4 * 60_000, rebuild = rebuildSummaries } = {}) {
+  if (!env.FILES) return { state: "idle", reason: "R2 não configurado" };
+  const passes = await summaryWindows(env, tenant);
+  // Nada a fazer: nenhuma gravação (o cron roda a cada 5 minutos).
+  const pending = async () => {
+    let n = 0;
+    for (const w of passes) n += (await rebuild(env, tenant, { ...w, limit: 0 })).remaining ?? 0;
+    return n;
+  };
+  if (!(await pending())) return { state: "idle", remaining: 0 };
+  const holder = crypto.randomUUID();
+  const until = new Date(Date.parse(at) + leaseMs).toISOString();
+  await s(env, "INSERT OR IGNORE INTO maintenance_leases(name) VALUES (?)", CATCHUP).run();
+  const got = await s(env, "UPDATE maintenance_leases SET holder=?,lease_until=?,last_started_at=? WHERE name=? AND (lease_until IS NULL OR lease_until<?)", holder, until, at, CATCHUP, at).run();
+  if (!got.meta?.changes) return { state: "busy" };
+  const row = await s(env, "SELECT cursor_json FROM maintenance_leases WHERE name=?", CATCHUP).first();
+  let cursor = {};
+  try { cursor = JSON.parse(row?.cursor_json ?? "{}") ?? {}; } catch { cursor = {}; }
+  let budget = batch, built = 0;
+  const errors = [];
+  try {
+    for (const w of passes) {
+      if (budget <= 0) break;
+      const r = await rebuild(env, tenant, { ...w, limit: budget, after: cursor[w.key] ?? null });
+      built += r.built;
+      errors.push(...(r.errors ?? []));
+      budget -= r.built + (r.failed?.length ?? 0);
+      // Fim da janela: volta ao começo na próxima vez (refaz o que falhou, sem repetir o que já foi feito).
+      cursor[w.key] = r.exhausted ? null : r.last;
+    }
+    const remaining = await pending();
+    const result = { built, remaining, errors: errors.slice(0, 10), at };
+    await s(env, "UPDATE maintenance_leases SET holder=NULL,lease_until=NULL,cursor_json=?,last_finished_at=?,last_result_json=?,last_error=?,last_error_at=? WHERE name=? AND holder=?", JSON.stringify(cursor), now(), JSON.stringify(result), errors.length ? errors.slice(0, 3).join("; ") : null, errors.length ? now() : null, CATCHUP, holder).run();
+    return { state: "ran", ...result };
+  } catch (e) {
+    const msg = String(e?.message ?? e).slice(0, 200);
+    await s(env, "UPDATE maintenance_leases SET holder=NULL,lease_until=NULL,cursor_json=?,last_error=?,last_error_at=? WHERE name=? AND holder=?", JSON.stringify(cursor), msg, now(), CATCHUP, holder).run().catch(() => null);
+    return { state: "failed", built, error: msg };
+  }
+}
+// Situação da retomada para a tela: último lote, falha, restante.
+export async function catchUpStatus(env) {
+  const r = await s(env, "SELECT lease_until,last_started_at,last_finished_at,last_result_json,last_error,last_error_at FROM maintenance_leases WHERE name=?", CATCHUP).first().catch(() => null);
+  if (!r) return null;
+  let last = null;
+  try { last = r.last_result_json ? JSON.parse(r.last_result_json) : null; } catch { last = null; }
+  return { running: !!(r.lease_until && r.lease_until > now()), lastStartedAt: r.last_started_at, lastFinishedAt: r.last_finished_at, built: last?.built ?? null, remaining: last?.remaining ?? null, error: r.last_error, errorAt: r.last_error_at };
 }
 
 export async function rebuildSummariesRoute(request, env, actor, rid) {

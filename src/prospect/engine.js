@@ -20,6 +20,8 @@ import { pickNational, pickInternational } from "./rotation.js";
 import { rebuildSummaries } from "../importers.js";
 import { existingCompatible, addRelationsToInvestigate } from "../compatibility.js";
 import { destinationsFor, productsOf } from "../destinations.js";
+import { availabilityFor, byCountry, recordAssessment, reassessRoute as reassessPair } from "../availability.js";
+import { catchUpStatus } from "../importers.js";
 const ADMIN_ROLES = new Set(["admin"]);
 // Produto com o nome da commodity da lista única do catálogo.
 const productL = async (env, tenant, id) => {
@@ -217,8 +219,12 @@ export async function createJob(request, env, actor, rid, deps = {}) {
   // automática). Pesquisas antigas e o histórico ficam como estão; só o início de uma combinação incompatível é recusado.
   if (market === "international" && !deps.allowUnverifiedDestination) {
     await ensureClassified(env, actor.tenant_id, [p], policy);
-    const dest = await destinationsFor(env, actor.tenant_id, { products: [p], profile: profile.profile ?? DEFAULT_PROFILE, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }) } });
+    const dest = await availabilityFor(env, actor.tenant_id, { products: [p], profile: profile.profile ?? DEFAULT_PROFILE, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) } });
     const hit = dest.items.find((x) => x.iso3 === input.location.iso3);
+    // Mesma relação do formulário: par retirado por busca vazia recente, ou sem fonte de empresas, não começa.
+    const out = [...dest.withdrawn, ...dest.coverageGaps].find((x) => x.iso3 === input.location.iso3 && x.productId === p.id);
+    if (!hit && out?.status === "withdrawn") fail(409, "market_withdrawn", `${input.location.country} × ${p.display_name ?? p.variant_name} está retirada temporariamente da seleção: ${out.reason} Reavaliação a partir de ${out.reviewAfter.slice(0, 10)}, ou antes pela reavaliação na tela (fontes, regra ou empresa compatível nova).`, { assessmentId: out.assessmentId });
+    if (!hit && out?.status === "coverage") fail(422, "no_company_source", `${input.location.country} tem comércio comprovado de ${p.display_name ?? p.variant_name} com o Brasil, mas nenhuma fonte de empresas coberta no Compass: limitação de cobertura, não ausência de compradores.`);
     if (!hit) fail(422, "destination_not_eligible", `${input.location.country} não tem evidência oficial de comércio de ${p.display_name ?? p.variant_name} com o Brasil nos dados disponíveis${dest.state === "ready" ? "" : ` (${dest.message})`}. A pesquisa não começa com uma combinação sem evidência; escolha um destino da lista.`, { state: dest.state, reasons: dest.reasons });
     input.evidenceAtStart = { line: hit.line, basis: hit.basis, hs6: hit.products.flatMap((x) => x.hs6) };
   }
@@ -1073,6 +1079,7 @@ const INTERNATIONAL = {
       const r = await ctx.call(`/api/foreign-searches/${state.searchId}/discover`, "POST", { source: src.key, role: "processor" });
       if (ok(r)) {
         st.done = true;
+        st.found = r.data.found ?? 0;
         ctx.log("discover", "ok", `${src.label ?? src.key}: ${r.data.found ?? 0} empresa(s) encontrada(s) (indício, não prova de compra nem de importação).`);
       } else if (r.data?.error?.code === "source_unavailable" && st.tries <= MAX_SOURCE_RETRIES) {
         waiting = true;
@@ -1141,6 +1148,7 @@ const INTERNATIONAL = {
     if (!ctx.state.searchId) {
       const b = ctx.state.blocked ?? { message: "A busca de empresas não foi aberta." };
       const summary = { market: "international", country: ctx.input.location.country, candidates: 0, registered: 0, exceptions: 0, ranked: [], queue: [], partial: true, partialNote: b.message, coverage: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, { status: "not_applicable", note: "não consultada: a busca de empresas não foi aberta" }])), sourceLabels: Object.fromEntries((ctx.state.applicable ?? []).map((x) => [x.key, x.label])), notCommercial: "Nenhuma empresa foi buscada, cadastrada, qualificada ou contatada.", nextAction: "Aguardar a evidência de mercado do país; nada foi concluído sobre compradores.", analysisId: ctx.state.analysisId ?? null, existing: ctx.state.existing ?? null };
+      summary.assessment = await assess(ctx, summary);
       ctx.log("report", "ok", `Relatório: ${b.message}`);
       return { summary };
     }
@@ -1168,10 +1176,19 @@ const INTERNATIONAL = {
       searchId: ctx.state.searchId, campaignId: ctx.state.campaignId, analysisId: ctx.state.analysisId,
       existing: ctx.state.existing ?? null,
     };
+    summary.assessment = await assess(ctx, summary);
     ctx.log("report", "ok", `Relatório: ${summary.candidates} candidata(s), ${summary.registered} empresa(s) na busca, ${summary.exceptions} exceção(ões). ${summary.nextAction}`);
     return { summary };
   },
 };
+
+// Avaliação da combinação para a seleção (src/availability.js), registrada no andamento da pesquisa.
+const OUTCOME_TEXT = { found: "empresas encontradas: a combinação continua disponível", empty: "busca real concluída sem candidatas: combinação retirada temporariamente da seleção principal", technical: "pendência técnica: a combinação continua disponível e nada se conclui sobre compradores" };
+async function assess(ctx, summary) {
+  const a = await recordAssessment(ctx.env, { job: ctx.job, input: ctx.input, state: ctx.state, summary, profile: ctx.profile, policy: ctx.policy, at: ctx.now() });
+  ctx.log("report", a.outcome === "found" ? "ok" : "partial", `Disponibilidade: ${OUTCOME_TEXT[a.outcome]}${a.origin === "simulated" ? " (execução simulada: registrada, sem efeito sobre os mercados reais)" : ""}. ${a.reason}${a.outcome === "found" ? "" : ` Reavaliação a partir de ${a.reviewAfter.slice(0, 10)}, ou antes com fonte nova, regra nova ou empresa compatível cadastrada.`}`);
+  return { outcome: a.outcome, origin: a.origin, reason: a.reason, reviewAfter: a.reviewAfter };
+}
 
 // Classificação automática dos produtos da escolha sem código verificado (sob a política, como na análise do país).
 // → { asks: [{ productId, name, key, question, options, why }], unresolved: [{ productId, name, reason }] }
@@ -1211,9 +1228,28 @@ export async function destinationsRoute(request, env, actor, rid, deps = {}) {
     ? async (iso3) => !!(await requestCountryList(env, actor.tenant_id, iso3, { requestedBy: `policy:${policy.id}@v${policy.version}`, reason: "Destinos da pesquisa internacional: dado oficial vencido de destino comprovado", rid, deps: trade }))
     : null;
   const progress = await marketDataProgress(env, trade);
-  const r = await destinationsFor(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }), refresh }, preparation: { prep, progress, asks: cls.asks } });
-  return { ...r, asks: cls.asks, unresolvedClassification: cls.unresolved, recovery, policy: policy ? { version: policy.version, grantedVia: policy.policy?.grantedVia ?? "panel" } : null, products: products.map((p) => ({ id: p.id, name: p.display_name ?? p.variant_name })) };
+  const r = await availabilityFor(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }), refresh }, preparation: { prep, progress, asks: cls.asks } });
+  return { ...r, catchUp: await catchUpStatus(env), asks: cls.asks, unresolvedClassification: cls.unresolved, recovery, policy: policy ? { version: policy.version, grantedVia: policy.policy?.grantedVia ?? "panel" } : null, products: products.map((p) => ({ id: p.id, name: p.display_name ?? p.variant_name })) };
 }
+
+// POST /api/prospect/availability { iso2? } — sentido país → commodities, com a mesma relação de destinationsRoute
+// (evidência oficial, fontes de empresas, pesquisas anteriores). Sem iso2: países com alguma commodity disponível.
+export async function availabilityRoute(request, env, actor, rid) {
+  requireRole(actor, WRITE_ROLES);
+  const i = await bodyJson(request);
+  const iso2 = i.iso2 ? str(i.iso2, "país", 2).toUpperCase() : null;
+  const products = (await s(env, "SELECT * FROM products WHERE tenant_id=? AND active<>0", actor.tenant_id).all()).results;
+  const policy = await ensurePolicy(env, actor.tenant_id);
+  const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
+  await ensureClassified(env, actor.tenant_id, products, policy);
+  const prep = await prepareMarketData(env, actor.tenant_id, { allowStart: indicatorsAllowed(policy), deps: {} });
+  const progress = await marketDataProgress(env, {});
+  const labels = new Map();
+  for (const c of new Set(products.map((p) => p.commodity))) labels.set(c, await commodityLabelOf(env, actor.tenant_id, c));
+  const r = await byCountry(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) }, preparation: { prep, progress }, iso2, labels });
+  return { ...r, catchUp: await catchUpStatus(env) };
+}
+export const reassessRoute = async (request, env, actor, rid) => reassessPair(request, env, actor, rid, await bodyJson(request));
 
 // "Tentar de novo" com recuperação concreta: retoma a fila (jobs devidos e leases vencidos), refaz resumos a partir dos
 // objetos guardados e pede de novo os países cuja última consulta falhou (fluxo R12.15: um por país por dia, poucos por
@@ -1347,7 +1383,7 @@ export async function autoStart(request, env, actor, rid, deps = {}) {
   if (!policy.policy.markets.includes(market)) fail(409, "market_not_covered", "A política vigente não cobre este mercado.");
   const profile = (await currentProfile(env, actor.tenant_id))?.profile ?? DEFAULT_PROFILE;
   const at = deps.now?.() ?? now();
-  const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at }, { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 60, ...o }) });
+  const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at }, { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) });
   if (pick.none) return { started: false, reasons: pick.reasons, coverage: pick.coverage ?? null, note: "Nenhuma combinação elegível agora. Falta de dado ou falha de fonte não é conclusão de ausência de compradores." };
   const job = await createJob(new Request("https://compass.internal/api/prospect/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pick.input) }), env, actor, rid, deps);
   if (!job.reused) {

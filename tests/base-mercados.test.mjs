@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { setup } from "./helpers/db.mjs";
 import { sources, tradeParams, driver, AGRI, rec } from "./helpers/trade.mjs";
+import { summaryCatchUp } from "../src/importers.js";
 
 const FIX = new URL("./fixtures/mercados-publicos.json", import.meta.url);
 const EXTRACT = existsSync(FIX) ? JSON.parse(readFileSync(FIX, "utf8")) : null;
@@ -32,6 +33,8 @@ async function world(t, mutate = (x) => x) {
   await d.drain();
   const dest = async (body) => {
     let r;
+    // Como na produção: o cron retoma os resumos que faltam em lotes (summaryCatchUp) entre as consultas da tela.
+    for (let k = 0; k < 40; k++) if ((await summaryCatchUp(env, "eag-internal", { batch: 200 })).state === "idle") break;
     for (let k = 0; k < 15; k++) { r = (await api("/api/prospect/destinations", "POST", body)).data; if (!r.coverage?.pendingSummaries && r.state !== "preparing") break; }
     return r;
   };
@@ -65,7 +68,9 @@ test("catálogo inteiro: destinos do formulário = destinos calculados do extrat
     const r = await dest({ commodity: c });
     const hs = X.meta.subposicoes.filter((h) => Object.entries(X.meta.produtos).some(([pid, codes]) => catalog.products.find((p) => p.id === pid)?.commodity === c && codes.includes(h)));
     const exp = expected(X, hs, countries);
-    const got = new Set(r.items.map((x) => x.iso3));
+    // Destino comprovado = seleção principal + fora dela com motivo (sem fonte de empresas coberta, retirado por busca
+    // vazia): o filtro de disponibilidade (2026-10-22) não apaga a evidência de comércio.
+    const got = new Set([...r.items, ...(r.coverageGaps ?? []), ...(r.withdrawn ?? [])].map((x) => x.iso3));
     const missing = [...exp.keys()].filter((k) => !got.has(k));
     const extra = [...got].filter((k) => !exp.has(k));
     report.push(`${c}: extrato ${exp.size}, formulário ${got.size}${missing.length ? `, faltando ${missing.join(",")}` : ""}${extra.length ? `, a mais ${extra.join(",")}` : ""}`);

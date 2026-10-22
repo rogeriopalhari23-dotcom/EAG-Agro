@@ -6,7 +6,7 @@ import { statement as s, parameters } from "../store.js";
 import { SEGMENT_PRESETS } from "../rodada/segments.js";
 import { foreignSources } from "../sources-applicable.js";
 import { commodityLabelOf } from "../catalog-names.js";
-import { destinationsFor } from "../destinations.js";
+import { availabilityFor } from "../availability.js";
 
 const DAY = 86400000;
 const STALE_DAYS = 30; // mesmo prazo de validade da consulta cadastral nacional
@@ -84,11 +84,20 @@ const evText = (e, name) => e.source === "mdic" ? `exportações do Brasil para 
 
 export async function pickInternational(env, tenant, { profile, at }, deps = {}) {
   const products = (await s(env, "SELECT * FROM products WHERE tenant_id=? AND active<>0 AND identity_status='confirmed'", tenant).all()).results;
-  const dest = await destinationsFor(env, tenant, { products, profile, deps });
+  // Mesma relação do formulário (src/availability.js): par retirado por busca vazia recente ou sem fonte de empresas
+  // fica fora; pendência técnica recente espera o prazo de nova tentativa (sem repetir consulta idêntica).
+  const dest = await availabilityFor(env, tenant, { products, profile, deps, at });
   const jobs = (await history(env, tenant, "international")).map((j) => ({ ...j, key: `${j.input.productId}|${j.input.location?.iso3}` }));
   const byId = new Map(products.map((p) => [p.id, p]));
   const day = at.slice(0, 10);
-  const cands = [], gaps = [];
+  const cands = [], waitingRetry = [];
+  const gaps = [];
+  for (const g of dest.coverageGaps) {
+    const all = foreignSources(g.iso2, g.hs6);
+    const p = byId.get(g.productId);
+    const label = await commodityLabelOf(env, tenant, p.commodity);
+    gaps.push({ productId: g.productId, iso3: g.iso3, label: `${both(label, p.variant_name)} × ${g.country}`, evidence: g.evidence.join("; "), coverage: all.length ? all.map((x) => `${x.label}: ${x.status === "available" ? "fora das fontes do perfil" : x.note ?? "pendente"}`).join("; ") : "nenhum conector de empresas cobre este país e esta commodity" });
+  }
   let busy = 0;
   for (const d of dest.items) {
     for (const pr of d.products) {
@@ -96,27 +105,25 @@ export async function pickInternational(env, tenant, { profile, at }, deps = {})
       const label = await commodityLabelOf(env, tenant, p.commodity);
       const ev = d.evidence.filter((e) => e.productId === p.id).map((e) => `${evText(e, d.name)} registram SH ${e.hs6.join(", ")}`).join("; ");
       const srcs = foreignSources(d.iso2, pr.hs6).filter((x) => x.status === "available" && (profile.sources?.international ?? []).includes(x.key));
-      if (!srcs.length) {
-        const all = foreignSources(d.iso2, pr.hs6);
-        const why = all.length ? all.map((x) => `${x.label}: ${x.status === "available" ? "fora das fontes do perfil" : x.note ?? "pendente"}`).join("; ") : "nenhum conector de empresas cobre este país e esta commodity";
-        gaps.push({ productId: p.id, iso3: d.iso3, label: `${both(label, p.variant_name)} × ${d.name}`, evidence: ev, coverage: why });
-        continue;
-      }
       const key = `${p.id}|${d.iso3}`;
+      if (pr.availability?.technical && pr.availability.retryAfter) { waitingRetry.push(`${both(label, p.variant_name)} × ${d.name}: pendência técnica, nova tentativa a partir de ${pr.availability.retryAfter.slice(0, 16).replace("T", " ")} UTC (${pr.availability.note})`); continue; }
       const score = scoreOf(key, jobs, at);
       if (!score) { busy++; continue; }
       cands.push({
         key, score, tie: jobs.filter((j) => j.input.productId === p.id).length,
         input: { market: "international", productId: p.id, location: { iso3: d.iso3 } },
-        reason: `${both(label, p.variant_name)} × ${d.name}: ${ev}; ${score.why}. Fontes de empresas: ${srcs.map((x) => x.label).join("; ")}.`,
+        reason: `${both(label, p.variant_name)} × ${d.name}: ${ev}; ${score.why}${pr.availability?.tag === "reavaliação" ? ` (${pr.availability.note})` : ""}. Fontes de empresas: ${srcs.map((x) => x.label).join("; ")}.`,
       });
     }
   }
   const coverage = {
     gaps: gaps.slice(0, 30), gapCount: gaps.length,
     note: gaps.length ? `${gaps.length} mercado(s) com comércio oficial registrado com o Brasil e sem fonte de empresas coberta: limitação de cobertura, não ausência de compradores.` : null,
+    withdrawn: dest.withdrawn.slice(0, 30).map((w) => ({ productId: w.productId, iso3: w.iso3, label: `${w.product} × ${w.country}`, reason: w.reason, assessedAt: w.assessedAt, reviewAfter: w.reviewAfter })),
+    withdrawnNote: dest.withdrawn.length ? `${dest.withdrawn.length} combinação(ões) retirada(s) temporariamente por busca real recente sem candidatas (reavaliação no prazo ou com atualização).` : null,
+    waitingRetry: waitingRetry.slice(0, 30),
     partialSummaries: dest.coverage.pendingSummaries ? `Resumo completo de subposições ainda em preparação para ${dest.coverage.pendingSummaries} registro(s).` : null,
   };
   const best = pickBest(cands, day);
-  return best ? { ...best, eligible: cands.length, coverage } : { none: true, eligible: 0, coverage, reasons: [busy ? `as ${busy} combinação(ões) elegível(is) já têm pesquisa em andamento (reaproveitadas, sem duplicar)` : null, dest.unclassified.length ? `${dest.unclassified.length} produto(s) ainda sem classificação SH confirmada` : null, gaps.length ? coverage.note : null, !dest.items.length ? "nenhum país com comércio oficial registrado com o Brasil para os produtos classificados (na lista mensal já publicada)" : null].filter(Boolean) };
+  return best ? { ...best, eligible: cands.length, coverage } : { none: true, eligible: 0, coverage, reasons: [busy ? `as ${busy} combinação(ões) elegível(is) já têm pesquisa em andamento (reaproveitadas, sem duplicar)` : null, dest.unclassified.length ? `${dest.unclassified.length} produto(s) ainda sem classificação SH confirmada` : null, gaps.length ? coverage.note : null, coverage.withdrawnNote, waitingRetry.length ? `${waitingRetry.length} combinação(ões) com pendência técnica recente aguardando o prazo de nova tentativa` : null, !dest.items.length && !dest.withdrawn.length && !gaps.length ? "nenhum país com comércio oficial registrado com o Brasil para os produtos classificados (na lista mensal já publicada)" : null].filter(Boolean) };
 }
