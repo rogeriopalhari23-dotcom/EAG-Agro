@@ -1183,7 +1183,7 @@ const INTERNATIONAL = {
 };
 
 // Avaliação da combinação para a seleção (src/availability.js), registrada no andamento da pesquisa.
-const OUTCOME_TEXT = { found: "empresas encontradas: a combinação continua disponível", empty: "busca real concluída sem candidatas: combinação retirada temporariamente da seleção principal", technical: "pendência técnica: a combinação continua disponível e nada se conclui sobre compradores" };
+const OUTCOME_TEXT = { found: "empresas encontradas: a combinação continua disponível", empty: "combinação retirada temporariamente da seleção principal", technical: "pendência técnica: a combinação continua disponível e nada se conclui sobre compradores" };
 async function assess(ctx, summary) {
   const a = await recordAssessment(ctx.env, { job: ctx.job, input: ctx.input, state: ctx.state, summary, profile: ctx.profile, policy: ctx.policy, at: ctx.now() });
   ctx.log("report", a.outcome === "found" ? "ok" : "partial", `Disponibilidade: ${OUTCOME_TEXT[a.outcome]}${a.origin === "simulated" ? " (execução simulada: registrada, sem efeito sobre os mercados reais)" : ""}. ${a.reason}${a.outcome === "found" ? "" : ` Reavaliação a partir de ${a.reviewAfter.slice(0, 10)}, ou antes com fonte nova, regra nova ou empresa compatível cadastrada.`}`);

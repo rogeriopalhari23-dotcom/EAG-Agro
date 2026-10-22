@@ -5544,7 +5544,7 @@ function availabilityLists(r, reload) {
       text("strong", `${w.country} — ${w.product}`),
       text("p", w.reason),
       text("small", `Avaliada em ${fmtDate(w.assessedAt)}. Fontes: ${(w.sources ?? []).map((x) => `${x.label} (${x.status === "ok" ? `${x.found ?? 0} encontrada(s)` : x.status})`).join("; ") || "não registradas"}. Reavaliação a partir de ${fmtDate(w.reviewAfter)}, ou antes com fonte nova, regra nova ou empresa compatível cadastrada.`),
-      writable() ? button("Reavaliar agora", async () => { await api("/api/prospect/availability/reassess", "POST", { productId: w.productId, iso3: w.iso3 }); notice("Combinação devolvida à seleção principal; a avaliação anterior fica no histórico."); reload(); }) : null,
+      writable() ? button("Reavaliar agora", async () => { await api("/api/prospect/availability/reassess", "POST", { assessmentId: w.assessmentId, productId: w.productId, iso3: w.iso3 }); notice("Combinação devolvida à seleção principal; a avaliação anterior fica no histórico."); reload(); }) : null,
     )))));
   if (r.coverageGaps?.length) out.push(details(`Sem fonte de empresas coberta (${r.coverageGaps.length})`, el("ul", { class: "compact-list" }, ...r.coverageGaps.map((w) => text("li", `${w.country} — ${w.product}: ${w.note}.`)))));
   if (r.catchUp && (r.catchUp.remaining || r.catchUp.error)) out.push(text("small", catchUpText(r.catchUp)));

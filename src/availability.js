@@ -26,8 +26,10 @@ export function reviewWindows(policy) {
 const allowedOf = (profile) => new Set(profile?.sources?.international ?? []);
 // Fontes de empresas aplicáveis ao par (mesma regra do planejamento e da execução).
 export const connectorOf = (iso2, hs6, profile) => foreignSources(iso2, hs6).filter((x) => x.status === "available" && allowedOf(profile).has(x.key));
-// O que justifica reavaliar uma busca vazia antes do prazo: regra de descoberta ou conjunto de fontes diferente.
-export const fingerprintOf = (iso2, hs6, profile) => `${MAP_VERSION}|fontes:${connectorOf(iso2, hs6, profile).map((x) => x.key).sort().join(",")}`;
+// Identidade da consulta de empresas: regra de descoberta e, por fonte, a regra aplicada (etiquetas do mapa, atividades
+// do registro). Produtos da mesma commodity com a mesma consulta no mesmo país (ex.: Milho GMO e convencional, mesmo SH)
+// compartilham o resultado: repetir a consulta idêntica não traria dado novo. Fonte ou regra diferente: reavaliação.
+export const fingerprintOf = (iso2, hs6, profile) => `${MAP_VERSION}|${connectorOf(iso2, hs6, profile).map((x) => `${x.key}:${x.rule ?? ""}`).sort().join(";")}`;
 
 // Avaliação ao fim de uma pesquisa internacional (etapa "relatório"). → linha gravada
 export async function recordAssessment(env, { job, input, state, summary, profile, policy, at = now() }) {
@@ -71,49 +73,56 @@ export async function recordAssessment(env, { job, input, state, summary, profil
 async function pairsState(env, tenant) {
   const rows = (await s(env, "SELECT * FROM market_assessments WHERE tenant_id=? AND superseded_at IS NULL AND origin='real'", tenant).all()).results;
   const assessed = new Map(rows.map((r) => [`${r.product_id}|${r.iso3}`, r]));
+  // Mesma consulta no mesmo país (outro produto): a mais recente com resultado (encontradas ou vazia).
+  const sameQuery = new Map();
+  for (const r of rows.filter((x) => x.outcome !== "technical").sort((a, b) => a.assessed_at.localeCompare(b.assessed_at))) sameQuery.set(`${r.iso3}|${r.fingerprint}`, r);
+  const names = new Map((await s(env, "SELECT id,COALESCE(display_name,variant_name) name FROM products WHERE tenant_id=?", tenant).all()).results.map((p) => [p.id, p.name]));
   const jobs = new Map();
   for (const j of (await s(env, "SELECT id,status,input_json,created_at,updated_at,error FROM prospect_jobs WHERE tenant_id=? AND market='international' ORDER BY created_at", tenant).all()).results) {
     const i = parse(j.input_json, {});
     if (i.productId && i.location?.iso3) jobs.set(`${i.productId}|${i.location.iso3}`, j);
   }
-  return { assessed, jobs };
+  return { assessed, jobs, sameQuery, names };
 }
 
 // Classificação de um par. → { status: available|withdrawn|coverage, tag, note, review }
-async function classify(env, tenant, { product, iso2, iso3, hs6, profile, at, assessed, job }) {
+async function classify(env, tenant, { product, iso2, iso3, hs6, profile, at, assessed, job, sameQuery, names }) {
   const conn = connectorOf(iso2, hs6, profile);
   const fp = fingerprintOf(iso2, hs6, profile);
   if (job && ACTIVE.includes(job.status)) return { status: "available", tag: "em andamento", note: "pesquisa em andamento (reaproveitada, sem duplicar)", jobId: job.id };
   if (!conn.length) return { status: "coverage", tag: "sem fonte de empresas", note: "sem fonte de empresas coberta para este país e esta commodity: limitação de cobertura, não ausência de compradores" };
-  const a = assessed;
+  // Sem avaliação própria: a da mesma consulta feita para outro produto no país (identificada como tal).
+  const sib = !assessed ? sameQuery?.get(`${iso3}|${fp}`) ?? null : null;
+  const a = assessed ?? sib;
+  const via = sib ? ` (mesma consulta de empresas já feita na pesquisa de ${names?.get(sib.product_id) ?? sib.product_id}: mesmas fontes e regras)` : "";
   // Pesquisa interrompida depois da última avaliação (falha ou cancelamento): pendência técnica.
   if (job && ["failed", "cancelled"].includes(job.status) && (!a || a.assessed_at < job.created_at))
     return { status: "available", tag: "pendência técnica", note: `última pesquisa ${job.status === "failed" ? `falhou${job.error ? ` (${String(job.error).slice(0, 120)})` : ""}` : "cancelada"} antes de concluir; não indica ausência de compradores`, technical: true, retryAfter: null, jobId: job.id };
   if (!a) return { status: "available", tag: "não pesquisada", note: "ainda não pesquisada" };
   const sources = parse(a.sources_json, []);
-  const base = { assessmentId: a.id, assessedAt: a.assessed_at, reviewAfter: a.review_after, sources, reason: a.reason, jobId: a.job_id };
-  if (a.outcome === "found") return { status: "available", tag: "empresas encontradas", note: a.reason, ...base };
+  const base = { assessmentId: a.id, assessedAt: a.assessed_at, reviewAfter: a.review_after, sources, reason: `${a.reason}${via}`, jobId: a.job_id, viaProductId: sib ? sib.product_id : null };
+  if (a.outcome === "found") return { status: "available", tag: "empresas encontradas", note: base.reason, ...base };
   if (a.outcome === "technical") return { status: "available", tag: "pendência técnica", note: a.reason, technical: true, retryAfter: a.review_after > at ? a.review_after : null, ...base };
   // Busca vazia: reavaliação quando vence, quando muda regra ou fonte, ou quando há empresa compatível já cadastrada.
   if (a.review_after <= at) return { status: "available", tag: "reavaliação", note: `busca vazia em ${a.assessed_at.slice(0, 10)}; avaliação vencida em ${a.review_after.slice(0, 10)}: nova pesquisa permitida`, ...base };
   if (a.fingerprint !== fp) return { status: "available", tag: "reavaliação", note: `busca vazia em ${a.assessed_at.slice(0, 10)}; desde então mudaram as fontes ou a regra de descoberta`, ...base };
   const existing = await existingCompatible(env, tenant, { product, market: "international", iso2, limit: 5 });
   if (existing.length) return { status: "available", tag: "empresas já cadastradas", note: `${existing.length} empresa(s) já cadastrada(s) no país com atividade compatível (inclusive de outra commodity)`, ...base };
-  return { status: "withdrawn", tag: "retirada temporariamente", note: a.reason, ...base };
+  return { status: "withdrawn", tag: "retirada temporariamente", note: base.reason, ...base };
 }
 
 // Relação disponível a partir dos destinos comprovados. products: linhas de products. → resposta de destinationsFor com
 // items só dos pares disponíveis, e withdrawn/coverage com os pares fora da seleção principal (motivo, fontes, datas).
 export async function availabilityFor(env, tenant, { products, profile, deps = {}, preparation = {}, at = now() }) {
   const dest = await destinationsFor(env, tenant, { products, profile, deps, preparation });
-  const { assessed, jobs } = await pairsState(env, tenant);
+  const { assessed, jobs, sameQuery, names } = await pairsState(env, tenant);
   const byId = new Map(products.map((p) => [p.id, p]));
   const items = [], withdrawn = [], coverage = [];
   for (const d of dest.items) {
     const keep = [];
     for (const pr of d.products) {
       const key = `${pr.productId}|${d.iso3}`;
-      const c = await classify(env, tenant, { product: byId.get(pr.productId), iso2: d.iso2, iso3: d.iso3, hs6: pr.hs6, profile, at, assessed: assessed.get(key), job: jobs.get(key) });
+      const c = await classify(env, tenant, { product: byId.get(pr.productId), iso2: d.iso2, iso3: d.iso3, hs6: pr.hs6, profile, at, assessed: assessed.get(key), job: jobs.get(key), sameQuery, names });
       const entry = { ...pr, availability: c };
       if (c.status === "available") keep.push(entry);
       else (c.status === "withdrawn" ? withdrawn : coverage).push({ iso2: d.iso2, iso3: d.iso3, country: d.name, productId: pr.productId, product: pr.name, commodity: byId.get(pr.productId)?.commodity ?? null, hs6: pr.hs6, evidence: d.evidence.filter((e) => e.productId === pr.productId).map((e) => e.text), ...c });
@@ -161,13 +170,16 @@ export async function byCountry(env, tenant, { products, profile, deps, preparat
 export async function reassessRoute(request, env, actor, rid, body) {
   requireRole(actor, WRITE_ROLES);
   const productId = String(body?.productId ?? "").slice(0, 80), iso3 = String(body?.iso3 ?? "").toUpperCase().slice(0, 3);
-  const a = await s(env, "SELECT id,outcome FROM market_assessments WHERE tenant_id=? AND product_id=? AND iso3=? AND superseded_at IS NULL AND origin='real'", actor.tenant_id, productId, iso3).first();
+  const assessmentId = body?.assessmentId ? String(body.assessmentId).slice(0, 80) : null;
+  const a = assessmentId
+    ? await s(env, "SELECT id,outcome,product_id,iso3 FROM market_assessments WHERE tenant_id=? AND id=? AND superseded_at IS NULL AND origin='real'", actor.tenant_id, assessmentId).first()
+    : await s(env, "SELECT id,outcome,product_id,iso3 FROM market_assessments WHERE tenant_id=? AND product_id=? AND iso3=? AND superseded_at IS NULL AND origin='real'", actor.tenant_id, productId, iso3).first();
   if (!a) fail(404, "assessment_not_found", "Não há avaliação vigente para esta combinação.");
   if (a.outcome !== "empty") fail(409, "not_withdrawn", "Só uma combinação retirada por busca vazia pode ser reavaliada aqui.");
   const at = now();
   await commit(env, [
     s(env, "UPDATE market_assessments SET superseded_at=?,superseded_reason=?,superseded_by=? WHERE id=? AND superseded_at IS NULL", at, "reavaliação pedida por pessoa", `user:${actor.id}`, a.id),
-    auditStatement(env, actor, rid, "market_assessment.reassess_requested", "market_assessment", a.id, { productId, iso3 }),
+    auditStatement(env, actor, rid, "market_assessment.reassess_requested", "market_assessment", a.id, { productId: a.product_id, iso3: a.iso3, requestedFor: productId || null }),
   ]);
   return { ok: true, assessmentId: a.id, at };
 }

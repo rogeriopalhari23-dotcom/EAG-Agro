@@ -236,3 +236,37 @@ test("pela prospecção: o relatório registra a avaliação (execução real ×
   assert.equal(DB.raw.prepare("SELECT origin FROM market_assessments WHERE job_id=?").get(j2.id).origin, "simulated");
   assert.match(j2.events.find((e) => e.step === "report" && /^Disponibilidade/.test(e.message)).message, /execução simulada: registrada, sem efeito sobre os mercados reais/);
 });
+
+test("retomada sem pendência não relê o D1 a cada ciclo; lista nova invalida a verificação guardada", async (t) => {
+  const { env, DB } = await world(t);
+  for (let k = 0; k < 40; k++) if ((await summaryCatchUp(env, "eag-internal", { batch: 60 })).state === "idle") break;
+  const a = await summaryCatchUp(env, "eag-internal");
+  assert.equal(a.state, "idle");
+  const b = await summaryCatchUp(env, "eag-internal");
+  assert.deepEqual([b.state, b.cached], ["idle", true], "verificação guardada: sem contar os resumos de novo");
+  // Nova versão da lista (rotina mensal ou pedido manual): confere de novo.
+  DB.raw.prepare("UPDATE trade_list_versions SET finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 minute') WHERE rowid=(SELECT MAX(rowid) FROM trade_list_versions)").run();
+  const c = await summaryCatchUp(env, "eag-internal");
+  assert.equal(c.cached, undefined, "lista nova: verificação refeita");
+});
+
+test("mesma consulta de empresas para outro produto do país (ex.: Milho GMO × não GMO): o resultado vale, identificado; reavaliação pela avaliação", async (t) => {
+  const { api, env, DB } = await world(t);
+  // Pesquisa real vazia feita para outro produto (identificador fictício) com a MESMA consulta (mesmas fontes e regras).
+  await recordAssessment(env, { job: job("job-irmao"), input: { productId: "product-irmao-teste", location: INPUT.location }, state: ran(), summary: { candidates: 0, registered: 0 }, profile: DEFAULT_PROFILE, policy: null });
+  let r = await coffee(api);
+  assert.ok(!r.items.some((x) => x.iso3 === "DEU"), "consulta idêntica não é oferecida de novo");
+  const w = r.withdrawn.find((x) => x.iso3 === "DEU");
+  assert.equal(w.productId, "product-05");
+  assert.equal(w.viaProductId, "product-irmao-teste");
+  assert.match(w.reason, /mesma consulta de empresas já feita na pesquisa de product-irmao-teste: mesmas fontes e regras/);
+  // Consulta diferente (outra regra/fonte): não herda.
+  DB.raw.prepare("UPDATE market_assessments SET fingerprint='outra-consulta'").run();
+  assert.ok((await coffee(api)).items.some((x) => x.iso3 === "DEU"));
+  DB.raw.prepare("UPDATE market_assessments SET fingerprint=?").run(fingerprintOf("DE", ["090111"], DEFAULT_PROFILE));
+  // Reavaliar pela tela: pela avaliação herdada.
+  const rr = await api("/api/prospect/availability/reassess", "POST", { assessmentId: w.assessmentId, productId: "product-05", iso3: "DEU" });
+  assert.equal(rr.status, 200, JSON.stringify(rr.data));
+  r = await coffee(api);
+  assert.equal(r.items.find((x) => x.iso3 === "DEU")?.products[0].availability.tag, "não pesquisada");
+});

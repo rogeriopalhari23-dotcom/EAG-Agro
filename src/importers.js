@@ -89,8 +89,17 @@ export async function summaryWindows(env, tenant) {
     { key: "hist", comtradeHistory: true },
   ].filter(Boolean);
 }
-export async function summaryCatchUp(env, tenant, { at = now(), batch = 20, leaseMs = 4 * 60_000, rebuild = rebuildSummaries } = {}) {
+export async function summaryCatchUp(env, tenant, { at = now(), batch = 20, leaseMs = 4 * 60_000, idleRecheckMs = 6 * 3600_000, force = false, rebuild = rebuildSummaries } = {}) {
   if (!env.FILES) return { state: "idle", reason: "R2 não configurado" };
+  // Limite diário de leituras do D1 (plano gratuito): sem pendência na última verificação, confere de novo só a cada
+  // idleRecheckMs (a rotina mensal e a tela também refazem resumos quando há lista nova).
+  const prev = await s(env, "SELECT last_result_json,last_finished_at,lease_until FROM maintenance_leases WHERE name=?", CATCHUP).first().catch(() => null);
+  let prevResult = null;
+  try { prevResult = prev?.last_result_json ? JSON.parse(prev.last_result_json) : null; } catch { prevResult = null; }
+  // Lista nova (versão mensal ou pedido manual) invalida a verificação guardada: tabela pequena, leitura barata.
+  const v = await s(env, "SELECT COUNT(*) n, MAX(started_at) s, MAX(finished_at) f FROM trade_list_versions").first().catch(() => null);
+  const marker = `${v?.n ?? 0}|${v?.s ?? ""}|${v?.f ?? ""}`;
+  if (!force && prevResult?.remaining === 0 && prevResult.marker === marker && prev?.last_finished_at && Date.parse(at) - Date.parse(prev.last_finished_at) < idleRecheckMs) return { state: "idle", remaining: 0, cached: true };
   const passes = await summaryWindows(env, tenant);
   // Nada a fazer: nenhuma gravação (o cron roda a cada 5 minutos).
   const pending = async () => {
@@ -98,7 +107,11 @@ export async function summaryCatchUp(env, tenant, { at = now(), batch = 20, leas
     for (const w of passes) n += (await rebuild(env, tenant, { ...w, limit: 0 })).remaining ?? 0;
     return n;
   };
-  if (!(await pending())) return { state: "idle", remaining: 0 };
+  if (!(await pending())) {
+    // Registra a verificação sem pendência (uma gravação por janela de reverificação), para o próximo ciclo não reler.
+    await s(env, "INSERT INTO maintenance_leases(name,last_finished_at,last_result_json) VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET last_finished_at=excluded.last_finished_at,last_result_json=excluded.last_result_json WHERE maintenance_leases.lease_until IS NULL OR maintenance_leases.lease_until<?", CATCHUP, at, JSON.stringify({ built: 0, remaining: 0, errors: [], at, marker }), at).run();
+    return { state: "idle", remaining: 0 };
+  }
   const holder = crypto.randomUUID();
   const until = new Date(Date.parse(at) + leaseMs).toISOString();
   await s(env, "INSERT OR IGNORE INTO maintenance_leases(name) VALUES (?)", CATCHUP).run();
@@ -120,7 +133,7 @@ export async function summaryCatchUp(env, tenant, { at = now(), batch = 20, leas
       cursor[w.key] = r.exhausted ? null : r.last;
     }
     const remaining = await pending();
-    const result = { built, remaining, errors: errors.slice(0, 10), at };
+    const result = { built, remaining, errors: errors.slice(0, 10), at, marker };
     await s(env, "UPDATE maintenance_leases SET holder=NULL,lease_until=NULL,cursor_json=?,last_finished_at=?,last_result_json=?,last_error=?,last_error_at=? WHERE name=? AND holder=?", JSON.stringify(cursor), now(), JSON.stringify(result), errors.length ? errors.slice(0, 3).join("; ") : null, errors.length ? now() : null, CATCHUP, holder).run();
     return { state: "ran", ...result };
   } catch (e) {
