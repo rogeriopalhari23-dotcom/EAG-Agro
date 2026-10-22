@@ -19,7 +19,7 @@ import { runJob } from "../src/prospect/engine.js";
 import { exploreTick } from "../src/prospect/explore.js";
 import { recordAssessment, fingerprintOf, EXPLORER_ID } from "../src/availability.js";
 import { DEFAULT_PROFILE } from "../src/prospect/defaults.js";
-import { summaryCatchUp, catchUpStatus } from "../src/importers.js";
+import { summaryCatchUp, catchUpStatus, rebuildSummaries } from "../src/importers.js";
 import { destinationsFor, productsOf } from "../src/destinations.js";
 import { overpassQuery, parseOverpass } from "../src/adapters/discovery.js";
 import { foreignSources } from "../src/sources-applicable.js";
@@ -256,6 +256,21 @@ test("preparação parcial: resumo ausente é preparação, nunca ausência; ret
   if (lost) assert.match(st.error ?? "", /comtrade\/CHN: objeto não encontrado no R2/);
   const after = await destinationsFor(env, "eag-internal", { products, profile: DEFAULT_PROFILE });
   assert.ok(after.items.some((x) => x.iso3 === "DEU"), after.message);
+});
+
+test("tela com resumos pendentes responde dentro do orçamento de tempo: R2 lento não segura a consulta; o restante fica com o cron", async (t) => {
+  const { api, env, DB } = await world(t);
+  DB.raw.exec("DELETE FROM trade_country_summary");
+  // R2 lento (como em produção, ~1 s por objeto): cada leitura demora 1,5 s.
+  const get = env.FILES.get.bind(env.FILES);
+  env.FILES.get = async (k) => (await new Promise((r) => setTimeout(r, 1500)), get(k));
+  const t0 = Date.now();
+  const r = await coffee(api);
+  const ms = Date.now() - t0;
+  assert.ok(ms < 9000, `respondeu em ${ms} ms`);
+  assert.ok(["preparing", "ready"].includes(r.state) && r.preparing, `${r.state}: ${r.message}`);
+  const past = await rebuildSummaries(env, "eag-internal", { limit: 10, deadline: Date.now() - 1 });
+  assert.deepEqual([past.built, past.exhausted], [0, false]);
 });
 
 test("retomada sem pendência não relê o D1 a cada ciclo; lista nova invalida a verificação guardada", async (t) => {

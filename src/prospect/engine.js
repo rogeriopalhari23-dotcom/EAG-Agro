@@ -17,7 +17,7 @@ import { nationalSources, foreignSources, inventory } from "../sources-applicabl
 import { countryIndicators, requestCountryList, prepareMarketData, marketDataProgress, sweep as tradeSweep } from "../trade-list.js";
 import { resolveClassification, applyClassification, recordCharacteristic } from "../classification.js";
 import { pickNational, pickInternational } from "./rotation.js";
-import { rebuildSummaries } from "../importers.js";
+import { rebuildSummaries, inlineRebuild } from "../importers.js";
 import { existingCompatible, addRelationsToInvestigate } from "../compatibility.js";
 import { destinationsFor, productsOf } from "../destinations.js";
 import { availabilityFor, byCountry, recordAssessment, reassessRoute as reassessPair, EXPLORER_ID } from "../availability.js";
@@ -228,7 +228,7 @@ export async function createJob(request, env, actor, rid, deps = {}) {
   // automática). Pesquisas antigas e o histórico ficam como estão; só o início de uma combinação incompatível é recusado.
   if (market === "international" && !deps.allowUnverifiedDestination) {
     await ensureClassified(env, actor.tenant_id, [p], policy);
-    const dest = await availabilityFor(env, actor.tenant_id, { products: [p], profile: profile.profile ?? DEFAULT_PROFILE, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) } });
+    const dest = await availabilityFor(env, actor.tenant_id, { products: [p], profile: profile.profile ?? DEFAULT_PROFILE, deps: { rebuild: inlineRebuild() } });
     const found = dest.items.find((x) => x.iso3 === input.location.iso3 && x.products.some((y) => y.productId === p.id));
     // Mesma relação do formulário: sem fonte de empresas não começa; a mesma consulta sem estabelecimentos não se repete
     // antes do prazo registrado (fonte ou regra nova libera na hora).
@@ -1240,7 +1240,7 @@ export async function destinationsRoute(request, env, actor, rid, deps = {}) {
     ? async (iso3) => !!(await requestCountryList(env, actor.tenant_id, iso3, { requestedBy: `policy:${policy.id}@v${policy.version}`, reason: "Destinos da pesquisa internacional: dado oficial vencido de destino comprovado", rid, deps: trade }))
     : null;
   const progress = await marketDataProgress(env, trade);
-  const r = await availabilityFor(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }), refresh }, preparation: { prep, progress, asks: cls.asks } });
+  const r = await availabilityFor(env, actor.tenant_id, { products, profile, deps: { rebuild: inlineRebuild(), refresh }, preparation: { prep, progress, asks: cls.asks } });
   return { ...r, catchUp: await catchUpStatus(env), asks: cls.asks, unresolvedClassification: cls.unresolved, recovery, policy: policy ? { version: policy.version, grantedVia: policy.policy?.grantedVia ?? "panel" } : null, products: products.map((p) => ({ id: p.id, name: p.display_name ?? p.variant_name })) };
 }
 
@@ -1258,7 +1258,7 @@ export async function availabilityRoute(request, env, actor, rid) {
   const progress = await marketDataProgress(env, {});
   const labels = new Map();
   for (const c of new Set(products.map((p) => p.commodity))) labels.set(c, await commodityLabelOf(env, actor.tenant_id, c));
-  const r = await byCountry(env, actor.tenant_id, { products, profile, deps: { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) }, preparation: { prep, progress }, iso2, labels });
+  const r = await byCountry(env, actor.tenant_id, { products, profile, deps: { rebuild: inlineRebuild() }, preparation: { prep, progress }, iso2, labels });
   return { ...r, catchUp: await catchUpStatus(env) };
 }
 export const reassessRoute = async (request, env, actor, rid) => reassessPair(request, env, actor, rid, await bodyJson(request));
@@ -1270,7 +1270,7 @@ async function recoverMarketData(env, tenant, policy, rid, trade) {
   const done = [];
   const sw = await tradeSweep(env, trade).catch(() => null);
   if (sw?.enqueued) done.push(`${sw.enqueued} trabalho(s) da fila retomado(s)`);
-  const rb = await rebuildSummaries(env, tenant, { limit: 60 }).catch(() => null);
+  const rb = await rebuildSummaries(env, tenant, { limit: 60, deadline: Date.now() + 6000 }).catch(() => null);
   if (rb?.built) done.push(`${rb.built} resumo(s) refeito(s) dos dados guardados`);
   if (indicatorsAllowed(policy)) {
     const failed = (await s(env, "SELECT DISTINCT st.iso3 FROM trade_list_status st JOIN trade_list_versions v ON v.id=st.version_id WHERE v.status<>'running' AND st.state='data_unavailable' AND COALESCE(st.error,'')<>'país sem código nesta fonte' AND NOT EXISTS (SELECT 1 FROM trade_list_current c WHERE c.iso3=st.iso3 AND c.source=st.source) AND st.iso3 NOT IN (SELECT iso3 FROM trade_list_manual_refresh WHERE day=?) LIMIT 3", now().slice(0, 10)).all()).results;
@@ -1397,7 +1397,7 @@ export async function autoStart(request, env, actor, rid, deps = {}) {
   const at = deps.now?.() ?? now();
   // Classificação fiscal automática sob a política (a mesma da lista de destinos), antes de escolher.
   if (market === "international") await ensureClassified(env, actor.tenant_id, (await s(env, "SELECT * FROM products WHERE tenant_id=? AND active<>0", actor.tenant_id).all()).results, policy);
-  const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at }, { rebuild: (e, t, o) => rebuildSummaries(e, t, { limit: 10, ...o }) });
+  const pick = market === "national" ? await pickNational(env, actor.tenant_id, { profile, policy, at }) : await pickInternational(env, actor.tenant_id, { profile, at }, { rebuild: inlineRebuild() });
   if (pick.none) return { started: false, reasons: pick.reasons, coverage: pick.coverage ?? null, note: "Nenhuma combinação elegível agora. Falta de dado ou falha de fonte não é conclusão de ausência de compradores." };
   const job = await createJob(new Request("https://compass.internal/api/prospect/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pick.input) }), env, actor, rid, deps);
   if (!job.reused) {

@@ -34,7 +34,9 @@ async function periodMonths(env, tenant) {
 // comtradeHistory: resumo da Comtrade nos anos guardados da janela recente (period_months = ano inicial), só Comtrade.
 // after: cursor "fonte|ISO3" (retomada do lote anterior, sem recomeçar pelos mesmos países); objeto que falha não
 // interrompe o lote: fica em failed, com o motivo, e os demais seguem.
-export async function rebuildSummaries(env, tenant, { limit = 40, months: windowMonths = null, comtradeHistory = false, after = null } = {}) {
+// deadline (ms desde a época, opcional): para de refazer ao passar dele; o restante fica com a retomada do cron.
+export async function rebuildSummaries(env, tenant, { limit = 40, months: windowMonths = null, comtradeHistory = false, after = null, deadline = null } = {}) {
+  if (deadline && Date.now() >= deadline) return { built: 0, remaining: null, failed: [], errors: [], last: null, exhausted: false, reason: "tempo da consulta esgotado: o restante fica com a retomada automática" };
   const minYear = comtradeHistory ? comtradeMinYear((await parameters(env, tenant))["trade_list_comtrade_years:international"], now()) : null;
   const months = comtradeHistory ? minYear : windowMonths ?? (await periodMonths(env, tenant));
   if (months == null) return { built: 0, remaining: null, reason: "Parâmetro period_default_months (D1) não aprovado." };
@@ -50,7 +52,9 @@ export async function rebuildSummaries(env, tenant, { limit = 40, months: window
   const todo = (await s(env, `SELECT c.iso3,c.source,c.version_id,c.r2_key,c.content_sha256 ${missingSql}${after ? " AND (c.source||'|'||c.iso3)>?" : ""} ORDER BY c.source,c.iso3 LIMIT ?`, ...(after ? [months, after, limit] : [months, limit])).all()).results;
   let built = 0, last = null;
   const failed = [], errors = [];
+  let cut = false;
   for (const p of todo) {
+    if (deadline && Date.now() >= deadline) { cut = true; break; }
     last = `${p.source}|${p.iso3}`;
     try {
       const o = await env.FILES.get(p.r2_key);
@@ -71,8 +75,15 @@ export async function rebuildSummaries(env, tenant, { limit = 40, months: window
   // Resumos de objetos que nenhum ponteiro usa mais saem (a lista nunca os mostraria).
   await s(env, "DELETE FROM trade_country_summary WHERE content_sha256 NOT IN (SELECT content_sha256 FROM trade_list_current)").run();
   const remaining = (await s(env, `SELECT COUNT(*) n ${missingSql}`, months).first()).n;
-  return { built, remaining, failed, errors, last, exhausted: todo.length < limit };
+  return { built, remaining, failed, errors, last, exhausted: !cut && todo.length < limit };
 }
+
+// Telas e rotas de pessoa: refazem resumos só dentro de um orçamento de tempo comum à consulta (cada resumo lê um objeto
+// do R2, cerca de 1 s em produção); o restante fica com a retomada do cron e a lista aparece "em preparação".
+export const inlineRebuild = (ms = 4000) => {
+  const deadline = Date.now() + ms;
+  return (e, t, o) => rebuildSummaries(e, t, { limit: 10, deadline, ...o });
+};
 
 // Retomada automática dos resumos que faltam (cron de 5 minutos): lotes pequenos, um executor por vez (lease), cursor
 // persistido por janela e último resultado ou falha visível na tela. Só lê objetos oficiais já guardados no R2; nenhuma
