@@ -1,7 +1,9 @@
 // Disponibilidade da prospecção internacional (2026-10-22, revisão): mercado comprador × capacidade efetiva de encontrar
-// empresas. Seleção principal = empresas identificadas (candidatas reais ou já cadastradas compatíveis, inclusive de
-// outra commodity); "Mercados a investigar" = comércio comprovado sem candidata (não pesquisado, consultas sem
-// estabelecimentos com cobertura e qualidade registradas, pendência técnica, sem fonte). Mesma regra nos dois sentidos,
+// empresas. Seleção principal = todo destino com comércio comprovado; empresas identificadas (candidatas reais ou já
+// cadastradas compatíveis, inclusive de outra commodity) só ordenam e informam o progresso; "Mercados a investigar" =
+// acompanhamento das combinações sem candidata (não pesquisado, consultas sem estabelecimentos com cobertura e qualidade
+// registradas, pendência técnica, sem fonte), sem esconder destino da seleção. Exploração em segundo plano com chave
+// persistente, desligada por padrão. Mesma regra nos dois sentidos,
 // na criação, na pesquisa automática e na exploração em segundo plano. Simulação, falha e cobertura insuficiente nunca
 // concluem ausência. Retomada automática dos resumos com lease, cursor e falha registrada.
 // Tudo SIMULADO e identificado: lista mensal de teste, R2 em memória, descoberta fictícia; nenhuma rede real.
@@ -49,21 +51,26 @@ const ran = (found = { osm: 0, de_coffee_assoc: 0 }, extra = {}) => ({
 const assess = (env, state, summary = { candidates: 0, registered: 0 }, input = INPUT) => recordAssessment(env, { job: job(), input, state, summary, profile: DEFAULT_PROFILE, policy: null });
 const pairOf = (r) => r.items.find((x) => x.iso3 === "DEU")?.products.find((p) => p.productId === "product-05")?.availability;
 
-test("mercado comprovado sem pesquisa: \"Mercados a investigar\" (nos dois sentidos), com fundamento e fontes a consultar; nunca na seleção principal", async (t) => {
+test("mercado comprovado sem pesquisa: selecionável na seleção principal e acompanhado em \"Mercados a investigar\" (nos dois sentidos), com fundamento e fontes a consultar", async (t) => {
   const { api } = await world(t);
   const r = await coffee(api);
-  assert.equal(r.state, "none_identified", r.message);
-  assert.equal(r.principal.length, 0);
-  assert.ok(r.items.some((x) => x.iso3 === "DEU"), "evidência de comércio preservada");
+  assert.equal(r.state, "ready", r.message);
+  assert.deepEqual(r.principal.map((x) => x.iso3).sort(), r.items.map((x) => x.iso3).sort(), "todo destino comprovado é selecionável");
+  const de = r.principal.find((x) => x.iso3 === "DEU");
+  assert.ok(de, "evidência de comércio preservada e selecionável");
+  assert.equal(de.identified, 0);
+  assert.match(de.identifiedNote, /sem empresa identificada ainda/);
+  assert.equal(r.identifiedSummary.withCompanies, 0);
   const inv = r.investigate.find((x) => x.iso3 === "DEU");
   assert.equal(inv.status, "not_researched");
   assert.ok(inv.evidence.length && inv.evidence.every((e) => /MDIC|Comtrade/.test(e)));
   assert.deepEqual(inv.sourcesToTry.map((x) => [x.key, x.quality]), [["de_coffee_assoc", "boa"], ["osm", "parcial"]]);
-  assert.match(r.message, /Mercados a investigar/);
   const g = await germany(api);
-  assert.ok(!g.countries.some((c) => c.iso2 === "DE"), "destino → commodities: mesma regra");
+  assert.ok(g.countries.some((c) => c.iso2 === "DE" && c.commodities.some((x) => x.code === "coffee" && !x.identified)), "destino → commodities: mesma regra");
   assert.equal(g.country.investigate[0].productId, "product-05");
-  assert.ok(g.investigateCountries.some((c) => c.iso2 === "DE"));
+  // Criação da pesquisa aceita o destino comprovado sem empresa identificada.
+  const j = await api("/api/prospect/jobs", "POST", { market: "international", productId: "product-05", location: { iso3: "DEU" } });
+  assert.equal(j.status, 201, JSON.stringify(j.data));
 });
 
 test("candidatas encontradas: seleção principal nos dois sentidos, \"empresas identificadas\" sem chamar de compradoras", async (t) => {
@@ -72,10 +79,24 @@ test("candidatas encontradas: seleção principal nos dois sentidos, \"empresas 
   const r = await coffee(api);
   assert.equal(r.state, "ready");
   const de = r.principal.find((x) => x.iso3 === "DEU");
+  assert.equal(r.principal[0].iso3, "DEU", "empresas identificadas primeiro na ordem");
+  assert.equal(de.identified, 1);
   assert.equal(de.products[0].availability.tag, "empresas identificadas");
   assert.match(de.products[0].availability.note, /Candidatas, não compradoras confirmadas/);
   const g = await germany(api);
-  assert.ok(g.countries.some((c) => c.iso2 === "DE" && c.commodities.some((x) => x.code === "coffee")));
+  assert.ok(g.countries.some((c) => c.iso2 === "DE" && c.commodities.some((x) => x.code === "coffee" && x.identified)));
+});
+
+test("consulta vazia, falha ou pendência nunca retiram o destino comprador da seleção principal", async (t) => {
+  const { api, env } = await world(t);
+  await assess(env, ran());
+  let r = await coffee(api);
+  assert.ok(r.principal.some((x) => x.iso3 === "DEU"), "vazia: continua selecionável");
+  assert.equal(pairOf(r).status, "empty");
+  assert.ok(r.investigate.some((x) => x.iso3 === "DEU"), "e acompanhada em Mercados a investigar");
+  await assess(env, ran({ osm: 0 }, { sourceRuns: { osm: { done: false, error: "timeout" } } }));
+  r = await coffee(api);
+  assert.ok(r.principal.some((x) => x.iso3 === "DEU"), "falha: continua selecionável");
 });
 
 test("empresa já cadastrada de outra commodity com atividade compatível: empresas identificadas mesmo após consultas vazias", async (t) => {
@@ -147,14 +168,34 @@ test("reinclusão: candidatas encontradas depois levam à seleção principal; r
   const s2 = pairOf(await coffee(api));
   assert.equal(s2.viaProductId, "product-irmao-teste");
   assert.match(s2.reason, /mesma consulta de empresas já feita na pesquisa de product-irmao-teste/);
-  // A exploração acha candidatas: passa para a seleção principal.
+  // A exploração acha candidatas: o destino sobe na ordem, com empresas identificadas.
   await assess(env, ran({ osm: 2, de_coffee_assoc: 0 }), { candidates: 2, registered: 2 });
-  assert.ok((await coffee(api)).principal.some((x) => x.iso3 === "DEU"));
+  assert.ok((await coffee(api)).principal.find((x) => x.iso3 === "DEU").identified > 0);
   assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM market_assessments").get().n, 3, "histórico preservado");
 });
 
-test("exploração em segundo plano: só com política, uma por vez, limite diário, identidade de automação", async (t) => {
+test("exploração em segundo plano: chave persistente desligada por padrão; política, preparação e telas não a religam; desligada não revoga a política", async (t) => {
   const { api, env, DB } = await world(t);
+  const sw = DB.raw.prepare("SELECT enabled FROM automation_switches WHERE name='market_exploration'").get();
+  assert.equal(sw.enabled, 0, "a migração grava desligada");
+  assert.equal((await exploreTick(env, "eag-internal")).state, "switched_off");
+  await api("/api/prospect/policy/prepare", "POST", {});
+  await coffee(api);
+  await germany(api);
+  assert.equal((await exploreTick(env, "eag-internal")).state, "switched_off", "preparação da política e abertura de tela não religam");
+  assert.equal(DB.raw.prepare("SELECT enabled FROM automation_switches WHERE name='market_exploration'").get().enabled, 0);
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM prospect_jobs WHERE created_by=?").get(EXPLORER_ID).n, 0, "nenhuma pesquisa de exploração");
+  assert.equal(DB.raw.prepare("SELECT COUNT(*) n FROM maintenance_leases WHERE name='market_exploration'").get().n, 0, "desligada não grava nada");
+  assert.equal((await coffee(api)).exploration.enabled, false);
+  // Política continua vigente; a pesquisa automática do botão continua.
+  assert.ok(DB.raw.prepare("SELECT 1 FROM research_policies WHERE revoked_at IS NULL").get());
+  const auto = (await api("/api/prospect/auto", "POST", { market: "international" })).data;
+  assert.equal(auto.started, true, JSON.stringify(auto));
+});
+
+test("exploração em segundo plano (chave ligada por decisão registrada): só com política, uma por vez, limite diário, identidade de automação", async (t) => {
+  const { api, env, DB } = await world(t);
+  DB.raw.prepare("UPDATE automation_switches SET enabled=1,reason='Teste (fictício)',set_by='teste',set_at=? WHERE name='market_exploration'").run(new Date().toISOString());
   const a = await exploreTick(env, "eag-internal");
   assert.equal(a.state, "started", JSON.stringify(a));
   const j = DB.raw.prepare("SELECT id,created_by,status FROM prospect_jobs WHERE id=?").get(a.jobId);

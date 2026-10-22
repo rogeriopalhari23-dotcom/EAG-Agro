@@ -2,12 +2,12 @@
 // comércio com o Brasil, src/destinations.js) de CAPACIDADE EFETIVA DE ENCONTRAR EMPRESAS. Uma relação país × produto para
 // os dois sentidos (commodity → destinos; destino → commodities), usada no formulário, no Radar Internacional, na
 // criação da pesquisa, na pesquisa automática e na exploração em segundo plano.
-//  - "Empresas identificadas" (seleção principal): candidatas reais encontradas numa pesquisa, ou empresas já cadastradas
-//    no país relacionadas ao produto ou com atividade compatível (inclusive de outra commodity). São candidatas, não
-//    compradoras confirmadas.
-//  - "Mercados a investigar" (seção recolhida): comércio comprovado sem candidata identificada — ainda não pesquisado,
-//    pesquisa sem candidatas, pendência técnica ou sem fonte de empresas coberta. A exploração automática tenta as fontes
-//    pertinentes dentro da política e dos limites; com candidatas, a combinação passa para a seleção principal.
+//  - Seleção principal: TODO destino com evidência de comércio da commodity com o Brasil. "Empresas identificadas"
+//    (candidatas reais de uma pesquisa, ou empresas já cadastradas no país relacionadas ao produto ou com atividade
+//    compatível, inclusive de outra commodity) só ordena e informa o progresso; são candidatas, não compradoras.
+//  - "Mercados a investigar" (seção recolhida): acompanhamento das combinações sem candidata identificada — ainda não
+//    pesquisada, pesquisa sem candidatas, pendência técnica ou sem fonte de empresas coberta. Não esconde destino da
+//    seleção principal. A exploração automática (quando ligada na política) tenta as fontes pertinentes.
 //  - Consulta vazia comprova só que AQUELA consulta não achou estabelecimentos: a cobertura e a qualidade de cada fonte
 //    ficam registradas e definem quando tentar de novo; nunca conclui ausência de compradores. Falha técnica, simulação
 //    ausente ou cobertura insuficiente nunca produzem conclusão negativa. Execução simulada não muda nada aqui.
@@ -153,7 +153,11 @@ function classify({ product, iso2, iso3, hs6, profile, at, ctx }) {
 export const EXPLORER_ID = "system-exploration";
 
 // Relação a partir dos destinos comprovados. products: linhas de products. → resposta de destinationsFor com cada
-// produto classificado (availability), principal (só empresas identificadas) e investigate (mercados a investigar).
+// produto classificado (availability), principal e investigate.
+// Elegibilidade (regra definitiva, 2026-10-22): todo destino com evidência de comércio da commodity com o Brasil na base
+// existente fica na seleção principal. Empresa identificada só ordena (primeiro) e informa o progresso; pesquisa vazia,
+// falha ou ainda não feita nunca retira o destino. "Mercados a investigar" é o acompanhamento das combinações sem
+// empresa identificada, sem esconder nenhuma delas da seleção.
 export async function availabilityFor(env, tenant, { products, profile, deps = {}, preparation = {}, at = now() }) {
   const dest = await destinationsFor(env, tenant, { products, profile, deps, preparation });
   const ctx = await pairsState(env, tenant);
@@ -162,28 +166,28 @@ export async function availabilityFor(env, tenant, { products, profile, deps = {
   for (const d of dest.items) {
     const prods = d.products.map((pr) => ({ ...pr, availability: classify({ product: byId.get(pr.productId), iso2: d.iso2, iso3: d.iso3, hs6: pr.hs6, profile, at, ctx }) }));
     items.push({ ...d, products: prods });
-    const ident = prods.filter((p) => p.availability.tier === "identified");
-    if (ident.length) principal.push({ ...d, products: ident, evidence: d.evidence.filter((e) => ident.some((k) => k.productId === e.productId)) });
+    const identified = prods.filter((p) => p.availability.tier === "identified").length;
+    principal.push({ ...d, products: prods, identified, identifiedNote: identified ? `empresas identificadas em ${identified} de ${prods.length} produto(s)` : "sem empresa identificada ainda: comércio comprovado; a pesquisa de empresas pode ser iniciada" });
     for (const p of prods.filter((x) => x.availability.tier === "investigate")) {
       const ev = d.evidence.filter((e) => e.productId === p.productId);
       investigate.push({ iso2: d.iso2, iso3: d.iso3, country: d.name, productId: p.productId, product: p.name, commodity: byId.get(p.productId)?.commodity ?? null, hs6: p.hs6, evidence: ev.map((e) => e.text), usd: ev.reduce((n, e) => n + (Number(e.usd) || 0), 0), sourcesToTry: connectorOf(d.iso2, p.hs6, profile).map((x) => ({ key: x.key, label: x.label, ...sourceQuality(x) })), ...p.availability });
     }
   }
-  const out = { ...dest, items, principal, investigate, exploration: await explorationStatus(env, investigate) };
-  if (dest.state === "ready" && !principal.length) {
-    out.state = "none_identified";
-    out.message = `${dest.preparing && dest.message ? `${dest.message} ` : ""}Nenhum destino com empresas identificadas ainda. ${investigate.length} mercado(s) com comércio comprovado estão em "Mercados a investigar": a exploração automática consulta as fontes de empresas pertinentes dentro da política e dos limites.`;
-    out.retry = false;
-  }
-  return out;
+  // Ordem: destinos com empresas identificadas primeiro; depois a ordem alfabética de destinationsFor.
+  principal.sort((a, b) => (b.identified > 0) - (a.identified > 0));
+  const withCompanies = principal.filter((d) => d.identified).length;
+  return { ...dest, items, principal, investigate, identifiedSummary: { destinations: principal.length, withCompanies, withoutCompanies: principal.length - withCompanies }, exploration: await explorationStatus(env, investigate) };
 }
 
 // Progresso da exploração em segundo plano (src/prospect/explore.js).
 export async function explorationStatus(env, investigate = []) {
   const r = await s(env, "SELECT last_started_at,last_finished_at,last_result_json,last_error,last_error_at FROM maintenance_leases WHERE name='market_exploration'").first().catch(() => null);
+  // Chave persistente (automation_switches): sem linha ou enabled=0 = desligada.
+  const sw = await s(env, "SELECT enabled,reason,set_by,set_at FROM automation_switches WHERE name='market_exploration'").first().catch(() => null);
   const last = parse(r?.last_result_json, null);
   const count = (st) => investigate.filter((x) => x.status === st).length;
   return {
+    enabled: sw?.enabled === 1, switchReason: sw?.reason ?? null, switchSetAt: sw?.set_at ?? null,
     toInvestigate: investigate.length, notResearched: count("not_researched"), empty: count("empty"), technical: count("technical"), noSource: count("no_source"), researching: count("researching"),
     due: investigate.filter((x) => ["not_researched", "empty", "technical"].includes(x.status) && !x.nextAttempt).length,
     lastRunAt: r?.last_finished_at ?? null, last, error: r?.last_error ?? null, errorAt: r?.last_error_at ?? null,
@@ -200,17 +204,17 @@ export async function byCountry(env, tenant, { products, profile, deps, preparat
     const c = touch(d);
     for (const pr of d.products) {
       const code = prodById.get(pr.productId)?.commodity;
-      const g = c.commodities.get(code) ?? c.commodities.set(code, { code, label: labels.get(code) ?? code, products: [] }).get(code);
+      const g = c.commodities.get(code) ?? c.commodities.set(code, { code, label: labels.get(code) ?? code, products: [], identified: false }).get(code);
       g.products.push({ productId: pr.productId, name: pr.name, hs6: pr.hs6, availability: pr.availability });
+      if (pr.availability.tier === "identified") g.identified = true;
     }
   }
   for (const w of r.investigate) touch(w).investigate.push({ ...w, commodityLabel: labels.get(w.commodity) ?? w.commodity });
-  const list = [...countries.values()].map((c) => ({ ...c, commodities: [...c.commodities.values()].sort((a, b) => a.label.localeCompare(b.label, "pt-BR")) })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const list = [...countries.values()].map((c) => ({ ...c, commodities: [...c.commodities.values()].sort((a, b) => (b.identified - a.identified) || a.label.localeCompare(b.label, "pt-BR")) })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   return {
-    state: ["ready", "none_identified"].includes(r.state) ? (list.some((c) => c.commodities.length) ? "ready" : "none_identified") : r.state,
+    state: r.state,
     preparing: r.preparing, progressText: r.progressText, message: r.message, reasons: r.reasons, incomplete: r.incomplete, coverage: r.coverage, exploration: r.exploration,
-    countries: list.filter((c) => c.commodities.length).map((c) => ({ iso2: c.iso2, iso3: c.iso3, name: c.name, commodities: c.commodities.map((g) => ({ code: g.code, label: g.label })) })),
-    investigateCountries: list.filter((c) => !c.commodities.length && c.investigate.length).map((c) => ({ iso2: c.iso2, iso3: c.iso3, name: c.name, count: c.investigate.length })),
+    countries: list.filter((c) => c.commodities.length).map((c) => ({ iso2: c.iso2, iso3: c.iso3, name: c.name, identified: c.commodities.filter((g) => g.identified).length, commodities: c.commodities.map((g) => ({ code: g.code, label: g.label, identified: g.identified })) })),
     country: iso2 ? list.find((c) => c.iso2 === iso2) ?? null : null,
   };
 }

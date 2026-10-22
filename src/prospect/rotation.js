@@ -125,7 +125,7 @@ export async function pickInternational(env, tenant, { profile, at }, deps = {})
   const { list, skipped } = rankPairs(dest, jobsByKey, at);
   const byId = new Map(products.map((p) => [p.id, p]));
   const coverage = {
-    identified: dest.principal.length, toInvestigate: dest.investigate.length, exploration: dest.exploration,
+    identified: dest.identifiedSummary.withCompanies, toInvestigate: dest.investigate.length, exploration: dest.exploration,
     noSourceNote: skipped.noSource ? `${skipped.noSource} combinação(ões) com comércio comprovado e sem fonte de empresas coberta: limitação de cobertura, não ausência de compradores.` : null,
     waitingNote: skipped.waiting ? `${skipped.waiting} combinação(ões) aguardando o prazo de nova tentativa (consulta sem estabelecimentos ou pendência técnica, com cobertura e qualidade registradas).` : null,
     partialSummaries: dest.coverage.pendingSummaries ? `Resumo completo de subposições ainda em preparação para ${dest.coverage.pendingSummaries} registro(s).` : null,

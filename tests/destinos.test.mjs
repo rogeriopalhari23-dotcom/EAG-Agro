@@ -80,9 +80,9 @@ test("Derivados de soja — Canadá (simulado): sem exportação de lecitina ao 
 test("Derivados de soja — Canadá (simulado): com exportação de lecitina do Brasil ao Canadá, o país aparece, com fonte, período e produto que fundamenta", async (t) => {
   const { api } = await world(t, { lecithinToCanada: true });
   const r = await dest(api, { commodity: "soy_lecithin" });
-  // Disponibilidade (2026-10-22): o destino comprovado continua na relação (fundamento preservado); sem fonte de empresas
-  // e sem empresa identificada, fica em "Mercados a investigar" como limitação de cobertura, nunca "sem destino".
-  assert.equal(r.state, "none_identified", r.message);
+  // Disponibilidade (regra definitiva, 2026-10-22): o destino comprovado fica na seleção principal mesmo sem fonte de
+  // empresas e sem empresa identificada; "Mercados a investigar" registra a limitação de cobertura, nunca "sem destino".
+  assert.equal(r.state, "ready", r.message);
   const can = r.items.find((x) => x.iso3 === "CAN");
   assert.ok(can, JSON.stringify(r));
   assert.equal(can.basis, "Lecitina de soja");
@@ -94,7 +94,7 @@ test("Derivados de soja — Canadá (simulado): com exportação de lecitina do 
   const inv = r.investigate.find((x) => x.iso3 === "CAN");
   assert.equal(inv.status, "no_source");
   assert.match(inv.note, /limitação de cobertura, não ausência de compradores/);
-  assert.ok(!r.principal.some((x) => x.iso3 === "CAN"));
+  assert.ok(r.principal.some((x) => x.iso3 === "CAN" && !x.identified), "selecionável sem empresa identificada");
 });
 
 test("commodity com vários produtos: o país indica qual produto fundamenta a inclusão; produto específico restringe a lista", async (t) => {

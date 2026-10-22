@@ -3830,3 +3830,32 @@ Na demonstração, a exploração iniciou sozinha 4 pesquisas, entre elas Soja �
 - `npm run test:ui` OK.
 
 **Publicação:** `PUBLICACAO-DISPONIBILIDADE-PLANO.md`, revisado e não executado. Para revisão: depois de publicada, a exploração começa sozinha, até 6 pesquisas por dia, com consultas externas gratuitas e cadastro em descoberta dentro da política.
+
+## 2026-10-22 — Seleção: todos os destinos compradores; exploração com chave persistente desligada (na branch)
+
+**Problema:** na prévia, Soja mostrava só a Noruega, porque a caixa principal exigia empresa identificada e só a Noruega tinha candidatas da exploração.
+
+**Regra definitiva** (`src/availability.js`):
+- a caixa principal ("Selecione um país comprador") mostra todo destino com evidência de comércio da commodity com o Brasil na base existente;
+- empresas identificadas só ordenam (primeiro) e informam o progresso;
+- pesquisa vazia, falha ou ainda não feita nunca retira o destino;
+- "Mercados a investigar" continua registrando fontes, resultado e limitações, sem esconder destino;
+- a mesma regra vale no sentido país → commodities, nos dois radares (formulário compartilhado) e na criação da pesquisa.
+
+**Comparação com a base** (`tests/base-mercados.test.mjs`, extrato da produção, conta independente do código): caixa = destinos comprovados em todas as 22 commodities.
+- Soja: 68 = 68 (SH 120190).
+- Milho 117, café 154, açúcar 164, etanol 91, álcool industrial 91, trigo 38, sorgo 7, farelo de soja 79, farelo de canola 6, farelo de algodão 23, óleo de soja 104, óleo de canola 36, óleo de algodão 24, óleo de palma 41, DDGS 18, CGF 15, CGM 15, farelo de milho 46.
+- Lecitina, UCO e CSO: 0 destinos no extrato.
+- Exclusões pela regra vigente (declaração da Comtrade anterior ao ano mínimo, sem MDIC): café WLF, TJK, YEM; açúcar KIR, ERI, TJK, TKM.
+- Guiana Francesa ficava fora por falta de alpha-2 no seed de países (não é restrição). A 0049 grava o alpha-2 dos territórios atuais sem código (GP, GF, RE, VI); códigos históricos continuam sem.
+
+**Demonstração no Edge** (execução local real, banco isolado):
+- Soja com 68 países no campo, nenhum com empresa identificada;
+- Alemanha (Soja GMO e não GMO ainda não pesquisadas) selecionável e também acompanhada em "Mercados a investigar";
+- Alemanha → commodities com Soja;
+- exploração desligada no servidor e na tela, sem pesquisa de exploração;
+- sem erro de JavaScript.
+
+**Exploração em segundo plano:** chave persistente `automation_switches` (0049) gravada desligada. Sem linha ou com `enabled=0` não lê nem grava nada. Nenhuma rota, tela, reinício ou preparação da política grava nela. A política, as pesquisas por pessoa e a pesquisa automática dos botões continuam.
+
+**Testes:** `tests/disponibilidade.test.mjs` (14); suíte completa 588 + 2 + 37, 0 falhas; teste de interface OK.

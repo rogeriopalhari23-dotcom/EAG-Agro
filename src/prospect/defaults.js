@@ -72,8 +72,8 @@ export const POLICY_TEMPLATE = {
     "prova de uso e compra": "partial",
     "triagem de sanções": "partial",
   },
-  // Disponibilidade (src/availability.js): busca real vazia sai da seleção principal por reassessEmptyDays (depois, ou com
-  // fonte/regra nova ou empresa compatível, volta); pendência técnica espera retryTechnicalHours na pesquisa automática.
+  // Disponibilidade (src/availability.js): destino comprovado nunca sai da seleção; busca real vazia só adia nova tentativa por reassessEmptyDays (ou menos, com
+  // fonte/regra nova); pendência técnica espera retryTechnicalHours na pesquisa automática.
   // Exploração em segundo plano dos mercados a investigar (src/prospect/explore.js): uma pesquisa por vez, no máximo
   // explorationPerDay por dia. Consulta sem estabelecimentos: nova tentativa em reassessEmptyDays (busca com registro ou
   // diretório da atividade) ou reassessPartialDays (só o mapa colaborativo).

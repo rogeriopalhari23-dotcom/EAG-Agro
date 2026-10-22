@@ -5534,12 +5534,12 @@ function decisionActions(j, id) {
 }
 const jobActive = (j) => ["queued", "running", "waiting"].includes(j.status);
 
-// Mercados a investigar (mesma relação do servidor, src/availability.js): comércio comprovado sem empresa identificada.
-// Cada um com o fundamento da inclusão, as fontes consultadas (cobertura e qualidade), o resultado e a próxima tentativa
-// automática; a exploração em segundo plano segue sozinha, dentro da política e dos limites. Recolhido.
+// Mercados a investigar (mesma relação do servidor, src/availability.js): acompanhamento das combinações com comércio
+// comprovado sem empresa identificada, que continuam selecionáveis na seleção principal. Cada uma com o fundamento da
+// inclusão, as fontes consultadas (cobertura e qualidade), o resultado e a próxima tentativa. Recolhido.
 const catchUpText = (c) => `Preparação automática dos resumos a partir dos dados oficiais guardados (a cada 5 minutos)${c.remaining != null ? `: ${c.remaining} restante(s)` : ""}${c.lastFinishedAt ? `; último lote em ${fmtDate(c.lastFinishedAt)}${c.built != null ? ` (${c.built} feito(s))` : ""}` : "; ainda não executada"}${c.error ? `; última falha: ${c.error} (${fmtDate(c.errorAt)})` : ""}.`;
 const EXPLORE_STATE = { started: "pesquisa iniciada", none: "nada devido agora", failed: "falhou" };
-const explorationText = (e) => e ? `Exploração em segundo plano: ${e.toInvestigate} mercado(s) a investigar (${e.notResearched} nunca pesquisado(s), ${e.empty} com consultas sem estabelecimentos, ${e.technical} com pendência técnica, ${e.noSource} sem fonte de empresas, ${e.researching} em pesquisa); ${e.due} com tentativa devida.${e.last ? ` Último ciclo ${fmtDate(e.lastRunAt)}: ${EXPLORE_STATE[e.last.state] ?? e.last.state}${e.last.pair ? ` (${e.last.pair})` : ""}; ${e.last.today ?? 0} de ${e.last.perDay ?? "—"} hoje.` : " Ainda não executada."}${e.error ? ` Última falha: ${e.error} (${fmtDate(e.errorAt)}).` : ""}` : "";
+const explorationText = (e) => !e ? "" : e.enabled === false ? `Exploração em segundo plano: desligada${e.switchSetAt ? ` (configuração registrada em ${fmtDate(e.switchSetAt)})` : ""}. A política de pesquisa continua vigente; as pesquisas iniciadas por pessoa e a pesquisa automática continuam disponíveis.` : e ? `Exploração em segundo plano: ${e.toInvestigate} mercado(s) a investigar (${e.notResearched} nunca pesquisado(s), ${e.empty} com consultas sem estabelecimentos, ${e.technical} com pendência técnica, ${e.noSource} sem fonte de empresas, ${e.researching} em pesquisa); ${e.due} com tentativa devida.${e.last ? ` Último ciclo ${fmtDate(e.lastRunAt)}: ${EXPLORE_STATE[e.last.state] ?? e.last.state}${e.last.pair ? ` (${e.last.pair})` : ""}; ${e.last.today ?? 0} de ${e.last.perDay ?? "—"} hoje.` : " Ainda não executada."}${e.error ? ` Última falha: ${e.error} (${fmtDate(e.errorAt)}).` : ""}` : "";
 const SOURCE_STATUS = { ok: "consultada", failed: "falhou", pending: "pendente", not_run: "não consultada" };
 function investigateItem(w, reload) {
   const src = (w.sources ?? []).length
@@ -5559,7 +5559,7 @@ function availabilityLists(r, reload) {
   const out = [];
   const list = r.investigate ?? [];
   if (list.length || r.exploration) out.push(details(`Mercados a investigar (${list.length})`, el("div", { class: "availability-investigate" },
-    text("p", "Comércio comprovado com o Brasil, mas nenhuma empresa identificada ainda. Uma consulta vazia comprova só o resultado daquela consulta, nunca ausência de compradores.", "form-hint"),
+    text("p", "Comércio comprovado com o Brasil, sem empresa identificada ainda. Estes destinos continuam selecionáveis na lista de países. Uma consulta vazia comprova só o resultado daquela consulta, nunca ausência de compradores.", "form-hint"),
     r.exploration ? text("p", explorationText(r.exploration), "form-hint") : null,
     ...(list.length ? (() => {
       // Todos os mercados (sem corte), com filtro por país ou produto.
@@ -5614,25 +5614,26 @@ function prospectStart(fixedMarket = null) {
   city.onChange(() => coverage());
   const natBox = el("div", { class: "form-grid" }, region.node, city.node, radius.node);
   // Internacional: país (todos os países da base; a cobertura das fontes aparece abaixo, sem esconder país).
-  // Internacional: só destinos com evidência oficial de comércio do produto escolhido com o Brasil (mesma regra do
-  // servidor e da pesquisa automática). Sem dados, nunca a lista inteira de países: o estado aparece abaixo do campo.
+  // Internacional: todos os destinos com evidência oficial de comércio da commodity com o Brasil (mesma regra do servidor
+  // e da pesquisa automática); empresas identificadas só ordenam e aparecem como indicação. Sem dados, nunca a lista
+  // inteira de países: o estado aparece abaixo do campo.
   let dest = null, destSeq = 0, destKey = "", destTimer = null, destTries = 0;
-  const country = comboBox({ label: "País de destino", name: "country", placeholder: "Digite para buscar entre os destinos com empresas identificadas", load: async () => (dest?.principal ?? []).map((d) => ({ id: d.iso2, iso3: d.iso3, label: d.name, aliases: d.nameEn ? [d.nameEn] : [], dest: d })), required: true });
+  const country = comboBox({ label: "País de destino", name: "country", placeholder: "Selecione um país comprador", load: async () => (dest?.principal ?? []).map((d) => ({ id: d.iso2, iso3: d.iso3, label: d.name, aliases: d.nameEn ? [d.nameEn] : [], hint: d.identified ? "empresas identificadas" : "sem empresa identificada ainda", dest: d })), required: true });
   const destBox = el("div", { class: "destinations-status", "aria-live": "polite" });
   // Sentido país → commodities: o país primeiro (países com alguma commodity disponível), depois a commodity.
   let startBy = "commodity", avail = null;
   const startSel = select("Começar por", "startBy", [["commodity", "Commodity"], ["country", "País"]], startBy);
   const firstBox = el("div", { class: "availability-country", "aria-live": "polite" });
   const countryFirst = comboBox({
-    label: "País", name: "countryFirst", placeholder: "Digite para buscar entre os países disponíveis",
+    label: "País", name: "countryFirst", placeholder: "Selecione um país comprador",
     load: async () => {
       avail ??= await api("/api/prospect/availability", "POST", {});
       const r = avail;
-      if (r.state !== "ready") {
-        firstBox.replaceChildren(text("p", r.message ?? `Preparando os mercados compradores${r.progressText ? ` (${r.progressText})` : ""}.`, "form-hint"), ...(r.catchUp ? [text("small", catchUpText(r.catchUp))] : []));
+      if (r.state !== "ready" || r.preparing) {
+        if (r.state !== "ready") firstBox.replaceChildren(text("p", r.message ?? `Preparando os mercados compradores${r.progressText ? ` (${r.progressText})` : ""}.`, "form-hint"), ...(r.catchUp ? [text("small", catchUpText(r.catchUp))] : []));
         avail = null; // nova consulta na próxima abertura da lista
       }
-      return (r.countries ?? []).map((c) => ({ id: c.iso2, iso3: c.iso3, label: c.name, hint: `${c.commodities.length} commodity(ies) disponível(is)`, choice: c }));
+      return (r.countries ?? []).map((c) => ({ id: c.iso2, iso3: c.iso3, label: c.name, hint: `${c.commodities.length} commodity(ies) com comércio comprovado${c.identified ? `; ${c.identified} com empresas identificadas` : ""}`, choice: c }));
     },
   });
   countryFirst.onChange((it) => safe(async () => {
@@ -5650,7 +5651,7 @@ function prospectStart(fixedMarket = null) {
     const r = await api("/api/prospect/availability", "POST", { iso2: it.id });
     const c = r.country;
     firstBox.append(
-      text("p", c?.commodities.length ? `Com empresas identificadas em ${it.label}: ${c.commodities.map((x) => x.label).join(", ")}.` : `Nenhuma commodity com empresas identificadas em ${it.label} ainda.`, "form-hint"),
+      text("p", c?.commodities.length ? `Commodities com comércio comprovado com o Brasil em ${it.label}: ${c.commodities.map((x) => `${x.label}${x.identified ? " (empresas identificadas)" : ""}`).join(", ")}.` : `Nenhuma commodity com comércio comprovado em ${it.label} nos dados disponíveis.`, "form-hint"),
       ...availabilityLists({ investigate: c?.investigate ?? [], exploration: r.exploration, catchUp: r.catchUp }, () => ((avail = null), countryFirst.set(it, false))),
     );
     if (code) loadDestinations(true);
@@ -5747,7 +5748,8 @@ function prospectStart(fixedMarket = null) {
       const again = () => { if (destTries++ < 90) destTimer = setTimeout(() => loadDestinations(true), 4000); };
       if (r.recovery?.length) destBox.append(text("small", `Nova tentativa: ${r.recovery.join("; ")}.`));
       if (r.state === "ready") {
-        destBox.append(text("p", `${r.principal.length} destino(s) com empresas identificadas (candidatas, não compradoras confirmadas), de ${r.items.length} com comércio do produto registrado com o Brasil${list.length > 1 && !productId ? " (cada país indica o produto que o fundamenta)" : ""}.${r.incomplete && !r.preparing ? " Cobertura incompleta: pode haver outros destinos." : ""}`, "form-hint"));
+        const ids = r.identifiedSummary?.withCompanies ?? 0;
+        destBox.append(text("p", `${r.principal.length} país(es) comprador(es) com comércio do produto registrado com o Brasil${list.length > 1 && !productId ? " (cada país indica o produto que o fundamenta)" : ""}; ${ids ? `${ids} com empresas identificadas (candidatas, não compradoras confirmadas), no topo da lista` : "nenhum com empresa identificada ainda"}.${r.incomplete && !r.preparing ? " Cobertura incompleta: pode haver outros destinos." : ""}`, "form-hint"));
         if (r.preparing) {
           destBox.append(el("p", { class: "preparing" }, text("strong", "Preparando os mercados compradores: "), `os destinos comprovados aparecem conforme os dados chegam (${r.progressText}).`));
           again();
@@ -5756,10 +5758,6 @@ function prospectStart(fixedMarket = null) {
       } else if (r.state === "preparing") {
         destBox.append(el("p", { class: "preparing" }, text("strong", "Preparando os mercados compradores"), r.progressText ? text("span", ` — ${r.progressText}.`) : "…"), r.policy?.grantedVia === "written_authorization" ? text("small", "Preparação automática sob a política delimitada da autorização escrita de 2026-10-20 (automação, sem clique de pessoa).") : null);
         again();
-      } else if (r.state === "none_identified") {
-        destBox.append(el("div", { class: "callout" }, text("p", r.message)));
-        // Dados ainda chegando: a relação cresce; nova consulta a cada poucos segundos, como na preparação.
-        if (r.preparing) again();
       } else if (r.state === "needs_characteristic") {
         destBox.append(text("p", r.message, "form-hint"));
       } else {
@@ -5842,10 +5840,10 @@ function prospectStart(fixedMarket = null) {
         if (!(Number(radius.control.value) > 0)) return fail("Informe o raio.");
         Object.assign(body, { location: { region: c.uf, municipality: c.label, municipalityCode: c.id }, radius: { value: Number(radius.control.value), unit: "km" } });
       } else {
-        if (!["ready", "none_identified"].includes(dest?.state) || destBox.dataset.for !== JSON.stringify({ commodity: code })) return fail("Aguarde a lista de destinos desta commodity.");
+        if (dest?.state !== "ready" || destBox.dataset.for !== JSON.stringify({ commodity: code })) return fail("Aguarde a lista de destinos desta commodity.");
         const c = await country.resolve();
         if (!c) return fail("Escolha o país na lista.");
-        if (!(dest.principal ?? []).some((x) => x.iso2 === c.id && x.products.some((p) => p.productId === productId))) return fail("Escolha um destino da lista (empresas identificadas). Os demais estão em \"Mercados a investigar\".");
+        if (!(dest.principal ?? []).some((x) => x.iso2 === c.id && x.products.some((p) => p.productId === productId))) return fail("Escolha um país comprador da lista.");
         Object.assign(body, { location: { iso3: c.iso3 } });
       }
       submit.disabled = true;

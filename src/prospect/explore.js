@@ -2,7 +2,7 @@
 // pesquisa vigente e de limites definidos, inicia pesquisas internacionais em combinações com comércio comprovado e sem
 // empresa identificada, para descobrir candidatas nas fontes pertinentes. Uma de cada vez; no máximo explorationPerDay
 // por dia (política; padrão 6); progresso e último resultado persistidos; sem política, não faz nada. Usa a identidade de
-// automação (sem conta de acesso). Pesquisa que acha candidatas leva a combinação para a seleção principal; consulta sem
+// automação (sem conta de acesso). Pesquisa que acha candidatas põe o destino no topo da seleção principal; consulta sem
 // estabelecimentos ou falha volta para "a investigar" com nova tentativa no prazo registrado (src/availability.js).
 // Nada de contato, ficha, campanha ativa ou envio: a pesquisa é a mesma do botão, com as mesmas regras.
 import { statement as s, now } from "../store.js";
@@ -32,7 +32,17 @@ async function marker(env, tenant) {
   return `${a?.n}|${a?.m}|${j?.n}|${j?.m}|${v?.n}|${v?.f}`;
 }
 
+// Chave persistente (automation_switches, migração 0049): sem a linha ou com enabled=0, desligada. Nenhuma rota, tela,
+// reinício ou preparação automática da política grava nela; desligada não revoga a política nem as pesquisas por pessoa.
+export async function explorationSwitch(env) {
+  const r = await s(env, "SELECT enabled,reason,set_by,set_at FROM automation_switches WHERE name=?", EXPLORATION).first().catch(() => null);
+  return { enabled: r?.enabled === 1, reason: r?.reason ?? "sem registro de ativação: desligada", setBy: r?.set_by ?? null, setAt: r?.set_at ?? null };
+}
+
 export async function exploreTick(env, tenant, { at = now(), deps = {}, idleRecheckMs = 6 * 3600_000, leaseMs = 4 * 60_000 } = {}) {
+  // Desligada: nada é lido além da chave, nada é gravado, nenhuma pesquisa começa.
+  const sw = await explorationSwitch(env);
+  if (!sw.enabled) return { state: "switched_off", reason: sw.reason };
   const policy = await currentPolicy(env, tenant);
   const actor = await explorerActor(env, tenant);
   if (!policy || !actor) return { state: "no_policy" };
@@ -67,7 +77,7 @@ export async function exploreTick(env, tenant, { at = now(), deps = {}, idleRech
     for (const d of dest.items) for (const pr of d.products) pr.availability.sourcesToTry ??= dest.investigate.find((x) => x.iso3 === d.iso3 && x.productId === pr.productId)?.sourcesToTry ?? [];
     // Só mercados a investigar (exploração de mercados novos); as identificadas ficam com a pesquisa automática do botão.
     const list = rankPairs(dest, jobsByKey, at).list.filter((x) => x.pr.availability.tier === "investigate");
-    const counts = { toInvestigate: dest.investigate.length, due: list.length, today, perDay: lim.perDay, identified: dest.principal.length, preparing: !!dest.preparing };
+    const counts = { toInvestigate: dest.investigate.length, due: list.length, today, perDay: lim.perDay, identified: dest.identifiedSummary.withCompanies, preparing: !!dest.preparing };
     if (!list.length) {
       await record(env, at, { state: "none", ...counts, marker: mk, at });
       return { state: "none", ...counts };

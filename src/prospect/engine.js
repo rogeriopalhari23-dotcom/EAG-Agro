@@ -1195,7 +1195,7 @@ const INTERNATIONAL = {
 };
 
 // Avaliação da combinação para a seleção (src/availability.js), registrada no andamento da pesquisa.
-const OUTCOME_TEXT = { found: "empresas identificadas: a combinação fica na seleção principal (candidatas, não compradoras confirmadas)", empty: "consultas sem estabelecimentos: a combinação fica em \"Mercados a investigar\"; nada se conclui sobre compradores", technical: "pendência técnica: a combinação fica em \"Mercados a investigar\"; nada se conclui sobre compradores" };
+const OUTCOME_TEXT = { found: "empresas identificadas: a combinação sobe na ordem da seleção principal (candidatas, não compradoras confirmadas)", empty: "consultas sem estabelecimentos: o destino continua na seleção principal e a combinação segue em \"Mercados a investigar\"; nada se conclui sobre compradores", technical: "pendência técnica: o destino continua na seleção principal e a combinação segue em \"Mercados a investigar\"; nada se conclui sobre compradores" };
 async function assess(ctx, summary) {
   const a = await recordAssessment(ctx.env, { job: ctx.job, input: ctx.input, state: ctx.state, summary, profile: ctx.profile, policy: ctx.policy, at: ctx.now() });
   ctx.log("report", a.outcome === "found" ? "ok" : "partial", `Disponibilidade: ${OUTCOME_TEXT[a.outcome]}${a.origin === "simulated" ? " (execução simulada: registrada, sem efeito sobre os mercados reais)" : ""}. ${a.reason}${a.outcome === "found" ? "" : ` Nova tentativa automática a partir de ${a.reviewAfter.slice(0, 16).replace("T", " ")} UTC${a.quality ? ` (busca de qualidade ${a.quality === "complete" ? "completa: registro ou diretório da atividade" : "parcial: só o mapa colaborativo"})` : ""}, ou antes com fonte ou regra nova ou empresa compatível cadastrada.`}`);

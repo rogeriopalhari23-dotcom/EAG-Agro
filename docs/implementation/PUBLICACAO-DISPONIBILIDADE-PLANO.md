@@ -1,6 +1,6 @@
 # Plano de publicação: disponibilidade (empresas identificadas × mercados a investigar), exploração em segundo plano e retomada dos resumos
 
-Preparado em 2026-10-22, revisado no mesmo dia. **Não executado.** Aguarda revisão e autorização. Nada foi publicado, nenhuma migração remota foi aplicada e nenhuma pesquisa foi feita em produção.
+Preparado em 2026-10-22, revisado no mesmo dia. Publicação autorizada em 22/10 com a exploração em segundo plano desligada; execução registrada em EVIDENCIAS.md.
 
 ## 1. O que vai
 
@@ -10,10 +10,12 @@ Preparado em 2026-10-22, revisado no mesmo dia. **Não executado.** Aguarda revi
 
 **Seleção e disponibilidade** (`src/availability.js`). Uma relação país × produto, nos dois sentidos (commodity → destinos e destino → commodities). Vale para o formulário, o Radar Internacional, a criação da pesquisa, a pesquisa automática e a exploração em segundo plano.
 
+**Regra definitiva (revisão de 22/10):** a seleção principal ("Selecione um país comprador") mostra todo destino com evidência de comércio da commodity com o Brasil. Pesquisa vazia, falha ou ainda não feita nunca retira o destino.
+
 | Grupo | Conteúdo | Onde aparece |
 | --- | --- | --- |
-| **Empresas identificadas** | Candidatas reais de uma pesquisa, ou empresas já cadastradas no país relacionadas ao produto ou com atividade compatível, inclusive de outra commodity. São mostradas como candidatas, não como compradoras confirmadas | Seleção principal |
-| **Mercados a investigar** | Comércio comprovado sem candidata: ainda não pesquisado, consultas sem estabelecimentos, pendência técnica ou sem fonte de empresas | Seção recolhida, com filtro |
+| **Empresas identificadas** | Candidatas reais de uma pesquisa, ou empresas já cadastradas no país relacionadas ao produto ou com atividade compatível, inclusive de outra commodity. São mostradas como candidatas, não como compradoras confirmadas | Indicação na seleção principal, no topo da ordem |
+| **Mercados a investigar** | Comércio comprovado sem candidata: ainda não pesquisado, consultas sem estabelecimentos, pendência técnica ou sem fonte de empresas | Seção recolhida, com filtro; o destino continua na seleção principal |
 
 Para cada mercado a investigar aparecem:
 - o fundamento da inclusão;
@@ -48,7 +50,10 @@ Regras de nova tentativa:
 - sem pendência, uma verificação a cada 6 horas ou com lista nova;
 - na tela, no máximo 10 por consulta.
 
-**Migração 0049:** só cria `market_assessments` e `maintenance_leases`.
+**Migração 0049:**
+- cria `market_assessments` e `maintenance_leases`;
+- cria `automation_switches` e grava `market_exploration` **desligada**, antes do primeiro ciclo do Worker novo;
+- grava o alpha-2 dos territórios atuais que o seed deixou sem código: GP, GF, RE e VI.
 - Ensaio na cópia da produção (backup de 22/10 mais 0045–0049): contagens mantidas, `integrity_check` ok, 0 pendências de chave estrangeira.
 - A reversão para `a74acf8e` é compatível.
 
@@ -57,12 +62,11 @@ Regras de nova tentativa:
 ## 2. O que acontece sozinho depois da publicação (para revisão)
 
 1. **Resumos:** a retomada começa no primeiro ciclo. Só lê o R2 e não faz chamada externa. Estimativa de cerca de 2 horas.
-2. **Exploração:** começa no primeiro ciclo em que houver política vigente. Em produção já há a política v1 (22/10).
+2. **Exploração: desligada** (decisão de 22/10). A chave persistente `automation_switches.market_exploration=0` é gravada pela 0049 antes do deploy; o cron só lê a chave e não inicia pesquisa. Nenhuma tela, reinício ou preparação da política grava nela. Desligar não revoga a política; as pesquisas por pessoa e os botões de pesquisa automática continuam. Ligar exige decisão registrada e uma mudança explícita da chave. O comportamento abaixo vale só se ela for ligada:
    - Até 6 pesquisas internacionais por dia, uma por vez, sobre mercados a investigar, nesta ordem: primeiro os que têm registro oficial ou diretório (ex.: França, Noruega, Alemanha para café, Chile para ração), depois pelo valor de comércio.
    - **Cada pesquisa consulta fontes externas gratuitas:** registros oficiais, diretórios e OpenStreetMap. O OpenStreetMap recusa a Cloudflare, então nesses casos a fonte fica como pendência técnica.
    - **Cada pesquisa também grava:** cadastra candidatas em descoberta, faz a triagem de sanções e grava a avaliação. Isso está dentro da política: descoberta, consulta cadastral, triagem e cadastro em descoberta, sem contato.
    - **Nada de** contato, ficha, campanha ativa ou envio. Campanhas criadas pela seleção nascem em rascunho, como já acontece hoje.
-   - **Se a revisão preferir não ligar a exploração na publicação:** gravar `international.exploration: false` numa nova versão da política antes de publicar, ou publicar com o limite diário menor. Exige decisão.
 3. **Avaliações:** só nascem de pesquisas, sejam da exploração, do botão ou de uma pessoa.
 
 ## 3. Passos (com autorização)
@@ -76,8 +80,8 @@ Regras de nova tentativa:
 4. **Publicação:** `npm run deploy`. Se o consumidor da fila repetir o erro 10013: conferir pela API, só leitura, e não repetir o deploy.
 5. **Conferência:**
    - **Resumos:** `maintenance_leases` (`trade_summary_catchup`) com `remaining` caindo.
-   - **Exploração:** `market_exploration` com o último ciclo, `today`/`perDay`, nenhuma falha e uma pesquisa por vez.
-   - **Pesquisas:** `prospect_jobs` com `created_by='system-exploration'`.
+   - **Exploração:** `automation_switches` com `enabled=0`; nenhuma linha `market_exploration` em `maintenance_leases`; tela com "Exploração em segundo plano: desligada".
+   - **Pesquisas:** nenhum `prospect_jobs` com `created_by='system-exploration'`.
    - **Estado comercial e ponte:** os mesmos de antes, e uma leitura bem-sucedida da ponte depois da publicação.
    - **Gravações:** registradas como tal, sem chamar a conferência de "só leitura".
 

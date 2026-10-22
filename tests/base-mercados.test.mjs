@@ -52,6 +52,16 @@ function expected(X, hs6, countries) {
   for (const [iso3, c] of Object.entries(X.comtrade)) if (c.lines.some(([h, y, v]) => hs.has(h) && y >= minYear && v > 0)) out.set(iso3, out.has(iso3) ? "MDIC+Comtrade" : "Comtrade");
   return new Map([...out].filter(([iso3]) => countries.has(iso3)));
 }
+// O que o extrato registra e as restrições vigentes deixam de fora: código sem país na base (agregados, Brasil) e
+// declaração da Comtrade anterior ao ano mínimo (sem linha recente nem MDIC). → { outside: [iso3], oldOnly: [iso3] }
+function excluded(X, hs6, countries) {
+  const hs = new Set(hs6);
+  const minYear = new Date().getUTCFullYear() - 3 - 1;
+  const any = new Set(), recent = new Set();
+  for (const [iso3, c] of Object.entries(X.mdic)) if (c.lines.some(([ncm, , fob, kg]) => hs.has(X.names[ncm]?.[0] ?? ncm.slice(0, 6)) && (fob > 0 || kg > 0))) (any.add(iso3), recent.add(iso3));
+  for (const [iso3, c] of Object.entries(X.comtrade)) for (const [h, y, v] of c.lines) if (hs.has(h) && v > 0) (any.add(iso3), y >= minYear && recent.add(iso3));
+  return { outside: [...any].filter((k) => !countries.has(k)), oldOnly: [...any].filter((k) => countries.has(k) && !recent.has(k)) };
+}
 
 test("extrato da base pública presente e identificado (origem, versões, natureza)", { skip: !EXTRACT && "extrato ausente" }, () => {
   assert.match(EXTRACT.meta.origem, /Produção, somente leitura/);
@@ -68,12 +78,14 @@ test("catálogo inteiro: destinos do formulário = destinos calculados do extrat
     const r = await dest({ commodity: c });
     const hs = X.meta.subposicoes.filter((h) => Object.entries(X.meta.produtos).some(([pid, codes]) => catalog.products.find((p) => p.id === pid)?.commodity === c && codes.includes(h)));
     const exp = expected(X, hs, countries);
-    // Destino comprovado = seleção principal + fora dela com motivo (sem fonte de empresas coberta, retirado por busca
-    // vazia): o filtro de disponibilidade (2026-10-22) não apaga a evidência de comércio.
-    const got = new Set([...r.items, ...(r.coverageGaps ?? []), ...(r.withdrawn ?? [])].map((x) => x.iso3));
+    // Regra definitiva (2026-10-22): a caixa principal mostra TODO destino comprovado da commodity; empresa
+    // identificada, pesquisa vazia, falha ou sem fonte de empresas não tiram nem acrescentam país.
+    const got = new Set((r.principal ?? []).map((x) => x.iso3));
+    assert.deepEqual([...got].sort(), r.items.map((x) => x.iso3).sort(), `${c}: caixa principal = destinos comprovados`);
     const missing = [...exp.keys()].filter((k) => !got.has(k));
     const extra = [...got].filter((k) => !exp.has(k));
-    report.push(`${c}: extrato ${exp.size}, formulário ${got.size}${missing.length ? `, faltando ${missing.join(",")}` : ""}${extra.length ? `, a mais ${extra.join(",")}` : ""}`);
+    const ex = excluded(X, hs, countries);
+    report.push(`${c}: extrato ${exp.size}, formulário ${got.size}${ex.outside.length ? `, fora da base de países ${ex.outside.join(",")}` : ""}${ex.oldOnly.length ? `, só Comtrade anterior ao ano mínimo ${ex.oldOnly.join(",")}` : ""}${missing.length ? `, faltando ${missing.join(",")}` : ""}${extra.length ? `, a mais ${extra.join(",")}` : ""}`);
     assert.deepEqual(missing, [], `${c}: destinos do extrato que o formulário não mostrou`);
     assert.deepEqual(extra, [], `${c}: país mostrado sem evidência no extrato`);
     // Commodities distintas não se misturam: cada país é fundamentado por produto da própria commodity.
