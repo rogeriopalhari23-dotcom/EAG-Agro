@@ -3730,3 +3730,57 @@ A consulta de leitura à API mostrou o consumidor existente intacto: `eag-compas
 - seção recolhida com motivo e histórico;
 - reavaliação por atualização ou vencimento;
 - investigação dos casos Etanol — África do Sul e Milho — Albânia.
+
+## 2026-10-22 — Filtro de disponibilidade país × commodity e retomada automática dos resumos (na branch, não publicado)
+
+**Regra.** Há uma relação só (`src/availability.js`), nos dois sentidos: commodity → países e país → commodities ("Começar por: País"). Ela vale para o formulário, o Radar Internacional, a criação da pesquisa e a pesquisa automática. Cada pesquisa internacional grava uma avaliação (`market_assessments`, migração 0049) com motivo, fontes, data e prazo:
+
+| Resultado | Efeito |
+| --- | --- |
+| Empresas encontradas, inclusive já cadastradas de outra commodity com atividade compatível | Disponível |
+| Busca real concluída sem candidatas (todas as fontes aplicáveis responderam) | Retirada temporariamente da seleção principal. Fica na seção recolhida, com "Reavaliar agora" |
+| Falha, fonte pendente, pesquisa incompleta ou busca não aberta | Pendência técnica: continua disponível. A automática espera 24 h antes de nova tentativa |
+| Ainda não pesquisada, com evidência e fonte de empresas | Disponível |
+| Evidência sem fonte de empresas | Seção "Sem fonte de empresas coberta" (limitação de cobertura) |
+| Execução simulada | Registrada como `simulated`, sem efeito |
+
+**Reinclusão** de uma combinação retirada acontece em quatro casos:
+- prazo de 90 dias vencido;
+- fonte ou regra nova (impressão da consulta);
+- empresa compatível cadastrada;
+- pedido de pessoa.
+
+Nada é apagado: a avaliação nova encerra a anterior.
+
+Produtos da mesma commodity com a **mesma consulta** no país compartilham o resultado, com a origem indicada (ex.: Milho GMO e não GMO). Esse defeito foi achado na própria demonstração: Albânia aparecia retirada e, ao mesmo tempo, na lista do milho pelo outro produto.
+
+**Resumos (produção tinha 21 de 250 do MDIC às 02:48Z):**
+- retomada no cron de 5 minutos, em lotes de 20, com lease, cursor e falha registrada (`maintenance_leases`);
+- objeto ausente no R2 não interrompe o lote;
+- sem pendência, nova verificação a cada 6 horas ou com lista nova, para proteger o limite de leituras do D1;
+- resumo ausente é "em preparação", nunca ausência.
+
+**Erro 10013 da publicação anterior.** O consumidor da fila `eag-compass-async` continua ligado ao Worker, com as mesmas configurações (consulta de leitura à API). A fila leva `trade_job` e `prospect_job`. O último trabalho foi processado em 20/10, então nada passou pela fila desde a publicação. O cron de 5 minutos retoma prospecção cuja mensagem se perdeu. A comprovação por execução real fica para a primeira prospecção ou rotina mensal.
+
+**Casos dos prints** (os dois aconteceram só na execução local real; produção tem 0 prospecções e nada é retirado lá):
+- **Milho — Albânia:** a única fonte aplicável é o OpenStreetMap (`industrial=feed` e etiquetas de produto). Em 22/10, a consulta registrada respondeu de novo com HTTP 200 e 0 elementos (base OSM 2026-10-22T03:03Z). É busca real válida, sem candidatas.
+- **Etanol — África do Sul:** a regra consulta só etiquetas de produto (`product=ethanol|alcohol|…`). Respondeu com HTTP 200 e 0 elementos. Uma consulta de controle fora da regra encontrou 10 destilarias mapeadas como `craft=distillery`.
+  - O vazio é real para a regra vigente, que tem cobertura fraca.
+  - Uma regra nova reabre a combinação pela impressão da consulta. A regra não foi mudada nesta etapa.
+
+**Demonstração no Edge** (execução local REAL, commit `f49af40`, banco em memória isolado, fontes reais), pelo formulário:
+- Milho GMO — Albânia: 0 candidatas, retirada.
+- Etanol — África do Sul: 0 candidatas, retirada.
+- Soja GMO — Chile: 148 candidatas (LENAA 147, OpenStreetMap 1), "empresas encontradas".
+- Milho → países: sem Albânia, que aparece em "Retiradas temporariamente" (GMO e não GMO). Etanol → países: sem África do Sul.
+- Albânia → commodities: sem milho. Chile → commodities: com soja, e o país já vem escolhido.
+- Sem erro de JavaScript.
+- No relatório da execução, o OpenStreetMap respondeu 502 e foi retentado; essa falha aparece como tal.
+
+**Testes:**
+- `tests/disponibilidade.test.mjs` (9);
+- testes de destinos ajustados à regra nova: destino sem fonte de empresas sai para a seção recolhida, com a evidência mantida;
+- suíte completa 583 + 2 + 37, 0 falhas;
+- `npm run test:ui` OK.
+
+**Publicação:** plano em `PUBLICACAO-DISPONIBILIDADE-PLANO.md`, não executado. A 0049 só cria tabelas; ensaio na cópia da produção ok; reversão para `a74acf8e`, compatível.
