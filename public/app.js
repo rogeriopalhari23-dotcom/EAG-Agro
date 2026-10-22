@@ -5561,8 +5561,14 @@ function availabilityLists(r, reload) {
   if (list.length || r.exploration) out.push(details(`Mercados a investigar (${list.length})`, el("div", { class: "availability-investigate" },
     text("p", "Comércio comprovado com o Brasil, mas nenhuma empresa identificada ainda. Uma consulta vazia comprova só o resultado daquela consulta, nunca ausência de compradores.", "form-hint"),
     r.exploration ? text("p", explorationText(r.exploration), "form-hint") : null,
-    list.length ? el("ul", { class: "compact-list" }, ...list.slice(0, 80).map((w) => investigateItem(w, reload))) : null,
-    list.length > 80 ? text("small", `Mostrando 80 de ${list.length}.`) : null,
+    ...(list.length ? (() => {
+      // Todos os mercados (sem corte), com filtro por país ou produto.
+      const ul = el("ul", { class: "compact-list" }, ...list.map((w) => investigateItem(w, reload)));
+      const norm = (x) => String(x).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+      const q = el("input", { type: "search", class: "investigate-filter", placeholder: "Filtrar por país ou produto", "aria-label": "Filtrar mercados a investigar" });
+      q.addEventListener("input", () => { const v = norm(q.value.trim()); for (const li of ul.children) li.hidden = !!v && !norm(li.firstChild?.textContent ?? "").includes(v); });
+      return [q, ul];
+    })() : []),
   )));
   if (r.catchUp && (r.catchUp.remaining || r.catchUp.error)) out.push(text("small", catchUpText(r.catchUp)));
   return out;
