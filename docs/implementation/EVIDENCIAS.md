@@ -3784,3 +3784,49 @@ Produtos da mesma commodity com a **mesma consulta** no país compartilham o res
 - `npm run test:ui` OK.
 
 **Publicação:** plano em `PUBLICACAO-DISPONIBILIDADE-PLANO.md`, não executado. A 0049 só cria tabelas; ensaio na cópia da produção ok; reversão para `a74acf8e`, compatível.
+
+## 2026-10-22 — Mercado comprador × empresas identificadas; mercados a investigar; Café — Martinica (na branch, não publicado)
+
+**Café — Martinica, investigação da execução do print** (execução local real, banco isolado):
+- **Fundamento da inclusão:** o MDIC registra exportações do Brasil para a Martinica de SH 090111, 090112, 090121 e 090122 em 2025-09 a 2026-08.
+- **Comtrade "sem simulação configurada":** a Martinica não está no extrato da produção usado pela prévia, que tem 99 países na Comtrade. É lacuna do extrato, não resultado. O texto passou a dizer isso.
+- **Consultas de empresas realmente feitas:** uma só, no OpenStreetMap.
+  - A consulta exigia `admin_level=2`, e a Martinica está nos níveis 3 e 4 (`ISO3166-2=FR-972`, conferido no mapa em 22/10). A consulta buscou numa área inexistente e respondeu 0 sem erro.
+  - **Motivo do resultado vazio:** defeito da consulta, não ausência de estabelecimentos.
+  - Fonte pertinente não consultada: o registro oficial francês, que cobre os departamentos ultramarinos. Em 22/10, a API mostrava 15 empresas ativas com NAF 10.83Z e 8 com 46.37Z com estabelecimento no departamento 972.
+- **Depois da correção** (mesma prévia real, pelo "Pesquisar agora" do item em "Mercados a investigar"):
+  - 15 candidatas do registro francês, cada uma com SIREN, cidade do estabelecimento na Martinica e página pública (`annuaire-entreprises.data.gouv.fr/entreprise/<SIREN>`). Ex.: La Tivolienne (Fort-de-France), Café Antilles (Le Lamentin), Rama Global (Le Carbet), Soprocaf (Fort-de-France).
+  - OpenStreetMap com a área correta: 0 torrefações mapeadas; os 2 estabelecimentos `shop=coffee` são varejo e ficam de fora.
+  - O registro francês respondeu "indisponível" duas vezes (limite por IP) e respondeu na terceira.
+  - A combinação passou para a seleção principal como "empresas identificadas" (candidatas, não compradoras), nos dois sentidos.
+
+**Regras** (`src/availability.js`, `src/prospect/explore.js`, `src/prospect/rotation.js`):
+
+| Situação | Onde fica |
+| --- | --- |
+| Candidatas reais, ou empresa já cadastrada relacionada ou compatível (inclusive de outra commodity) | Seleção principal ("empresas identificadas") |
+| Comércio comprovado sem candidata | "Mercados a investigar", com fundamento, fontes consultadas (cobertura e qualidade), resultado e próxima tentativa |
+| Consulta sem estabelecimentos | Nova tentativa em 90 dias com registro ou diretório, 30 dias só com o mapa, ou já com fonte ou regra nova |
+| Falha técnica | Espera crescente, de 24 h até 30 dias |
+| Execução simulada | Registrada como tal, sem efeito |
+
+**Exploração em segundo plano** (cron):
+- só com política vigente;
+- uma pesquisa por vez, até 6 por dia;
+- identidade de automação `system-exploration`, sem conta de acesso;
+- progresso e falha registrados.
+
+Na demonstração, a exploração iniciou sozinha 4 pesquisas, entre elas Soja × Noruega.
+
+**Pesquisa automática:** empresas identificadas sem pesquisa própria vêm primeiro, depois os mercados nunca pesquisados, por qualidade da fonte e valor de comércio. A classificação fiscal automática acontece antes de escolher.
+
+**Demonstração no Edge:** execução local real, commit `33c41da` mais os ajustes de texto de `b83622f`, banco em memória isolado, fontes reais. Todas as verificações OK, sem erro de JavaScript.
+
+**Testes:**
+- `tests/disponibilidade.test.mjs` (12);
+- testes de destinos, de pesquisa automática e de reaproveitamento ajustados à regra nova;
+- teste da ficha de identificação sem o falso positivo do token aleatório do descadastro;
+- suíte completa 586 + 2 + 37, 0 falhas;
+- `npm run test:ui` OK.
+
+**Publicação:** `PUBLICACAO-DISPONIBILIDADE-PLANO.md`, revisado e não executado. Para revisão: depois de publicada, a exploração começa sozinha, até 6 pesquisas por dia, com consultas externas gratuitas e cadastro em descoberta dentro da política.
