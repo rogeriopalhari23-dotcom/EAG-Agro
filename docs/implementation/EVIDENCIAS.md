@@ -3859,3 +3859,50 @@ Na demonstração, a exploração iniciou sozinha 4 pesquisas, entre elas Soja �
 **Exploração em segundo plano:** chave persistente `automation_switches` (0049) gravada desligada. Sem linha ou com `enabled=0` não lê nem grava nada. Nenhuma rota, tela, reinício ou preparação da política grava nela. A política, as pesquisas por pessoa e a pesquisa automática dos botões continuam.
 
 **Testes:** `tests/disponibilidade.test.mjs` (14); suíte completa 588 + 2 + 37, 0 falhas; teste de interface OK.
+
+## 2026-10-22 — Publicação da disponibilidade (0049), com a exploração em segundo plano desligada
+
+Autorizada por instrução escrita de 22/10, com a correção da seleção antes (commit `7f7a612`).
+
+**Antes:**
+- produção estava no Worker `a74acf8e`, migrações até a 0048;
+- única migração pendente: 0049.
+
+**Backup** em `C:\Users\Roger\eag-compass-backups\d1-remoto-antes-0049-20261022\eag_compass.sql`:
+- SHA-256 `138652798e0a52e2da381eb4ab5b5aeca76ef41ec4891e436bef3711b78f4de2`;
+- marcador do Time Travel `0000084f-00000104-0000510c-19129be6978fc13432f0efc538a03ed0`.
+
+**Ensaio na cópia do backup:**
+- só três tabelas novas e o alpha-2 de GP, GF, RE e VI;
+- chave `market_exploration=0`;
+- `integrity_check` ok e 0 pendências de chave estrangeira.
+
+**Migração 0049 aplicada** (`npm run db:migrate:remote`). A chave da exploração estava gravada desligada antes do deploy.
+
+**Publicação:**
+1. Versão `a9ee20eb` (código `7f7a612`).
+2. Na conferência, a lista de destinos foi cancelada aos 20,6 s (log do Worker). Com 558 resumos pendentes, cada consulta refazia até 30 resumos do R2, cerca de 1,3 s cada.
+3. Correção `719b444`: orçamento de tempo de 4 s comum à consulta e 6 s para "Tentar de novo"; o restante fica com a retomada do cron. Teste novo com R2 lento; suíte completa 589 + 2 + 37, 0 falhas.
+4. Publicada como versão `12e3c465`.
+
+**Conferência depois da publicação:**
+- **Exploração:** `automation_switches.enabled=0`. Nenhuma linha `market_exploration` em `maintenance_leases` e nenhum `prospect_jobs` com `created_by='system-exploration'`. Nenhuma pesquisa criada depois da publicação.
+- **Na tela:** "Exploração em segundo plano: desligada". A data mostrada é a do registro gravado na migração (`2026-10-22T00:00Z`, que aparece como 21/10 20:00 no horário de Brasília).
+- **Radar Internacional → Soja:** campo "Selecione um país comprador" com 63 países, enquanto os resumos ainda estão em preparação; "Mercados a investigar (126)" acessível.
+- **Tempo da lista:** 16,0 s e 12,9 s; dentro do limite de 20 s da tela, mas perto dele.
+- **Resumos:** a retomada avançou 558 → 538 → … → 341, 20 por ciclo, sem erro.
+- **Estado comercial:** igual.
+  - 37 empresas, 13 fichas, 29 versões, 7 aprovações, 28 envios, 3 supressões, T11 0;
+  - canais planejados; campanhas: 3 em rascunho e 1 encerrada;
+  - conteúdo sensível com o mesmo hash;
+  - só as tabelas novas diferem.
+- **Ponte:** lendo; última leitura bem-sucedida às 16:06:25Z.
+
+**Gravações feitas pelas conferências** (registradas como tal):
+- a abertura de Prospecção e do Radar Internacional leu a política vigente e refez resumos dos dados guardados;
+- pediu a atualização de listas vencidas de destinos comprovados, no fluxo existente (R12.15, até 3 por consulta): 7 versões manuais (DEU, DZA, BEL, CMR, CHN, CYP, KOR);
+- nenhuma pesquisa iniciada; nenhum lote local importado.
+
+**Reversão:**
+- código: `npx wrangler rollback a74acf8e-79ef-4e01-94b9-3f5ca3d21e60`, compatível (o código anterior ignora as tabelas da 0049; o alpha-2 novo só acrescenta destinos comprovados);
+- banco: nada a desfazer; restauração nunca automática.

@@ -1,6 +1,6 @@
 # Plano de publicação: disponibilidade (empresas identificadas × mercados a investigar), exploração em segundo plano e retomada dos resumos
 
-Preparado em 2026-10-22, revisado no mesmo dia. Publicação autorizada em 22/10 com a exploração em segundo plano desligada; execução registrada em EVIDENCIAS.md.
+Preparado em 2026-10-22, revisado no mesmo dia. **Executado em 22/10:** migração 0049 aplicada; Worker `12e3c465` (código `719b444`); exploração em segundo plano desligada. Registro em EVIDENCIAS.md.
 
 ## 1. O que vai
 
