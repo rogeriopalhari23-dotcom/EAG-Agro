@@ -14,7 +14,7 @@ import { securityHeaders } from "../src/http.js";
 import { provenanceHeaders } from "../src/provenance.js";
 import { internalCaller } from "../src/worker.js";
 import { tick } from "../src/prospect/engine.js";
-import { rebuildSummaries } from "../src/importers.js";
+import { summaryCatchUp } from "../src/importers.js";
 import { simulatedWorld, nearestMunicipality } from "./helpers/simulated-world.mjs";
 import { sources as tradeSources, keepCountries, tradeParams, driver, AGRI, rec, MDIC_ROWS } from "./helpers/trade.mjs";
 
@@ -205,10 +205,8 @@ setInterval(async () => {
     // Fila da lista mensal (na produção, a fila assíncrona da Cloudflare): pedidos da prospecção avançam aqui.
     await tradeDriver.sweep();
     await tradeDriver.drain(400);
-    // Resumos por país refeitos dos objetos já guardados (como no cron diário), nas duas janelas.
-    await rebuildSummaries(ctx.env, "eag-internal", { limit: 60 });
-    await rebuildSummaries(ctx.env, "eag-internal", { limit: 60, months: 24 });
-    await rebuildSummaries(ctx.env, "eag-internal", { limit: 60, comtradeHistory: true });
+    // Resumos por país que faltam: a mesma retomada do cron de 5 minutos da produção (lote, lease, cursor, falha registrada).
+    await summaryCatchUp(ctx.env, "eag-internal", { batch: 60 });
   } catch (e) {
     console.error("ciclo da prospecção:", e.message);
   } finally {
